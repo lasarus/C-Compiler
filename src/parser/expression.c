@@ -168,13 +168,6 @@ struct type *calculate_type(struct expr *expr) {
 		return type;
 	}
 
-	case E_ARROW_OPERATOR: {
-		struct type *type;
-		int offset;
-		type_select(type_deref(expr->member.lhs->data_type), expr->member.member_idx, &offset, &type);
-		return type;
-	}
-
 	case E_CONDITIONAL:
 		assert(expr->args[1]->data_type == expr->args[2]->data_type);
 		return expr->args[1]->data_type;
@@ -461,13 +454,6 @@ struct lvalue expression_to_lvalue(struct expr *expr) {
 		default:
 			NOTIMP();
 		}
-	} break;
-
-	case E_ARROW_OPERATOR: {
-		var_id lhs = expression_to_ir(expr->member.lhs);
-		var_id member_address = new_variable(type_pointer(expr->data_type), 1);
-		IR_PUSH_GET_MEMBER(member_address, lhs, expr->member.member_idx);
-		return (struct lvalue) { LVALUE_PTR, member_address };
 	} break;
 
 	case E_SYMBOL: {
@@ -841,15 +827,6 @@ var_id expression_to_ir(struct expr *expr) {
 		return res;
 	} break;
 
-	case E_ARROW_OPERATOR: {
-		var_id lhs = expression_to_ir(expr->member.lhs);
-		var_id member_address = new_variable(type_pointer(expr->data_type), 1);
-		IR_PUSH_GET_MEMBER(member_address, lhs, expr->member.member_idx);
-		var_id res = new_variable(expr->data_type, 1);
-		IR_PUSH_LOAD(res, member_address);
-		return res;
-	} break;
-
 	case E_CONDITIONAL: {
 		var_id condition = expression_to_ir(expr->args[0]);
 		var_id res = new_variable(expr->data_type, 1);
@@ -1152,8 +1129,10 @@ struct expr *parse_postfix_expression(int starts_with_lpar, struct expr *startin
 			int idx = type_member_idx(lhs_type, identifier);
 
 			lhs = expr_new((struct expr) {
-					.type = E_ARROW_OPERATOR,
-					.member = { lhs, idx }
+					.type = E_DOT_OPERATOR,
+					.member = {
+						EXPR_ARGS(E_INDIRECTION, lhs), idx
+					}
 				});
 		} else if (TACCEPT(T_INC)) {
 			lhs = expr_new((struct expr) {
@@ -1620,7 +1599,6 @@ int evaluate_constant_expression(struct expr *expr,
 
 	case E_ENUM_TO_INT:
 		NOTIMP();
-		//*constant = expr->constant;
 		return 1;
 
 	case E_CAST: {
@@ -1631,7 +1609,6 @@ int evaluate_constant_expression(struct expr *expr,
 	} break;
 
 	case E_VARIABLE:
-	case E_ARROW_OPERATOR:
 	case E_DOT_OPERATOR:
 	case E_CALL:
 		return 0;
