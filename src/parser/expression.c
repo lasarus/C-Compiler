@@ -479,37 +479,35 @@ void lvalue_store(struct lvalue lvalue, var_id value) {
 	}
 }
 
-var_id expression_to_ir(struct expr *expr) {
-	switch(expr->type) {
-	case E_BINARY_OP: {
-		var_id lhs = expression_to_ir(expr->args[0]);
-		var_id rhs = expression_to_ir(expr->args[1]);
-		var_id res = new_variable(expr->data_type, 1);
+var_id expression_to_ir_result(struct expr *expr, var_id res) {
+	// E_VARIABLE
+	// E_ADDRESS_OF
+	// E_ASSIGNMENT
+	// E_ASSIGNMENT_OP
+	// E_ASSIGNMENT_POINTER_ADD
+	// E_COMMA
 
-		IR_PUSH_BINARY_OPERATOR(expr->binary_op.op, lhs, rhs, res);
-		return res;
-	} break;
+	if (!res)
+		res = new_variable(expr->data_type, 1);
+
+	switch(expr->type) {
+	case E_BINARY_OP:
+		IR_PUSH_BINARY_OPERATOR(expr->binary_op.op,
+								expression_to_ir(expr->args[0]),
+								expression_to_ir(expr->args[1]), res);
+		break;
 
 	case E_UNARY_OP:
-	{
-		var_id rhs = expression_to_ir(expr->args[0]);
-		var_id res = new_variable(expr->data_type, 1);
+		IR_PUSH_UNARY_OPERATOR(expr->unary_op, expression_to_ir(expr->args[0]), res);
+		break;
 
-		IR_PUSH_UNARY_OPERATOR(expr->unary_op, rhs, res);
-		return res;
-	} break;
-
-	case E_CONSTANT: {
-		var_id res = new_variable(expr->data_type, 1);
+	case E_CONSTANT:
 		IR_PUSH_CONSTANT(expr->constant, res);
-		return res;
-	} break;
+		break;
 
-	case E_STRING_LITERAL: {
-		var_id res = new_variable(expr->data_type, 1);
+	case E_STRING_LITERAL:
 		IR_PUSH_STRING_LITERAL(expr->string_literal, res);
-		return res;
-	} break;
+		break;
 
 	case E_CALL: {
 		struct expr *callee = expr->call.callee;
@@ -526,7 +524,6 @@ var_id expression_to_ir(struct expr *expr) {
 		}
 
 		var_id *args = malloc(sizeof *args * expr->call.n_args);
-		var_id res = new_variable(expr->data_type, 1);
 		for (int i = 0; i < expr->call.n_args; i++) {
 			if (i + 1 < signature->n) {
 				args[i] = expression_to_ir(expression_cast(expr->call.args[i],
@@ -556,14 +553,13 @@ var_id expression_to_ir(struct expr *expr) {
 	}
 
 	case E_VARIABLE:
-		return expr->variable.id;
+		// TODO: Remove some of these unnecessary copies in an optimization pass.
+		IR_PUSH_COPY(res, expr->variable.id);
+		break;
 
-	case E_INDIRECTION: {
-		// Assume that this will be a rvalue.
-		var_id res = new_variable(expr->data_type, 1);
+	case E_INDIRECTION:
 		IR_PUSH_LOAD(res, expression_to_ir(expr->args[0]));
-		return res;
-	}
+		break;
 
 	case E_ADDRESS_OF: {
 		struct lvalue lvalue = expression_to_lvalue(expr->args[0]);
@@ -571,7 +567,6 @@ var_id expression_to_ir(struct expr *expr) {
 		case LVALUE_PTR:
 			return lvalue.variable;
 		case LVALUE_VARIABLE: {
-			var_id res = new_variable(expr->data_type, 1);
 			IR_PUSH_ADDRESS_OF(res, lvalue.variable);
 			return res;
 		}
@@ -584,37 +579,33 @@ var_id expression_to_ir(struct expr *expr) {
 		struct lvalue lvalue = expression_to_lvalue(expr->args[0]);
 		switch (lvalue.type) {
 		case LVALUE_PTR: {
-			var_id res = new_variable(expr->data_type, 1);
 			IR_PUSH_CAST(res, lvalue.variable, expr->data_type);
 			return res;
 		}
 		case LVALUE_VARIABLE: {
 			var_id array_ptr = new_variable(type_pointer(get_variable_type(lvalue.variable)), 1);
-			var_id res = new_variable(expr->data_type, 1);
 			IR_PUSH_ADDRESS_OF(array_ptr, lvalue.variable);
 			IR_PUSH_CAST(res, array_ptr, expr->data_type);
 			return res;
 		}
+		default:
+			NOTIMP();
 		}
-	} NOTIMP();
+	}
 
-	case E_POINTER_ADD: {
-		var_id res = new_variable(expr->data_type, 1);
+	case E_POINTER_ADD:
 		IR_PUSH_POINTER_INCREMENT(res, expression_to_ir(expr->args[0]),
 								  expression_to_ir(expr->args[1]));
-		return res;
-	}
+		break;
 
-	case E_POINTER_DIFF: {
+	case E_POINTER_DIFF:
 		// TODO: Make this work on variable length objects.
-		var_id res = new_variable(expr->data_type, 1);
 		IR_PUSH_POINTER_DIFF(res, expression_to_ir(expr->args[0]),
 							 expression_to_ir(expr->args[1]));
-		return res;
-	}
+		break;
 
+	case E_POSTFIX_DEC:
 	case E_POSTFIX_INC: {
-		var_id res = new_variable(expr->data_type, 1);
 		struct type *type = get_variable_type(res);
 
 		struct lvalue lvalue = expression_to_lvalue(expr->args[0]);
@@ -623,29 +614,15 @@ var_id expression_to_ir(struct expr *expr) {
 
 		if (type->type == TY_POINTER) {
 			var_id constant_one = expression_to_ir(EXPR_INT(1));
+			if (expr->type == E_POSTFIX_DEC)
+				NOTIMP();
 			IR_PUSH_POINTER_INCREMENT(value, value, constant_one);
 		} else {
 			var_id constant_one = expression_to_ir(expression_cast(EXPR_INT(1), type));
-			IR_PUSH_BINARY_OPERATOR(OP_ADD, value, constant_one, value);
-		}
-		lvalue_store(lvalue, value);
-		return res;
-	} break;
-
-	case E_POSTFIX_DEC: {
-		var_id res = new_variable(expr->data_type, 1);
-		struct type *type = get_variable_type(res);
-		var_id constant_one = new_variable(type_simple(ST_INT), 1);
-		IR_PUSH_CONSTANT(((struct constant) {.type = CONSTANT_TYPE, .data_type = type_simple(ST_INT), .i = 1}), constant_one);
-		struct lvalue lvalue = expression_to_lvalue(expr->args[0]);
-		var_id value = lvalue_load(lvalue);
-		IR_PUSH_COPY(res, value);
-		if (type->type == TY_POINTER) {
-			NOTIMP();
-			// Should decrement.
-			IR_PUSH_POINTER_INCREMENT(value, value, constant_one);
-		} else {
-			IR_PUSH_BINARY_OPERATOR(OP_SUB, value, constant_one, value);
+			if (expr->type == E_POSTFIX_DEC)
+				IR_PUSH_BINARY_OPERATOR(OP_SUB, value, constant_one, value);
+			else
+				IR_PUSH_BINARY_OPERATOR(OP_ADD, value, constant_one, value);
 		}
 		lvalue_store(lvalue, value);
 		return res;
@@ -657,10 +634,9 @@ var_id expression_to_ir(struct expr *expr) {
 
 		lvalue_store(lvalue, rhs);
 		return rhs;
-	};
+	}
 
-	case E_ASSIGNMENT_OP:
-	{
+	case E_ASSIGNMENT_OP: {
 		struct expr *lhs = expr->args[0];
 		if (lhs->type == E_CAST)
 			NOTIMP();
@@ -680,10 +656,9 @@ var_id expression_to_ir(struct expr *expr) {
 
 		lvalue_store(lvalue, prev_val);
 		return prev_val;
-	} break;
+	}
 
-	case E_ASSIGNMENT_POINTER_ADD:
-	{
+	case E_ASSIGNMENT_POINTER_ADD: {
 		struct lvalue lvalue = expression_to_lvalue(expr->args[0]);
 		var_id rhs = expression_to_ir(expr->args[1]);
 
@@ -695,13 +670,11 @@ var_id expression_to_ir(struct expr *expr) {
 
 		lvalue_store(lvalue, prev_val);
 		return prev_val;
-	} break;
-
-	case E_CAST: {
-		var_id res = new_variable(expr->data_type, 1);
-		IR_PUSH_CAST(res, expression_to_ir(expr->cast.arg), expr->cast.target);
-		return res;
 	}
+
+	case E_CAST:
+		IR_PUSH_CAST(res, expression_to_ir(expr->cast.arg), expr->cast.target);
+		break;
 
 	case E_DOT_OPERATOR: {
 		var_id lhs = expression_to_ir(expr->member.lhs);
@@ -709,14 +682,11 @@ var_id expression_to_ir(struct expr *expr) {
 		var_id member_address = new_variable(type_pointer(expr->data_type), 1);
 		IR_PUSH_ADDRESS_OF(address, lhs);
 		IR_PUSH_GET_MEMBER(member_address, address, expr->member.member_idx);
-		var_id res = new_variable(expr->data_type, 1);
 		IR_PUSH_LOAD(res, member_address);
-		return res;
 	} break;
 
 	case E_CONDITIONAL: {
 		var_id condition = expression_to_ir(expr->args[0]);
-		var_id res = new_variable(expr->data_type, 1);
 
 		block_id block_true = new_block(),
 			block_false = new_block(),
@@ -736,25 +706,19 @@ var_id expression_to_ir(struct expr *expr) {
 		IR_PUSH_GOTO(block_end);
 
 		IR_PUSH_START_BLOCK(block_end);
-		return res;
 	} break;
 
 	case E_BUILTIN_VA_END:
-		// Null operation.
-		return VOID_VAR;
 		break;
 
 	case E_BUILTIN_VA_START: {
 		var_id ptr = expression_to_ir(expr->va_start_.array);
 		IR_PUSH_VA_START(ptr);
-		return VOID_VAR;
 	} break;
 
 	case E_BUILTIN_VA_ARG: {
-		var_id res = new_variable(expr->data_type, 1);
 		var_id ptr = expression_to_ir(expr->va_arg_.v);
 		IR_PUSH_VA_ARG(ptr, res, expr->va_arg_.t);
-		return res;
 	} break;
 
 	case E_BUILTIN_VA_COPY: {
@@ -765,39 +729,38 @@ var_id expression_to_ir(struct expr *expr) {
 
 		IR_PUSH_LOAD(tmp, source);
 		IR_PUSH_STORE(tmp, dest);
-
-		return VOID_VAR;
-	}
+	} break;
 
 	case E_COMPOUND_LITERAL: {
 		struct initializer *init = expr->compound_literal.init;
-		var_id variable = new_variable(expr->compound_literal.type, 1);
-		IR_PUSH_SET_ZERO(variable);
+		IR_PUSH_SET_ZERO(res);
 
 		for (int i = 0; i < init->n; i++) {
-			IR_PUSH_ASSIGN_CONSTANT_OFFSET(variable, expression_to_ir(init->pairs[i].expr), init->pairs[i].offset);
+			IR_PUSH_ASSIGN_CONSTANT_OFFSET(res, expression_to_ir(init->pairs[i].expr), init->pairs[i].offset);
 		}
-
-		return variable;
 	} break;
 
 	case E_SYMBOL: {
-		var_id res = new_variable(expr->data_type, 1);
 		var_id ptr = new_variable(type_pointer(expr->symbol.type), 1);
 		IR_PUSH_GET_SYMBOL_PTR(expr->symbol.name, ptr);
 		IR_PUSH_LOAD(res, ptr);
-		return res;
-	} break;
+		break;
+	}
 
-	case E_COMMA: {
+	case E_COMMA:
 		expression_to_ir(expr->args[0]);
-		return expression_to_ir(expr->args[1]);
-	} break;
+		expression_to_ir_result(expr->args[1], res);
+		break;
 
 	default:
 		printf("%d\n", expr->type);
 		NOTIMP();
 	}
+	return res;
+}
+
+var_id expression_to_ir(struct expr *expr) {
+	return expression_to_ir_result(expr, 0);
 }
 
 // Parsing.
