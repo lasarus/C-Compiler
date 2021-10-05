@@ -125,8 +125,6 @@ struct type *calculate_type(struct expr *expr) {
 
 	case E_POSTFIX_INC:
 	case E_POSTFIX_DEC:
-	case E_PREFIX_INC:
-	case E_PREFIX_DEC:
 		return expr->args[0]->data_type;
 
 	case E_ASSIGNMENT:
@@ -178,9 +176,7 @@ int dont_decay_ptr[E_NUM_TYPES] = {
 
 int num_args[E_NUM_TYPES] = {
 	[E_POSTFIX_INC] = 1,
-	[E_PREFIX_INC] = 1,
 	[E_POSTFIX_DEC] = 1,
-	[E_PREFIX_DEC] = 1,
 	[E_ADDRESS_OF] = 1,
 	[E_INDIRECTION] = 1,
 	[E_UNARY_OP] = 1,
@@ -655,44 +651,6 @@ var_id expression_to_ir(struct expr *expr) {
 		return res;
 	} break;
 
-	case E_PREFIX_INC: {
-		var_id res = new_variable(expr->data_type, 1);
-		struct type *type = get_variable_type(res);
-
-		struct lvalue lvalue = expression_to_lvalue(expr->args[0]);
-		var_id value = lvalue_load(lvalue);
-		IR_PUSH_COPY(res, value);
-
-		if (type->type == TY_POINTER) {
-			var_id constant_one = expression_to_ir(EXPR_INT(1));
-			IR_PUSH_POINTER_INCREMENT(value, value, constant_one);
-		} else {
-			var_id constant_one = expression_to_ir(expression_cast(EXPR_INT(1), type));
-			IR_PUSH_BINARY_OPERATOR(OP_ADD, value, constant_one, value);
-		}
-		lvalue_store(lvalue, value);
-		return value;
-	} break;
-
-	case E_PREFIX_DEC: {
-		var_id res = new_variable(expr->data_type, 1);
-		struct type *type = get_variable_type(res);
-		var_id constant_one = new_variable(type_simple(ST_INT), 1);
-		IR_PUSH_CONSTANT(((struct constant) {.type = CONSTANT_TYPE, .data_type = type_simple(ST_INT), .i = 1}), constant_one);
-		struct lvalue lvalue = expression_to_lvalue(expr->args[0]);
-		var_id value = lvalue_load(lvalue);
-		IR_PUSH_COPY(res, value);
-		if (type->type == TY_POINTER) {
-			NOTIMP();
-			// Should decrement.
-			IR_PUSH_POINTER_INCREMENT(value, value, constant_one);
-		} else {
-			IR_PUSH_BINARY_OPERATOR(OP_SUB, value, constant_one, value);
-		}
-		lvalue_store(lvalue, value);
-		return value;
-	} break;
-
 	case E_ASSIGNMENT: {
 		struct lvalue lvalue = expression_to_lvalue(expr->args[0]);
 		var_id rhs = expression_to_ir(expression_cast(expr->args[1], expr->args[0]->data_type));
@@ -1058,17 +1016,9 @@ struct expr *parse_postfix_expression(int starts_with_lpar, struct expr *startin
 struct expr *parse_cast_expression(void);
 struct expr *parse_unary_expression() {
 	if (TACCEPT(T_INC)) {
-		struct expr *rhs = parse_unary_expression();
-		return expr_new((struct expr) {
-				.type = E_PREFIX_INC,
-				.args = { rhs }
-			});
+		return EXPR_ASSIGNMENT_OP(OP_ADD, parse_unary_expression(), EXPR_INT(1));
 	} else if (TACCEPT(T_DEC)) {
-		struct expr *rhs = parse_unary_expression();
-		return expr_new((struct expr) {
-				.type = E_PREFIX_DEC,
-				.args = { rhs }
-			});
+		return EXPR_ASSIGNMENT_OP(OP_SUB, parse_unary_expression(), EXPR_INT(1));
 	} else if (TACCEPT(T_STAR)) {
 		struct expr *rhs = parse_cast_expression();
 		return expr_new((struct expr) {
