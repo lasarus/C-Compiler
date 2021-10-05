@@ -5,6 +5,7 @@
 #include <types.h>
 #include "parser.h"
 #include "declaration.h"
+#include "operators.h"
 
 struct expr *expr_new(struct expr expr);
 
@@ -17,9 +18,17 @@ struct expr *expr_new(struct expr expr);
 			.type = (TYPE),										\
 			.args = {(LHS), (RHS)}								\
 		})
+
+#define EXPR_BINARY_OP(TYPE, LHS, RHS) expr_new((struct expr) {	\
+			.type = E_BINARY_OP,								\
+			.binary_op.op = (TYPE),								\
+			.binary_op.type = E_BINARY_OP_UNASIGNED,			\
+			.args = {(LHS), (RHS)}								\
+		})
+
 #define EXPR_CAST(TYPE, EXPR) expr_new((struct expr) {	\
 			.type = (E_CAST),							\
-			.cast = {EXPR, TYPE}						\
+			.cast = {(EXPR), (TYPE)}					\
 		})
 
 #define EXPR_INT(I) expr_new((struct expr) {							\
@@ -54,30 +63,10 @@ struct expr {
 		E_UNARY_PLUS,
 		E_UNARY_MINUS,
 		E_BITWISE_NOT,
-		E_NOT,
-		E_SIZEOF,
 		E_ALIGNOF,
 		E_CAST,
-		E_MULTIPLY,
-		E_DIVIDE,
-		E_MODULUS,
-		E_ADDITIVE_ADD,
-		E_ADDITIVE_SUB,
 		E_POINTER_ADD,
 		E_POINTER_DIFF,
-		E_BITWISE_SHIFT_LEFT,
-		E_BITWISE_SHIFT_RIGHT,
-		E_RELATIONAL_LESSTHAN,
-		E_RELATIONAL_GREATERTHAN,
-		E_RELATIONAL_LESSTHAN_EQUAL,
-		E_RELATIONAL_GREATERTHAN_EQUAL,
-		E_EQUALITY,
-		E_NOT_EQUAL,
-		E_BITWISE_AND,
-		E_BITWISE_XOR,
-		E_BITWISE_OR,
-		E_LOGICAL_AND,
-		E_LOGICAL_OR,
 		E_ASSIGNMENT,
 		E_ASSIGNMENT_ADD,
 		E_ASSIGNMENT_POINTER_ADD,
@@ -93,13 +82,12 @@ struct expr {
 		E_CONDITIONAL,
 		E_COMMA,
 		E_ARRAY_PTR_DECAY,
-
 		E_ENUM_TO_INT,
-
 		E_BUILTIN_VA_START,
 		E_BUILTIN_VA_END,
 		E_BUILTIN_VA_ARG,
 		E_BUILTIN_VA_COPY,
+		E_BINARY_OP,
 
 		E_NUM_TYPES
 	} type;
@@ -153,11 +141,20 @@ struct expr {
 			struct expr *d, *s;
 		} va_copy_;
 
-		struct expr *args[3];
-
 		struct constant constant;
 		const char *string_literal;
+
+		struct {
+			enum operator_type op;
+			enum {
+				E_BINARY_OP_UNASIGNED,
+				E_BINARY_OP_POINTER,
+				E_BINARY_OP_ARITHMETIC,
+			} type;
+		} binary_op;
 	};
+	
+	struct expr *args[3];
 
 	struct position pos;
 	struct type *data_type;

@@ -94,20 +94,9 @@ struct type *calculate_type(struct expr *expr) {
 		assert(expr->constant.type == CONSTANT_TYPE);
 		return expr->constant.data_type;
 
-	case E_ADDITIVE_ADD:
-	case E_ADDITIVE_SUB:
-	case E_MULTIPLY:
-	case E_DIVIDE:
-	case E_MODULUS:
-	case E_BITWISE_XOR:
-	case E_BITWISE_OR:
-	case E_BITWISE_AND:
-	case E_BITWISE_SHIFT_LEFT:
-	case E_BITWISE_SHIFT_RIGHT:
-		if (expr->args[0]->data_type != expr->args[1]->data_type) {
-			ERROR("Invalid expr type %d\n", expr->type);
-		}
-		return expr->args[0]->data_type;
+	case E_BINARY_OP:
+		return operators_get_result_type(expr->binary_op.op, expr->args[0]->data_type,
+										 expr->args[1]->data_type);
 
 	case E_BITWISE_NOT:
 	case E_UNARY_PLUS:
@@ -148,17 +137,6 @@ struct type *calculate_type(struct expr *expr) {
 
 	case E_ARRAY_PTR_DECAY:
 		return type_pointer(expr->args[0]->data_type->children[0]);
-
-	case E_RELATIONAL_LESSTHAN:
-	case E_RELATIONAL_GREATERTHAN:
-	case E_RELATIONAL_LESSTHAN_EQUAL:
-	case E_RELATIONAL_GREATERTHAN_EQUAL:
-	case E_EQUALITY:
-	case E_NOT_EQUAL:
-	case E_NOT:
-	case E_LOGICAL_OR:
-	case E_LOGICAL_AND:
-		return type_simple(ST_INT);
 
 	case E_POSTFIX_INC:
 	case E_POSTFIX_DEC:
@@ -225,7 +203,6 @@ struct type *calculate_type(struct expr *expr) {
 }
 
 int dont_decay_ptr[E_NUM_TYPES] = {
-	[E_SIZEOF] = 1,
 	[E_ADDRESS_OF] = 1,
 	[E_ARRAY_PTR_DECAY] = 1,
 };
@@ -240,28 +217,8 @@ int num_args[E_NUM_TYPES] = {
 	[E_UNARY_PLUS] = 1,
 	[E_UNARY_MINUS] = 1,
 	[E_BITWISE_NOT] = 1,
-	[E_NOT] = 1,
-	[E_SIZEOF] = 1,
 	[E_ALIGNOF] = 1,
-	[E_CAST] = 1,
-	[E_MULTIPLY] = 2,
-	[E_DIVIDE] = 2,
-	[E_MODULUS] = 2,
-	[E_ADDITIVE_ADD] = 2,
-	[E_ADDITIVE_SUB] = 2,
-	[E_BITWISE_SHIFT_LEFT] = 2,
-	[E_BITWISE_SHIFT_RIGHT] = 2,
-	[E_RELATIONAL_LESSTHAN] = 2,
-	[E_RELATIONAL_GREATERTHAN] = 2,
-	[E_RELATIONAL_GREATERTHAN_EQUAL] = 2,
-	[E_RELATIONAL_LESSTHAN_EQUAL] = 2,
-	[E_EQUALITY] = 2,
-	[E_NOT_EQUAL] = 2,
-	[E_BITWISE_AND] = 2,
-	[E_BITWISE_XOR] = 2,
-	[E_BITWISE_OR] = 2,
-	[E_LOGICAL_AND] = 2,
-	[E_LOGICAL_OR] = 2,
+	[E_BINARY_OP] = 2,
 	[E_ASSIGNMENT] = 2,
 	[E_CONDITIONAL] = 3,
 	[E_COMMA] = 2,
@@ -272,45 +229,13 @@ int does_integer_conversion[E_NUM_TYPES] = {
 	[E_UNARY_PLUS] = 1,
 	[E_UNARY_MINUS] = 1,
 	[E_BITWISE_NOT] = 1,
-	[E_NOT] = 1,
-	[E_MULTIPLY] = 1,
-	[E_DIVIDE] = 1,
-	[E_MODULUS] = 1,
-	[E_ADDITIVE_ADD] = 1,
-	[E_ADDITIVE_SUB] = 1,
-	[E_BITWISE_SHIFT_LEFT] = 1,
-	[E_BITWISE_SHIFT_RIGHT] = 1,
-	[E_RELATIONAL_LESSTHAN] = 1,
-	[E_RELATIONAL_GREATERTHAN] = 1,
-	[E_RELATIONAL_GREATERTHAN_EQUAL] = 1,
-	[E_RELATIONAL_LESSTHAN_EQUAL] = 1,
-	[E_EQUALITY] = 1,
-	[E_NOT_EQUAL] = 1,
-	[E_BITWISE_AND] = 1,
-	[E_BITWISE_XOR] = 1,
-	[E_BITWISE_OR] = 1,
-	[E_LOGICAL_AND] = 1,
-	[E_LOGICAL_OR] = 1,
+	[E_BINARY_OP] = 1,
 	[E_CONDITIONAL] = 1,
 };
 
 int does_arithmetic_conversion[E_NUM_TYPES] = {
-	[E_ADDITIVE_ADD] = 1,
-	[E_ADDITIVE_SUB] = 1,
-	[E_MULTIPLY] = 1,
-	[E_DIVIDE] = 1,
-	[E_MODULUS] = 1,
-	[E_BITWISE_XOR] = 1,
-	[E_BITWISE_AND] = 1,
-	[E_BITWISE_OR] = 1,
-	[E_BITWISE_SHIFT_LEFT] = 1,
-	[E_BITWISE_SHIFT_RIGHT] = 1,
-	[E_RELATIONAL_LESSTHAN] = 1,
-	[E_RELATIONAL_GREATERTHAN] = 1,
-	[E_RELATIONAL_GREATERTHAN_EQUAL] = 1,
-	[E_RELATIONAL_LESSTHAN_EQUAL] = 1,
+	[E_BINARY_OP] = 1,
 	[E_ASSIGNMENT_BINARY_OR] = 1,
-	[E_EQUALITY] = 1,
 };
 
 struct expr *do_integer_promotion(struct expr *expr) {
@@ -336,7 +261,8 @@ struct expr *do_integer_promotion(struct expr *expr) {
 }
 
 void change_to_additive_pointer(struct expr *expr) {
-	if (expr->type != E_ADDITIVE_ADD)
+	if (expr->type != E_BINARY_OP ||
+		expr->binary_op.op != OP_ADD)
 		return;
 
 	int lhs_ptr = type_is_pointer(expr->args[0]->data_type),
@@ -414,7 +340,8 @@ void fix_assignment_add(struct expr *expr) {
 }
 
 void fix_pointer_sub(struct expr *expr) {
-	if (expr->type != E_ADDITIVE_SUB)
+	if (expr->type != E_BINARY_OP ||
+		expr->binary_op.op != OP_SUB)
 		return;
 
 	struct type *lhs_type = expr->args[0]->data_type,
@@ -433,9 +360,11 @@ void fix_pointer_sub(struct expr *expr) {
 	}
 }
 
-void fix_pointer_add(struct expr *expr) {
-	if (expr->type != E_ADDITIVE_SUB)
+void fix_pointer_op(struct expr *expr) {
+	if (expr->type != E_BINARY_OP)
 		return;
+
+
 }
 
 struct expr *expr_new(struct expr expr) {
@@ -443,6 +372,7 @@ struct expr *expr_new(struct expr expr) {
 
 	for (int i = 0; i < num_args[expr.type]; i++) {
 		if (!expr.args[i]) {
+			PRINT_POS(T0->pos);
 			ERROR("Wrongly constructed expression of type %d", expr.type);
 		}
 	}
@@ -552,29 +482,6 @@ struct lvalue expression_to_lvalue(struct expr *expr) {
 	}
 }
 
-enum operator_type op_type_from_expr(struct expr *expr) {
-	switch (expr->type) {
-	case E_ADDITIVE_ADD: return OP_ADD;
-	case E_ADDITIVE_SUB: return OP_SUB;
-	case E_MULTIPLY: return OP_MUL;
-	case E_DIVIDE: return OP_DIV;
-	case E_MODULUS: return OP_MOD;
-	case E_EQUALITY: return OP_EQUAL;
-	case E_NOT_EQUAL: return OP_NOT_EQUAL;
-	case E_RELATIONAL_LESSTHAN: return OP_LESS;
-	case E_RELATIONAL_GREATERTHAN: return OP_GREATER;
-	case E_RELATIONAL_GREATERTHAN_EQUAL: return OP_GREATER_EQ;
-	case E_RELATIONAL_LESSTHAN_EQUAL: return OP_LESS_EQ;
-	case E_BITWISE_XOR: return OP_BXOR;
-	case E_BITWISE_OR: return OP_BOR;
-	case E_BITWISE_AND: return OP_BAND;
-	case E_BITWISE_SHIFT_LEFT: return OP_LSHIFT;
-	case E_BITWISE_SHIFT_RIGHT: return OP_RSHIFT;
-	default:
-		ERROR("Invalid expr type");
-	}
-}
-
 enum operator_type op_assignment_type_from_expr(struct expr *expr) {
 	switch (expr->type) {
 	case E_ASSIGNMENT_ADD: return OP_ADD;
@@ -594,7 +501,6 @@ enum operator_type op_assignment_type_from_expr(struct expr *expr) {
 
 enum unary_operator_type uop_type_from_expr(struct expr *expr) {
 	switch (expr->type) {
-	case E_NOT: return UOP_NOT;
 	case E_UNARY_PLUS: return UOP_PLUS;
 	case E_UNARY_MINUS: return UOP_NEG;
 	case E_BITWISE_NOT: return UOP_BNOT;
@@ -653,32 +559,15 @@ void lvalue_store(struct lvalue lvalue, var_id value) {
 
 var_id expression_to_ir(struct expr *expr) {
 	switch(expr->type) {
-	case E_ADDITIVE_ADD:
-	case E_ADDITIVE_SUB:
-	case E_RELATIONAL_LESSTHAN:
-	case E_RELATIONAL_GREATERTHAN:
-	case E_RELATIONAL_LESSTHAN_EQUAL:
-	case E_RELATIONAL_GREATERTHAN_EQUAL:
-	case E_EQUALITY:
-	case E_BITWISE_OR:
-	case E_BITWISE_XOR:
-	case E_BITWISE_AND:
-	case E_BITWISE_SHIFT_LEFT:
-	case E_BITWISE_SHIFT_RIGHT:
-	case E_NOT_EQUAL:
-	case E_MULTIPLY:
-	case E_MODULUS:
-	case E_DIVIDE:
-	{
+	case E_BINARY_OP: {
 		var_id lhs = expression_to_ir(expr->args[0]);
 		var_id rhs = expression_to_ir(expr->args[1]);
 		var_id res = new_variable(expr->data_type, 1);
 
-		IR_PUSH_BINARY_OPERATOR(op_type_from_expr(expr), lhs, rhs, res);
+		IR_PUSH_BINARY_OPERATOR(expr->binary_op.op, lhs, rhs, res);
 		return res;
 	} break;
 
-	case E_NOT:
 	case E_UNARY_PLUS:
 	case E_UNARY_MINUS:
 	case E_BITWISE_NOT:
@@ -986,31 +875,31 @@ var_id expression_to_ir(struct expr *expr) {
 		return res;
 	} break;
 
-	case E_LOGICAL_OR: {
-		// A || B -> A ? 1 : (B ? 1 : 0)
-		var_id condition = expression_to_ir(expr->args[0]);
-		var_id res = new_variable(expr->data_type, 1);
+	/* case E_LOGICAL_OR: { */
+	/* 	// A || B -> A ? 1 : (B ? 1 : 0) */
+	/* 	var_id condition = expression_to_ir(expr->args[0]); */
+	/* 	var_id res = new_variable(expr->data_type, 1); */
 
-		block_id block_true = new_block(),
-			block_false = new_block(),
-			block_end = new_block();
+	/* 	block_id block_true = new_block(), */
+	/* 		block_false = new_block(), */
+	/* 		block_end = new_block(); */
 
-		IR_PUSH(.type = IR_IF_SELECTION,
-				.if_selection = { condition, block_true, block_false });
+	/* 	IR_PUSH(.type = IR_IF_SELECTION, */
+	/* 			.if_selection = { condition, block_true, block_false }); */
 
-		IR_PUSH_START_BLOCK(block_true);
-		var_id true_val = expression_to_ir(expr->args[1]);
-		IR_PUSH_COPY(res, true_val);
-		IR_PUSH_GOTO(block_end);
+	/* 	IR_PUSH_START_BLOCK(block_true); */
+	/* 	var_id true_val = expression_to_ir(expr->args[1]); */
+	/* 	IR_PUSH_COPY(res, true_val); */
+	/* 	IR_PUSH_GOTO(block_end); */
 
-		IR_PUSH_START_BLOCK(block_false);
-		var_id false_val = expression_to_ir(expr->args[2]);
-		IR_PUSH_COPY(res, false_val);
-		IR_PUSH_GOTO(block_end);
+	/* 	IR_PUSH_START_BLOCK(block_false); */
+	/* 	var_id false_val = expression_to_ir(expr->args[2]); */
+	/* 	IR_PUSH_COPY(res, false_val); */
+	/* 	IR_PUSH_GOTO(block_end); */
 
-		IR_PUSH_START_BLOCK(block_end);
-		return res;
-	} break;
+	/* 	IR_PUSH_START_BLOCK(block_end); */
+	/* 	return res; */
+	/* } break; */
 
 	case E_BUILTIN_VA_END:
 		// Null operation.
@@ -1211,10 +1100,7 @@ struct expr *parse_postfix_expression(int starts_with_lpar, struct expr *startin
 			lhs = expr_new((struct expr) {
 					.type = E_INDIRECTION,
 					.args = {
-						expr_new((struct expr) {
-								.type = E_ADDITIVE_ADD,
-								.args = {lhs, index}
-							})
+						EXPR_BINARY_OP(OP_ADD, lhs, index)
 					}
 				});
 		} else if (TACCEPT(T_LPAR)) {
@@ -1416,15 +1302,15 @@ struct expr *parse_multiplicative_expression() {
 		if (lhs) {
 			switch (last_token) {
 			case T_STAR:
-				lhs = EXPR_BINARY(E_MULTIPLY, lhs, rhs);
+				lhs = EXPR_BINARY_OP(OP_MUL, lhs, rhs);
 				break;
 
 			case T_DIV:
-				lhs = EXPR_BINARY(E_DIVIDE, lhs, rhs);
+				lhs = EXPR_BINARY_OP(OP_DIV, lhs, rhs);
 				break;
 
 			case T_MOD:
-				lhs = EXPR_BINARY(E_MODULUS, lhs, rhs);
+				lhs = EXPR_BINARY_OP(OP_MOD, lhs, rhs);
 				break;
 
 			default:
@@ -1449,11 +1335,11 @@ struct expr *parse_additive_expression() {
 		if (lhs) {
 			switch (last_token) {
 			case T_ADD:
-				lhs = EXPR_BINARY(E_ADDITIVE_ADD, lhs, rhs);
+				lhs = EXPR_BINARY_OP(OP_ADD, lhs, rhs);
 				break;
 
 			case T_SUB:
-				lhs = EXPR_BINARY(E_ADDITIVE_SUB, lhs, rhs);
+				lhs = EXPR_BINARY_OP(OP_SUB, lhs, rhs);
 				break;
 
 			default:
@@ -1478,11 +1364,11 @@ struct expr *parse_shift_expression() {
 		if (lhs) {
 			switch (last_token) {
 			case T_RSHIFT:
-				lhs = EXPR_BINARY(E_BITWISE_SHIFT_RIGHT, lhs, rhs);
+				lhs = EXPR_BINARY_OP(OP_RSHIFT, lhs, rhs);
 				break;
 
 			case T_LSHIFT:
-				lhs = EXPR_BINARY(E_BITWISE_SHIFT_LEFT, lhs, rhs);
+				lhs = EXPR_BINARY_OP(OP_LSHIFT, lhs, rhs);
 				break;
 
 			default:
@@ -1507,19 +1393,19 @@ struct expr *parse_relational_expression() {
 		if (lhs) {
 			switch (last_token) {
 			case T_LEQ:
-				lhs = EXPR_BINARY(E_RELATIONAL_LESSTHAN_EQUAL, lhs, rhs);
+				lhs = EXPR_BINARY_OP(OP_LESS_EQ, lhs, rhs);
 				break;
 
 			case T_GEQ:
-				lhs = EXPR_BINARY(E_RELATIONAL_GREATERTHAN_EQUAL, lhs, rhs);
+				lhs = EXPR_BINARY_OP(OP_GREATER_EQ, lhs, rhs);
 				break;
 
 			case T_L:
-				lhs = EXPR_BINARY(E_RELATIONAL_LESSTHAN, lhs, rhs);
+				lhs = EXPR_BINARY_OP(OP_LESS, lhs, rhs);
 				break;
 
 			case T_G:
-				lhs = EXPR_BINARY(E_RELATIONAL_GREATERTHAN, lhs, rhs);
+				lhs = EXPR_BINARY_OP(OP_GREATER, lhs, rhs);
 				break;
 
 			default:
@@ -1551,11 +1437,11 @@ struct expr *parse_equality_expression() {
 			}
 			switch (last_token) {
 			case T_EQ:
-				lhs = EXPR_BINARY(E_EQUALITY, lhs, rhs);
+				lhs = EXPR_BINARY_OP(OP_EQUAL, lhs, rhs);
 				break;
 
 			case T_NEQ:
-				lhs = EXPR_BINARY(E_NOT_EQUAL, lhs, rhs);
+				lhs = EXPR_BINARY_OP(OP_NOT_EQUAL, lhs, rhs);
 				break;
 
 			default:
@@ -1577,7 +1463,7 @@ struct expr *parse_and_expression() {
 		struct expr *rhs = parse_equality_expression();
 
 		if (lhs) {
-			lhs = EXPR_BINARY(E_BITWISE_AND, lhs, rhs);
+			lhs = EXPR_BINARY_OP(OP_BAND, lhs, rhs);
 		} else {
 			lhs = rhs;
 		}
@@ -1593,7 +1479,7 @@ struct expr *parse_exclusive_or_expression() {
 		struct expr *rhs = parse_and_expression();
 
 		if (lhs) {
-			lhs = EXPR_BINARY(E_BITWISE_XOR, lhs, rhs);
+			lhs = EXPR_BINARY_OP(OP_BXOR, lhs, rhs);
 		} else {
 			lhs = rhs;
 		}
@@ -1609,7 +1495,7 @@ struct expr *parse_inclusive_or_expression() {
 		struct expr *rhs = parse_exclusive_or_expression();
 
 		if (lhs) {
-			lhs = EXPR_BINARY(E_BITWISE_OR, lhs, rhs);
+			lhs = EXPR_BINARY_OP(OP_BOR, lhs, rhs);
 		} else {
 			lhs = rhs;
 		}
@@ -1744,46 +1630,19 @@ int evaluate_constant_expression(struct expr *expr,
 		*constant = constant_cast(rhs, expr->cast.target);
 	} break;
 
-	case E_ADDITIVE_SUB: {
-		struct constant lhs, rhs;
-		if (!evaluate_constant_expression(expr->args[0], &lhs))
-			return 0;
-		if (!evaluate_constant_expression(expr->args[1], &rhs))
-			return 0;
-		*constant = constant_sub(lhs, rhs);
-	} break;
-
-	case E_ADDITIVE_ADD: {
-		struct constant lhs, rhs;
-		if (!evaluate_constant_expression(expr->args[0], &lhs))
-			return 0;
-		if (!evaluate_constant_expression(expr->args[1], &rhs))
-			return 0;
-		*constant = constant_add(lhs, rhs);
-	} break;
-
 	case E_VARIABLE:
 	case E_ARROW_OPERATOR:
 	case E_DOT_OPERATOR:
 	case E_CALL:
 		return 0;
 
-	case E_BITWISE_SHIFT_LEFT: {
+	case E_BINARY_OP: {
 		struct constant lhs, rhs;
 		if (!evaluate_constant_expression(expr->args[0], &lhs))
 			return 0;
 		if (!evaluate_constant_expression(expr->args[1], &rhs))
 			return 0;
-		*constant = constant_shift_left(lhs, rhs);
-	} break;
-
-	case E_BITWISE_OR: {
-		struct constant lhs, rhs;
-		if (!evaluate_constant_expression(expr->args[0], &lhs))
-			return 0;
-		if (!evaluate_constant_expression(expr->args[1], &rhs))
-			return 0;
-		*constant = constant_or(lhs, rhs);
+		*constant = operators_constant(expr->binary_op.op, lhs, rhs);
 	} break;
 
 	case E_STRING_LITERAL: {

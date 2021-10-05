@@ -4,6 +4,7 @@
 #include <types.h>
 
 #include "variables.h"
+#include "operators.h"
 
 typedef int block_id;
 block_id new_block();
@@ -70,27 +71,7 @@ struct instruction {
 		} function;
 #define IR_PUSH_FUNCTION(SIGNATURE, ARGS, NAME, GLOBAL) IR_PUSH(.type = IR_FUNCTION, .function.global = (GLOBAL), .function.signature = (SIGNATURE), .function.named_arguments = (ARGS), .function.name = (NAME))
 		struct {
-			enum operator_type {
-				OP_ADD,
-				OP_SUB,
-				OP_MUL,
-				OP_DIV,
-				OP_MOD,
-				OP_BXOR,
-				OP_BOR,
-				OP_BAND,
-				OP_LSHIFT,
-				OP_RSHIFT,
-				OP_LESS,
-				OP_GREATER,
-				OP_LESS_EQ,
-				OP_GREATER_EQ,
-				OP_EQUAL,
-				OP_NOT_EQUAL,
-
-				OP_TYPE_COUNT
-			} type;
-
+			enum operator_type type;
 			var_id lhs, rhs, result;
 		} binary_operator;
 #define IR_PUSH_BINARY_OPERATOR(TYPE, LHS, RHS, RESULT) IR_PUSH(.type = IR_BINARY_OPERATOR, .binary_operator = { .type = (TYPE), .lhs = (LHS), .rhs = (RHS), .result = (RESULT)})
