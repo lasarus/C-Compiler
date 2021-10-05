@@ -569,7 +569,7 @@ const char *constant_to_string(struct constant constant) {
 	return buffer;
 }
 
-void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_info) {
+void codegen_instruction(struct instruction ins, struct instruction next_ins, struct reg_save_info reg_save_info) {
 	const char *ins_str = instruction_to_str(ins);
 	EMIT("#instruction start \"%s\":", ins_str);
 	switch (ins.type) {
@@ -745,7 +745,9 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 	} break;
 
 	case IR_GOTO: {
-		EMIT("jmp .LB%d\n", ins.goto_.block);
+		if (!(next_ins.type == IR_START_BLOCK &&
+			  next_ins.start_block.block == ins.goto_.block))
+			EMIT("jmp .LB%d\n", ins.goto_.block);
 	} break;
 
 	case IR_IF_SELECTION: {
@@ -757,7 +759,9 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 			const char *reg_name = get_reg_name(REG_RDI, size);
 			EMIT("test%c %s, %s", size_to_suffix(size), reg_name, reg_name);
 			EMIT("je .LB%d", ins.if_selection.block_false);
-			EMIT("jmp .LB%d", ins.if_selection.block_true);
+			if (!(next_ins.type == IR_START_BLOCK &&
+				  next_ins.start_block.block == ins.if_selection.block_true))
+				EMIT("jmp .LB%d", ins.if_selection.block_true);
 		} else {
 			ERROR("Invalid argument to if selection");
 		}
@@ -1063,7 +1067,7 @@ void codegen_function(struct instruction *is,
 		if (is[i].type == IR_ALLOCA)
 			continue;
 		
-		codegen_instruction(is[i], reg_save_info);
+		codegen_instruction(is[i], i + 1 < count ? is[i + 1] : (struct instruction) {0}, reg_save_info);
 	}
 
 	// Allocate all variables.
