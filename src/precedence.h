@@ -17,7 +17,6 @@ enum {
 
 int precedence_get(enum ttype token_type,
 				   enum prec_part part,
-				   int loop,
-				   int in_function);
+				   int loop);
 
 #endif

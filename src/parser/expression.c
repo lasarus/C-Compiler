@@ -4,6 +4,7 @@
 #include <assert.h>
 #include "symbols.h"
 #include <codegen/rodata.h>
+#include <precedence.h>
 
 void convert_arithmetic(struct expr *a,
 						struct expr *b,
@@ -1207,321 +1208,100 @@ struct expr *parse_cast_expression(void) {
 	return parse_unary_expression();
 }
 
-struct expr *parse_multiplicative_expression() {
-	struct expr *lhs = NULL;
-	enum ttype last_token = 0;
+struct expr *parse_pratt(int precedence) {
+	struct expr *lhs = parse_cast_expression();
 
-	do {
-		struct expr *rhs = parse_cast_expression();
+	if (!lhs)
+		return NULL;
 
-		if (lhs) {
-			switch (last_token) {
-			case T_STAR:
-				lhs = EXPR_BINARY_OP(OP_MUL, lhs, rhs);
-				break;
+	while (precedence < precedence_get(T0->type, PREC_INFIX, 1)) {
+		int new_prec = precedence_get(T0->type, PREC_INFIX, 0);
 
-			case T_DIV:
-				lhs = EXPR_BINARY_OP(OP_DIV, lhs, rhs);
-				break;
-
-			case T_MOD:
-				lhs = EXPR_BINARY_OP(OP_MOD, lhs, rhs);
-				break;
-
-			default:
-				ERROR("Invalid addition token");
-			}
-		} else {
-			lhs = rhs;
-		}
-		last_token = T0->type;
-	} while (TACCEPT(T_STAR) || TACCEPT(T_DIV) || TACCEPT(T_MOD));
-
-	return lhs;
-}
-
-struct expr *parse_additive_expression() {
-	struct expr *lhs = NULL;
-	enum ttype last_token = 0;
-
-	do {
-		struct expr *rhs = parse_multiplicative_expression();
-
-		if (lhs) {
-			switch (last_token) {
-			case T_ADD:
-				lhs = EXPR_BINARY_OP(OP_ADD, lhs, rhs);
-				break;
-
-			case T_SUB:
-				lhs = EXPR_BINARY_OP(OP_SUB, lhs, rhs);
-				break;
-
-			default:
-				ERROR("Invalid addition token");
-			}
-		} else {
-			lhs = rhs;
-		}
-		last_token = T0->type;
-	} while (TACCEPT(T_ADD) || TACCEPT(T_SUB));
-
-	return lhs;
-}
-
-struct expr *parse_shift_expression() {
-	struct expr *lhs = NULL;
-	enum ttype last_token = 0;
-
-	do {
-		struct expr *rhs = parse_additive_expression();
-
-		if (lhs) {
-			switch (last_token) {
-			case T_RSHIFT:
-				lhs = EXPR_BINARY_OP(OP_RSHIFT, lhs, rhs);
-				break;
-
-			case T_LSHIFT:
-				lhs = EXPR_BINARY_OP(OP_LSHIFT, lhs, rhs);
-				break;
-
-			default:
-				ERROR("Invalid addition token");
-			}
-		} else {
-			lhs = rhs;
-		}
-		last_token = T0->type;
-	} while (TACCEPT(T_LSHIFT) || TACCEPT(T_RSHIFT));
-
-	return lhs;
-}
-
-struct expr *parse_relational_expression() {
-	struct expr *lhs = NULL;
-	enum ttype last_token = 0;
-
-	do {
-		struct expr *rhs = parse_shift_expression();
-
-		if (lhs) {
-			switch (last_token) {
-			case T_LEQ:
-				lhs = EXPR_BINARY_OP(OP_LESS_EQ, lhs, rhs);
-				break;
-
-			case T_GEQ:
-				lhs = EXPR_BINARY_OP(OP_GREATER_EQ, lhs, rhs);
-				break;
-
-			case T_L:
-				lhs = EXPR_BINARY_OP(OP_LESS, lhs, rhs);
-				break;
-
-			case T_G:
-				lhs = EXPR_BINARY_OP(OP_GREATER, lhs, rhs);
-				break;
-
-			default:
-				ERROR("Invalid relational token");
-			}
-		} else {
-			lhs = rhs;
-		}
-
-		last_token = T0->type;
-	} while (TACCEPT(T_LEQ) || TACCEPT(T_GEQ) ||
-			 TACCEPT(T_L) || TACCEPT(T_G));
-
-	return lhs;
-}
-
-struct expr *parse_equality_expression() {
-	struct expr *lhs = NULL;
-	enum ttype last_token = 0;
-
-	do {
-		struct expr *rhs = parse_relational_expression();
-
-		if (lhs) {
-			if (!rhs) {
-				PRINT_POS(T0->pos);
-				printf("\n");
-				ERROR("Expected relational expression");
-			}
-			switch (last_token) {
-			case T_EQ:
-				lhs = EXPR_BINARY_OP(OP_EQUAL, lhs, rhs);
-				break;
-
-			case T_NEQ:
-				lhs = EXPR_BINARY_OP(OP_NOT_EQUAL, lhs, rhs);
-				break;
-
-			default:
-				ERROR("Invalid equality token");
-			}
-		} else {
-			lhs = rhs;
-		}
-		last_token = T0->type;
-	} while (TACCEPT(T_EQ) || TACCEPT(T_NEQ));
-
-	return lhs;
-}
-
-struct expr *parse_and_expression() {
-	struct expr *lhs = NULL;
-
-	do {
-		struct expr *rhs = parse_equality_expression();
-
-		if (lhs) {
-			lhs = EXPR_BINARY_OP(OP_BAND, lhs, rhs);
-		} else {
-			lhs = rhs;
-		}
-	} while (TACCEPT(T_AMP));
-
-	return lhs;
-}
-
-struct expr *parse_exclusive_or_expression() {
-	struct expr *lhs = NULL;
-
-	do {
-		struct expr *rhs = parse_and_expression();
-
-		if (lhs) {
-			lhs = EXPR_BINARY_OP(OP_BXOR, lhs, rhs);
-		} else {
-			lhs = rhs;
-		}
-	} while (TACCEPT(T_XOR));
-
-	return lhs;
-}
-
-struct expr *parse_inclusive_or_expression() {
-	struct expr *lhs = NULL;
-
-	do {
-		struct expr *rhs = parse_exclusive_or_expression();
-
-		if (lhs) {
-			lhs = EXPR_BINARY_OP(OP_BOR, lhs, rhs);
-		} else {
-			lhs = rhs;
-		}
-	} while (TACCEPT(T_BOR));
-
-	return lhs;
-}
-
-struct expr *parse_logical_and_expression() {
-	struct expr *lhs = NULL;
-
-	do {
-		struct expr *rhs = parse_inclusive_or_expression();
-
-		if (lhs) {
+		if (TACCEPT(T_COMMA)) {
+			struct expr *rhs = parse_pratt(new_prec);
+			lhs = EXPR_ARGS(E_COMMA, lhs, rhs);
+		} else if (TACCEPT(T_A)) {
+			lhs = EXPR_ARGS(E_ASSIGNMENT, lhs, parse_pratt(new_prec));
+		} else if (TACCEPT(T_MULA)) {
+			lhs = EXPR_ASSIGNMENT_OP(OP_MUL, lhs, parse_pratt(new_prec));
+		} else if (TACCEPT(T_DIVA)) {
+			lhs = EXPR_ASSIGNMENT_OP(OP_DIV, lhs, parse_pratt(new_prec));
+		} else if (TACCEPT(T_MODA)) {
+			lhs = EXPR_ASSIGNMENT_OP(OP_MOD, lhs, parse_pratt(new_prec));
+		} else if (TACCEPT(T_ADDA)) {
+			lhs = EXPR_ASSIGNMENT_OP(OP_ADD, lhs, parse_pratt(new_prec));
+		} else if (TACCEPT(T_SUBA)) {
+			lhs = EXPR_ASSIGNMENT_OP(OP_SUB, lhs, parse_pratt(new_prec));
+		} else if (TACCEPT(T_LSHIFTA)) {
+			lhs = EXPR_ASSIGNMENT_OP(OP_LSHIFT, lhs, parse_pratt(new_prec));
+		} else if (TACCEPT(T_RSHIFTA)) {
+			lhs = EXPR_ASSIGNMENT_OP(OP_RSHIFT, lhs, parse_pratt(new_prec));
+		} else if (TACCEPT(T_BANDA)) {
+			lhs = EXPR_ASSIGNMENT_OP(OP_BAND, lhs, parse_pratt(new_prec));
+		} else if (TACCEPT(T_XORA)) {
+			lhs = EXPR_ASSIGNMENT_OP(OP_BXOR, lhs, parse_pratt(new_prec));
+		} else if (TACCEPT(T_BORA)) {
+			lhs = EXPR_ASSIGNMENT_OP(OP_BOR, lhs, parse_pratt(new_prec));
+		} else if (TACCEPT(T_QUEST)) {
+			struct expr *mid = parse_expression();
+			TEXPECT(T_COLON);
+			struct expr *rhs = parse_pratt(new_prec);
+			lhs = EXPR_ARGS(E_CONDITIONAL, lhs, mid, rhs);
+		} else if (TACCEPT(T_OR)) {
+			// A || B -> A ? 1 : (B ? 1 : 0)
+			struct expr *rhs = parse_pratt(new_prec);
+			lhs = EXPR_ARGS(E_CONDITIONAL, lhs, EXPR_INT(1),
+							EXPR_ARGS(E_CONDITIONAL, rhs, EXPR_INT(1), EXPR_INT(0)));
+		} else if (TACCEPT(T_AND)) {
 			// A && B -> A ? (B ? 1 : 0) : 0
+			struct expr *rhs = parse_pratt(new_prec);
 			lhs = EXPR_ARGS(E_CONDITIONAL, lhs,
 							EXPR_ARGS(E_CONDITIONAL, rhs, EXPR_INT(1), EXPR_INT(0)),
 							EXPR_INT(0));
-		} else {
-			lhs = rhs;
+		} else if (TACCEPT(T_BOR)) {
+			lhs = EXPR_BINARY_OP(OP_BOR, lhs, parse_pratt(new_prec));
+		} else if (TACCEPT(T_XOR)) {
+			lhs = EXPR_BINARY_OP(OP_BXOR, lhs, parse_pratt(new_prec));
+		} else if (TACCEPT(T_AMP)) {
+			lhs = EXPR_BINARY_OP(OP_BAND, lhs, parse_pratt(new_prec));
+		} else if (TACCEPT(T_EQ)) {
+			lhs = EXPR_BINARY_OP(OP_EQUAL, lhs, parse_pratt(new_prec));
+		} else if (TACCEPT(T_NEQ)) {
+			lhs = EXPR_BINARY_OP(OP_NOT_EQUAL, lhs, parse_pratt(new_prec));
+		} else if (TACCEPT(T_LEQ)) {
+			lhs = EXPR_BINARY_OP(OP_LESS_EQ, lhs, parse_pratt(new_prec));
+		} else if (TACCEPT(T_GEQ)) {
+			lhs = EXPR_BINARY_OP(OP_GREATER_EQ, lhs, parse_pratt(new_prec));
+		} else if (TACCEPT(T_L)) {
+			lhs = EXPR_BINARY_OP(OP_LESS, lhs, parse_pratt(new_prec));
+		} else if (TACCEPT(T_G)) {
+			lhs = EXPR_BINARY_OP(OP_GREATER, lhs, parse_pratt(new_prec));
+		} else if (TACCEPT(T_LSHIFT)) {
+			lhs = EXPR_BINARY_OP(OP_LSHIFT, lhs, parse_pratt(new_prec));
+		} else if (TACCEPT(T_RSHIFT)) {
+			lhs = EXPR_BINARY_OP(OP_RSHIFT, lhs, parse_pratt(new_prec));
+		} else if (TACCEPT(T_ADD)) {
+			lhs = EXPR_BINARY_OP(OP_ADD, lhs, parse_pratt(new_prec));
+		} else if (TACCEPT(T_SUB)) {
+			lhs = EXPR_BINARY_OP(OP_SUB, lhs, parse_pratt(new_prec));
+		} else if (TACCEPT(T_STAR)) {
+			lhs = EXPR_BINARY_OP(OP_MUL, lhs, parse_pratt(new_prec));
+		} else if (TACCEPT(T_DIV)) {
+			lhs = EXPR_BINARY_OP(OP_DIV, lhs, parse_pratt(new_prec));
+		} else if (TACCEPT(T_MOD)) {
+			lhs = EXPR_BINARY_OP(OP_MOD, lhs, parse_pratt(new_prec));
 		}
-	} while (TACCEPT(T_AND));
-
-	return lhs;
-}
-
-struct expr *parse_logical_or_expression() {
-	struct expr *lhs = NULL;
-
-	do {
-		struct expr *rhs = parse_logical_and_expression();
-
-		if (lhs) {
-			// A || B -> A ? 1 : (B ? 1 : 0)
-			lhs = EXPR_ARGS(E_CONDITIONAL, lhs, EXPR_INT(1),
-							EXPR_ARGS(E_CONDITIONAL, rhs, EXPR_INT(1), EXPR_INT(0)));
-		} else {
-			lhs = rhs;
-		}
-	} while (TACCEPT(T_OR));
-
-	return lhs;
-}
-
-// 6.5.15
-struct expr *parse_conditional_expression() {
-	struct expr *lhs = parse_logical_or_expression();
-
-	if (TACCEPT(T_QUEST)) {
-		struct expr *mid = parse_expression();
-		TEXPECT(T_COLON);
-		struct expr *rhs = parse_conditional_expression();
-
-		return expr_new((struct expr) {
-				.type = E_CONDITIONAL,
-				.args = {lhs, mid, rhs}
-			});
-	} else {
-		return lhs;
 	}
+
+	return lhs;
 }
 
 struct expr *parse_assignment_expression() {
-	struct expr *lhs = parse_conditional_expression();
-
-	if (TACCEPT(T_A)) {
-		return EXPR_ARGS(E_ASSIGNMENT, lhs, parse_assignment_expression());
-	} else if (TACCEPT(T_MULA)) {
-		return EXPR_ASSIGNMENT_OP(OP_MUL, lhs, parse_assignment_expression());
-	} else if (TACCEPT(T_DIVA)) {
-		return EXPR_ASSIGNMENT_OP(OP_DIV, lhs, parse_assignment_expression());
-	} else if (TACCEPT(T_MODA)) {
-		return EXPR_ASSIGNMENT_OP(OP_MOD, lhs, parse_assignment_expression());
-	} else if (TACCEPT(T_ADDA)) {
-		return EXPR_ASSIGNMENT_OP(OP_ADD, lhs, parse_assignment_expression());
-	} else if (TACCEPT(T_SUBA)) {
-		return EXPR_ASSIGNMENT_OP(OP_SUB, lhs, parse_assignment_expression());
-	} else if (TACCEPT(T_LSHIFTA)) {
-		return EXPR_ASSIGNMENT_OP(OP_LSHIFT, lhs, parse_assignment_expression());
-	} else if (TACCEPT(T_RSHIFTA)) {
-		return EXPR_ASSIGNMENT_OP(OP_RSHIFT, lhs, parse_assignment_expression());
-	} else if (TACCEPT(T_BANDA)) {
-		return EXPR_ASSIGNMENT_OP(OP_BAND, lhs, parse_assignment_expression());
-	} else if (TACCEPT(T_XORA)) {
-		return EXPR_ASSIGNMENT_OP(OP_BXOR, lhs, parse_assignment_expression());
-	} else if (TACCEPT(T_BORA)) {
-		return EXPR_ASSIGNMENT_OP(OP_BOR, lhs, parse_assignment_expression());
-	} else {
-		// TODO: Assert that lhs is a unary-expression.
-		return lhs;
-	}
+	return parse_pratt(5);
 }
 
 struct expr *parse_expression() {
-	struct expr *lhs = NULL;
-
-	do {
-		struct expr *rhs = parse_assignment_expression();
-
-		if (lhs) {
-			lhs = expr_new((struct expr) {
-					.type = E_COMMA,
-					.args = {lhs, rhs}
-				});
-		} else {
-			lhs = rhs;
-		}
-	} while (TACCEPT(T_COMMA));
-
-	return lhs;
+	return parse_pratt(0);
 }
 
 // Constant expressions.

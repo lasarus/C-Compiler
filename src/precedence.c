@@ -1,13 +1,10 @@
 #include "precedence.h"
 
 // Taken from https://en.wikipedia.org/wiki/Operators_in_C_and_C%2B%2B
-// Not used any more in the expression parser, but still used in
-// preprocessor.
 
 int precedence_get(enum ttype token_type,
 				   enum prec_part part,
-				   int loop,
-				   int in_function) {
+				   int loop) {
 	switch (part) {
 	case PREC_POSTFIX:
 		return 18;
@@ -68,7 +65,7 @@ int precedence_get(enum ttype token_type,
 		case T_QUEST:
 			return 6 - (loop ? 0 : 1);
 		case T_COMMA:
-			return in_function ? 0 : 5;
+			return 5;
 		default:
 			return -1;
 		}

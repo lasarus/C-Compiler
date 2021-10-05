@@ -128,8 +128,8 @@ intmax_t evaluate_expression(int prec) {
 
 	t = NEXT_E();
 
-	while (prec < precedence_get(t.type, PREC_INFIX, 1, 0)) {
-		int new_prec = precedence_get(t.type, PREC_INFIX, 0, 0);
+	while (prec < precedence_get(t.type, PREC_INFIX, 1)) {
+		int new_prec = precedence_get(t.type, PREC_INFIX, 0);
 
 		if (t.type == T_OR) {
 			int rhs = evaluate_expression(new_prec);
