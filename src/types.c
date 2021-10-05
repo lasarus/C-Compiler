@@ -160,26 +160,6 @@ struct type *type_simple(enum simple_type type) {
 	return type_create(&t, NULL);
 }
 
-struct type *type_composed(enum type_ty type, int n, ...) {
-	va_list args;
-	va_start(args, n);
-
-	struct type *children[n];
-
-	for (int i = 0; i < n; i++) {
-		children[i] = va_arg(args, struct type *);
-	}
-
-	va_end(args);
-
-	struct type params = {
-		.type = type,
-		.n = n
-	};
-
-	return type_create(&params, children);
-}
-
 struct type *type_pointer(struct type *type) {
 	struct type params = {
 		.type = TY_POINTER,
@@ -244,8 +224,8 @@ struct enum_data *register_enum(void) {
 	return &array[n++];
 }
 
-int type_member_idx_no_fail(struct type *type,
-							const char *name) {
+int type_member_idx(struct type *type,
+					const char *name) {
 	if (type->type != TY_STRUCT) {
 		pretty_print(type);
 		printf("\n");
@@ -258,34 +238,14 @@ int type_member_idx_no_fail(struct type *type,
 		ERROR("Member access on incomplete type not allowed");
 
 	for (int i = 0; i < data->n; i++) {
-		if (data->names[i] == NULL) {
-			/* int idx = type_member_idx_no_fail(data->types[i], name); */
-			/* if (idx >= 0) */
-			/* 	return idx; */
-		} else if (strcmp(name, data->names[i]) == 0)
+		if (strcmp(name, data->names[i]) == 0)
 			return i;
 	}
-
-	return -1;
-}
-
-int type_member_idx(struct type *type,
-					const char *name) {
-	int idx = type_member_idx_no_fail(type, name);
-
-	if (idx >= 0)
-		return idx;
 
 	printf("TYPE: \"");
 	pretty_print(type);
 	printf("\"\n");
 	ERROR("No member with name %s", name);
-}
-
-struct type *type_member(struct type *type,
-						 const char *name) {
-	int idx = type_member_idx(type, name);
-	return type->struct_data->types[idx];
 }
 
 struct type *parameter_adjust(struct type *type) {

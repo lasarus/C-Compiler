@@ -19,13 +19,7 @@ void convert_arithmetic(struct expr *a,
 		*converted_a = a;
 		*converted_b = b;
 
-		return; // Ignore for now?
-		pretty_print(a_type);
-		printf("\n");
-		pretty_print(b_type);
-		printf("\n");
-		PRINT_POS(T0->pos);
-		ERROR("INVALID");
+		return;
 	}
 	assert(a_type->type == TY_SIMPLE);
 	assert(b_type->type == TY_SIMPLE);
@@ -77,16 +71,8 @@ void convert_arithmetic(struct expr *a,
 		ERROR("Internal compiler error!");
 	}
 
-	*converted_a = target_type == a_stype ? a :
-		expr_new((struct expr) {
-				.type = E_CAST,
-				.cast = { a, type_simple(target_type) }
-			});
-	*converted_b = target_type == b_stype ? b :
-		expr_new((struct expr) {
-				.type = E_CAST,
-				.cast = { b, type_simple(target_type) }
-			});
+	*converted_a = expression_cast(a, type_simple(target_type));
+	*converted_b = expression_cast(b, type_simple(target_type));
 }
 
 struct type *calculate_type(struct expr *expr) {
@@ -267,15 +253,9 @@ void decay_array(struct expr **expr) {
 	if (type->type == TY_ARRAY ||
 		type->type == TY_INCOMPLETE_ARRAY ||
 		type->type == TY_VARIABLE_LENGTH_ARRAY) {
-		*expr = expr_new((struct expr) {
-				.type = E_ARRAY_PTR_DECAY,
-				.args = { *expr }
-			});
+		*expr = EXPR_ARGS(E_ARRAY_PTR_DECAY, *expr);
 	} else if (type->type == TY_FUNCTION) {
-		*expr = expr_new((struct expr) {
-				.type = E_ADDRESS_OF,
-				.args = { *expr }
-			});
+		*expr = EXPR_ARGS(E_ADDRESS_OF, *expr);
 	}
 }
 
@@ -800,32 +780,6 @@ var_id expression_to_ir(struct expr *expr) {
 		IR_PUSH_START_BLOCK(block_end);
 		return res;
 	} break;
-
-	/* case E_LOGICAL_OR: { */
-	/* 	// A || B -> A ? 1 : (B ? 1 : 0) */
-	/* 	var_id condition = expression_to_ir(expr->args[0]); */
-	/* 	var_id res = new_variable(expr->data_type, 1); */
-
-	/* 	block_id block_true = new_block(), */
-	/* 		block_false = new_block(), */
-	/* 		block_end = new_block(); */
-
-	/* 	IR_PUSH(.type = IR_IF_SELECTION, */
-	/* 			.if_selection = { condition, block_true, block_false }); */
-
-	/* 	IR_PUSH_START_BLOCK(block_true); */
-	/* 	var_id true_val = expression_to_ir(expr->args[1]); */
-	/* 	IR_PUSH_COPY(res, true_val); */
-	/* 	IR_PUSH_GOTO(block_end); */
-
-	/* 	IR_PUSH_START_BLOCK(block_false); */
-	/* 	var_id false_val = expression_to_ir(expr->args[2]); */
-	/* 	IR_PUSH_COPY(res, false_val); */
-	/* 	IR_PUSH_GOTO(block_end); */
-
-	/* 	IR_PUSH_START_BLOCK(block_end); */
-	/* 	return res; */
-	/* } break; */
 
 	case E_BUILTIN_VA_END:
 		// Null operation.

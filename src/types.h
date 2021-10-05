@@ -125,15 +125,12 @@ struct enum_data *register_enum(void);
 // string interning.
 struct type *type_simple(enum simple_type type);
 struct type *type_create(struct type *params, struct type **children);
-struct type *type_composed(enum type_ty type, int n, ...);
 struct type *type_pointer(struct type *type);
 struct type *type_deref(struct type *type);
 struct type *type_struct(struct struct_data *struct_data);
 
 int type_member_idx(struct type *type,
 					const char *name);
-struct type *type_member(struct type *type,
-						 const char *name);
 
 void type_select(struct type *type, int index,
 				 int *field_offset, struct type **field_type);
