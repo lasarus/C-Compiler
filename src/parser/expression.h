@@ -28,6 +28,12 @@ struct expr *expr_new(struct expr expr);
 			.args = {(LHS), (RHS)}								\
 		})
 
+#define EXPR_UNARY_OP(TYPE, RHS) expr_new((struct expr) {	\
+			.type = E_UNARY_OP,								\
+			.unary_op = (TYPE),								\
+			.args = {(RHS)}									\
+		})
+
 #define EXPR_CAST(TYPE, EXPR) expr_new((struct expr) {	\
 			.type = (E_CAST),							\
 			.cast = {(EXPR), (TYPE)}					\
@@ -61,9 +67,7 @@ struct expr {
 		E_PREFIX_DEC,
 		E_ADDRESS_OF,
 		E_INDIRECTION,
-		E_UNARY_PLUS,
-		E_UNARY_MINUS,
-		E_BITWISE_NOT,
+		E_UNARY_OP,
 		E_ALIGNOF,
 		E_CAST,
 		E_POINTER_ADD,
@@ -145,6 +149,8 @@ struct expr {
 				E_BINARY_OP_ARITHMETIC,
 			} type;
 		} binary_op;
+
+		enum unary_operator_type unary_op;
 	};
 	
 	struct expr *args[3];

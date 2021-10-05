@@ -76,10 +76,7 @@ struct instruction {
 		} binary_operator;
 #define IR_PUSH_BINARY_OPERATOR(TYPE, LHS, RHS, RESULT) IR_PUSH(.type = IR_BINARY_OPERATOR, .binary_operator = { .type = (TYPE), .lhs = (LHS), .rhs = (RHS), .result = (RESULT)})
 		struct {
-			enum unary_operator_type {
-				UOP_PLUS, UOP_NEG, UOP_BNOT, UOP_NOT,
-				UOP_TYPE_COUNT
-			} type;
+			enum unary_operator_type type;
 			var_id operand, result;
 		} unary_operator;
 #define IR_PUSH_UNARY_OPERATOR(TYPE, OPERAND, RESULT) IR_PUSH(.type = IR_UNARY_OPERATOR, .unary_operator = { (TYPE), (OPERAND), (RESULT)})

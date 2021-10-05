@@ -98,9 +98,7 @@ struct type *calculate_type(struct expr *expr) {
 		return operators_get_result_type(expr->binary_op.op, expr->args[0]->data_type,
 										 expr->args[1]->data_type);
 
-	case E_BITWISE_NOT:
-	case E_UNARY_PLUS:
-	case E_UNARY_MINUS:
+	case E_UNARY_OP:
 		return expr->args[0]->data_type;
 
 	case E_SYMBOL:
@@ -145,8 +143,6 @@ struct type *calculate_type(struct expr *expr) {
 		return expr->args[0]->data_type;
 
 	case E_ASSIGNMENT:
-	/* case E_ASSIGNMENT_ADD: */
-	/* case E_ASSIGNMENT_SUBTRACT: */
 	case E_ASSIGNMENT_OP:
 	case E_ASSIGNMENT_POINTER_ADD:
 		return expr->args[0]->data_type;
@@ -200,9 +196,7 @@ int num_args[E_NUM_TYPES] = {
 	[E_PREFIX_DEC] = 1,
 	[E_ADDRESS_OF] = 1,
 	[E_INDIRECTION] = 1,
-	[E_UNARY_PLUS] = 1,
-	[E_UNARY_MINUS] = 1,
-	[E_BITWISE_NOT] = 1,
+	[E_UNARY_OP] = 1,
 	[E_ALIGNOF] = 1,
 	[E_BINARY_OP] = 2,
 	[E_ASSIGNMENT] = 2,
@@ -212,9 +206,7 @@ int num_args[E_NUM_TYPES] = {
 };
 
 int does_integer_conversion[E_NUM_TYPES] = {
-	[E_UNARY_PLUS] = 1,
-	[E_UNARY_MINUS] = 1,
-	[E_BITWISE_NOT] = 1,
+	[E_UNARY_OP] = 1,
 	[E_BINARY_OP] = 1,
 	[E_CONDITIONAL] = 1,
 };
@@ -462,16 +454,6 @@ struct lvalue expression_to_lvalue(struct expr *expr) {
 	}
 }
 
-enum unary_operator_type uop_type_from_expr(struct expr *expr) {
-	switch (expr->type) {
-	case E_UNARY_PLUS: return UOP_PLUS;
-	case E_UNARY_MINUS: return UOP_NEG;
-	case E_BITWISE_NOT: return UOP_BNOT;
-	default:
-		ERROR("Invalid expr type");
-	}
-}
-
 struct type *get_lvalue_type(struct lvalue lvalue) {
 	switch (lvalue.type) {
 	case LVALUE_VARIABLE:
@@ -531,14 +513,12 @@ var_id expression_to_ir(struct expr *expr) {
 		return res;
 	} break;
 
-	case E_UNARY_PLUS:
-	case E_UNARY_MINUS:
-	case E_BITWISE_NOT:
+	case E_UNARY_OP:
 	{
 		var_id rhs = expression_to_ir(expr->args[0]);
 		var_id res = new_variable(expr->data_type, 1);
 
-		IR_PUSH_UNARY_OPERATOR(uop_type_from_expr(expr), rhs, res);
+		IR_PUSH_UNARY_OPERATOR(expr->unary_op, rhs, res);
 		return res;
 	} break;
 
@@ -1147,23 +1127,11 @@ struct expr *parse_unary_expression() {
 				.args = { rhs }
 			});
 	} else if (TACCEPT(T_ADD)) {
-		struct expr *rhs = parse_cast_expression();
-		return expr_new((struct expr) {
-				.type = E_UNARY_PLUS,
-				.args = { rhs }
-			});
+		return EXPR_UNARY_OP(UOP_PLUS, parse_cast_expression());
 	} else if (TACCEPT(T_SUB)) {
-		struct expr *rhs = parse_cast_expression();
-		return expr_new((struct expr) {
-				.type = E_UNARY_MINUS,
-				.args = { rhs }
-			});
+		return EXPR_UNARY_OP(UOP_NEG, parse_cast_expression());
 	} else if (TACCEPT(T_BNOT)) {
-		struct expr *rhs = parse_cast_expression();
-		return expr_new((struct expr) {
-				.type = E_BITWISE_NOT,
-				.args = { rhs }
-			});
+		return EXPR_UNARY_OP(UOP_BNOT, parse_cast_expression());
 	} else if (TACCEPT(T_NOT)) {
 		struct expr *rhs = parse_cast_expression();
 		return EXPR_ARGS(E_CONDITIONAL, rhs,

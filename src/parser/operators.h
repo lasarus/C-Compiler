@@ -31,4 +31,9 @@ struct type *operators_get_result_type(enum operator_type op,
 struct constant operators_constant(enum operator_type op,
 								   struct constant lhs, struct constant rhs);
 
+enum unary_operator_type {
+	UOP_PLUS, UOP_NEG, UOP_BNOT,
+	UOP_TYPE_COUNT
+};
+
 #endif
