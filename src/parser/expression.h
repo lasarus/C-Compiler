@@ -36,7 +36,7 @@ struct expr *expr_new(struct expr expr);
 
 #define EXPR_INT(I) expr_new((struct expr) {							\
 			.type = E_CONSTANT,											\
-			.constant = {.type = CONSTANT_TYPE, .data_type = type_simple(ST_INT), .i = (I)} \
+			.constant = {.type = CONSTANT_TYPE, .data_type = type_simple(ST_INT), .int_d = (I)} \
 		})
 #define EXPR_VAR(V) expr_new((struct expr) {	\
 			.type = E_VARIABLE,								\

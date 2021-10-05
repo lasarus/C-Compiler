@@ -25,15 +25,17 @@ enum operator_type {
 	OP_TYPE_COUNT
 };
 
+enum unary_operator_type {
+	UOP_PLUS, UOP_NEG, UOP_BNOT,
+	UOP_TYPE_COUNT
+};
+
 struct type *operators_get_result_type(enum operator_type op,
 									   struct type *lhs_type,
 									   struct type *rhs_type);
 struct constant operators_constant(enum operator_type op,
 								   struct constant lhs, struct constant rhs);
-
-enum unary_operator_type {
-	UOP_PLUS, UOP_NEG, UOP_BNOT,
-	UOP_TYPE_COUNT
-};
+struct constant operators_constant_unary(enum unary_operator_type op,
+										 struct constant rhs);
 
 #endif

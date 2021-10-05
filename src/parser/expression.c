@@ -78,7 +78,8 @@ void convert_arithmetic(struct expr *a,
 struct type *calculate_type(struct expr *expr) {
 	switch (expr->type) {
 	case E_CONSTANT:
-		assert(expr->constant.type == CONSTANT_TYPE);
+		if (expr->constant.type == CONSTANT_LABEL)
+			NOTIMP();
 		return expr->constant.data_type;
 
 	case E_BINARY_OP:
@@ -372,6 +373,17 @@ struct expr *expr_new(struct expr expr) {
 	}
 
 	expr.data_type = calculate_type(&expr);
+
+	if (expr.type != E_CONSTANT &&
+		expr.type != E_STRING_LITERAL) {
+		struct constant c;
+		if (evaluate_constant_expression(&expr, &c)) {
+			return expr_new((struct expr) {
+					.type = E_CONSTANT,
+					.constant = c
+				});
+		}
+	}
 
 	struct expr *ret = malloc(sizeof *ret);
 	*ret = expr;
@@ -1026,7 +1038,7 @@ struct expr *parse_unary_expression() {
 			size = calculate_size(rhs->data_type);
 		}
 		// TODO: Size should perhaps not be an integer.
-		struct constant c = {.type = CONSTANT_TYPE, .data_type = type_simple(ST_INT), .i = size };
+		struct constant c = {.type = CONSTANT_TYPE, .data_type = type_simple(ST_INT), .int_d = size };
 
 		return expr_new((struct expr) {
 				.type = E_CONSTANT,
@@ -1177,11 +1189,6 @@ int evaluate_constant_expression(struct expr *expr,
 		*constant = constant_cast(rhs, expr->cast.target);
 	} break;
 
-	case E_VARIABLE:
-	case E_DOT_OPERATOR:
-	case E_CALL:
-		return 0;
-
 	case E_BINARY_OP: {
 		struct constant lhs, rhs;
 		if (!evaluate_constant_expression(expr->args[0], &lhs))
@@ -1189,6 +1196,13 @@ int evaluate_constant_expression(struct expr *expr,
 		if (!evaluate_constant_expression(expr->args[1], &rhs))
 			return 0;
 		*constant = operators_constant(expr->binary_op.op, lhs, rhs);
+	} break;
+
+	case E_UNARY_OP: {
+		struct constant rhs;
+		if (!evaluate_constant_expression(expr->args[0], &rhs))
+			return 0;
+		*constant = operators_constant_unary(expr->unary_op, rhs);
 	} break;
 
 	case E_STRING_LITERAL: {
@@ -1200,13 +1214,13 @@ int evaluate_constant_expression(struct expr *expr,
 	} break;
 
 	default:
-		ERROR("Not imp %d\n", expr->type);
-		NOTIMP();
+		return 0;
 	}
 	return 1;
 }
 
 struct expr *expression_cast(struct expr *expr, struct type *type) {
+	decay_array(&expr);
 	return (expr->data_type == type) ? expr :
 		expr_new((struct expr) {
 				.type = E_CAST,

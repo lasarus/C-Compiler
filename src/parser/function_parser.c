@@ -45,7 +45,7 @@ int parse_labeled_statement(struct jump_blocks jump_blocks) {
 		TEXPECT(T_COLON);
 		struct constant constant;
 		if (!evaluate_constant_expression(expression_cast(value, type_simple(ST_INT)), &constant))
-			ERROR("Expression not constant");
+			ERROR("Expression not constant, is of type %d", value->type);
 
 		struct case_labels *labels = jump_blocks.case_labels;
 		if (!labels)

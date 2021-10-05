@@ -78,7 +78,39 @@ struct constant operators_constant(enum operator_type op,
 		return (struct constant) {
 			.type = CONSTANT_TYPE,
 			.data_type = type_simple(ST_INT),
-			.i = op_integer(op, lhs.i, rhs.i)
+			.int_d = op_integer(op, lhs.int_d, rhs.int_d)
+		};
+		break;
+	default:
+		NOTIMP();
+	}
+}
+
+int uop_integer(enum unary_operator_type op, int rhs) {
+	switch (op) {
+	case UOP_PLUS: return +rhs;
+	case UOP_NEG: return -rhs;
+	case UOP_BNOT: return ~rhs;
+	default: NOTIMP();
+	}
+}
+
+struct constant operators_constant_unary(enum unary_operator_type op,
+										 struct constant rhs) {
+	if (rhs.type != CONSTANT_TYPE)
+		NOTIMP();
+
+	struct type *type = rhs.data_type;
+
+	if (type->type != TY_SIMPLE)
+		NOTIMP();
+
+	switch (type->simple) {
+	case ST_INT:
+		return (struct constant) {
+			.type = CONSTANT_TYPE,
+			.data_type = type_simple(ST_INT),
+			.int_d = uop_integer(op, rhs.int_d)
 		};
 		break;
 	default:

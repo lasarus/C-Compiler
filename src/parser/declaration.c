@@ -589,7 +589,7 @@ struct type *ast_to_type(const struct type_specifiers *ts, struct type_ast *ast,
 					assert(type_is_simple(length.data_type, ST_INT));
 					struct type params = {
 						.type = TY_ARRAY,
-						.array.length = length.i,
+						.array.length = length.int_d,
 						.n = 1
 					};
 					type = type_create(&params, &type);
@@ -841,7 +841,7 @@ int parse_designator_list(int *first_index, int *offset, struct type **type) {
 				case TY_SIMPLE:
 					switch (constant.data_type->simple) {
 					case ST_INT:
-						mem_idx = constant.i;
+						mem_idx = constant.int_d;
 						break;
 
 					default:

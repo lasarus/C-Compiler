@@ -369,124 +369,7 @@ void calculate_offsets(struct struct_data *data) {
 	data->alignment = alignment;
 }
 
-// Constant
-struct constant constant_add(struct constant a, struct constant b) {
-	assert(a.type == b.type);
-	assert(a.data_type == b.data_type);
-
-	switch (a.type) {
-	case CONSTANT_TYPE:
-		switch(a.data_type->type) {
-		case TY_SIMPLE:
-			switch (a.data_type->simple) {
-			case ST_INT:
-				return (struct constant) {
-					.type = CONSTANT_TYPE,
-					.data_type = type_simple(ST_INT),
-					.i = a.i + b.i
-				};
-				break;
-			default:
-				NOTIMP();
-			}
-			break;
-		default:
-			NOTIMP();
-		}
-		break;
-	default:
-		NOTIMP();
-	}
-}
-
-struct constant constant_sub(struct constant a, struct constant b) {
-	assert(a.type == b.type);
-	assert(a.data_type == b.data_type);
-
-	switch (a.type) {
-	case CONSTANT_TYPE:
-		switch(a.data_type->type) {
-		case TY_SIMPLE:
-			switch (a.data_type->simple) {
-			case ST_INT:
-				return (struct constant) {
-					.type = CONSTANT_TYPE,
-					.data_type = type_simple(ST_INT),
-					.i = a.i - b.i
-				};
-				break;
-			default:
-				NOTIMP();
-			}
-			break;
-		default:
-			NOTIMP();
-		}
-		break;
-	default:
-		NOTIMP();
-	}
-}
-
-struct constant constant_shift_left(struct constant a, struct constant b) {
-	assert(a.type == b.type);
-	assert(a.data_type == b.data_type);
-
-	switch (a.type) {
-	case CONSTANT_TYPE:
-		switch(a.data_type->type) {
-		case TY_SIMPLE:
-			switch (a.data_type->simple) {
-			case ST_INT:
-				return (struct constant) {
-					.type = CONSTANT_TYPE,
-					.data_type = type_simple(ST_INT),
-					.i = a.i << b.i
-				};
-				break;
-			default:
-				NOTIMP();
-			}
-			break;
-		default:
-			NOTIMP();
-		} break;
-
-	default:
-		NOTIMP();
-	}
-}
-
-struct constant constant_or(struct constant a, struct constant b) {
-	assert(a.type == b.type);
-	assert(a.data_type == b.data_type);
-
-
-	switch (a.type) {
-	case CONSTANT_TYPE:
-		switch(a.data_type->type) {
-		case TY_SIMPLE:
-			switch (a.data_type->simple) {
-			case ST_INT:
-				return (struct constant) {
-					.type = CONSTANT_TYPE,
-					.data_type = type_simple(ST_INT),
-					.i = a.i | b.i
-				};
-				break;
-			default:
-				NOTIMP();
-			}
-			break;
-		default:
-			NOTIMP();
-		} break;
-
-	default:
-		NOTIMP();
-	}
-}
-
+/* // Constant */
 struct constant constant_increment(struct constant a) {
 	switch (a.type) {
 	case CONSTANT_TYPE:
@@ -494,7 +377,7 @@ struct constant constant_increment(struct constant a) {
 		case TY_SIMPLE:
 			switch (a.data_type->simple) {
 			case ST_INT:
-				a.i++;
+				a.int_d++;
 				return a;
 			default:
 				NOTIMP();
@@ -525,10 +408,49 @@ struct constant constant_from_string(const char *str) {
 	// TODO: Manage all kinds of bases.
 	if (str[0] == '0' && str[1] == 'x') {
 		return (struct constant) {.type = CONSTANT_TYPE, .data_type = type_simple(ST_INT),
-			.i = strtol(str + 2, NULL, 16)};
+			.int_d = strtol(str + 2, NULL, 16)};
 	} else {
-		return (struct constant) {.type = CONSTANT_TYPE, .data_type = type_simple(ST_INT), .i = atoi(str)};
+		return (struct constant) {.type = CONSTANT_TYPE, .data_type = type_simple(ST_INT), .int_d = atoi(str)};
 	}
+}
+
+struct constant simple_cast(struct constant from, enum simple_type target) {
+	assert(from.type == CONSTANT_TYPE);
+	assert(from.data_type->type == TY_SIMPLE);
+
+#define CONVERT_TO(NAME)\
+		switch (target) {\
+		case ST_VOID: break;							\
+		case ST_CHAR: from.NAME = from.char_d; break;\
+		case ST_UCHAR: from.NAME = from.uchar_d; break;\
+		case ST_SCHAR: from.NAME = from.schar_d; break;\
+		case ST_SHORT: from.NAME = from.short_d; break;\
+		case ST_USHORT: from.NAME = from.ushort_d; break;\
+		case ST_INT: from.NAME = from.int_d; break;\
+		case ST_UINT: from.NAME = from.uint_d; break;\
+		case ST_LONG: from.NAME = from.long_d; break;\
+		case ST_ULONG: from.NAME = from.ulong_d; break;\
+		case ST_LLONG: from.NAME = from.llong_d; break;\
+		case ST_ULLONG: from.NAME = from.ullong_d; break;\
+		default: ERROR("Trying to convert from %s to %s", strdup(type_to_string(from.data_type)), strdup(type_to_string(type_simple(target)))); \
+		}\
+
+	switch (from.data_type->simple) {
+	case ST_CHAR: CONVERT_TO(char_d); break;
+	case ST_SCHAR: CONVERT_TO(schar_d); break;
+	case ST_UCHAR: CONVERT_TO(uchar_d); break;
+	case ST_SHORT: CONVERT_TO(short_d); break;
+	case ST_USHORT: CONVERT_TO(ushort_d); break;
+	case ST_INT: CONVERT_TO(int_d); break;
+	case ST_UINT: CONVERT_TO(uint_d); break;
+	case ST_LONG: CONVERT_TO(long_d); break;
+	case ST_ULONG: CONVERT_TO(ulong_d); break;
+	case ST_LLONG: CONVERT_TO(llong_d); break;
+	case ST_ULLONG: CONVERT_TO(ullong_d); break;
+	default: NOTIMP();
+	}
+	from.data_type = type_simple(target);
+	return from;
 }
 
 struct constant constant_cast(struct constant a, struct type *target) {
@@ -547,7 +469,7 @@ struct constant constant_cast(struct constant a, struct type *target) {
 
 	if (type_is_pointer(target) && type_is_simple(a.data_type, ST_INT)) {
 		a.data_type = target;
-		a.quad = a.i;
+		a.long_d = a.int_d;
 		return a;
 	}
 
@@ -561,11 +483,9 @@ struct constant constant_cast(struct constant a, struct type *target) {
 		return a;
 	}
 
-	if (type_is_simple(a.data_type, ST_INT) &&
-		type_is_simple(target, ST_ULONG)) {
-		a.data_type = target;
-		a.quad = (unsigned long)a.i;
-		return a;
+	if (target->type == TY_SIMPLE &&
+		a.data_type->type == TY_SIMPLE) {
+		return simple_cast(a, target->simple);
 	}
 
 	printf("Trying to cast from %s to %s\n",
