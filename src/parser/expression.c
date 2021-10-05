@@ -232,7 +232,7 @@ struct expr *do_integer_promotion(struct expr *expr) {
 	case ST_UCHAR:
 	case ST_SHORT:
 	case ST_USHORT:
-		return EXPR_CAST(type_simple(ST_INT), expr);
+		return expression_cast(expr, type_simple(ST_INT));
 	default:
 		return expr;
 	}
@@ -648,7 +648,7 @@ var_id expression_to_ir(struct expr *expr) {
 			var_id constant_one = expression_to_ir(EXPR_INT(1));
 			IR_PUSH_POINTER_INCREMENT(value, value, constant_one);
 		} else {
-			var_id constant_one = expression_to_ir(EXPR_CAST(type, EXPR_INT(1)));
+			var_id constant_one = expression_to_ir(expression_cast(EXPR_INT(1), type));
 			IR_PUSH_BINARY_OPERATOR(OP_ADD, value, constant_one, value);
 		}
 		lvalue_store(lvalue, value);
@@ -686,7 +686,7 @@ var_id expression_to_ir(struct expr *expr) {
 			var_id constant_one = expression_to_ir(EXPR_INT(1));
 			IR_PUSH_POINTER_INCREMENT(value, value, constant_one);
 		} else {
-			var_id constant_one = expression_to_ir(EXPR_CAST(type, EXPR_INT(1)));
+			var_id constant_one = expression_to_ir(expression_cast(EXPR_INT(1), type));
 			IR_PUSH_BINARY_OPERATOR(OP_ADD, value, constant_one, value);
 		}
 		lvalue_store(lvalue, value);
@@ -1191,7 +1191,7 @@ struct expr *parse_paren_or_cast_expression() {
 			struct expr *rhs = parse_cast_expression();
 			if (!rhs)
 				ERROR("Expected expression");
-			return EXPR_CAST(cast_type, rhs);
+			return expression_cast(rhs, cast_type);
 		}
 	} else {
 		// This is wrong.
@@ -1574,7 +1574,9 @@ int evaluate_constant_expression(struct expr *expr,
 }
 
 struct expr *expression_cast(struct expr *expr, struct type *type) {
-	if (expr->data_type != type)
-		return EXPR_CAST(type, expr);
-	return expr;
+	return (expr->data_type == type) ? expr :
+		expr_new((struct expr) {
+				.type = E_CAST,
+				.cast = {expr, type}				   
+			});
 }

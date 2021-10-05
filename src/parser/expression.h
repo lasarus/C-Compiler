@@ -34,11 +34,6 @@ struct expr *expr_new(struct expr expr);
 			.args = {(RHS)}									\
 		})
 
-#define EXPR_CAST(TYPE, EXPR) expr_new((struct expr) {	\
-			.type = (E_CAST),							\
-			.cast = {(EXPR), (TYPE)}					\
-		})
-
 #define EXPR_INT(I) expr_new((struct expr) {							\
 			.type = E_CONSTANT,											\
 			.constant = {.type = CONSTANT_TYPE, .data_type = type_simple(ST_INT), .i = (I)} \
