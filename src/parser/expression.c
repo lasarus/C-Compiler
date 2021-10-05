@@ -1510,7 +1510,7 @@ struct expr *parse_assignment_expression() {
 	struct expr *lhs = parse_conditional_expression();
 
 	if (TACCEPT(T_A)) {
-		return EXPR_BINARY(E_ASSIGNMENT, lhs, parse_assignment_expression());
+		return EXPR_ARGS(E_ASSIGNMENT, lhs, parse_assignment_expression());
 	} else if (TACCEPT(T_MULA)) {
 		return EXPR_ASSIGNMENT_OP(OP_MUL, lhs, parse_assignment_expression());
 	} else if (TACCEPT(T_DIVA)) {

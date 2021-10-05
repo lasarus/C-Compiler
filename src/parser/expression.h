@@ -14,11 +14,6 @@ struct expr *expr_new(struct expr expr);
 			.args = {__VA_ARGS__}						\
 		})
 
-#define EXPR_BINARY(TYPE, LHS, RHS) expr_new((struct expr) {	\
-			.type = (TYPE),										\
-			.args = {(LHS), (RHS)}								\
-		})
-
 #define EXPR_ASSIGNMENT_OP(TYPE, LHS, RHS) expr_new((struct expr) {	\
 			.type = E_ASSIGNMENT_OP,								\
 			.binary_op.op = (TYPE),								\
