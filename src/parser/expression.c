@@ -145,16 +145,9 @@ struct type *calculate_type(struct expr *expr) {
 		return expr->args[0]->data_type;
 
 	case E_ASSIGNMENT:
-	case E_ASSIGNMENT_ADD:
-	case E_ASSIGNMENT_SUBTRACT:
-	case E_ASSIGNMENT_MULTIPLY:
-	case E_ASSIGNMENT_DIVIDE:
-	case E_ASSIGNMENT_MODULUS:
-	case E_ASSIGNMENT_LEFT_SHIFT:
-	case E_ASSIGNMENT_RIGHT_SHIFT:
-	case E_ASSIGNMENT_XOR:
-	case E_ASSIGNMENT_BINARY_OR:
-	case E_ASSIGNMENT_BINARY_AND:
+	/* case E_ASSIGNMENT_ADD: */
+	/* case E_ASSIGNMENT_SUBTRACT: */
+	case E_ASSIGNMENT_OP:
 	case E_ASSIGNMENT_POINTER_ADD:
 		return expr->args[0]->data_type;
 
@@ -215,7 +208,7 @@ int num_args[E_NUM_TYPES] = {
 	[E_ASSIGNMENT] = 2,
 	[E_CONDITIONAL] = 3,
 	[E_COMMA] = 2,
-	[E_ASSIGNMENT_BINARY_OR] = 2,
+	[E_ASSIGNMENT_OP] = 2,
 };
 
 int does_integer_conversion[E_NUM_TYPES] = {
@@ -228,7 +221,7 @@ int does_integer_conversion[E_NUM_TYPES] = {
 
 int does_arithmetic_conversion[E_NUM_TYPES] = {
 	[E_BINARY_OP] = 1,
-	[E_ASSIGNMENT_BINARY_OR] = 1,
+	[E_ASSIGNMENT_OP] = 1,
 };
 
 struct expr *do_integer_promotion(struct expr *expr) {
@@ -325,7 +318,8 @@ void cast_conditional(struct expr *expr) {
 }
 
 void fix_assignment_add(struct expr *expr) {
-	if (expr->type != E_ASSIGNMENT_ADD)
+	if (expr->type != E_ASSIGNMENT_OP ||
+		expr->binary_op.op != OP_ADD)
 		return;
 
 	if (type_is_pointer(expr->args[0]->data_type))
@@ -465,23 +459,6 @@ struct lvalue expression_to_lvalue(struct expr *expr) {
 	default:
 		ERROR("NOt imp %d\n", expr->type);
 		NOTIMP();
-	}
-}
-
-enum operator_type op_assignment_type_from_expr(struct expr *expr) {
-	switch (expr->type) {
-	case E_ASSIGNMENT_ADD: return OP_ADD;
-	case E_ASSIGNMENT_SUBTRACT: return OP_SUB;
-	case E_ASSIGNMENT_MULTIPLY: return OP_MUL;
-	case E_ASSIGNMENT_DIVIDE: return OP_DIV;
-	case E_ASSIGNMENT_MODULUS: return OP_MOD;
-	case E_ASSIGNMENT_LEFT_SHIFT: return OP_LSHIFT;
-	case E_ASSIGNMENT_RIGHT_SHIFT: return OP_RSHIFT;
-	case E_ASSIGNMENT_XOR: return OP_BXOR;
-	case E_ASSIGNMENT_BINARY_OR: return OP_BOR;
-	case E_ASSIGNMENT_BINARY_AND: return OP_BAND;
-	default:
-		ERROR("Invalid expr type");
 	}
 }
 
@@ -763,16 +740,7 @@ var_id expression_to_ir(struct expr *expr) {
 		return rhs;
 	};
 
-	case E_ASSIGNMENT_ADD:
-	case E_ASSIGNMENT_SUBTRACT:
-	case E_ASSIGNMENT_MULTIPLY:
-	case E_ASSIGNMENT_DIVIDE:
-	case E_ASSIGNMENT_MODULUS:
-	case E_ASSIGNMENT_LEFT_SHIFT:
-	case E_ASSIGNMENT_RIGHT_SHIFT:
-	case E_ASSIGNMENT_XOR:
-	case E_ASSIGNMENT_BINARY_OR:
-	case E_ASSIGNMENT_BINARY_AND:
+	case E_ASSIGNMENT_OP:
 	{
 		struct expr *lhs = expr->args[0];
 		if (lhs->type == E_CAST)
@@ -781,7 +749,7 @@ var_id expression_to_ir(struct expr *expr) {
 		var_id rhs = expression_to_ir(expr->args[1]);
 
 		var_id prev_val = lvalue_load(lvalue);
-		enum operator_type ot = op_assignment_type_from_expr(expr);
+		enum operator_type ot = expr->binary_op.op;
 
 		if (type_is_pointer(expr->args[0]->data_type) ||
 			type_is_pointer(expr->args[1]->data_type)) {
@@ -1544,25 +1512,25 @@ struct expr *parse_assignment_expression() {
 	if (TACCEPT(T_A)) {
 		return EXPR_BINARY(E_ASSIGNMENT, lhs, parse_assignment_expression());
 	} else if (TACCEPT(T_MULA)) {
-		return EXPR_BINARY(E_ASSIGNMENT_MULTIPLY, lhs, parse_assignment_expression());
+		return EXPR_ASSIGNMENT_OP(OP_MUL, lhs, parse_assignment_expression());
 	} else if (TACCEPT(T_DIVA)) {
-		return EXPR_BINARY(E_ASSIGNMENT_DIVIDE, lhs, parse_assignment_expression());
+		return EXPR_ASSIGNMENT_OP(OP_DIV, lhs, parse_assignment_expression());
 	} else if (TACCEPT(T_MODA)) {
-		return EXPR_BINARY(E_ASSIGNMENT_MODULUS, lhs, parse_assignment_expression());
+		return EXPR_ASSIGNMENT_OP(OP_MOD, lhs, parse_assignment_expression());
 	} else if (TACCEPT(T_ADDA)) {
-		return EXPR_BINARY(E_ASSIGNMENT_ADD, lhs, parse_assignment_expression());
+		return EXPR_ASSIGNMENT_OP(OP_ADD, lhs, parse_assignment_expression());
 	} else if (TACCEPT(T_SUBA)) {
-		return EXPR_BINARY(E_ASSIGNMENT_SUBTRACT, lhs, parse_assignment_expression());
+		return EXPR_ASSIGNMENT_OP(OP_SUB, lhs, parse_assignment_expression());
 	} else if (TACCEPT(T_LSHIFTA)) {
-		return EXPR_BINARY(E_ASSIGNMENT_LEFT_SHIFT, lhs, parse_assignment_expression());
+		return EXPR_ASSIGNMENT_OP(OP_LSHIFT, lhs, parse_assignment_expression());
 	} else if (TACCEPT(T_RSHIFTA)) {
-		return EXPR_BINARY(E_ASSIGNMENT_RIGHT_SHIFT, lhs, parse_assignment_expression());
+		return EXPR_ASSIGNMENT_OP(OP_RSHIFT, lhs, parse_assignment_expression());
 	} else if (TACCEPT(T_BANDA)) {
-		return EXPR_BINARY(E_ASSIGNMENT_BINARY_AND, lhs, parse_assignment_expression());
+		return EXPR_ASSIGNMENT_OP(OP_BAND, lhs, parse_assignment_expression());
 	} else if (TACCEPT(T_XORA)) {
-		return EXPR_BINARY(E_ASSIGNMENT_XOR, lhs, parse_assignment_expression());
+		return EXPR_ASSIGNMENT_OP(OP_BXOR, lhs, parse_assignment_expression());
 	} else if (TACCEPT(T_BORA)) {
-		return EXPR_BINARY(E_ASSIGNMENT_BINARY_OR, lhs, parse_assignment_expression());
+		return EXPR_ASSIGNMENT_OP(OP_BOR, lhs, parse_assignment_expression());
 	} else {
 		// TODO: Assert that lhs is a unary-expression.
 		return lhs;

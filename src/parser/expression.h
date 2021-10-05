@@ -19,6 +19,13 @@ struct expr *expr_new(struct expr expr);
 			.args = {(LHS), (RHS)}								\
 		})
 
+#define EXPR_ASSIGNMENT_OP(TYPE, LHS, RHS) expr_new((struct expr) {	\
+			.type = E_ASSIGNMENT_OP,								\
+			.binary_op.op = (TYPE),								\
+			.binary_op.type = E_BINARY_OP_UNASIGNED,			\
+			.args = {(LHS), (RHS)}								\
+		})
+
 #define EXPR_BINARY_OP(TYPE, LHS, RHS) expr_new((struct expr) {	\
 			.type = E_BINARY_OP,								\
 			.binary_op.op = (TYPE),								\
@@ -67,17 +74,8 @@ struct expr {
 		E_POINTER_ADD,
 		E_POINTER_DIFF,
 		E_ASSIGNMENT,
-		E_ASSIGNMENT_ADD,
 		E_ASSIGNMENT_POINTER_ADD,
-		E_ASSIGNMENT_SUBTRACT,
-		E_ASSIGNMENT_MULTIPLY,
-		E_ASSIGNMENT_DIVIDE,
-		E_ASSIGNMENT_MODULUS,
-		E_ASSIGNMENT_LEFT_SHIFT,
-		E_ASSIGNMENT_RIGHT_SHIFT,
-		E_ASSIGNMENT_XOR,
-		E_ASSIGNMENT_BINARY_OR,
-		E_ASSIGNMENT_BINARY_AND,
+		E_ASSIGNMENT_OP,
 		E_CONDITIONAL,
 		E_COMMA,
 		E_ARRAY_PTR_DECAY,
@@ -86,6 +84,7 @@ struct expr {
 		E_BUILTIN_VA_END,
 		E_BUILTIN_VA_ARG,
 		E_BUILTIN_VA_COPY,
+
 		E_BINARY_OP,
 
 		E_NUM_TYPES
