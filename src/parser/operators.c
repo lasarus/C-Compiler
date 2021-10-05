@@ -2,6 +2,7 @@
 
 #include <common.h>
 #include <string.h>
+#include <preprocessor/preprocessor.h>
 
 struct type *operators_get_result_type(enum operator_type op,
 									   struct type *lhs_type,
@@ -27,6 +28,7 @@ struct type *operators_get_result_type(enum operator_type op,
 	if (lhs_type != rhs_type) {
 		if (!supports_pointer[op] ||
 			type_is_pointer(lhs_type) != type_is_pointer(rhs_type)) {
+			PRINT_POS(T0->pos);
 			ERROR("Can't perform op %d on %s and %s\n", op,
 				  strdup(type_to_string(lhs_type)),
 				  strdup(type_to_string(rhs_type)));

@@ -12,6 +12,7 @@ enum ttype {
     #undef X
     #undef KEY
     #undef SYM
+	T_COUNT
 };
 
 int int_max(int a, int b);

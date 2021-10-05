@@ -1217,31 +1217,49 @@ struct expr *parse_pratt(int precedence) {
 	while (precedence < precedence_get(T0->type, PREC_INFIX, 1)) {
 		int new_prec = precedence_get(T0->type, PREC_INFIX, 0);
 
-		if (TACCEPT(T_COMMA)) {
-			struct expr *rhs = parse_pratt(new_prec);
-			lhs = EXPR_ARGS(E_COMMA, lhs, rhs);
-		} else if (TACCEPT(T_A)) {
-			lhs = EXPR_ARGS(E_ASSIGNMENT, lhs, parse_pratt(new_prec));
-		} else if (TACCEPT(T_MULA)) {
-			lhs = EXPR_ASSIGNMENT_OP(OP_MUL, lhs, parse_pratt(new_prec));
-		} else if (TACCEPT(T_DIVA)) {
-			lhs = EXPR_ASSIGNMENT_OP(OP_DIV, lhs, parse_pratt(new_prec));
-		} else if (TACCEPT(T_MODA)) {
-			lhs = EXPR_ASSIGNMENT_OP(OP_MOD, lhs, parse_pratt(new_prec));
-		} else if (TACCEPT(T_ADDA)) {
-			lhs = EXPR_ASSIGNMENT_OP(OP_ADD, lhs, parse_pratt(new_prec));
-		} else if (TACCEPT(T_SUBA)) {
-			lhs = EXPR_ASSIGNMENT_OP(OP_SUB, lhs, parse_pratt(new_prec));
-		} else if (TACCEPT(T_LSHIFTA)) {
-			lhs = EXPR_ASSIGNMENT_OP(OP_LSHIFT, lhs, parse_pratt(new_prec));
-		} else if (TACCEPT(T_RSHIFTA)) {
-			lhs = EXPR_ASSIGNMENT_OP(OP_RSHIFT, lhs, parse_pratt(new_prec));
-		} else if (TACCEPT(T_BANDA)) {
-			lhs = EXPR_ASSIGNMENT_OP(OP_BAND, lhs, parse_pratt(new_prec));
-		} else if (TACCEPT(T_XORA)) {
-			lhs = EXPR_ASSIGNMENT_OP(OP_BXOR, lhs, parse_pratt(new_prec));
-		} else if (TACCEPT(T_BORA)) {
-			lhs = EXPR_ASSIGNMENT_OP(OP_BOR, lhs, parse_pratt(new_prec));
+		static int ops[T_COUNT][2] = {
+			[T_COMMA] = {1, E_COMMA},
+			[T_A] = {1, E_ASSIGNMENT},
+
+			[T_MULA] = {2, OP_MUL},
+			[T_DIVA] = {2, OP_DIV},
+			[T_MODA] = {2, OP_MOD},
+			[T_ADDA] = {2, OP_ADD},
+			[T_SUBA] = {2, OP_SUB},
+			[T_LSHIFTA] = {2, OP_LSHIFT},
+			[T_RSHIFTA] = {2, OP_RSHIFT},
+			[T_BANDA] = {2, OP_BAND},
+			[T_XORA] = {2, OP_BXOR},
+			[T_BORA] = {2, OP_BOR},
+
+			[T_BOR] = {3, OP_BOR},
+			[T_XOR] = {3, OP_BXOR},
+			[T_AMP] = {3, OP_BAND},
+			[T_EQ] = {3, OP_EQUAL},
+			[T_NEQ] = {3, OP_NOT_EQUAL},
+			[T_LEQ] = {3, OP_LESS_EQ},
+			[T_GEQ] = {3, OP_GREATER_EQ},
+			[T_L] = {3, OP_LESS},
+			[T_G] = {3, OP_GREATER},
+			[T_LSHIFT] = {3, OP_LSHIFT},
+			[T_RSHIFT] = {3, OP_RSHIFT},
+			[T_ADD] = {3, OP_ADD},
+			[T_SUB] = {3, OP_SUB},
+			[T_STAR] = {3, OP_MUL},
+			[T_DIV] = {3, OP_DIV},
+			[T_MOD] = {3, OP_MOD},
+		};
+
+		int tok_type = T0->type;
+		if (ops[tok_type][0] == 1) {
+			TNEXT();
+			lhs = EXPR_ARGS(ops[tok_type][1], lhs, parse_pratt(new_prec));
+		} else if (ops[tok_type][0] == 2) {
+			TNEXT();
+			lhs = EXPR_ASSIGNMENT_OP(ops[tok_type][1], lhs, parse_pratt(new_prec));
+		} else if (ops[tok_type][0] == 3) {
+			TNEXT();
+			lhs = EXPR_BINARY_OP(ops[tok_type][1], lhs, parse_pratt(new_prec));
 		} else if (TACCEPT(T_QUEST)) {
 			struct expr *mid = parse_expression();
 			TEXPECT(T_COLON);
@@ -1258,38 +1276,6 @@ struct expr *parse_pratt(int precedence) {
 			lhs = EXPR_ARGS(E_CONDITIONAL, lhs,
 							EXPR_ARGS(E_CONDITIONAL, rhs, EXPR_INT(1), EXPR_INT(0)),
 							EXPR_INT(0));
-		} else if (TACCEPT(T_BOR)) {
-			lhs = EXPR_BINARY_OP(OP_BOR, lhs, parse_pratt(new_prec));
-		} else if (TACCEPT(T_XOR)) {
-			lhs = EXPR_BINARY_OP(OP_BXOR, lhs, parse_pratt(new_prec));
-		} else if (TACCEPT(T_AMP)) {
-			lhs = EXPR_BINARY_OP(OP_BAND, lhs, parse_pratt(new_prec));
-		} else if (TACCEPT(T_EQ)) {
-			lhs = EXPR_BINARY_OP(OP_EQUAL, lhs, parse_pratt(new_prec));
-		} else if (TACCEPT(T_NEQ)) {
-			lhs = EXPR_BINARY_OP(OP_NOT_EQUAL, lhs, parse_pratt(new_prec));
-		} else if (TACCEPT(T_LEQ)) {
-			lhs = EXPR_BINARY_OP(OP_LESS_EQ, lhs, parse_pratt(new_prec));
-		} else if (TACCEPT(T_GEQ)) {
-			lhs = EXPR_BINARY_OP(OP_GREATER_EQ, lhs, parse_pratt(new_prec));
-		} else if (TACCEPT(T_L)) {
-			lhs = EXPR_BINARY_OP(OP_LESS, lhs, parse_pratt(new_prec));
-		} else if (TACCEPT(T_G)) {
-			lhs = EXPR_BINARY_OP(OP_GREATER, lhs, parse_pratt(new_prec));
-		} else if (TACCEPT(T_LSHIFT)) {
-			lhs = EXPR_BINARY_OP(OP_LSHIFT, lhs, parse_pratt(new_prec));
-		} else if (TACCEPT(T_RSHIFT)) {
-			lhs = EXPR_BINARY_OP(OP_RSHIFT, lhs, parse_pratt(new_prec));
-		} else if (TACCEPT(T_ADD)) {
-			lhs = EXPR_BINARY_OP(OP_ADD, lhs, parse_pratt(new_prec));
-		} else if (TACCEPT(T_SUB)) {
-			lhs = EXPR_BINARY_OP(OP_SUB, lhs, parse_pratt(new_prec));
-		} else if (TACCEPT(T_STAR)) {
-			lhs = EXPR_BINARY_OP(OP_MUL, lhs, parse_pratt(new_prec));
-		} else if (TACCEPT(T_DIV)) {
-			lhs = EXPR_BINARY_OP(OP_DIV, lhs, parse_pratt(new_prec));
-		} else if (TACCEPT(T_MOD)) {
-			lhs = EXPR_BINARY_OP(OP_MOD, lhs, parse_pratt(new_prec));
 		}
 	}
 
