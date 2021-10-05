@@ -1,0 +1,87 @@
+#include "preprocessor/preprocessor.h"
+#include "parser/parser.h"
+#include "codegen/codegen.h"
+#include "common.h"
+#include "preprocessor/search_path.h"
+#include "preprocessor/macro_expander.h"
+#include "arch/builtins.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+
+struct arguments {
+	const char *input;
+	const char *output;
+};
+
+struct arguments parse_arguments(int argc, char **argv) {
+	struct arguments args = {0};
+
+	enum {
+		STATE_INPUT,
+		STATE_OUTPUT,
+		STATE_END
+	} state = STATE_INPUT;
+
+	for (int i = 1; i < argc; i++) {
+		if (argv[i][0] == '-' &&
+			argv[i][1] == 'I') {
+			add_include_path(argv[i] + 2);
+		} else if (argv[i][0] == '-' &&
+			argv[i][1] == 'D') {
+			struct define def = define_init(argv[i] + 2);
+			define_map_add(def);
+		} else {
+			switch (state) {
+			case STATE_INPUT:
+				args.input = argv[i];
+				state++;
+				break;
+
+			case STATE_OUTPUT:
+				args.output = argv[i];
+				state++;
+				break;
+
+			case STATE_END:
+				ERROR("Too many arguments");
+			}
+		}
+	}
+
+	if (!args.input || !args.output) {
+		ERROR("Requires input and output");
+	}
+
+	return args;
+}
+
+void add_implementation_defs(void) {
+	struct define def = define_init("NULL");
+	struct token tokens[] = {
+		token_init(PP_LPAR, "(", (struct position){0}),
+		token_init(PP_IDENT, "void", (struct position){0}),
+		token_init(PP_PUNCT, "*", (struct position){0}),
+		token_init(PP_RPAR, ")", (struct position){0}),
+		token_init(PP_NUMBER, "0", (struct position){0})
+	};
+
+	for (unsigned int i = 0;
+		 i < sizeof(tokens) / sizeof(*tokens); i++) {
+		define_add_def(&def, tokens[i]);
+	}
+	define_map_add(def);
+}
+
+int main(int argc, char **argv) {
+	add_implementation_defs();
+	builtins_init();
+   
+	struct arguments arguments = parse_arguments(argc, argv);
+
+	preprocessor_create(arguments.input);
+	parse_into_ir();
+	codegen(arguments.output);
+
+	return 0;
+}
