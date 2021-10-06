@@ -6,6 +6,7 @@
 #include "registers.h"
 
 #include <assert.h>
+#include <stdarg.h>
 
 #include "binary_operators.h"
 #include "unary_operators.h"
@@ -15,18 +16,8 @@
 
 int calling_convention[] = {REG_RDI, REG_RSI, REG_RDX, REG_RCX, REG_R8, REG_R9};
 
-int ir_pos = 0;
-int ir_count = 0;
-struct instruction *is = NULL;
-
-struct instruction *ir_next() {
-	static int counter = 0;
-	struct program *program = get_program();
-	if (counter < program->size)
-		return &program->instructions[counter++];
-	else
-		return NULL;
-}
+/* int ir_pos = 0; */
+/* int ir_count = 0; */
 
 struct {
 	FILE *out;
@@ -34,15 +25,20 @@ struct {
 	int local_counter;
 } data;
 
-
 void set_section(const char *section) {
 	if (strcmp(section, data.current_section) != 0)
-		EMIT(".section %s", section);
+		emit(".section %s", section);
 	data.current_section = section;
 }
 
-FILE *get_fp(void) {
-	return data.out;
+void emit(const char *fmt, ...) {
+	va_list args;
+	va_start(args, fmt);
+	if (!str_contains(fmt, ':'))
+		fprintf(data.out, "\t");
+	vfprintf(data.out, fmt, args);
+	fprintf(data.out, "\n");
+	va_end(args);
 }
 
 struct {
@@ -92,7 +88,7 @@ void codegen_binary_operator(int operator_type, var_id out,
 	scalar_to_reg(variable_info[lhs].stack_location, lhs, REG_RDI);
 	scalar_to_reg(variable_info[rhs].stack_location, rhs, REG_RSI);
 
-	EMIT("%s", binary_operator_outputs[ot][operator_type]);
+	emit("%s", binary_operator_outputs[ot][operator_type]);
 
 	reg_to_scalar(REG_RAX, variable_info[out].stack_location, out);
 }
@@ -113,7 +109,7 @@ void codegen_unary_operator(int operator_type, var_id out,
 
 	scalar_to_reg(variable_info[rhs].stack_location, rhs, REG_RDI);
 
-	EMIT("%s", unary_operator_outputs[ot][operator_type]);
+	emit("%s", unary_operator_outputs[ot][operator_type]);
 
 	reg_to_scalar(REG_RAX, variable_info[out].stack_location, out);
 }
@@ -127,7 +123,7 @@ void codegen_simple_cast(var_id in, var_id out) {
 
 	scalar_to_reg(variable_info[in].stack_location, in, REG_RDI);
 
-	EMIT("%s", cast_operator_outputs[in_type->simple][out_type->simple]);
+	emit("%s", cast_operator_outputs[in_type->simple][out_type->simple]);
 
 	reg_to_scalar(REG_RAX, variable_info[out].stack_location, out);
 }
@@ -219,10 +215,10 @@ void codegen_call(var_id variable, int n_args, var_id *args, var_id result) {
 						&current_gp_reg);
 
 	if (return_classification.pass_in_memory) {
-		EMIT("leaq -%d(%%rbp), %%rdi", variable_info[result].stack_location);
+		emit("leaq -%d(%%rbp), %%rdi", variable_info[result].stack_location);
 	}
 
-	EMIT("subq $%d, %%rsp", round_up_to_nearest(total_memory_argument_size, 16));
+	emit("subq $%d, %%rsp", round_up_to_nearest(total_memory_argument_size, 16));
 
 	int current_stack_pos = 0;
 	for (int i = 0; i < n_args; i++) {
@@ -230,18 +226,18 @@ void codegen_call(var_id variable, int n_args, var_id *args, var_id result) {
 		var_id var = args[i];
 
 		if (classification->pass_in_memory) {
-			EMIT("#Passed in stack:");
+			emit("#Passed in stack:");
 			int stack_loc = variable_info[var].stack_location;
 			for (int i = 0; i < classification->arg_size; i += 8) {
-				EMIT("movq %d(%%rbp), %%rax", -stack_loc + i);
-				EMIT("movq %%rax, %d(%%rsp)", current_stack_pos);
+				emit("movq %d(%%rbp), %%rax", -stack_loc + i);
+				emit("movq %%rax, %d(%%rsp)", current_stack_pos);
 				current_stack_pos += 8;
 			}
 		} else {
-			EMIT("#Passed in register:");
+			emit("#Passed in register:");
 			for (int i = 0; i < classification->n_parts; i++) {
 				if (classification->classes[i] == CLASS_INTEGER) {
-					EMIT("movq -%d(%%rbp), %s",
+					emit("movq -%d(%%rbp), %s",
 						 variable_info[var].stack_location - 8 * i,
 						 get_reg_name(classification->regs[i], 8));
 				} else {
@@ -251,8 +247,8 @@ void codegen_call(var_id variable, int n_args, var_id *args, var_id result) {
 		}
 	}
 
-	EMIT("movl $0, %%eax");
-	EMIT("callq *%%rbx");
+	emit("movl $0, %%eax");
+	emit("callq *%%rbx");
 
 	if (!return_classification.pass_in_memory && return_type != type_simple(ST_VOID)) {
 		int var_size = calculate_size(get_variable_type(result));
@@ -260,7 +256,7 @@ void codegen_call(var_id variable, int n_args, var_id *args, var_id result) {
 			int size = var_size - 8 * i;
 			if (size > 8) size = 8;
 			if (return_classification.classes[i] == CLASS_INTEGER) {
-				EMIT("mov%c %s, -%d(%%rbp)",
+				emit("mov%c %s, -%d(%%rbp)",
 					 size_to_suffix(size),
 					 get_reg_name(return_classification.regs[i], size),
 					 variable_info[result].stack_location - 8 * i);
@@ -281,16 +277,16 @@ struct reg_save_info {
 void codegen_memzero(int len) {
 	int pos = 0;
 	for (;pos < (len & ~7); pos += 8) {
-		EMIT("movq $0, %d(%%rdi)", pos);
+		emit("movq $0, %d(%%rdi)", pos);
 	}
 	for (;pos < (len & ~3); pos += 4) {
-		EMIT("movl $0, %d(%%rdi)", pos);
+		emit("movl $0, %d(%%rdi)", pos);
 	}
 	for (;pos < (len & ~1); pos += 2) {
-		EMIT("movw $0, %d(%%rdi)", pos);
+		emit("movw $0, %d(%%rdi)", pos);
 	}
 	for (;pos < len; pos += 1) {
-		EMIT("movb $0, %d(%%rdi)", pos);
+		emit("movb $0, %d(%%rdi)", pos);
 	}
 }
 
@@ -298,40 +294,40 @@ void codegen_memzero(int len) {
 void codegen_memcpy(int len) {
 	int pos = 0;
 	for (;pos < (len & ~7); pos += 8) {
-		EMIT("movq %d(%%rdi), %%rax", pos);
-		EMIT("movq %%rax, %d(%%rsi)", pos);
+		emit("movq %d(%%rdi), %%rax", pos);
+		emit("movq %%rax, %d(%%rsi)", pos);
 	}
 	for (;pos < (len & ~3); pos += 4) {
-		EMIT("movl %d(%%rdi), %%eax", pos);
-		EMIT("movl %%eax, %d(%%rsi)", pos);
+		emit("movl %d(%%rdi), %%eax", pos);
+		emit("movl %%eax, %d(%%rsi)", pos);
 	}
 	for (;pos < (len & ~1); pos += 2) {
-		EMIT("movw %d(%%rdi), %%ax", pos);
-		EMIT("movw %%ax, %d(%%rsi)", pos);
+		emit("movw %d(%%rdi), %%ax", pos);
+		emit("movw %%ax, %d(%%rsi)", pos);
 	}
 	for (;pos < len; pos += 1) {
-		EMIT("movb %d(%%rdi), %%al", pos);
-		EMIT("movb %%al, %d(%%rsi)", pos);
+		emit("movb %d(%%rdi), %%al", pos);
+		emit("movb %%al, %d(%%rsi)", pos);
 	}
 }
 
 void codegen_stackcpy(int dest, int source, int len) {
 	int pos = 0;
 	for (;pos < (len & ~7); pos += 8) {
-		EMIT("movq %d(%%rbp), %%rax", source + pos);
-		EMIT("movq %%rax, %d(%%rbp)", dest + pos);
+		emit("movq %d(%%rbp), %%rax", source + pos);
+		emit("movq %%rax, %d(%%rbp)", dest + pos);
 	}
 	for (;pos < (len & ~3); pos += 4) {
-		EMIT("movl %d(%%rbp), %%eax", source + pos);
-		EMIT("movl %%eax, %d(%%rbp)", dest + pos);
+		emit("movl %d(%%rbp), %%eax", source + pos);
+		emit("movl %%eax, %d(%%rbp)", dest + pos);
 	}
 	for (;pos < (len & ~1); pos += 2) {
-		EMIT("movw %d(%%rbp), %%ax", source + pos);
-		EMIT("movw %%ax, %d(%%rbp)", dest + pos);
+		emit("movw %d(%%rbp), %%ax", source + pos);
+		emit("movw %%ax, %d(%%rbp)", dest + pos);
 	}
 	for (;pos < len; pos += 1) {
-		EMIT("movb %d(%%rbp), %%al", source + pos);
-		EMIT("movb %%al, %d(%%rbp)", dest + pos);
+		emit("movb %d(%%rbp), %%al", source + pos);
+		emit("movb %%al, %d(%%rbp)", dest + pos);
 	}
 }
 
@@ -430,13 +426,13 @@ void codegen_initializer(struct type *type,
 
 	for (int i = 0; i < size; i++) {
 		if (is_label[i]) {
-			EMIT(".quad %s", get_label_name(labels[i]));
+			emit(".quad %s", get_label_name(labels[i]));
 			i += 7;
 		} else {
 			//TODO: This shouldn't need an integer cast.
 			// But right now I can't be bothered to implement
 			// implicit integer casts for variadic functions.
-			EMIT(".byte %d", (int)buffer[i]);
+			emit(".byte %d", (int)buffer[i]);
 		}
 	}
 }
@@ -444,16 +440,16 @@ void codegen_initializer(struct type *type,
 void codegen_static_var(struct instruction ins) {
 	set_section(".data");
 	if (ins.static_var.global)
-		EMIT(".global %s", ins.static_var.label);
+		emit(".global %s", ins.static_var.label);
 	if (ins.static_var.init) {
-		EMIT("%s:", ins.static_var.label);
+		emit("%s:", ins.static_var.label);
 
 		codegen_initializer(ins.static_var.type,
 							ins.static_var.init);
 	} else {
-		EMIT("%s:", ins.static_var.label);
+		emit("%s:", ins.static_var.label);
 
-		EMIT(".zero %d", calculate_size(ins.static_var.type));
+		emit(".zero %d", calculate_size(ins.static_var.type));
 	}
 	set_section(".text");
 }
@@ -525,7 +521,7 @@ const char *constant_to_string(struct constant constant) {
 
 void codegen_instruction(struct instruction ins, struct instruction next_ins, struct reg_save_info reg_save_info) {
 	const char *ins_str = instruction_to_str(ins);
-	EMIT("#instruction start \"%s\":", ins_str);
+	emit("#instruction start \"%s\":", ins_str);
 	switch (ins.type) {
 	case IR_CONSTANT: {
 		struct constant c = ins.constant.constant;
@@ -534,16 +530,16 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 			int size = calculate_size(c.data_type);
 			switch (size) {
 			case 1:
-				EMIT("movb $%s, -%d(%%rbp)", constant_to_string(c), variable_info[ins.constant.result].stack_location);
+				emit("movb $%s, -%d(%%rbp)", constant_to_string(c), variable_info[ins.constant.result].stack_location);
 				break;
 			case 2:
-				EMIT("movw $%s, -%d(%%rbp)", constant_to_string(c), variable_info[ins.constant.result].stack_location);
+				emit("movw $%s, -%d(%%rbp)", constant_to_string(c), variable_info[ins.constant.result].stack_location);
 				break;
 			case 4:
-				EMIT("movl $%s, -%d(%%rbp)", constant_to_string(c), variable_info[ins.constant.result].stack_location);
+				emit("movl $%s, -%d(%%rbp)", constant_to_string(c), variable_info[ins.constant.result].stack_location);
 				break;
 			case 8:
-				EMIT("movq $%s, -%d(%%rbp)", constant_to_string(c), variable_info[ins.constant.result].stack_location);
+				emit("movq $%s, -%d(%%rbp)", constant_to_string(c), variable_info[ins.constant.result].stack_location);
 				break;
 
 			case -1:
@@ -556,7 +552,7 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 		} break;
 
 		case CONSTANT_LABEL:
-			EMIT("movq $%s, -%d(%%rbp)", get_label_name(c.label), variable_info[ins.constant.result].stack_location);
+			emit("movq $%s, -%d(%%rbp)", get_label_name(c.label), variable_info[ins.constant.result].stack_location);
 			break;
 
 		default:
@@ -588,23 +584,23 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 				classify(ret_type, &n_parts, classes);
 
 				if (n_parts == 1 && classes[0] == CLASS_MEMORY) {
-					EMIT("movq -%d(%%rbp), %%rsi", 8);
-					EMIT("leaq -%d(%%rbp), %%rdi", variable_info[ret].stack_location);
+					emit("movq -%d(%%rbp), %%rsi", 8);
+					emit("leaq -%d(%%rbp), %%rdi", variable_info[ret].stack_location);
 
 					codegen_memcpy(calculate_size(ret_type));
 				} else if (n_parts == 1 && classes[0] == CLASS_INTEGER) {
-					EMIT("movq -%d(%%rbp), %%rax", variable_info[ret].stack_location);
+					emit("movq -%d(%%rbp), %%rax", variable_info[ret].stack_location);
 				} else if (n_parts == 2) {
-					EMIT("# COMMENT");
-					EMIT("movq -%d(%%rbp), %%rax", variable_info[ret].stack_location);
-					EMIT("movq -%d(%%rbp), %%rdx", variable_info[ret].stack_location - 8);
+					emit("# COMMENT");
+					emit("movq -%d(%%rbp), %%rax", variable_info[ret].stack_location);
+					emit("movq -%d(%%rbp), %%rdx", variable_info[ret].stack_location - 8);
 				} else {
 					NOTIMP();
 				}
 			}
 		}
-		EMIT("leave");
-		EMIT("ret");
+		emit("leave");
+		emit("ret");
 		break;
 
 	case IR_CALL_VARIABLE:
@@ -624,16 +620,16 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 		   index_type == type_simple(ST_UINT)) {
 			scalar_to_reg(variable_info[index].stack_location, index, REG_RDX);
 			scalar_to_reg(variable_info[pointer].stack_location, pointer, REG_RSI);
-			EMIT("movslq %%edx, %%rdx");
-			EMIT("imulq $%d, %%rdx, %%rdx", size);
-			EMIT("leaq (%%rsi, %%rdx), %%rax");
+			emit("movslq %%edx, %%rdx");
+			emit("imulq $%d, %%rdx, %%rdx", size);
+			emit("leaq (%%rsi, %%rdx), %%rax");
 			reg_to_scalar(REG_RAX, variable_info[result].stack_location, result);
 		} else if(index_type == type_simple(ST_LONG) ||
 				  index_type == type_simple(ST_ULONG)) {
 			scalar_to_reg(variable_info[index].stack_location, index, REG_RDX);
 			scalar_to_reg(variable_info[pointer].stack_location, pointer, REG_RSI);
-			EMIT("imulq $%d, %%rdx, %%rdx", size);
-			EMIT("leaq (%%rsi, %%rdx), %%rax");
+			emit("imulq $%d, %%rdx, %%rdx", size);
+			emit("leaq (%%rsi, %%rdx), %%rax");
 			reg_to_scalar(REG_RAX, variable_info[result].stack_location, result);
 		} else {
 			ERROR("Pointer increment by %s not implemented",
@@ -652,10 +648,10 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 					  lhs, REG_RAX);
 		scalar_to_reg(variable_info[rhs].stack_location,
 					  rhs, REG_RDX);
-		EMIT("subq %%rdx, %%rax");
-		EMIT("movq $%d, %%rdi", size);
-		EMIT("cqto");
-		EMIT("idivq %%rdi");
+		emit("subq %%rdx, %%rax");
+		emit("movq $%d, %%rdi", size);
+		emit("cqto");
+		emit("idivq %%rdi");
 
 		reg_to_scalar(REG_RAX, variable_info[result].stack_location,
 					  result);
@@ -664,7 +660,7 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 	case IR_LOAD: {
 		struct type *type = get_variable_type(ins.load.result);
 		scalar_to_reg(variable_info[ins.load.pointer].stack_location, ins.load.pointer, REG_RDI);
-		EMIT("leaq -%d(%%rbp), %%rsi", variable_info[ins.load.result].stack_location);
+		emit("leaq -%d(%%rbp), %%rsi", variable_info[ins.load.result].stack_location);
 
 		codegen_memcpy(calculate_size(type));
 
@@ -673,19 +669,19 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 	case IR_STORE: {
 		struct type *type = get_variable_type(ins.store.value);
 		scalar_to_reg(variable_info[ins.store.pointer].stack_location, ins.store.pointer, REG_RSI);
-		EMIT("leaq -%d(%%rbp), %%rdi", variable_info[ins.store.value].stack_location);
+		emit("leaq -%d(%%rbp), %%rdi", variable_info[ins.store.value].stack_location);
 
 		codegen_memcpy(calculate_size(type));
 	} break;
 
 	case IR_START_BLOCK: {
-		EMIT(".LB%d:\n", ins.start_block.block);
+		emit(".LB%d:\n", ins.start_block.block);
 	} break;
 
 	case IR_GOTO: {
 		if (!(next_ins.type == IR_START_BLOCK &&
 			  next_ins.start_block.block == ins.goto_.block))
-			EMIT("jmp .LB%d\n", ins.goto_.block);
+			emit("jmp .LB%d\n", ins.goto_.block);
 	} break;
 
 	case IR_IF_SELECTION: {
@@ -695,11 +691,11 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 		if (size == 1 || size == 2 || size == 4 || size == 8) {
 			scalar_to_reg(variable_info[cond].stack_location, cond, REG_RDI);
 			const char *reg_name = get_reg_name(REG_RDI, size);
-			EMIT("test%c %s, %s", size_to_suffix(size), reg_name, reg_name);
-			EMIT("je .LB%d", ins.if_selection.block_false);
+			emit("test%c %s, %s", size_to_suffix(size), reg_name, reg_name);
+			emit("je .LB%d", ins.if_selection.block_false);
 			if (!(next_ins.type == IR_START_BLOCK &&
 				  next_ins.start_block.block == ins.if_selection.block_true))
-				EMIT("jmp .LB%d", ins.if_selection.block_true);
+				emit("jmp .LB%d", ins.if_selection.block_true);
 		} else {
 			ERROR("Invalid argument to if selection");
 		}
@@ -720,8 +716,8 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 			scalar_to_reg(variable_info[source].stack_location, source, REG_RAX);
 			reg_to_scalar(REG_RAX, variable_info[dest].stack_location, dest);
 		} else {
-			EMIT("leaq -%d(%%rbp), %%rdi", variable_info[source].stack_location);
-			EMIT("leaq -%d(%%rbp), %%rsi", variable_info[dest].stack_location);
+			emit("leaq -%d(%%rbp), %%rdi", variable_info[source].stack_location);
+			emit("leaq -%d(%%rbp), %%rsi", variable_info[dest].stack_location);
 			codegen_memcpy(calculate_size(type));
 		}
 	} break;
@@ -752,7 +748,7 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 	} break;
 
 	case IR_ADDRESS_OF:
-		EMIT("leaq -%d(%%rbp), %%rax", variable_info[ins.address_of.variable].stack_location);
+		emit("leaq -%d(%%rbp), %%rax", variable_info[ins.address_of.variable].stack_location);
 		reg_to_scalar(REG_RAX, variable_info[ins.address_of.result].stack_location, ins.address_of.result);
 		break;
 
@@ -763,7 +759,7 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 		type_select(type, ins.get_member.index, &member_offset, &member_type);
 
 		scalar_to_reg(variable_info[ins.get_member.pointer].stack_location, ins.get_member.pointer, REG_RAX);
-		EMIT("addq $%d, %%rax", member_offset);
+		emit("addq $%d, %%rax", member_offset);
 		reg_to_scalar(REG_RAX, variable_info[ins.get_member.result].stack_location, ins.get_member.result);
 	} break;
 
@@ -773,12 +769,12 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 		int overflow_arg_area_offset = builtin_va_list->offsets[2];
 		int reg_save_area_offset = builtin_va_list->offsets[3];
 		scalar_to_reg(variable_info[ins.va_start_.result].stack_location, ins.va_start_.result, REG_RAX);
-		EMIT("movl $%d, %d(%%rax)", reg_save_info.gp_offset, gp_offset_offset);
-		EMIT("movl $%d, %d(%%rax)", 0, fp_offset_offset);
-		EMIT("movq $%d, %d(%%rax)", 0, overflow_arg_area_offset);
+		emit("movl $%d, %d(%%rax)", reg_save_info.gp_offset, gp_offset_offset);
+		emit("movl $%d, %d(%%rax)", 0, fp_offset_offset);
+		emit("movq $%d, %d(%%rax)", 0, overflow_arg_area_offset);
 
-		EMIT("leaq -%d(%%rbp), %%rdi", reg_save_info.reg_save_position);
-		EMIT("movq %%rdi, %d(%%rax)", reg_save_area_offset);
+		emit("leaq -%d(%%rbp), %%rdi", reg_save_info.reg_save_position);
+		emit("movq %%rdi, %d(%%rax)", reg_save_area_offset);
 	} break;
 
 	case IR_VA_ARG: {
@@ -789,20 +785,20 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 			int overflow_arg_area_offset = builtin_va_list->offsets[2];
 			int reg_save_area_offset = builtin_va_list->offsets[3];
 			scalar_to_reg(variable_info[ins.va_arg_.array].stack_location, ins.va_arg_.array, REG_RDI);
-			EMIT("movl %d(%%rdi), %%eax", gp_offset_offset);
-			EMIT("cmpl $48, %%eax");
+			emit("movl %d(%%rdi), %%eax", gp_offset_offset);
+			emit("cmpl $48, %%eax");
 			va_arg_labels++;
-			EMIT("jae .va_arg_stack%d", va_arg_labels);
-			EMIT("leal 8(%%rax), %%edx");
-			EMIT("addq %d(%%rdi), %%rax", reg_save_area_offset);
-			EMIT("movl %%edx, %d(%%rdi)", gp_offset_offset);
-			EMIT("jmp .va_arg_fetch%d", va_arg_labels);
-			EMIT(".va_arg_stack%d:", va_arg_labels);
-			EMIT("movq %d(%%rdi), %%rax", overflow_arg_area_offset);
-			EMIT("leaq 8(%%rax), %%rdx");
-			EMIT("movq %%rdx, %d(%%rdi)", overflow_arg_area_offset);
-			EMIT(".va_arg_fetch%d:", va_arg_labels);
-			EMIT("movl (%%rax), %%eax");
+			emit("jae .va_arg_stack%d", va_arg_labels);
+			emit("leal 8(%%rax), %%edx");
+			emit("addq %d(%%rdi), %%rax", reg_save_area_offset);
+			emit("movl %%edx, %d(%%rdi)", gp_offset_offset);
+			emit("jmp .va_arg_fetch%d", va_arg_labels);
+			emit(".va_arg_stack%d:", va_arg_labels);
+			emit("movq %d(%%rdi), %%rax", overflow_arg_area_offset);
+			emit("leaq 8(%%rax), %%rdx");
+			emit("movq %%rdx, %d(%%rdi)", overflow_arg_area_offset);
+			emit(".va_arg_fetch%d:", va_arg_labels);
+			emit("movl (%%rax), %%eax");
 			
 			reg_to_scalar(REG_RAX, variable_info[ins.va_arg_.result].stack_location, ins.va_arg_.result);
 
@@ -823,20 +819,20 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 			int overflow_arg_area_offset = builtin_va_list->offsets[2];
 			int reg_save_area_offset = builtin_va_list->offsets[3];
 			scalar_to_reg(variable_info[ins.va_arg_.array].stack_location, ins.va_arg_.array, REG_RDI);
-			EMIT("movl %d(%%rdi), %%eax", gp_offset_offset);
-			EMIT("cmpl $48, %%eax");
+			emit("movl %d(%%rdi), %%eax", gp_offset_offset);
+			emit("cmpl $48, %%eax");
 			va_arg_labels++;
-			EMIT("jae .va_arg_stack%d", va_arg_labels);
-			EMIT("leal 8(%%rax), %%edx");
-			EMIT("addq %d(%%rdi), %%rax", reg_save_area_offset);
-			EMIT("movl %%edx, %d(%%rdi)", gp_offset_offset);
-			EMIT("jmp .va_arg_fetch%d", va_arg_labels);
-			EMIT(".va_arg_stack%d:", va_arg_labels);
-			EMIT("movq %d(%%rdi), %%rax", overflow_arg_area_offset);
-			EMIT("leaq 8(%%rax), %%rdx");
-			EMIT("movq %%rdx, %d(%%rdi)", overflow_arg_area_offset);
-			EMIT(".va_arg_fetch%d:", va_arg_labels);
-			EMIT("movq (%%rax), %%rax");
+			emit("jae .va_arg_stack%d", va_arg_labels);
+			emit("leal 8(%%rax), %%edx");
+			emit("addq %d(%%rdi), %%rax", reg_save_area_offset);
+			emit("movl %%edx, %d(%%rdi)", gp_offset_offset);
+			emit("jmp .va_arg_fetch%d", va_arg_labels);
+			emit(".va_arg_stack%d:", va_arg_labels);
+			emit("movq %d(%%rdi), %%rax", overflow_arg_area_offset);
+			emit("leaq 8(%%rax), %%rdx");
+			emit("movq %%rdx, %d(%%rdi)", overflow_arg_area_offset);
+			emit(".va_arg_fetch%d:", va_arg_labels);
+			emit("movq (%%rax), %%rax");
 			
 			reg_to_scalar(REG_RAX, variable_info[ins.va_arg_.result].stack_location, ins.va_arg_.result);
 		} else {
@@ -845,14 +841,14 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 	} break;
 
 	case IR_SET_ZERO:
-		EMIT("leaq -%d(%%rbp), %%rdi", variable_info[ins.set_zero.variable].stack_location);
+		emit("leaq -%d(%%rbp), %%rdi", variable_info[ins.set_zero.variable].stack_location);
 		codegen_memzero(calculate_size(get_variable_type(ins.set_zero.variable)));
 		break;
 
 	case IR_ASSIGN_CONSTANT_OFFSET:
-		EMIT("leaq -%d(%%rbp), %%rsi", variable_info[ins.assign_constant_offset.variable].stack_location);
-		EMIT("leaq %d(%%rsi), %%rsi", ins.assign_constant_offset.offset);
-		EMIT("leaq -%d(%%rbp), %%rdi", variable_info[ins.assign_constant_offset.value].stack_location);
+		emit("leaq -%d(%%rbp), %%rsi", variable_info[ins.assign_constant_offset.variable].stack_location);
+		emit("leaq %d(%%rsi), %%rsi", ins.assign_constant_offset.offset);
+		emit("leaq -%d(%%rbp), %%rdi", variable_info[ins.assign_constant_offset.value].stack_location);
 		codegen_memcpy(calculate_size(get_variable_type(ins.assign_constant_offset.value)));
 		break;
 
@@ -860,11 +856,11 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 		var_id control = ins.switch_selection.condition;
 		scalar_to_reg(variable_info[control].stack_location, control, REG_RDI);
 		for (int i = 0; i < ins.switch_selection.n; i++) {
-			EMIT("cmpl $%d, %%edi", ins.switch_selection.values[i].int_d);
-			EMIT("je .LB%d", ins.switch_selection.blocks[i]);
+			emit("cmpl $%d, %%edi", ins.switch_selection.values[i].int_d);
+			emit("je .LB%d", ins.switch_selection.blocks[i]);
 		}
 		if (ins.switch_selection.default_) {
-			EMIT("jmp .LB%d", ins.switch_selection.default_);
+			emit("jmp .LB%d", ins.switch_selection.default_);
 		}
 	} break;
 
@@ -873,14 +869,14 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 		//EMIT("pushq %%rsp");
 		//EMIT("subq $8, %%rsp");
 		scalar_to_reg(variable_info[ins.stack_alloc.length].stack_location, ins.stack_alloc.length, REG_RAX);
-		EMIT("subq %%rax, %%rsp");
+		emit("subq %%rax, %%rsp");
 		reg_to_scalar(REG_RSP, variable_info[ins.stack_alloc.pointer].stack_location, ins.stack_alloc.pointer);
 		// Align %rsp to 16 boundary. (Remember stack grows downwards. So rounding down is actually correct.)
-		EMIT("andq $-16, %%rsp"); // Round down to nearest 16 by clearing last 4 bits.
+		emit("andq $-16, %%rsp"); // Round down to nearest 16 by clearing last 4 bits.
 	} break;
 
 	case IR_GET_SYMBOL_PTR: {
-		EMIT("movq $%s, %%rax", ins.get_symbol_ptr.label);
+		emit("movq $%s, %%rax", ins.get_symbol_ptr.label);
 		reg_to_scalar(REG_RAX, variable_info[ins.get_symbol_ptr.result].stack_location, ins.get_symbol_ptr.result);
 	} break;
 
@@ -945,25 +941,25 @@ void codegen_function(struct instruction *is,
 	}
 
 	if (is->function.global)
-		EMIT(".global %s", is->function.name);
-	EMIT("%s:", is->function.name);
-	EMIT("pushq %%rbp");
-	EMIT("movq %%rsp, %%rbp");
-	EMIT("subq $%d, %%rsp", round_up16(stack_count));
+		emit(".global %s", is->function.name);
+	emit("%s:", is->function.name);
+	emit("pushq %%rbp");
+	emit("movq %%rsp, %%rbp");
+	emit("subq $%d, %%rsp", round_up16(stack_count));
 
 	if (return_type != type_simple(ST_VOID) &&
 		return_classification.pass_in_memory) {
-		EMIT("movq %%rdi, -%d(%%rbp)", 8);
+		emit("movq %%rdi, -%d(%%rbp)", 8);
 	}
 
 	if (reg_save) {
-		EMIT("leaq -%d(%%rbp), %%rax", reg_save_info.reg_save_position);
-		EMIT("movq %%rdi, %d(%%rax)", 0);
-		EMIT("movq %%rsi, %d(%%rax)", 8);
-		EMIT("movq %%rdx, %d(%%rax)", 16);
-		EMIT("movq %%rcx, %d(%%rax)", 24);
-		EMIT("movq %%r8, %d(%%rax)", 32);
-		EMIT("movq %%r9, %d(%%rax)", 40);
+		emit("leaq -%d(%%rbp), %%rax", reg_save_info.reg_save_position);
+		emit("movq %%rdi, %d(%%rax)", 0);
+		emit("movq %%rsi, %d(%%rax)", 8);
+		emit("movq %%rdx, %d(%%rax)", 16);
+		emit("movq %%rcx, %d(%%rax)", 24);
+		emit("movq %%r8, %d(%%rax)", 32);
+		emit("movq %%r9, %d(%%rax)", 40);
 		// TODO: xmm0-15
 	}
 
@@ -974,15 +970,15 @@ void codegen_function(struct instruction *is,
 
 		if (classification->pass_in_memory) {
 			// TODO: This doesn't have to copy memory at all.
-			EMIT("#Passed in stack:");
+			emit("#Passed in stack:");
 			codegen_stackcpy(-variable_info[var].stack_location, classification->mem_pos + 16, var_size);
 		} else {
-			EMIT("#Passed in register:");
+			emit("#Passed in register:");
 			for (int i = 0; i < classification->n_parts; i++) {
 				int size = var_size - 8 * i;
 				if (size > 8) size = 8;
 				if (classification->classes[i] == CLASS_INTEGER) {
-					EMIT("mov%c %s, -%d(%%rbp)",
+					emit("mov%c %s, -%d(%%rbp)",
 						 size_to_suffix(size),
 						 get_reg_name(classification->regs[i], size),
 						 variable_info[var].stack_location - 8 * i);
@@ -1001,32 +997,9 @@ void codegen_function(struct instruction *is,
 	}
 
 	// Allocate all variables.
-	EMIT("xor %%rax, %%rax");
-	EMIT("leave");
-	EMIT("ret");
-}
-
-int stops_function[IR_TYPE_COUNT] = {
-	[IR_FUNCTION] = 1
-};
-
-int codegen_chunk(void) {
-	switch (is[ir_pos].type) {
-	case IR_FUNCTION: {
-		int end_pos = ir_pos + 1;
-		for (; end_pos < ir_count && !stops_function[is[end_pos].type]; end_pos++);
-		codegen_function(is + ir_pos, end_pos - ir_pos);
-		ir_pos = end_pos;
-	} break;
-	case IR_STATIC_VAR:
-		codegen_static_var(is[ir_pos++]);
-		break;
-	default:
-		ERROR("Not imp %d", is[ir_pos].type);
-		NOTIMP();
-	}
-
-	return ir_pos < ir_count;
+	emit("xor %%rax, %%rax");
+	emit("leave");
+	emit("ret");
 }
 
 void codegen(const char *path) {
@@ -1039,11 +1012,25 @@ void codegen(const char *path) {
 		ERROR("Could not open file %s", path);
 
 	struct program *program = get_program();
-	ir_pos = 0;
-	ir_count = program->size;
-	is = program->instructions;
+	int ir_pos = 0;
+	struct instruction *is = program->instructions;
 
-	while (codegen_chunk());
+	while (ir_pos < program->size) {
+		switch (is[ir_pos].type) {
+		case IR_FUNCTION: {
+			int end_pos = ir_pos + 1;
+			for (; end_pos < program->size && is[end_pos].type != IR_FUNCTION; end_pos++);
+			codegen_function(is + ir_pos, end_pos - ir_pos);
+			ir_pos = end_pos;
+		} break;
+		case IR_STATIC_VAR:
+			codegen_static_var(is[ir_pos++]);
+			break;
+		default:
+			ERROR("Not imp %d", is[ir_pos].type);
+			NOTIMP();
+		}
+	}
 
 	codegen_rodata();
 

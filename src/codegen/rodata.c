@@ -40,7 +40,7 @@ const char *get_label_name(label_id id) {
 
 void codegen_rodata(void) {
 	for (int i = 0; i < n_entries; i++) {
-		EMIT("%s:", get_label_name(entries[i].id));
-		EMIT(".string \"%s\"", entries[i].name);
+		emit("%s:", get_label_name(entries[i].id));
+		emit(".string \"%s\"", entries[i].name);
 	}
 }

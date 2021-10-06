@@ -51,11 +51,11 @@ void scalar_to_reg(int stack_pos, var_id scalar, int reg) {
 	struct type *type = get_variable_type(scalar);
 	assert(is_scalar(type));
 
-	EMIT("xor %s, %s", registers[reg][0], registers[reg][0]);
+	emit("xor %s, %s", registers[reg][0], registers[reg][0]);
 
 	int size = calculate_size(type);
 
-	EMIT("mov%c -%d(%%rbp), %s", size_to_suffix(size),
+	emit("mov%c -%d(%%rbp), %s", size_to_suffix(size),
 		 stack_pos, registers[reg][size_to_idx(size)]);
 }
 
@@ -66,18 +66,18 @@ void reg_to_scalar(int reg, int stack_pos, var_id scalar) {
 		ERROR("%s should be scalar", type_to_string(type));
 
 	int size = calculate_size(type);
-	EMIT("mov%c %s, -%d(%%rbp)", size_to_suffix(size),
+	emit("mov%c %s, -%d(%%rbp)", size_to_suffix(size),
 		 registers[reg][size_to_idx(size)], stack_pos);
 }
 
 void load_address(struct type *type, int stack_pos, var_id result) {
 	if (type_is_pointer(type)) {
-		EMIT("movq (%%rdi), %%rax");
+		emit("movq (%%rdi), %%rax");
 		reg_to_scalar(REG_RAX, stack_pos, result);
 	} else if (type->type == TY_SIMPLE) {
 		switch (type->simple) {
 		case ST_INT:
-			EMIT("movl (%%rdi), %%eax");
+			emit("movl (%%rdi), %%eax");
 			reg_to_scalar(REG_RAX, stack_pos, result);
 			break;
 
@@ -92,12 +92,12 @@ void load_address(struct type *type, int stack_pos, var_id result) {
 void store_address(struct type *type, int stack_pos, var_id result) {
 	if (type_is_pointer(type)) {
 		scalar_to_reg(stack_pos, result, REG_RAX);
-		EMIT("movq %%rax, (%%rdi)");
+		emit("movq %%rax, (%%rdi)");
 	} else if (type->type == TY_SIMPLE) {
 		switch (type->simple) {
 		case ST_INT:
 			scalar_to_reg(stack_pos, result, REG_RAX);
-			EMIT("movl %%eax, (%%rdi)");
+			emit("movl %%eax, (%%rdi)");
 			break;
 
 		default:
