@@ -17,14 +17,12 @@ struct expr *expr_new(struct expr expr);
 #define EXPR_ASSIGNMENT_OP(TYPE, LHS, RHS) expr_new((struct expr) {	\
 			.type = E_ASSIGNMENT_OP,								\
 			.binary_op.op = (TYPE),								\
-			.binary_op.type = E_BINARY_OP_UNASIGNED,			\
 			.args = {(LHS), (RHS)}								\
 		})
 
 #define EXPR_BINARY_OP(TYPE, LHS, RHS) expr_new((struct expr) {	\
 			.type = E_BINARY_OP,								\
 			.binary_op.op = (TYPE),								\
-			.binary_op.type = E_BINARY_OP_UNASIGNED,			\
 			.args = {(LHS), (RHS)}								\
 		})
 
@@ -136,11 +134,6 @@ struct expr {
 
 		struct {
 			enum operator_type op;
-			enum {
-				E_BINARY_OP_UNASIGNED,
-				E_BINARY_OP_POINTER,
-				E_BINARY_OP_ARITHMETIC,
-			} type;
 		} binary_op;
 
 		enum unary_operator_type unary_op;
