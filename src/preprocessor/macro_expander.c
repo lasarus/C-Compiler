@@ -4,6 +4,63 @@
 struct token tokenizer_next();
 #define NEXT() tokenizer_next();
 
+#define MAP_SIZE 1024
+struct define_map {
+	struct define **entries;
+};
+
+static struct define_map *define_map = NULL;
+
+void define_map_init() {
+	define_map = malloc(sizeof *define_map);
+
+	define_map->entries = malloc(sizeof *define_map->entries * MAP_SIZE);
+	for (size_t i = 0; i < MAP_SIZE; i++) {
+		define_map->entries[i] = NULL;
+	}
+}
+
+struct define **define_map_find(char *name) {
+	if (!define_map)
+		define_map_init();
+	uint32_t hash_idx = hash_str(name) % MAP_SIZE;
+
+	struct define **it = &define_map->entries[hash_idx];
+
+	while (*it && strcmp((*it)->name, name) != 0) {
+		it = &(*it)->next;
+	}
+
+	return it;
+}
+
+void define_map_add(struct define define) {
+	struct define **elem = define_map_find(define.name);
+
+	if (*elem) {
+		define.next = (*elem)->next;
+		**elem = define;
+	} else {
+		define.next = NULL;
+		*elem = malloc(sizeof define);
+		**elem = define;
+	}
+}
+
+struct define *define_map_get(char *str) {
+	return *define_map_find(str);
+}
+
+void define_map_remove(char *str) {
+	struct define **elem = define_map_find(str);
+	if (*elem) {
+		struct define *next = (*elem)->next;
+		free(*elem);
+		*elem = next;
+		// TODO: Free contents of elem as well.
+	}
+}
+
 #define TOK_EQ(T1, T2) (T1.type == T2.type && strcmp(T1.str, T2.str) == 0)
 LIST_FREE_EQ(token_list, struct token, NULL_FREE, TOK_EQ);
 
@@ -31,35 +88,6 @@ void define_add_par(struct define *d, struct token t) {
 
 #define DEFINE_FREE(DEF) define_free(DEF)
 LIST_FREE_EQ(define_list, struct define, DEFINE_FREE, NULL_EQ);
-
-struct define_map {
-	struct define_list *defs;
-} dm = {.defs = NULL};
-
-int define_map_index(char *name) {
-	for(int i = 0; i < LIST_SIZE(dm.defs); i++) {
-		if(strcmp(dm.defs->list[i].name, name) == 0) {
-			return i;
-		}
-	}
-
-	return -1;
-}
-
-void define_map_remove(char *name) {
-	int idx;
-	if((idx = define_map_index(name)) >= 0)
-		define_list_remove(&dm.defs, idx);
-}
-
-void define_map_add(struct define def) {
-	define_map_remove(def.name);
-	define_list_add(&dm.defs, def);
-}
-
-int define_map_is_defined(char *name) {
-	return define_map_index(name) != -1;
-}
 
 struct expander {
 	struct token_list *stack;
@@ -133,10 +161,8 @@ struct token glue(struct token a, struct token b) {
 	return ret;
 }
 
-void expander_subs(int idx, struct str_list **hs,
+void expander_subs(struct define *def, struct str_list **hs,
 				   struct position new_pos) {
-	struct define *def = &dm.defs->list[idx];
-
 	str_list_insert(hs, strdup(def->name));
 
 	// Parse function macro.
@@ -303,12 +329,11 @@ struct token expander_next() {
 		return t;
 	}
 
-	int idx;
-
+	struct define *def = NULL;
 	if (builtin_macros(&t)) {
 		return t;
-	} else if ((idx = define_map_index(t.str)) != -1) {
-		expander_subs(idx, &t.hs, t.pos);
+	} else if ((def = define_map_get(t.str))) {
+		expander_subs(def, &t.hs, t.pos);
 		return expander_next();
 	}
 

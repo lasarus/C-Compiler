@@ -113,7 +113,7 @@ intmax_t evaluate_expression(int prec) {
 			name = nt;
 		}
 
-		expr = define_map_is_defined(name.str);
+		expr = (define_map_get(name.str) != NULL);
 	} else if (t.type == PP_IDENT) {
 		expr = 0;
 	} else if (t.type == T_LPAR) {
@@ -162,9 +162,9 @@ intmax_t evaluate_expression(int prec) {
 
 int directiver_evaluate_conditional(struct token dir) {
 	if (strcmp(dir.str, "ifdef") == 0) {
-		return define_map_is_defined(NEXT_U().str);
+		return (define_map_get(NEXT_U().str) != NULL);
 	} else if (strcmp(dir.str, "ifndef") == 0) {
-		return !define_map_is_defined(NEXT_U().str);
+		return !(define_map_get(NEXT_U().str) != NULL);
 	} else if (strcmp(dir.str, "if") == 0 ||
 			   strcmp(dir.str, "elif") == 0) {
 		intmax_t eval = evaluate_expression(0);

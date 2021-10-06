@@ -26,6 +26,14 @@ static inline uint32_t hash32(uint32_t a) {
 	return a;
 }
 
+// TODO: This is not a good hash function.
+static inline uint32_t hash_str(char *str) {
+	uint32_t hash = 0;
+	for (; *str; str++)
+		hash ^= hash32(*str);
+	return hash;
+}
+
 static inline uint32_t hash64(uint64_t a) {
 	return hash32(a) ^ hash32(a >> 32);
 }

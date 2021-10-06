@@ -70,14 +70,6 @@ int compare_types(struct type *a, struct type **a_children,
 	return 1;
 }
 
-// TODO: This is not a good hash function.
-uint32_t hash_str(char *str) {
-	uint32_t hash = 0;
-	for (; *str; str++)
-		hash ^= hash32(*str);
-	return hash;
-}
-
 uint32_t type_hash(struct type *type, struct type **children) {
 	uint32_t hash = 0;
 
