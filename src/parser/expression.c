@@ -920,15 +920,9 @@ struct expr *parse_postfix_expression(int starts_with_lpar, struct expr *startin
 					}
 				});
 		} else if (TACCEPT(T_INC)) {
-			lhs = expr_new((struct expr) {
-					.type = E_POSTFIX_INC,
-					.args = { lhs }
-				});
+			lhs = EXPR_ARGS(E_POSTFIX_INC, lhs);
 		} else if (TACCEPT(T_DEC)) {
-			lhs = expr_new((struct expr) {
-					.type = E_POSTFIX_DEC,
-					.args = { lhs }
-				});
+			lhs = EXPR_ARGS(E_POSTFIX_DEC, lhs);
 		} else {
 			break;
 		}
@@ -944,17 +938,9 @@ struct expr *parse_unary_expression() {
 	} else if (TACCEPT(T_DEC)) {
 		return EXPR_ASSIGNMENT_OP(OP_SUB, parse_unary_expression(), EXPR_INT(1));
 	} else if (TACCEPT(T_STAR)) {
-		struct expr *rhs = parse_cast_expression();
-		return expr_new((struct expr) {
-				.type = E_INDIRECTION,
-				.args = { rhs }
-			});
+		return EXPR_ARGS(E_INDIRECTION, parse_cast_expression());
 	} else if (TACCEPT(T_AMP)) {
-		struct expr *rhs = parse_cast_expression();
-		return expr_new((struct expr) {
-				.type = E_ADDRESS_OF,
-				.args = { rhs }
-			});
+		return EXPR_ARGS(E_ADDRESS_OF, parse_cast_expression());
 	} else if (TACCEPT(T_ADD)) {
 		return EXPR_UNARY_OP(UOP_PLUS, parse_cast_expression());
 	} else if (TACCEPT(T_SUB)) {
@@ -967,19 +953,17 @@ struct expr *parse_unary_expression() {
 						 EXPR_INT(0),
 						 EXPR_INT(1));
 	} else if (TACCEPT(T_KSIZEOF)) {
-		int size = 0;
+		struct type *type = NULL;
 		if (TACCEPT(T_LPAR)) {
-			struct type *type = parse_type_name();
+			type = parse_type_name();
 			if (!type)
 				type = parse_expression()->data_type;
-			size = calculate_size(type);
 			TEXPECT(T_RPAR);
 		} else {
-			struct expr *rhs = parse_unary_expression();
-			size = calculate_size(rhs->data_type);
+			type = parse_unary_expression()->data_type;
 		}
 		// TODO: Size should perhaps not be an integer.
-		struct constant c = {.type = CONSTANT_TYPE, .data_type = type_simple(ST_INT), .int_d = size };
+		struct constant c = {.type = CONSTANT_TYPE, .data_type = type_simple(ST_INT), .int_d = calculate_size(type) };
 
 		return expr_new((struct expr) {
 				.type = E_CONSTANT,
@@ -1015,7 +999,6 @@ struct expr *parse_paren_or_cast_expression() {
 			return expression_cast(rhs, cast_type);
 		}
 	} else {
-		// This is wrong.
 		return parse_postfix_expression(1, NULL);
 	}
 }
