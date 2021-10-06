@@ -16,13 +16,13 @@ struct expr *expr_new(struct expr expr);
 
 #define EXPR_ASSIGNMENT_OP(TYPE, LHS, RHS) expr_new((struct expr) {	\
 			.type = E_ASSIGNMENT_OP,								\
-			.binary_op.op = (TYPE),								\
+			.binary_op = (TYPE),								\
 			.args = {(LHS), (RHS)}								\
 		})
 
 #define EXPR_BINARY_OP(TYPE, LHS, RHS) expr_new((struct expr) {	\
 			.type = E_BINARY_OP,								\
-			.binary_op.op = (TYPE),								\
+			.binary_op = (TYPE),								\
 			.args = {(LHS), (RHS)}								\
 		})
 
@@ -44,12 +44,10 @@ struct expr *expr_new(struct expr expr);
 struct expr {
 	enum {
 		E_INVALID,
-		E_IDENTIFIER,
 		E_VARIABLE,
 		E_SYMBOL,
 		E_CALL,
 		E_CONSTANT,
-		E_STRING_LITERAL,
 		E_GENERIC_SELECTION,
 		E_FUNCTION_CALL,
 		E_DOT_OPERATOR,
@@ -81,10 +79,6 @@ struct expr {
 	} type;
 
 	union {
-		struct {
-			const char *name;
-		} identifier;
-
 		struct {
 			struct type *type;
 			struct initializer *init;
@@ -130,12 +124,9 @@ struct expr {
 		} va_copy_;
 
 		struct constant constant;
-		const char *string_literal;
+		//const char *string_literal;
 
-		struct {
-			enum operator_type op;
-		} binary_op;
-
+		enum operator_type binary_op;
 		enum unary_operator_type unary_op;
 	};
 	
@@ -149,8 +140,9 @@ struct expr *parse_assignment_expression();
 struct expr *parse_expression();
 struct expr *expression_cast(struct expr *expr, struct type *type);
 
-int evaluate_constant_expression(struct expr *expr,
-								 struct constant *constant);
+/* int evaluate_constant_expression(struct expr *expr, */
+/* 								 struct constant *constant); */
+struct constant *expression_to_constant(struct expr *expr);
 var_id expression_to_ir(struct expr *expr);
 
 #endif

@@ -126,6 +126,7 @@ struct enum_data *register_enum(void);
 struct type *type_simple(enum simple_type type);
 struct type *type_create(struct type *params, struct type **children);
 struct type *type_pointer(struct type *type);
+struct type *type_array(struct type *type, int length);
 struct type *type_deref(struct type *type);
 struct type *type_struct(struct struct_data *struct_data);
 

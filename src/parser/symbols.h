@@ -17,8 +17,7 @@ struct symbol_identifier {
 	enum {
 		IDENT_VARIABLE,
 		IDENT_CONSTANT,
-		IDENT_FUNCTION,
-		IDENT_GLOBAL_VAR,
+		IDENT_LABEL,
 		IDENT_INCOMPLETE,
 	} type;
 
@@ -28,11 +27,7 @@ struct symbol_identifier {
 		struct {
 			struct type *type;
 			const char *name;
-		} function;
-		struct {
-			struct type *type;
-			const char *name;
-		} global_var;
+		} label;
 	};
 };
 

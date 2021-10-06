@@ -169,6 +169,16 @@ struct type *type_struct(struct struct_data *struct_data) {
 	return type_create(&params, NULL);
 }
 
+struct type *type_array(struct type *type, int length) {
+	struct type params = {
+		.type = TY_ARRAY,
+		.n = 1,
+		.array.length = length
+	};
+	struct type *children = type;
+	return type_create(&params, &children);
+}
+
 struct type *type_deref(struct type *type) {
 	if (type->type != TY_POINTER)
 		ERROR("Expected type to be pointer when dereffing %s", type_to_string(type));

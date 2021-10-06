@@ -140,11 +140,10 @@ struct symbol_struct *symbols_add_struct(const char *name) {
 		ERROR("Struct/union name already declared, %s", name);
 	}
 
-	struct struct_storage nstor;
-	nstor.nest = current_nest;
-	nstor.name = strdup(name);
-
-	struct_storage_list_add(&struct_stor, nstor);
+	struct_storage_list_add(&struct_stor, (struct struct_storage) {
+			.nest = current_nest,
+			.name = strdup(name)
+		});
 	return &struct_stor->list[struct_stor->n - 1].data;
 }
 
@@ -161,11 +160,10 @@ struct symbol_typedef *symbols_add_typedef(const char *name) {
 		// Has to be fixed in declaration_parser.c
 	}
 
-	struct typedef_storage nstor;
-	nstor.nest = current_nest;
-	nstor.name = strdup(name);
-
-	typedef_storage_list_add(&typedef_stor, nstor);
+	typedef_storage_list_add(&typedef_stor, (struct typedef_storage) {
+			.nest = current_nest,
+			.name = strdup(name)
+		});
 	return &typedef_stor->list[typedef_stor->n - 1].data;
 }
 

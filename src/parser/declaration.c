@@ -206,9 +206,11 @@ int parse_enumerator(struct constant *prev, int first) {
 		if (!expr)
 			ERROR("Expected expression");
 			
-		if (!evaluate_constant_expression(expr, &val))
+		struct constant *ret = expression_to_constant(expr);
+		if (!ret)
 			ERROR("Could not evaluate constant expression");
 
+		val = *ret;
 	} else {
 		if (!first)
 			val = constant_increment(*prev);
@@ -582,14 +584,13 @@ struct type *ast_to_type(const struct type_specifiers *ts, struct type_ast *ast,
 				type = type_create(&params, &type);
 			} break;
 			case ARR_EXPRESSION: {
-				struct constant length;
-				if (evaluate_constant_expression(ast->array.expr,
-												 &length)) {
-					assert(length.type == CONSTANT_TYPE);
-					assert(type_is_simple(length.data_type, ST_INT));
+				struct constant *length;
+				if ((length = expression_to_constant(ast->array.expr))) {
+					assert(length->type == CONSTANT_TYPE);
+					assert(type_is_simple(length->data_type, ST_INT));
 					struct type params = {
 						.type = TY_ARRAY,
-						.array.length = length.int_d,
+						.array.length = length->int_d,
 						.n = 1
 					};
 					type = type_create(&params, &type);
@@ -831,17 +832,17 @@ int parse_designator_list(int *first_index, int *offset, struct type **type) {
 			struct expr *expr = parse_expression();
 			TEXPECT(T_RBRACK);
 
-			struct constant constant;
-			evaluate_constant_expression(expr, &constant);
+			struct constant *constant = expression_to_constant(expr);
+			assert(constant);
 
 			size_t mem_idx = 0;
-			switch (constant.type) {
+			switch (constant->type) {
 			case CONSTANT_TYPE:
-				switch (constant.data_type->type) {
+				switch (constant->data_type->type) {
 				case TY_SIMPLE:
-					switch (constant.data_type->simple) {
+					switch (constant->data_type->simple) {
 					case ST_INT:
-						mem_idx = constant.int_d;
+						mem_idx = constant->int_d;
 						break;
 
 					default:
@@ -994,15 +995,15 @@ int parse_init_declarator(struct specifiers s, int global, int *was_func) {
 	// Create space for symbol if not a function prototype.
 	if (global) {
 		if (type->type == TY_FUNCTION) {
-			symbol->type = IDENT_FUNCTION;
-			symbol->function.name = name;
-			symbol->function.type = type;
+			symbol->type = IDENT_LABEL;
+			symbol->label.name = name;
+			symbol->label.type = type;
 			return 1;
 		} else {
 			is_static = 1;
-			symbol->type = IDENT_GLOBAL_VAR;
-			symbol->global_var.name = name;
-			symbol->global_var.type = type;
+			symbol->type = IDENT_LABEL;
+			symbol->label.name = name;
+			symbol->label.type = type;
 			if (s.scs.extern_n) {
 				definition = 0;
 			}
@@ -1026,15 +1027,15 @@ int parse_init_declarator(struct specifiers s, int global, int *was_func) {
 			init = parse_initializer(&type);
 
 		if (is_static) {
-			symbol->type = IDENT_GLOBAL_VAR;
+			symbol->type = IDENT_LABEL;
 
 			if (!global) {
 				static int local_var = 0;
 				name = allocate_printf(".LVAR%d%s", local_var++, name);
 			}
 
-			symbol->global_var.name = name;
-			symbol->global_var.type = type;
+			symbol->label.name = name;
+			symbol->label.type = type;
 
 			if (!s.scs.extern_n) {
 				// init can be NULL

@@ -6,6 +6,7 @@
 #include <codegen/rodata.h>
 #include <precedence.h>
 
+// Type conversions
 enum simple_type get_arithmetic_type(enum simple_type a,
 									 enum simple_type b) {
 	if (a == ST_LDOUBLE || b == ST_LDOUBLE)
@@ -60,15 +61,46 @@ void convert_arithmetic(struct expr **a,
 	*b = expression_cast(*b, type_simple(target_type));
 }
 
+void decay_array(struct expr **expr) {
+	struct type *type = (*expr)->data_type;
+	if (type->type == TY_ARRAY ||
+		type->type == TY_INCOMPLETE_ARRAY ||
+		type->type == TY_VARIABLE_LENGTH_ARRAY) {
+		*expr = EXPR_ARGS(E_ARRAY_PTR_DECAY, *expr);
+	} else if (type->type == TY_FUNCTION) {
+		*expr = EXPR_ARGS(E_ADDRESS_OF, *expr);
+	}
+}
+
+struct expr *do_integer_promotion(struct expr *expr) {
+	struct type *current_type = expr->data_type;
+	
+	if (current_type->type != TY_SIMPLE) {
+		return expr;
+	}
+
+	enum simple_type simple_type = current_type->simple;
+
+	switch(simple_type) {
+	case ST_BOOL:
+	case ST_CHAR:
+	case ST_SCHAR:
+	case ST_UCHAR:
+	case ST_SHORT:
+	case ST_USHORT:
+		return expression_cast(expr, type_simple(ST_INT));
+	default:
+		return expr;
+	}
+}
+
 struct type *calculate_type(struct expr *expr) {
 	switch (expr->type) {
 	case E_CONSTANT:
-		if (expr->constant.type == CONSTANT_LABEL)
-			NOTIMP();
 		return expr->constant.data_type;
 
 	case E_BINARY_OP:
-		return operators_get_result_type(expr->binary_op.op, expr->args[0]->data_type,
+		return operators_get_result_type(expr->binary_op, expr->args[0]->data_type,
 										 expr->args[1]->data_type);
 
 	case E_UNARY_OP:
@@ -91,14 +123,8 @@ struct type *calculate_type(struct expr *expr) {
 		}
 	}
 
-	case E_STRING_LITERAL:
-		return type_pointer(type_simple(ST_CHAR));
-
 	case E_VARIABLE:
 		return get_variable_type(expr->variable.id);
-
-	case E_POINTER_ADD:
-		return expr->args[0]->data_type;
 
 	case E_INDIRECTION:
 		return type_deref(expr->args[0]->data_type);
@@ -109,13 +135,12 @@ struct type *calculate_type(struct expr *expr) {
 	case E_ARRAY_PTR_DECAY:
 		return type_pointer(expr->args[0]->data_type->children[0]);
 
-	case E_POSTFIX_INC:
-	case E_POSTFIX_DEC:
-		return expr->args[0]->data_type;
-
+	case E_POINTER_ADD:
 	case E_ASSIGNMENT:
 	case E_ASSIGNMENT_OP:
 	case E_ASSIGNMENT_POINTER_ADD:
+	case E_POSTFIX_INC:
+	case E_POSTFIX_DEC:
 		return expr->args[0]->data_type;
 
 	case E_CAST:
@@ -180,67 +205,6 @@ int does_integer_conversion[E_NUM_TYPES] = {
 	[E_CONDITIONAL] = 1,
 };
 
-int does_arithmetic_conversion[E_NUM_TYPES] = {
-	[E_BINARY_OP] = 1,
-	[E_ASSIGNMENT_OP] = 1,
-};
-
-struct expr *do_integer_promotion(struct expr *expr) {
-	struct type *current_type = expr->data_type;
-	
-	if (current_type->type != TY_SIMPLE) {
-		return expr;
-	}
-
-	enum simple_type simple_type = current_type->simple;
-
-	switch(simple_type) {
-	case ST_BOOL:
-	case ST_CHAR:
-	case ST_SCHAR:
-	case ST_UCHAR:
-	case ST_SHORT:
-	case ST_USHORT:
-		return expression_cast(expr, type_simple(ST_INT));
-	default:
-		return expr;
-	}
-}
-
-void change_to_additive_pointer(struct expr *expr) {
-	if (expr->type != E_BINARY_OP ||
-		expr->binary_op.op != OP_ADD)
-		return;
-
-	int lhs_ptr = type_is_pointer(expr->args[0]->data_type),
-		rhs_ptr = type_is_pointer(expr->args[1]->data_type);
-
-	if (!(lhs_ptr || rhs_ptr))
-		return;
-
-	if (lhs_ptr && rhs_ptr) {
-		ERROR("Invalid");
-	}
-
-	if (!lhs_ptr && rhs_ptr) {
-		SWAP(struct expr *, expr->args[0], expr->args[1]);
-	}
-
-	// Left hand side is now a pointer.
-	expr->type = E_POINTER_ADD;
-}
-
-void decay_array(struct expr **expr) {
-	struct type *type = (*expr)->data_type;
-	if (type->type == TY_ARRAY ||
-		type->type == TY_INCOMPLETE_ARRAY ||
-		type->type == TY_VARIABLE_LENGTH_ARRAY) {
-		*expr = EXPR_ARGS(E_ARRAY_PTR_DECAY, *expr);
-	} else if (type->type == TY_FUNCTION) {
-		*expr = EXPR_ARGS(E_ADDRESS_OF, *expr);
-	}
-}
-
 void cast_conditional(struct expr *expr) {
 	if (expr->type != E_CONDITIONAL)
 		return;
@@ -271,45 +235,71 @@ void cast_conditional(struct expr *expr) {
 	}
 }
 
-void fix_assignment_add(struct expr *expr) {
-	if (expr->type != E_ASSIGNMENT_OP ||
-		expr->binary_op.op != OP_ADD)
-		return;
-
-	if (type_is_pointer(expr->args[0]->data_type))
-		expr->type = E_ASSIGNMENT_POINTER_ADD;
-}
-
-void fix_pointer_sub(struct expr *expr) {
-	if (expr->type != E_BINARY_OP ||
-		expr->binary_op.op != OP_SUB)
-		return;
-
-	struct type *lhs_type = expr->args[0]->data_type,
-		*rhs_type = expr->args[1]->data_type;
-
-	if (type_is_pointer(lhs_type) &&
-		type_is_pointer(rhs_type)) {
-		assert(lhs_type == rhs_type);
-		expr->type = E_POINTER_DIFF;
-	} else if (type_is_pointer(lhs_type)) {
-		NOTIMP();
-	} else if (type_is_pointer(rhs_type)) {
-		NOTIMP();
-	} else {
-		// Not any kind of pointer subtraction.
-	}
-}
-
-void fix_pointer_op(struct expr *expr) {
+// This applies all the necessary transformations to binary operators
+void fix_binary_operator(struct expr *expr) {
 	if (expr->type != E_BINARY_OP)
 		return;
 
+	convert_arithmetic(&expr->args[0], &expr->args[1]);
 
+	int lhs_ptr = type_is_pointer(expr->args[0]->data_type),
+		rhs_ptr = type_is_pointer(expr->args[1]->data_type);
+
+	switch (expr->binary_op) {
+	case OP_SUB:
+		if (lhs_ptr && rhs_ptr) {
+			expr->type = E_POINTER_DIFF;
+		} else if (lhs_ptr) {
+			NOTIMP();
+		} else if (rhs_ptr) {
+			NOTIMP();
+		}
+		break;
+
+	case OP_ADD:
+		if (!(lhs_ptr || rhs_ptr))
+			return;
+
+		if (lhs_ptr && rhs_ptr) {
+			ERROR("Invalid");
+		}
+
+		if (!lhs_ptr && rhs_ptr) {
+			SWAP(struct expr *, expr->args[0], expr->args[1]);
+		}
+
+		// Left hand side is now a pointer.
+		expr->type = E_POINTER_ADD;
+	default: // Do nothing.
+		break;
+	}
 }
 
+void fix_assignment_operators(struct expr *expr) {
+	if (expr->type != E_ASSIGNMENT_OP)
+		return;
+
+	convert_arithmetic(&expr->args[0], &expr->args[1]);
+	int lhs_ptr = type_is_pointer(expr->args[0]->data_type);
+
+	switch (expr->binary_op) {
+	case OP_ADD:
+		if (lhs_ptr)
+			expr->type = E_ASSIGNMENT_POINTER_ADD;
+		break;
+	case OP_SUB:
+		if (lhs_ptr)
+			NOTIMP();
+		break;
+	default:
+		break;
+	}
+}
+
+int evaluate_constant_expression(struct expr *expr,
+ 								 struct constant *constant);
+
 struct expr *expr_new(struct expr expr) {
-	cast_conditional(&expr);
 
 	for (int i = 0; i < num_args[expr.type]; i++) {
 		if (!expr.args[i]) {
@@ -330,15 +320,14 @@ struct expr *expr_new(struct expr expr) {
 			decay_array(&expr.va_copy_.d);
 			decay_array(&expr.va_copy_.s);
 		} else if (expr.type == E_CALL) {
-			for (int i = 0; i < expr.call.n_args; i++) {
+			for (int i = 0; i < expr.call.n_args; i++)
 				decay_array(&expr.call.args[i]);
-			}
 		}
 	}
 	
-	fix_assignment_add(&expr);
-	fix_pointer_sub(&expr);
-	change_to_additive_pointer(&expr);
+	cast_conditional(&expr);
+	fix_assignment_operators(&expr);
+	fix_binary_operator(&expr);
 
 	int integer_promotion = does_integer_conversion[expr.type];
 	if (integer_promotion) {
@@ -347,18 +336,9 @@ struct expr *expr_new(struct expr expr) {
 		}
 	}
 
-	if (does_arithmetic_conversion[expr.type]) {
-		if (num_args[expr.type] != 2) {
-			ERROR("Wrong number of arguments %d", expr.type);
-		}
-
-		convert_arithmetic(&expr.args[0], &expr.args[1]);
-	}
-
 	expr.data_type = calculate_type(&expr);
 
-	if (expr.type != E_CONSTANT &&
-		expr.type != E_STRING_LITERAL) {
+	if (expr.type != E_CONSTANT) {
 		struct constant c;
 		if (evaluate_constant_expression(&expr, &c)) {
 			return expr_new((struct expr) {
@@ -475,19 +455,12 @@ void lvalue_store(struct lvalue lvalue, var_id value) {
 }
 
 var_id expression_to_ir_result(struct expr *expr, var_id res) {
-	// E_VARIABLE
-	// E_ADDRESS_OF
-	// E_ASSIGNMENT
-	// E_ASSIGNMENT_OP
-	// E_ASSIGNMENT_POINTER_ADD
-	// E_COMMA
-
 	if (!res)
 		res = new_variable(expr->data_type, 1);
 
 	switch(expr->type) {
 	case E_BINARY_OP:
-		IR_PUSH_BINARY_OPERATOR(expr->binary_op.op,
+		IR_PUSH_BINARY_OPERATOR(expr->binary_op,
 								expression_to_ir(expr->args[0]),
 								expression_to_ir(expr->args[1]), res);
 		break;
@@ -498,10 +471,6 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 
 	case E_CONSTANT:
 		IR_PUSH_CONSTANT(expr->constant, res);
-		break;
-
-	case E_STRING_LITERAL:
-		IR_PUSH_STRING_LITERAL(expr->string_literal, res);
 		break;
 
 	case E_CALL: {
@@ -639,7 +608,7 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		var_id rhs = expression_to_ir(expr->args[1]);
 
 		var_id prev_val = lvalue_load(lvalue);
-		enum operator_type ot = expr->binary_op.op;
+		enum operator_type ot = expr->binary_op;
 
 		if (type_is_pointer(expr->args[0]->data_type) ||
 			type_is_pointer(expr->args[1]->data_type)) {
@@ -821,11 +790,11 @@ struct expr *parse_primary_expression(int starts_with_lpar) {
 		}
 
 		switch (sym->type) {
-		case IDENT_FUNCTION:
+		case IDENT_LABEL:
 			TNEXT();
 			return expr_new((struct expr) {
 					.type = E_SYMBOL,
-					.symbol = { sym->function.name, sym->function.type }
+					.symbol = { sym->label.name, sym->label.type }
 				});
 			break;
 
@@ -844,14 +813,6 @@ struct expr *parse_primary_expression(int starts_with_lpar) {
 					.constant = sym->constant
 				});
 
-		case IDENT_GLOBAL_VAR:
-			TNEXT();
-			return expr_new((struct expr) {
-					.type = E_SYMBOL,
-					.symbol = { sym->function.name, sym->function.type }
-				});
-			break;
-
 		default:
 			printf("%s\n", T0->str);
 			NOTIMP();
@@ -867,10 +828,15 @@ struct expr *parse_primary_expression(int starts_with_lpar) {
 			});
 	} else if (T_ISNEXT(T_STRING)) {
 		const char *str = T0->str;
+		struct constant c = {
+			.type = CONSTANT_LABEL,
+			.data_type = type_array(type_simple(ST_CHAR), strlen(str) + 1),
+			.label = register_string(str)
+		};
 		TNEXT();
 		return expr_new((struct expr) {
-				.type = E_STRING_LITERAL,
-				.string_literal = str
+				.type = E_CONSTANT,
+				.constant = c
 			});
 	} else if (T_ISNEXT(T_CHARACTER_CONSTANT)) {
 		const char *str = T0->str;
@@ -1004,18 +970,10 @@ struct expr *parse_unary_expression() {
 		int size = 0;
 		if (TACCEPT(T_LPAR)) {
 			struct type *type = parse_type_name();
-			if (type) {
-				size = calculate_size(type);
-				TEXPECT(T_RPAR);
-			} else {
-				struct expr *rhs = parse_expression();
-				if (rhs->type == E_STRING_LITERAL) {
-					size = strlen(rhs->string_literal) + 1;
-				} else {
-					size = calculate_size(rhs->data_type);
-				}
-				TEXPECT(T_RPAR);
-			}
+			if (!type)
+				type = parse_expression()->data_type;
+			size = calculate_size(type);
+			TEXPECT(T_RPAR);
 		} else {
 			struct expr *rhs = parse_unary_expression();
 			size = calculate_size(rhs->data_type);
@@ -1153,7 +1111,6 @@ struct expr *parse_expression() {
 }
 
 // Constant expressions.
-
 int evaluate_constant_expression(struct expr *expr,
 								 struct constant *constant) {
 	switch (expr->type) {
@@ -1178,7 +1135,7 @@ int evaluate_constant_expression(struct expr *expr,
 			return 0;
 		if (!evaluate_constant_expression(expr->args[1], &rhs))
 			return 0;
-		*constant = operators_constant(expr->binary_op.op, lhs, rhs);
+		*constant = operators_constant(expr->binary_op, lhs, rhs);
 	} break;
 
 	case E_UNARY_OP: {
@@ -1188,12 +1145,12 @@ int evaluate_constant_expression(struct expr *expr,
 		*constant = operators_constant_unary(expr->unary_op, rhs);
 	} break;
 
-	case E_STRING_LITERAL: {
-		*constant = (struct constant) {
-			.type = CONSTANT_LABEL,
-			.data_type = type_pointer(type_simple(ST_CHAR)),
-			.label = register_string(expr->string_literal)
-		};
+	case E_ARRAY_PTR_DECAY: {
+		if (expr->args[0]->type != E_CONSTANT)
+			return 0;
+
+		*constant = expr->args[0]->constant;
+		constant->data_type = type_pointer(expr->args[0]->data_type->children[0]);
 	} break;
 
 	default:
@@ -1209,4 +1166,8 @@ struct expr *expression_cast(struct expr *expr, struct type *type) {
 				.type = E_CAST,
 				.cast = {expr, type}				   
 			});
+}
+
+struct constant *expression_to_constant(struct expr *expr) {
+	return expr->type == E_CONSTANT ? &expr->constant : NULL;
 }

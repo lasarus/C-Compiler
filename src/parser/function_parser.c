@@ -43,8 +43,8 @@ int parse_labeled_statement(struct jump_blocks jump_blocks) {
 		if (!value)
 			ERROR("Expected expression");
 		TEXPECT(T_COLON);
-		struct constant constant;
-		if (!evaluate_constant_expression(expression_cast(value, type_simple(ST_INT)), &constant))
+		struct constant *constant = expression_to_constant(expression_cast(value, type_simple(ST_INT)));
+		if (!constant)
 			ERROR("Expression not constant, is of type %d", value->type);
 
 		struct case_labels *labels = jump_blocks.case_labels;
@@ -59,7 +59,7 @@ int parse_labeled_statement(struct jump_blocks jump_blocks) {
 		labels->blocks = realloc(labels->blocks, sizeof (*labels->blocks) * labels->n);
 		labels->values = realloc(labels->values, sizeof (*labels->values) * labels->n);
 		labels->blocks[labels->n - 1] = block_case;
-		labels->values[labels->n - 1] = constant;
+		labels->values[labels->n - 1] = *constant;
 
 		return 1;
 	} else if (TACCEPT(T_KDEFAULT)) {
@@ -396,9 +396,9 @@ void parse_function(const char *name, struct type *type, int arg_n, char **arg_n
 		symbol = symbols_add_identifier(name);
 	}
 
-	symbol->type = IDENT_FUNCTION;
-	symbol->function.type = type;
-	symbol->function.name = name;
+	symbol->type = IDENT_LABEL;
+	symbol->label.type = type;
+	symbol->label.name = name;
 
 	if (arg_n && !arg_names)
 		ERROR("Should not be null");

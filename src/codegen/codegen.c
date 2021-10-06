@@ -452,18 +452,17 @@ void codegen_initializer(struct type *type,
 		struct init_pair *pair = init->pairs + i;
 		int offset = pair->offset;
 
-		struct constant c;
-		if (!evaluate_constant_expression(pair->expr, &c)) {
+		struct constant *c = expression_to_constant(pair->expr);
+		if (!c)
 			ERROR("Static initialization can't contain non constant expressions!");
-		}
 
-		switch (c.type) {
+		switch (c->type) {
 		case CONSTANT_TYPE:
-			constant_to_buffer(buffer + offset, c);
+			constant_to_buffer(buffer + offset, *c);
 			break;
 		default:
 			is_label[offset] = 1;
-			labels[offset] = c.label;
+			labels[offset] = c->label;
 			//NOTIMP();
 		}
 	}
@@ -596,6 +595,11 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 				ERROR("Not implemented %d\n", size);
 			}
 		} break;
+
+		case CONSTANT_LABEL:
+			EMIT("movq $%s, -%d(%%rbp)", get_label_name(c.label), variable_info[ins.constant.result].stack_location);
+			break;
+
 		default:
 			NOTIMP();
 		}

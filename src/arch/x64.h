@@ -54,13 +54,6 @@ struct constant {
 	struct type *data_type;
 
 	union {
-		/* uint8_t byte; */
-		/* uint16_t word; */
-		/* uint32_t i; */
-		/* uint64_t quad; */
-
-		/* uint8_t data[16]; */
-		//ST_VOID,
 		char char_d;
 		signed char schar_d;
 		unsigned char uchar_d;
