@@ -20,9 +20,12 @@ void parse_into_ir() {
 struct program program;
 
 void push_ir(struct instruction instruction) {
-	program.instructions = realloc(program.instructions,
-								   sizeof (*program.instructions) * ++program.instructions_n);
-	program.instructions[program.instructions_n - 1] = instruction;
+	if (program.size >= program.capacity) {
+		program.capacity = MAX(program.capacity * 2, 2);
+		program.instructions = realloc(program.instructions,
+									   sizeof (*program.instructions) * program.capacity);
+	}
+	program.instructions[program.size++] = instruction;
 }
 
 struct program *get_program(void) {
@@ -203,7 +206,7 @@ void print_instruction(struct instruction instruction) {
 }
 
 void print_parser_ir() {
-	for (int i = 0; i < program.instructions_n; i++) {
+	for (int i = 0; i < program.size; i++) {
 		print_instruction(program.instructions[i]);
 	}
 }

@@ -209,7 +209,7 @@ void parse_into_ir();
 void print_parser_ir();
 
 struct program {
-	int instructions_n;
+	int size, capacity;
 	struct instruction *instructions;
 };
 

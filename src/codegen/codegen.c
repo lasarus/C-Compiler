@@ -22,7 +22,7 @@ struct instruction *is = NULL;
 struct instruction *ir_next() {
 	static int counter = 0;
 	struct program *program = get_program();
-	if (counter < program->instructions_n)
+	if (counter < program->size)
 		return &program->instructions[counter++];
 	else
 		return NULL;
@@ -1062,7 +1062,7 @@ void codegen(const char *path) {
 
 	struct program *program = get_program();
 	ir_pos = 0;
-	ir_count = program->instructions_n;
+	ir_count = program->size;
 	is = program->instructions;
 
 	while (codegen_chunk());
