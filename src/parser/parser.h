@@ -42,7 +42,6 @@ struct instruction {
 		IR_ALLOCA,
 		IR_SWITCH_SELECTION,
 		IR_IF_SELECTION,
-		IR_CALL_LABEL,
 		IR_CALL_VARIABLE,
 		IR_COPY,
 		IR_CAST,
@@ -162,14 +161,6 @@ struct instruction {
 			var_id condition;
 			block_id block_true, block_false;
 		} if_selection;
-		struct {
-			const char *label;
-			struct type *function_type;
-			int n_args;
-			var_id *args;
-			var_id result;
-		} call_label;
-#define IR_PUSH_CALL_LABEL(LABEL, FUNCTION_TYPE, N_ARGS, ARGS, RESULT) IR_PUSH(.type = IR_CALL_LABEL, .call_label = {(LABEL), (FUNCTION_TYPE), (N_ARGS), (ARGS), (RESULT)})
 		struct {
 			var_id function;
 			struct type *function_type;

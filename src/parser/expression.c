@@ -322,6 +322,7 @@ struct expr *expr_new(struct expr expr) {
 		} else if (expr.type == E_CALL) {
 			for (int i = 0; i < expr.call.n_args; i++)
 				decay_array(&expr.call.args[i]);
+			decay_array(&expr.call.callee);
 		}
 	}
 	
@@ -445,23 +446,16 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 			}
 		}
 
-		switch (callee->type) {
-		case E_SYMBOL: {
-			struct type *func_type = callee->symbol.type;
-			const char *func_name = callee->symbol.name;
-			IR_PUSH_CALL_LABEL(func_name, func_type, expr->call.n_args, args, res);
-			return res;
-		} break;
-		default: {
-			var_id func_var = expression_to_ir(callee);
-			struct type *func_type = get_variable_type(func_var);
+		var_id func_var = expression_to_ir(callee);
+		struct type *func_type = get_variable_type(func_var);
 
-			assert(type_is_pointer(func_type));
+		if (func_type->type != TY_POINTER) {
+			ERROR("Can't call type %s", type_to_string(func_type));
+		}
+		assert(type_is_pointer(func_type));
 
-			IR_PUSH_CALL_VARIABLE(func_var, func_type, expr->call.n_args, args, res);
-			return res;
-		}
-		}
+		IR_PUSH_CALL_VARIABLE(func_var, func_type, expr->call.n_args, args, res);
+		return res;
 	}
 
 	case E_VARIABLE:

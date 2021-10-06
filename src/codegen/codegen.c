@@ -216,27 +216,13 @@ void classify_parameters(int n_args, var_id *args, struct type *return_type,
 	}
 }
 
-struct call_info {
-	enum {
-		CALL_VARIABLE,
-		CALL_LABEL,
-	} type;
-
-	union {
-		const char *label;
-		var_id variable;
-	};
-};
-
-void codegen_call(struct call_info info, int n_args, var_id *args, var_id result) {
+void codegen_call(var_id variable, int n_args, var_id *args, var_id result) {
 	int total_memory_argument_size, current_gp_reg;
 	struct type *return_type = get_variable_type(result);
 
-	if (info.type == CALL_VARIABLE) {
-		scalar_to_reg(variable_info[info.variable].stack_location,
-					  info.variable,
-					  REG_RBX);
-	}
+	scalar_to_reg(variable_info[variable].stack_location,
+				  variable,
+				  REG_RBX);
 
 	struct classification classifications[n_args];
 	struct classification return_classification;
@@ -280,18 +266,7 @@ void codegen_call(struct call_info info, int n_args, var_id *args, var_id result
 	}
 
 	EMIT("movl $0, %%eax");
-
-	switch (info.type) {
-	case CALL_LABEL:
-		EMIT("call %s", info.label);
-		break;
-
-	case CALL_VARIABLE:
-		EMIT("callq *%%rbx");
-		break;
-	default:
-		NOTIMP();
-	}
+	EMIT("callq *%%rbx");
 
 	if (!return_classification.pass_in_memory && return_type != type_simple(ST_VOID)) {
 		int var_size = calculate_size(get_variable_type(result));
@@ -648,18 +623,8 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 		EMIT("ret");
 		break;
 
-	case IR_CALL_LABEL: {
-		struct call_info info = {.type = CALL_LABEL,
-			.label = ins.call_label.label};
-		codegen_call(info,
-					 ins.call_label.n_args,
-					 ins.call_label.args,
-					 ins.call_label.result);
-	} break;
-
 	case IR_CALL_VARIABLE:
-		codegen_call((struct call_info){.type = CALL_VARIABLE,
-				.variable = ins.call_variable.function},
+		codegen_call(ins.call_variable.function,
 			ins.call_variable.n_args,
 			ins.call_variable.args,
 			ins.call_variable.result);

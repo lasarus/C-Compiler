@@ -85,16 +85,6 @@ const char *instruction_to_str(struct instruction ins) {
 		PRINT("allocate space for %d", ins.alloca.variable);
 		break;
 
-	case IR_CALL_LABEL:
-		PRINT("%d = %s (", ins.call_label.result, ins.call_label.label);
-		for (int i = 0; i < ins.call_label.n_args; i++) {
-			if (i)
-				PRINT(", ");
-			PRINT("%d", ins.call_label.args[i]);
-		}
-		PRINT(")");
-		break;
-
 	case IR_CALL_VARIABLE:
 		PRINT("%d = %d (", ins.call_variable.result, ins.call_variable.function);
 		for (int i = 0; i < ins.call_variable.n_args; i++) {
