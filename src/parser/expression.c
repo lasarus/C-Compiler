@@ -354,50 +354,29 @@ struct expr *expr_new(struct expr expr) {
 	return ret;
 }
 
-struct lvalue {
-	enum {
-		LVALUE_VARIABLE,
-		LVALUE_PTR
-	} type;
-
-	var_id variable;
-};
-
 // Loads pointer into return value.
-struct lvalue expression_to_lvalue(struct expr *expr) {
+var_id expression_to_address(struct expr *expr) {
 	switch (expr->type) {
 	case E_INDIRECTION:
-		return (struct lvalue) { LVALUE_PTR, expression_to_ir(expr->args[0]) };
+		return expression_to_ir(expr->args[0]);
 
-	case E_VARIABLE:
-		return (struct lvalue) { LVALUE_VARIABLE, expr->variable.id };
+	case E_VARIABLE: {
+		var_id address = new_variable(type_pointer(expr->data_type), 1);
+		IR_PUSH_ADDRESS_OF(address, expr->variable.id);
+		return address;
+	}
 
 	case E_DOT_OPERATOR: {
-		struct lvalue lvalue = expression_to_lvalue(expr->member.lhs);
-		switch (lvalue.type) {
-		case LVALUE_VARIABLE: {
-			var_id address = new_variable(type_pointer(expr->member.lhs->data_type), 1);
-			var_id member_address = new_variable(type_pointer(expr->data_type), 1);
-			IR_PUSH_ADDRESS_OF(address, lvalue.variable);
-			IR_PUSH_GET_MEMBER(member_address, address, expr->member.member_idx);
-			return (struct lvalue) { LVALUE_PTR, member_address };
-		} break;
-
-		case LVALUE_PTR: {
-			var_id member_address = new_variable(type_pointer(expr->data_type), 1);
-			IR_PUSH_GET_MEMBER(member_address, lvalue.variable, expr->member.member_idx);
-			return (struct lvalue) { LVALUE_PTR, member_address };
-		} break;
-
-		default:
-			NOTIMP();
-		}
+		var_id address = expression_to_address(expr->member.lhs);
+		var_id member_address = new_variable(type_pointer(expr->data_type), 1);
+		IR_PUSH_GET_MEMBER(member_address, address, expr->member.member_idx);
+		return member_address;
 	} break;
 
 	case E_SYMBOL: {
 		var_id ptr_result = new_variable(type_pointer(expr->data_type), 1);
 		IR_PUSH_GET_SYMBOL_PTR(expr->symbol.name, ptr_result);
-		return (struct lvalue) { LVALUE_PTR, ptr_result };
+		return ptr_result;
 	} break;
 
 	default:
@@ -406,52 +385,21 @@ struct lvalue expression_to_lvalue(struct expr *expr) {
 	}
 }
 
-struct type *get_lvalue_type(struct lvalue lvalue) {
-	switch (lvalue.type) {
-	case LVALUE_VARIABLE:
-		return get_variable_type(lvalue.variable);
-
-	case LVALUE_PTR:
-		return type_deref(get_variable_type(lvalue.variable));
-
-	default:
-		NOTIMP();
-	}
+struct type *get_address_type(var_id address) {
+	return type_deref(get_variable_type(address));
 }
 
-var_id lvalue_load(struct lvalue lvalue) {
-	struct type *type = get_lvalue_type(lvalue);
+var_id address_load(var_id address) {
+	struct type *type = get_address_type(address);
 	var_id ret = new_variable(type, 1);
 
-	switch (lvalue.type) {
-	case LVALUE_VARIABLE:
-		IR_PUSH_COPY(ret, lvalue.variable);
-		break;
-
-	case LVALUE_PTR:
-		IR_PUSH_LOAD(ret, lvalue.variable);
-		break;
-
-	default:
-		NOTIMP();
-	}
+	IR_PUSH_LOAD(ret, address);
 
 	return ret;
 }
 
-void lvalue_store(struct lvalue lvalue, var_id value) {
-	switch (lvalue.type) {
-	case LVALUE_VARIABLE:
-		IR_PUSH_COPY(lvalue.variable, value);
-		break;
-
-	case LVALUE_PTR:
-		IR_PUSH_STORE(value, lvalue.variable);
-		break;
-
-	default:
-		NOTIMP();
-	}
+void address_store(var_id address, var_id value) {
+	IR_PUSH_STORE(value, address);
 }
 
 var_id expression_to_ir_result(struct expr *expr, var_id res) {
@@ -525,37 +473,12 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		IR_PUSH_LOAD(res, expression_to_ir(expr->args[0]));
 		break;
 
-	case E_ADDRESS_OF: {
-		struct lvalue lvalue = expression_to_lvalue(expr->args[0]);
-		switch (lvalue.type) {
-		case LVALUE_PTR:
-			return lvalue.variable;
-		case LVALUE_VARIABLE: {
-			IR_PUSH_ADDRESS_OF(res, lvalue.variable);
-			return res;
-		}
-		default:
-			NOTIMP();
-		}
-	}
+	case E_ADDRESS_OF:
+		return expression_to_address(expr->args[0]);
 
-	case E_ARRAY_PTR_DECAY: {
-		struct lvalue lvalue = expression_to_lvalue(expr->args[0]);
-		switch (lvalue.type) {
-		case LVALUE_PTR: {
-			IR_PUSH_CAST(res, lvalue.variable, expr->data_type);
-			return res;
-		}
-		case LVALUE_VARIABLE: {
-			var_id array_ptr = new_variable(type_pointer(get_variable_type(lvalue.variable)), 1);
-			IR_PUSH_ADDRESS_OF(array_ptr, lvalue.variable);
-			IR_PUSH_CAST(res, array_ptr, expr->data_type);
-			return res;
-		}
-		default:
-			NOTIMP();
-		}
-	}
+	case E_ARRAY_PTR_DECAY:
+		IR_PUSH_CAST(res, expression_to_address(expr->args[0]), expr->data_type);
+		break;
 
 	case E_POINTER_ADD:
 		IR_PUSH_POINTER_INCREMENT(res, expression_to_ir(expr->args[0]),
@@ -572,8 +495,8 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 	case E_POSTFIX_INC: {
 		struct type *type = get_variable_type(res);
 
-		struct lvalue lvalue = expression_to_lvalue(expr->args[0]);
-		var_id value = lvalue_load(lvalue);
+		var_id address = expression_to_address(expr->args[0]);
+		var_id value = address_load(address);
 		IR_PUSH_COPY(res, value);
 
 		if (type->type == TY_POINTER) {
@@ -588,15 +511,15 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 			else
 				IR_PUSH_BINARY_OPERATOR(OP_ADD, value, constant_one, value);
 		}
-		lvalue_store(lvalue, value);
+		address_store(address, value);
 		return res;
 	} break;
 
 	case E_ASSIGNMENT: {
-		struct lvalue lvalue = expression_to_lvalue(expr->args[0]);
+		var_id address = expression_to_address(expr->args[0]);
 		var_id rhs = expression_to_ir(expression_cast(expr->args[1], expr->args[0]->data_type));
 
-		lvalue_store(lvalue, rhs);
+		address_store(address, rhs);
 		return rhs;
 	}
 
@@ -604,10 +527,10 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		struct expr *lhs = expr->args[0];
 		if (lhs->type == E_CAST)
 			NOTIMP();
-		struct lvalue lvalue = expression_to_lvalue(expr->args[0]);
+		var_id address = expression_to_address(expr->args[0]);
 		var_id rhs = expression_to_ir(expr->args[1]);
 
-		var_id prev_val = lvalue_load(lvalue);
+		var_id prev_val = address_load(address);
 		enum operator_type ot = expr->binary_op;
 
 		if (type_is_pointer(expr->args[0]->data_type) ||
@@ -618,21 +541,21 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 
 		IR_PUSH_BINARY_OPERATOR(ot, prev_val, rhs, prev_val);
 
-		lvalue_store(lvalue, prev_val);
+		address_store(address, prev_val);
 		return prev_val;
 	}
 
 	case E_ASSIGNMENT_POINTER_ADD: {
-		struct lvalue lvalue = expression_to_lvalue(expr->args[0]);
+		var_id address = expression_to_address(expr->args[0]);
 		var_id rhs = expression_to_ir(expr->args[1]);
 
-		var_id prev_val = lvalue_load(lvalue);
+		var_id prev_val = address_load(address);
 
 		assert(type_is_pointer(get_variable_type(prev_val)));
 
 		IR_PUSH_POINTER_INCREMENT(prev_val, prev_val, rhs);
 
-		lvalue_store(lvalue, prev_val);
+		address_store(address, prev_val);
 		return prev_val;
 	}
 

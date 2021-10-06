@@ -140,8 +140,6 @@ struct expr *parse_assignment_expression();
 struct expr *parse_expression();
 struct expr *expression_cast(struct expr *expr, struct type *type);
 
-/* int evaluate_constant_expression(struct expr *expr, */
-/* 								 struct constant *constant); */
 struct constant *expression_to_constant(struct expr *expr);
 var_id expression_to_ir(struct expr *expr);
 
