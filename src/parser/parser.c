@@ -105,10 +105,6 @@ const char *instruction_to_str(struct instruction ins) {
 		PRINT(")");
 		break;
 
-	case IR_STRING_LITERAL:
-		PRINT("%d = \"%s\"", ins.string_literal.result, ins.string_literal.str);
-		break;
-
 	case IR_LOAD:
 		PRINT("%d = load %d", ins.load.result, ins.load.pointer);
 		break;

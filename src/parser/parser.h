@@ -36,7 +36,6 @@ struct instruction {
 		IR_STORE,
 		IR_ADDRESS_OF,
 		IR_CONSTANT,
-		IR_STRING_LITERAL,
 		IR_GOTO,
 		IR_RETURN,
 		IR_START_BLOCK,
@@ -130,11 +129,6 @@ struct instruction {
 			var_id result;
 		} constant;
 #define IR_PUSH_CONSTANT(CONSTANT, RESULT) IR_PUSH(.type = IR_CONSTANT, .constant = {.constant = (CONSTANT), .result = (RESULT)})
-		struct {
-			const char *str;
-			var_id result;
-		} string_literal;
-#define IR_PUSH_STRING_LITERAL(STR, RESULT) IR_PUSH(.type = IR_STRING_LITERAL, .string_literal = {(STR), (RESULT)})
 		struct {
 			const char *label;
 			var_id result;

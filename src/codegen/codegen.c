@@ -605,15 +605,6 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 		}
 	} break;
 
-	case IR_STRING_LITERAL: {
-		int local = data.local_counter++;
-		set_section(".rodata");
-		EMIT(".L%d:", local);
-		EMIT(".string \"%s\"", ins.string_literal.str);
-		set_section(".text");
-		EMIT("movq $.L%d, -%d(%%rbp)", local, variable_info[ins.string_literal.result].stack_location);
-	} break;
-
 	case IR_BINARY_OPERATOR:
 		codegen_binary_operator(ins.binary_operator.type,
 								ins.binary_operator.result,
