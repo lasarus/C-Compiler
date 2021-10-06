@@ -239,8 +239,7 @@ struct type *usual_arithmetic_conversion(struct type *a,
 
 int is_scalar(struct type *type) {
 	return type->type == TY_SIMPLE ||
-		type->type == TY_POINTER ||
-		type->type == TY_ENUM;
+		type->type == TY_POINTER;
 }
 
 int alignof_struct(struct struct_data *struct_data) {
@@ -278,9 +277,6 @@ int calculate_alignment(struct type *type) {
 	case TY_ARRAY:
 		return calculate_alignment(type->children[0]);
 
-	case TY_ENUM:
-		return alignof_simple(ENUM_TYPE);
-
 	case TY_INCOMPLETE_ARRAY:
 		return -1;
 
@@ -293,9 +289,6 @@ int calculate_size(struct type *type) {
 	switch (type->type) {
 	case TY_SIMPLE:
 		return sizeof_simple(type->simple);
-
-	case TY_ENUM:
-		return sizeof_simple(ENUM_TYPE);
 
 	case TY_STRUCT:
 		return type->struct_data->size;
@@ -473,12 +466,12 @@ struct constant constant_cast(struct constant a, struct type *target) {
 		return a;
 	}
 
-	if (target->type == TY_ENUM && type_is_simple(a.data_type, ST_INT)) {
+	if (type_is_simple(a.data_type, ST_INT)) {
 		a.data_type = target;
 		return a;
 	}
 
-	if (a.data_type->type == TY_ENUM && type_is_simple(target, ST_INT)) {
+	if (type_is_simple(target, ST_INT)) {
 		a.data_type = target;
 		return a;
 	}

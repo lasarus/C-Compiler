@@ -1018,10 +1018,6 @@ int evaluate_constant_expression(struct expr *expr,
 		*constant = expr->constant;
 		return 1;
 
-	case E_ENUM_TO_INT:
-		NOTIMP();
-		return 1;
-
 	case E_CAST: {
 		struct constant rhs;
 		if (!evaluate_constant_expression(expr->cast.arg, &rhs))

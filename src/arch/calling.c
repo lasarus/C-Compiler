@@ -4,8 +4,6 @@
 int classify_non_recursive(struct type *type, enum parameter_class *class) {
 	if (type_is_pointer(type)) {
 		*class = CLASS_INTEGER;
-	} else if (type->type == TY_ENUM) {
-		*class = CLASS_INTEGER;
 	} else if (type->type == TY_SIMPLE) {
 		switch (type->simple) {
 		case ST_CHAR: case ST_SCHAR: case ST_UCHAR:
@@ -85,8 +83,6 @@ void classify_recursively(enum parameter_class *current,
 }
 
 void classify(struct type *type, int *n_parts, enum parameter_class *classes) {
-	if (type->type == TY_ENUM)
-		type = type_simple(ST_INT);
 	if (classify_non_recursive(type, classes)) {
 		*n_parts = 1;
 	} else if (type->type == TY_STRUCT) {

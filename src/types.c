@@ -32,11 +32,6 @@ int compare_types(struct type *a, struct type **a_children,
 			return 0;
 		break;
 
-	case TY_ENUM:
-		if (a->enum_data != b->enum_data)
-			return 0;
-		break;
-
 	case TY_STRUCT:
 		if (a->struct_data != b->struct_data)
 			return 0;
@@ -87,9 +82,6 @@ uint32_t type_hash(struct type *type, struct type **children) {
 		break;
 	case TY_STRUCT:
 		hash ^= hash32((size_t)type->struct_data);
-		break;
-	case TY_ENUM:
-		hash ^= hash32((size_t)type->enum_data);
 		break;
 	case TY_ARRAY:
 		hash ^= hash32(type->array.length);
@@ -273,7 +265,6 @@ struct type *parameter_adjust(struct type *type) {
 
 	case TY_STRUCT:
 	case TY_SIMPLE:
-	case TY_ENUM:
 		break;
 
 	default:
@@ -476,10 +467,6 @@ const char *type_to_string(struct type *type) {
 
 	while (type) {
 		switch (type->type) {
-		case TY_ENUM:
-			PRINT("ENUM");
-			type = NULL;
-			break;
 		case TY_SIMPLE:
 			PRINT("SIMPLE %s", simple_to_str(type->simple));
 			type = NULL;
@@ -518,7 +505,6 @@ const char *type_to_string(struct type *type) {
 int has_variable_size(struct type *type) {
 	switch (type->type) {
 	case TY_SIMPLE:
-	case TY_ENUM:
 	case TY_STRUCT:
 	case TY_POINTER:
 		return 0;

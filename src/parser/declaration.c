@@ -277,13 +277,7 @@ int parse_enum(struct type_specifiers *ts) {
 			.name = name
 		};
 
-		struct type params = {
-			.type = TY_ENUM,
-			.enum_data = data,
-			.n = 0
-		};
-
-		ts->data_type = type_create(&params, NULL);
+		ts->data_type = type_simple(ST_INT);
 		return 1;
 	} else {
 		struct symbol_struct *def = symbols_get_struct(name);
@@ -300,13 +294,7 @@ int parse_enum(struct type_specifiers *ts) {
 			ERROR("Previously not a enum");
 		}
 
-		struct type params = {
-			.type = TY_ENUM,
-			.enum_data = def->enum_data,
-			.n = 0
-		};
-
-		ts->data_type = type_create(&params, NULL);
+		ts->data_type = type_simple(ST_INT);
 		return 1;
 	}
 	return 1;

@@ -63,7 +63,6 @@ struct type {
 		TY_ARRAY,
 		TY_INCOMPLETE_ARRAY,
 		TY_STRUCT,
-		TY_ENUM,
 		TY_POINTER,
 		TY_FUNCTION,
 		TY_SIMPLE, // non-composite
@@ -86,7 +85,6 @@ struct type {
 			// TODO: other qualifiers
 		} pointer;
 		struct struct_data *struct_data;
-		struct enum_data *enum_data;
 	};
 
 	struct type *next; // Used in hash-map.

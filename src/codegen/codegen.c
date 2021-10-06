@@ -72,16 +72,6 @@ void codegen_binary_operator(int operator_type, var_id out,
 	struct type *lhs_type = get_variable_type(lhs);
 	struct type *rhs_type = get_variable_type(rhs);
 
-	if (rhs_type->type == TY_ENUM)
-		rhs_type = type_simple(ST_INT);
-
-	if (lhs_type->type == TY_ENUM)
-		lhs_type = type_simple(ST_INT);
-
-	if (data_type->type == TY_ENUM)
-		data_type = type_simple(ST_INT);
-
-
 	enum operand_type ot;
 
 	if (type_is_pointer(lhs_type) && type_is_pointer(rhs_type)) {
@@ -132,10 +122,6 @@ void codegen_simple_cast(var_id in, var_id out) {
 	struct type *in_type = get_variable_type(in);
 	struct type *out_type = get_variable_type(out);
 
-	if (in_type->type == TY_ENUM)
-		in_type = type_simple(ST_INT);
-	if (out_type->type == TY_ENUM)
-		out_type = type_simple(ST_INT);
 	assert(in_type->type == TY_SIMPLE);
 	assert(out_type->type == TY_SIMPLE);
 
@@ -482,9 +468,7 @@ const char *constant_to_string(struct constant constant) {
 	}
 
 	enum simple_type st;
-	if (constant.data_type->type == TY_ENUM)
-		st = ST_INT;
-	else if (constant.data_type->type == TY_SIMPLE)
+	if (constant.data_type->type == TY_SIMPLE)
 		st = constant.data_type->simple;
 	else
 		ERROR("Tried to print type %s to number\n", type_to_string(constant.data_type));
@@ -637,8 +621,7 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 		int size = calculate_size(type_deref(get_variable_type(pointer)));
 		struct type *index_type = get_variable_type(index);
 		if(index_type == type_simple(ST_INT) ||
-		   index_type == type_simple(ST_UINT) ||
-			index_type->type == TY_ENUM) {
+		   index_type == type_simple(ST_UINT)) {
 			scalar_to_reg(variable_info[index].stack_location, index, REG_RDX);
 			scalar_to_reg(variable_info[pointer].stack_location, pointer, REG_RSI);
 			EMIT("movslq %%edx, %%rdx");
@@ -748,11 +731,6 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 			dest = ins.cast.result;
 		struct type *dest_type = get_variable_type(dest);
 		struct type *source_type = get_variable_type(source);
-
-		if (dest_type->type == TY_ENUM)
-			dest_type = type_simple(ST_INT);
-		if (source_type->type == TY_ENUM)
-			source_type = type_simple(ST_INT);
 
 		if (dest_type == type_simple(ST_VOID)) {
 			// No o .
