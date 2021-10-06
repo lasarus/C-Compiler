@@ -6,73 +6,58 @@
 #include <codegen/rodata.h>
 #include <precedence.h>
 
-void convert_arithmetic(struct expr *a,
-						struct expr *b,
-						struct expr **converted_a,
-						struct expr **converted_b) {
-	struct type *a_type = a->data_type,
-		*b_type = b->data_type;
+enum simple_type get_arithmetic_type(enum simple_type a,
+									 enum simple_type b) {
+	if (a == ST_LDOUBLE || b == ST_LDOUBLE)
+		return ST_LDOUBLE;
+    else if (a == ST_DOUBLE || b == ST_DOUBLE)
+		return ST_DOUBLE;
+	else if (a == ST_FLOAT || b == ST_FLOAT)
+		return ST_FLOAT;
 
-	if (a_type->type != TY_SIMPLE ||
-		b_type->type != TY_SIMPLE) {
+	else if (a == b) {
+		return a;
 
-		*converted_a = a;
-		*converted_b = b;
+	} else if (is_signed(a) == is_signed(b)) {
+		return (type_rank(a) > type_rank(b)) ? a : b;
+	} else if (!is_signed(a) &&
+			   type_rank(a) >= type_rank(b)) {
+		return a;
+	} else if (!is_signed(b) &&
+			   type_rank(b) >= type_rank(a)) {
+		return b;
 
-		return;
-	}
-	assert(a_type->type == TY_SIMPLE);
-	assert(b_type->type == TY_SIMPLE);
+	} else if (is_signed(a) &&
+		is_contained_in(a, b)) {
+		return a;
+	} else if (is_signed(b) &&
+		is_contained_in(b, a)) {
+		return b;
 
-	enum simple_type a_stype = a_type->simple,
-		b_stype = b_type->simple;
+	} else if (is_signed(b)) {
+		return to_unsigned(b);
 
-	enum simple_type target_type = 0;
-
-	// 6.3.1.8
-	if (a_stype == ST_LDOUBLE || b_stype == ST_LDOUBLE)
-		target_type = ST_LDOUBLE;
-
-    else if (a_stype == ST_DOUBLE || b_stype == ST_DOUBLE)
-		target_type = ST_DOUBLE;
-
-	else if (a_stype == ST_FLOAT || b_stype == ST_FLOAT)
-		target_type = ST_FLOAT;
-
-	else if (a_stype == b_stype) {
-		target_type = a_stype;
-
-	} else if (is_signed(a_stype) == is_signed(b_stype)) {
-		if (type_rank(a_stype) > type_rank(b_stype))
-			target_type = a_stype;
-		else
-			target_type = b_stype;
-
-	} else if (!is_signed(a_stype) &&
-			   type_rank(a_stype) >= type_rank(b_stype)) {
-		target_type = a_stype;
-	} else if (!is_signed(b_stype) &&
-			   type_rank(b_stype) >= type_rank(a_stype)) {
-		target_type = b_stype;
-
-	} else if (is_signed(a_stype) &&
-		is_contained_in(a_stype, b_stype)) {
-		target_type = a_stype;
-	} else if (is_signed(b_stype) &&
-		is_contained_in(b_stype, a_stype)) {
-		target_type = b_stype;
-
-	} else if (is_signed(b_stype)) {
-		target_type = to_unsigned(b_stype);
-
-	} else if (is_signed(a_stype)) {
-		target_type = to_unsigned(a_stype);
+	} else if (is_signed(a)) {
+		return to_unsigned(a);
 	} else {
 		ERROR("Internal compiler error!");
 	}
+}
 
-	*converted_a = expression_cast(a, type_simple(target_type));
-	*converted_b = expression_cast(b, type_simple(target_type));
+void convert_arithmetic(struct expr **a,
+						struct expr **b) {
+	struct type *a_type = (*a)->data_type,
+		*b_type = (*b)->data_type;
+
+	if (a_type->type != TY_SIMPLE ||
+		b_type->type != TY_SIMPLE)
+		return;
+
+	enum simple_type target_type =
+		get_arithmetic_type(a_type->simple, b_type->simple);
+
+	*a = expression_cast(*a, type_simple(target_type));
+	*b = expression_cast(*b, type_simple(target_type));
 }
 
 struct type *calculate_type(struct expr *expr) {
@@ -278,8 +263,7 @@ void cast_conditional(struct expr *expr) {
 		}
 	} else if (type_is_arithmetic(a) &&
 			   type_is_arithmetic(b)) {
-		convert_arithmetic(expr->args[1], expr->args[2],
-						   &expr->args[1], &expr->args[2]);
+		convert_arithmetic(&expr->args[1], &expr->args[2]);
 	} else if (a != b) {
 		ERROR("Invalid combination of data types:\n%s and %s\n",
 			  strdup(type_to_string(a)),
@@ -368,8 +352,7 @@ struct expr *expr_new(struct expr expr) {
 			ERROR("Wrong number of arguments %d", expr.type);
 		}
 
-		convert_arithmetic(expr.args[0], expr.args[1],
-						   &expr.args[0], &expr.args[1]);
+		convert_arithmetic(&expr.args[0], &expr.args[1]);
 	}
 
 	expr.data_type = calculate_type(&expr);
