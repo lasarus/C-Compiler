@@ -149,7 +149,6 @@ uint32_t type_hash(struct type *type, struct type **children);
 int compare_types(struct type *a, struct type **a_children,
 				  struct type *b);
 
-void pretty_print(struct type *type);
 const char *type_to_string(struct type *type);
 
 void merge_anonymous(struct struct_data *data);

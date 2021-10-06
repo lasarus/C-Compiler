@@ -62,13 +62,8 @@ void scalar_to_reg(int stack_pos, var_id scalar, int reg) {
 void reg_to_scalar(int reg, int stack_pos, var_id scalar) {
 	struct type *type = get_variable_type(scalar);
 
-	if (!is_scalar(type)) {
-		printf("\"");
-		pretty_print(type);
-		printf("\"\n");
-		ERROR("Type should be scalar");
-	}
-	assert(is_scalar(type));
+	if (!is_scalar(type))
+		ERROR("%s should be scalar", type_to_string(type));
 
 	int size = calculate_size(type);
 	EMIT("mov%c %s, -%d(%%rbp)", size_to_suffix(size),
@@ -90,10 +85,7 @@ void load_address(struct type *type, int stack_pos, var_id result) {
 			NOTIMP();
 		}
 	} else {
-		printf("TYPE: \"");
-		pretty_print(type);
-		printf("\"\n");
-		NOTIMP();
+		ERROR("Can't load type %s", type_to_string(type));
 	}
 }
 

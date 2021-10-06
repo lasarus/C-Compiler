@@ -219,9 +219,7 @@ struct enum_data *register_enum(void) {
 int type_member_idx(struct type *type,
 					const char *name) {
 	if (type->type != TY_STRUCT) {
-		pretty_print(type);
-		printf("\n");
-		ERROR("Not a struct, is %d", type->type);
+		ERROR("%s is not a struct", type_to_string(type));
 	}
 
 	struct struct_data *data = type->struct_data;
@@ -234,10 +232,7 @@ int type_member_idx(struct type *type,
 			return i;
 	}
 
-	printf("TYPE: \"");
-	pretty_print(type);
-	printf("\"\n");
-	ERROR("No member with name %s", name);
+	ERROR("%s has no member with name %s", type_to_string(type), name);
 }
 
 struct type *parameter_adjust(struct type *type) {
@@ -404,11 +399,6 @@ const char *simple_to_str(enum simple_type st) {
 	case ST_LDOUBLE_COMPLEX: return "ST_LDOUBLE_COMPLEX";
 	default: return "???";
 	}
-}
-
-// TODO: remove this and replace completely with type_to_string.
-void pretty_print(struct type *type) {
-	printf("%s", type_to_string(type));
 }
 
 void merge_anonymous(struct struct_data *data) {

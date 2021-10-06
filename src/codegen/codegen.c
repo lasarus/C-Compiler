@@ -88,13 +88,9 @@ void codegen_binary_operator(int operator_type, var_id out,
 		ot = OT_PTR;
 	} else {
 		if(rhs_type != lhs_type) {
-			printf("In type: \"");
-			pretty_print(rhs_type);
-			printf("rhs type: \"");
-			pretty_print(lhs_type);
-			printf("\n");
-			printf("operator %d\n", operator_type);
-			ERROR("SHOOOO");
+			ERROR("Can't codegen binary operator %d between %s and %s",
+				  operator_type, strdup(type_to_string(lhs_type)),
+				  strdup(type_to_string(rhs_type)));
 		}
 
 		assert(data_type->type == TY_SIMPLE);
@@ -697,9 +693,8 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 			EMIT("leaq (%%rsi, %%rdx), %%rax");
 			reg_to_scalar(REG_RAX, variable_info[result].stack_location, result);
 		} else {
-			pretty_print(get_variable_type(index));
-			printf("\n");
-			NOTIMP();
+			ERROR("Pointer increment by %s not implemented",
+				  type_to_string(get_variable_type(index)));
 		}
 	} break;
 
@@ -812,12 +807,9 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 			scalar_to_reg(variable_info[source].stack_location, source, REG_RAX);
 			reg_to_scalar(REG_RAX, variable_info[dest].stack_location, dest);
 		} else {
-			printf("Trying to cast from : \"");
-			pretty_print(source_type);
-			printf("\" into \"");
-			pretty_print(dest_type);
-			printf("\"\n");
-			NOTIMP();
+			ERROR("Trying to cast from : \"%s\" to \"%s\"",
+				  strdup(type_to_string(source_type)),
+				  strdup(type_to_string(dest_type)));
 		}
 	} break;
 
