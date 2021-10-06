@@ -210,9 +210,6 @@ void expander_subs(struct define *def, struct str_list **hs,
 		int concat = 0;
 		int stringify = 0;
 
-		if (stringify)
-			NOTIMP();
-
 		if (i != 0) {
 			concat = (def->def->list[i - 1].type == PP_HHASH);
 			stringify = (def->def->list[i - 1].type == PP_HASH);
@@ -255,6 +252,23 @@ void expander_subs(struct define *def, struct str_list **hs,
 				ERROR("Not implemented, %s (%d)", def->name, def->func);
 				NOTIMP();
 			}
+		} else if (idx >= 0 && stringify) {
+			struct token_list *tl = arguments[idx];
+			char *str = "";
+
+			int start_it = LIST_SIZE(tl) - 1;
+			for(int i = start_it; i >= 0; i--) {
+				struct token t = tl->list[i];
+				t.pos = new_pos;
+
+				str = allocate_printf("%s%s", t.str, str);
+				if (i && t.whitespace)
+					str = allocate_printf(" %s", str);
+			}
+
+			struct token t = token_init(PP_STRING, str, (struct position) { 0 });
+			t.hs = NULL;
+			expander_push(t);
 		} else if(idx >= 0) {
 			struct token_list *tl = arguments[idx];
 
@@ -280,6 +294,7 @@ void expander_subs(struct define *def, struct str_list **hs,
 				PRINT_POS(t.pos);
 				NOTIMP();
 			} if (stringify) {
+				ERROR("# Should be followed by macro parameter");
 			} else {
 				t.hs = str_list_union(*hs, t.hs);
 				expander_push(t);
