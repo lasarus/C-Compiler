@@ -54,8 +54,11 @@ int try_open_file(const char *path, struct file *file) {
 
 int check_against_path(const char *dir, const char *name,
 					   struct file *file) {
-	char whole_path[strlen(dir) + 1 + strlen(name) + 1];
-	sprintf(whole_path, "%s/%s", dir, name);
+	char whole_path[(dir ? (strlen(dir) + 1) : 0) + strlen(name) + 1];
+	if (dir)
+		sprintf(whole_path, "%s/%s", dir, name);
+	else
+		sprintf(whole_path, "%s", name);
 
 	return try_open_file(whole_path, file);
 }
