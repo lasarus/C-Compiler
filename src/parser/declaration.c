@@ -875,7 +875,7 @@ void parse_initializer_recursive(int offset, struct type **type, int set_type,
 			return;
 		}
 
-		int current_member = 0;
+		int current_member = 0, max_member = 0;
 		while (!TACCEPT(T_RBRACE)) {
 			int noffset = 0;
 			struct type *ntype = *type;
@@ -888,12 +888,15 @@ void parse_initializer_recursive(int offset, struct type **type, int set_type,
 
 			parse_initializer_recursive(offset + noffset, &ntype, 0, initializer);
 			TACCEPT(T_COMMA);
+
+			if (current_member > max_member)
+				max_member = current_member;
 		}
 
 		if ((*type)->type == TY_INCOMPLETE_ARRAY && set_type) {
 			struct type complete_array_params = {
 				.type = TY_ARRAY,
-				.array.length = current_member,
+				.array.length = max_member,
 				.n = 1
 			};
 
