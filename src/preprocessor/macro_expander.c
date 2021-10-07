@@ -151,14 +151,14 @@ struct token glue(struct token a, struct token b) {
 
 	struct token ret = a;
 	ret.str = allocate_printf("%s%s", b.str, a.str);
-	ret.hs = str_list_intersection(a.hs, b.hs);
+	ret.hs = string_set_intersection(a.hs, b.hs);
 
 	return ret;
 }
 
-void expander_subs(struct define *def, struct str_list **hs,
+void expander_subs(struct define *def, struct string_set *hs,
 				   struct position new_pos) {
-	str_list_insert(hs, strdup(def->name));
+	string_set_insert(hs, strdup(def->name));
 
 	// Parse function macro.
 	int n_args = def->par.n;
@@ -262,7 +262,6 @@ void expander_subs(struct define *def, struct str_list **hs,
 			}
 
 			struct token t = token_init(PP_STRING, str, (struct position) { 0 });
-			t.hs = NULL;
 			expander_push(t);
 		} else if(idx >= 0) {
 			struct token_list tl = arguments[idx];
@@ -291,7 +290,7 @@ void expander_subs(struct define *def, struct str_list **hs,
 			} if (stringify) {
 				ERROR("# Should be followed by macro parameter");
 			} else {
-				t.hs = str_list_union(*hs, t.hs);
+				t.hs = string_set_union(*hs, t.hs);
 				expander_push(t);
 
 				if (concat)
@@ -335,7 +334,7 @@ struct token expander_next() {
 		return t;
 	}
 
-	if (str_list_index_of(t.hs, t.str) != -1) {
+	if (string_set_index_of(t.hs, t.str) != -1) {
 		return t;
 	}
 

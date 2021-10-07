@@ -32,7 +32,7 @@ void token_list_push_front(struct token_list *list, struct token t) {
 }
 
 int token_list_index_of(struct token_list *list, struct token t) {
-	for (int i = 0; i < LIST_SIZE(list); i++) {
+	for (int i = 0; i < list->n; i++) {
 		if (strcmp(list->list[i].str, t.str) == 0) return i;
 	}
 	return -1;

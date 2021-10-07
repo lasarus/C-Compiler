@@ -24,9 +24,7 @@ struct token_stream {
 // Token functions.
 
 struct token token_init(enum ttype type, char *str, struct position pos) {
-	struct token t = {.type = type, .str = str, .pos = pos};
-	t.hs = NULL;
-	return t;
+	return (struct token) { .type = type, .str = str, .pos = pos };
 }
 
 void token_delete(struct token *from) {
@@ -47,11 +45,11 @@ struct token token_move(struct token *from) {
 struct token token_dup(struct token *from) {
 	struct token t = *from;
 	t.str = strdup(from->str);
-	t.hs = str_list_dup(from->hs);
+	t.hs = string_set_dup(from->hs);
 	return t;
 }
 
-struct token token_dup_from_hs(struct token *from, struct str_list *hs) {
+struct token token_dup_from_hs(struct token *from, struct string_set hs) {
 	struct token t = *from;
 	t.str = strdup(from->str);
 	t.hs = hs;
@@ -60,7 +58,7 @@ struct token token_dup_from_hs(struct token *from, struct str_list *hs) {
 
 void token_free(struct token *from) {
 	free(from->str);
-	str_list_free(from->hs);
+	string_set_free(from->hs);
 	token_delete(from);
 }
 
