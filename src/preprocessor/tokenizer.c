@@ -10,36 +10,44 @@
 #include <stdlib.h>
 #include <ctype.h>
 
+#define MAX_INCLUDE_DEPTH 16
+
 struct tokenizer {
-	struct input_list *stack;
-	struct input *top;
+	int input_n;
+	struct input *stack, *top;
 
 	int header;
-} tok = {.stack = NULL, .top = NULL, .header = 0};
-
-LIST(input_list, struct input);
-
+} tok;
 // Tokenizer, abbreviated tok.
 
 void tokenizer_push_input_absolute(const char *path) {
 	struct file file;
 	if (!try_open_file(path, &file))
 		ERROR("No such file as %s exists", path);
-	input_list_add(&tok.stack, input_create(file));
-	tok.top = &tok.stack->list[tok.stack->n - 1];
+
+	if (!tok.stack)
+		tok.stack = malloc(sizeof *tok.stack * MAX_INCLUDE_DEPTH);
+
+	tok.input_n++;
+	tok.stack[tok.input_n - 1] = input_create(file);
+	tok.top = &tok.stack[tok.input_n - 1];
 }
 
 void tokenizer_push_input(const char *rel_path) {
 	struct file file = search_include(&tok.top->file, rel_path);
 
-	input_list_add(&tok.stack, input_create(file));
-	tok.top = &tok.stack->list[tok.stack->n - 1];
+	if (!tok.stack)
+		tok.stack = malloc(sizeof *tok.stack * MAX_INCLUDE_DEPTH);
+
+	tok.input_n++;
+	tok.stack[tok.input_n - 1] = input_create(file);
+	tok.top = &tok.stack[tok.input_n - 1];
 }
 
 static void tokenizer_pop_input(void) {
 	input_free(tok.top);
-	tok.stack->n--;
-	tok.top = &tok.stack->list[tok.stack->n - 1];
+	tok.input_n--;
+	tok.top = &tok.stack[tok.input_n - 1];
 }
 
 int flush_whitespace(int *whitespace,
@@ -310,7 +318,7 @@ struct token tokenizer_next(void) {
 	} else if(parse_pp_token(PP_NUMBER, &next,
 							 is_pp_number)) {
 	} else if(tok.top->c[0] == '\0') {
-		if(tok.stack->n > 1) {
+		if(tok.input_n > 1) {
 			// Retry on popped source.
 			tokenizer_pop_input();
 			return tokenizer_next();

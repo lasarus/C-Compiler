@@ -1,11 +1,7 @@
 #ifndef TOKEN_LIST_H
 #define TOKEN_LIST_H
 
-#include <list.h>
 #include "preprocessor.h"
-
-/* #define TOK_EQ(T1, T2) (T1.type == T2.type && strcmp(T1.str, T2.str) == 0) */
-/* LIST_FREE_EQ(token_list, struct token, NULL_FREE, TOK_EQ); */
 
 struct token_list {
 	int n, capacity;
