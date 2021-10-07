@@ -87,9 +87,6 @@ void define_add_par(struct define *d, struct token t) {
 	token_list_add(&d->par, t);
 }
 
-#define DEFINE_FREE(DEF) define_free(DEF)
-LIST_FREE_EQ(define_list, struct define, DEFINE_FREE, NULL_EQ);
-
 struct expander {
 	struct token_list *stack;
 } expander = {.stack = NULL};

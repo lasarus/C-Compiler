@@ -10,8 +10,9 @@
 // The pre-processor has its own symbol table, since it does not follow the same
 // scoping rules.
 
-void symbols_push_scope();
-void symbols_pop_scope();
+void symbols_push_scope(void);
+void symbols_pop_scope(void);
+void symbols_init(void);
 
 struct symbol_identifier {
 	enum {

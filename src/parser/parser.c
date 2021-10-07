@@ -1,5 +1,6 @@
 #include "parser.h"
 #include "declaration.h"
+#include "symbols.h"
 
 #include <common.h>
 #include <preprocessor/preprocessor.h>

@@ -1,181 +1,176 @@
 #include "symbols.h"
 
-#include <list.h>
 #include <common.h>
 
 #include <string.h>
 
-struct identifier_storage {
-	char *name;
-	int nest;
-	struct symbol_identifier data;
+// I got the idea for data structure from
+// https://www.ida.liu.se/~TDDB44/lectures/PDF-OH2006/Symboltable-2008.pdf
+// The performance improvement was quite modest, but it still feels like
+// the correct design.
+
+struct entry_id {
+	enum entry_type {
+		ENTRY_TYPEDEF,
+		ENTRY_STRUCT,
+		ENTRY_IDENTIFIER
+	} type;
+	const char *name;
 };
 
-struct struct_storage {
-	char *name;
-	int nest;
-	struct symbol_struct data;
+struct table_entry {
+	struct entry_id id;
+
+	union {
+		struct symbol_identifier identifier_data;
+		struct symbol_struct struct_data;
+		struct symbol_typedef typedef_data;
+	};
+
+	int block, link;
 };
 
-struct typedef_storage {
-	char *name;
-	int nest;
-	struct symbol_typedef data;
-};
+static struct hash_table {
+	int size;
+	int *entries;
+} hash_table;
 
-LIST(identifier_storage_list, struct identifier_storage);
-LIST(struct_storage_list, struct struct_storage);
-LIST(typedef_storage_list, struct typedef_storage);
+static struct table {
+	int size, capacity;
+	struct table_entry *entries;
+} table;
 
-struct identifier_storage_list *var_stor = NULL;
-struct struct_storage_list *struct_stor = NULL;
-struct typedef_storage_list *typedef_stor = NULL;
-int current_nest = 0;
+static int current_block = 0;
 
-void symbols_push_scope() {
-	current_nest++;
+uint32_t hash_entry(struct entry_id id) {
+	return hash32(id.type) ^ hash_str(id.name);
 }
 
-void symbols_pop_scope() {
-	current_nest--;
-	if (var_stor) {
-		int n;
+int compare_entry(struct entry_id a, struct entry_id b) {
+	return a.type == b.type &&
+		strcmp(a.name, b.name) == 0;
+}
 
-		for (n = var_stor->n - 1; n >= 0; n--) {
-			if (var_stor->list[n].nest <= current_nest)
-				break;
-		}
+void symbols_push_scope(void) {
+	current_block++;
+}
 
-		var_stor->n = n + 1;
-	}
+void symbols_pop_scope(void) {
+	current_block--;
+	for (int i = table.size - 1; i >= 0; i--) {
+		struct table_entry *entry = table.entries + i;
+		if (entry->block <= current_block)
+			break;
 
-	if (struct_stor) {
-		int n;
+		uint32_t hash = hash_entry(entry->id) % hash_table.size;
 
-		for (n = struct_stor->n - 1; n >= 0; n--) {
-			if (struct_stor->list[n].nest <= current_nest)
-				break;
-		}
-
-		struct_stor->n = n + 1;
-	}
-
-	if (typedef_stor) {
-		int n;
-
-		for (n = typedef_stor->n - 1; n >= 0; n--) {
-			if (typedef_stor->list[n].nest <= current_nest)
-				break;
-		}
-
-		typedef_stor->n = n + 1;
+		hash_table.entries[hash] = entry->link;
+		table.size = i;
 	}
 }
 
-struct identifier_storage *get_var(const char *name) {
-	if (var_stor)
-		for (int i = var_stor->n - 1; i >= 0; i--)
-			if (strcmp(var_stor->list[i].name, name) == 0)
-				return &var_stor->list[i];
+struct table_entry *get_entry(struct entry_id id) {
+	uint32_t hash = hash_entry(id) % hash_table.size;
+	int current_idx = hash_table.entries[hash];
+	while (current_idx >= 0) {
+		struct table_entry *entry = table.entries + current_idx;
+		if (compare_entry(entry->id, id))
+			return entry;
+		current_idx = entry->link;
+	}
 
 	return NULL;
 }
 
-struct struct_storage *get_struct(const char *name) {
-	if (struct_stor)
-		for (int i = struct_stor->n - 1; i >= 0; i--)
-			if (strcmp(struct_stor->list[i].name, name) == 0)
-				return &struct_stor->list[i];
+struct table_entry *add_entry(struct entry_id id) {
+	if (table.size >= table.capacity) {
+		table.capacity = MAX(table.capacity * 2, 4);
+		table.entries = realloc(table.entries, table.capacity * sizeof *table.entries);
+	}
 
-	return NULL;
+	struct table_entry *new_entry = &table.entries[table.size++];
+
+	uint32_t hash = hash_entry(id) % hash_table.size;
+
+	new_entry->id.name = id.name;
+	new_entry->id.type = id.type;
+	new_entry->block = current_block;
+	new_entry->link = hash_table.entries[hash];
+	hash_table.entries[hash] = table.size - 1;
+
+	return new_entry;
 }
 
-struct typedef_storage *get_typedef(const char *name) {
-	if (typedef_stor)
-		for (int i = typedef_stor->n - 1; i >= 0; i--)
-			if (strcmp(typedef_stor->list[i].name, name) == 0)
-				return &typedef_stor->list[i];
+// table_entry querying.
+struct table_entry *symbols_add(enum entry_type type, const char *name) {
+	struct table_entry *entry = get_entry((struct entry_id) { type, name });
 
-	return NULL;
+	if (entry && entry->block == current_block)
+		ERROR("Name already declared, %s", name);
+
+	return add_entry((struct entry_id) { type, name });
 }
 
+struct table_entry *symbols_get(enum entry_type type, const char *name) {
+	return get_entry((struct entry_id) { type, name });
+}
+
+struct table_entry *symbols_get_in_current_scope(enum entry_type type, const char *name) {
+	struct table_entry *entry = get_entry((struct entry_id) { type, name });
+
+	return (entry && entry->block == current_block) ? entry : NULL;
+}
+
+// Identifier help functions.
 struct symbol_identifier *symbols_add_identifier(const char *name) {
-	struct identifier_storage *stor = get_var(name);
-
-	if (stor && stor->nest == current_nest)
-		ERROR("Identifier name already declared, %s", name);
-
-	struct identifier_storage nstor;
-	nstor.nest = current_nest;
-	nstor.name = strdup(name);
-
-	identifier_storage_list_add(&var_stor, nstor);
-	return &var_stor->list[var_stor->n - 1].data;
+	return &symbols_add(ENTRY_IDENTIFIER, name)->identifier_data;
 }
 
 struct symbol_identifier *symbols_get_identifier(const char *name) {
-	struct identifier_storage *stor = get_var(name);
-	return stor ? &stor->data : NULL;
+	struct table_entry *entry = symbols_get(ENTRY_IDENTIFIER, name);
+	return entry ? &entry->identifier_data : NULL;
 }
 
 struct symbol_identifier *symbols_get_identifier_in_current_scope(const char *name) {
-	struct identifier_storage *stor = get_var(name);
-
-	if (stor && stor->nest == current_nest)
-		return &stor->data;
-	return NULL;
+	struct table_entry *entry = symbols_get_in_current_scope(ENTRY_IDENTIFIER, name);
+	return entry ? &entry->identifier_data : NULL;
 }
 
-struct symbol_struct *symbols_get_struct_in_current_scope(const char *name) {
-	struct struct_storage *stor = get_struct(name);
-
-	if (stor && stor->nest == current_nest)
-		return &stor->data;
-	return NULL;
-}
-
+// Struct help functions.
 struct symbol_struct *symbols_add_struct(const char *name) {
-	struct struct_storage *stor = get_struct(name);
-
-	if (stor && stor->nest == current_nest) {
-		ERROR("Struct/union name already declared, %s", name);
-	}
-
-	struct_storage_list_add(&struct_stor, (struct struct_storage) {
-			.nest = current_nest,
-			.name = strdup(name)
-		});
-	return &struct_stor->list[struct_stor->n - 1].data;
+	return &symbols_add(ENTRY_STRUCT, name)->struct_data;
 }
 
 struct symbol_struct *symbols_get_struct(const char *name) {
-	struct struct_storage *stor = get_struct(name);
-	return stor ? &stor->data : NULL;
+	struct table_entry *entry = symbols_get(ENTRY_STRUCT, name);
+	return entry ? &entry->struct_data : NULL;
 }
 
+struct symbol_struct *symbols_get_struct_in_current_scope(const char *name) {
+	struct table_entry *entry = symbols_get_in_current_scope(ENTRY_STRUCT, name);
+	return entry ? &entry->struct_data : NULL;
+}
+
+// Typedef help functions.
 struct symbol_typedef *symbols_add_typedef(const char *name) {
-	struct typedef_storage *stor = get_typedef(name);
+	struct entry_id id = {ENTRY_TYPEDEF, name};
+	struct table_entry *entry = get_entry(id);
 
-	if (stor && stor->nest == current_nest) {
-		return &stor->data; // This is technically wrong.
-		// Has to be fixed in declaration_parser.c
-	}
+	if (entry && entry->block == current_block)
+		return &entry->typedef_data;
 
-	typedef_storage_list_add(&typedef_stor, (struct typedef_storage) {
-			.nest = current_nest,
-			.name = strdup(name)
-		});
-	return &typedef_stor->list[typedef_stor->n - 1].data;
+	return &add_entry(id)->typedef_data;
 }
 
 struct symbol_typedef *symbols_get_typedef(const char *name) {
-	struct typedef_storage *stor = get_typedef(name);
-	return stor ? &stor->data : NULL;
+	struct table_entry *entry = symbols_get(ENTRY_TYPEDEF, name);
+	return entry ? &entry->typedef_data : NULL;
 }
 
-/* struct symbol_typedef *symbols_add_typedef(const char *name) { */
-/* } */
-
-/* struct symbol_typedef *symbols_get_typedef(const char *name) { */
-/* } */
-
+// Init everything. Called from main.
+void symbols_init(void) {
+	hash_table.size = 1024;
+	hash_table.entries = malloc(sizeof *hash_table.entries * hash_table.size);
+	for (int i = 0; i < hash_table.size; i++)
+		hash_table.entries[i] = -1;
+}

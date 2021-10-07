@@ -12,7 +12,7 @@ uint32_t hash32(uint32_t a) {
 }	
 
 // TODO: This is not a good hash function.
-uint32_t hash_str(char *str) {
+uint32_t hash_str(const char *str) {
 	uint32_t hash = 0;
 	for (; *str; str++)
 		hash ^= hash32(*str);

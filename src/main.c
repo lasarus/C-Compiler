@@ -5,6 +5,7 @@
 #include "preprocessor/search_path.h"
 #include "preprocessor/macro_expander.h"
 #include "arch/builtins.h"
+#include "parser/symbols.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -74,6 +75,7 @@ void add_implementation_defs(void) {
 }
 
 int main(int argc, char **argv) {
+	symbols_init();
 	add_implementation_defs();
 	builtins_init();
    
