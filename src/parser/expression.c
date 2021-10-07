@@ -1043,8 +1043,17 @@ int evaluate_constant_expression(struct expr *expr,
 		if (expr->args[0]->type != E_CONSTANT)
 			return 0;
 
-		*constant = expr->args[0]->constant;
-		constant->data_type = type_pointer(expr->args[0]->data_type->children[0]);
+		struct constant c = expr->args[0]->constant;
+
+		if (c.type == CONSTANT_LABEL) {
+			*constant = c;
+			constant->data_type = type_pointer(expr->args[0]->data_type->children[0]);
+		} else {
+			*constant = c;
+			constant->data_type = type_pointer(expr->args[0]->data_type->children[0]);
+			constant->type = CONSTANT_LABEL;
+			constant->label = rodata_register(c.str_d);
+		}
 	} break;
 
 	default:

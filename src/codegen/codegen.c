@@ -336,6 +336,19 @@ void constant_to_buffer(uint8_t *buffer, struct constant constant) {
 		*buffer = constant.long_d;
 		return;
 	}
+
+	if (constant.data_type->type == TY_ARRAY) {
+		if (constant.data_type->children[0] != type_simple(ST_CHAR))
+			NOTIMP();
+
+		const char *str = constant.str_d;
+		int i = 0;
+		for (; *str; i++) {
+			buffer[i] = take_character(&str);
+		}
+		buffer[i] = 0;
+		return;
+	}
 	assert(constant.data_type->type == TY_SIMPLE);
 
 	switch (constant.data_type->simple) {
@@ -415,10 +428,11 @@ void codegen_initializer(struct type *type,
 		case CONSTANT_TYPE:
 			constant_to_buffer(buffer + offset, *c);
 			break;
-		default:
+
+		case CONSTANT_LABEL:
 			is_label[offset] = 1;
 			labels[offset] = c->label;
-			//NOTIMP();
+			break;
 		}
 	}
 
@@ -544,8 +558,12 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 				// TODO: Is this really right?
 				break;
 
-			default:
-				ERROR("Not implemented %d\n", size);
+			default: {
+				uint8_t buffer[size];
+				constant_to_buffer(buffer, c);
+				for (int i = 0; i < size; i++)
+					emit("movb $%d, -%d(%%rbp)", buffer[i], variable_info[ins.constant.result].stack_location - i);
+			}
 			}
 		} break;
 

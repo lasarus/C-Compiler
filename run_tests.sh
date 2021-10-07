@@ -11,8 +11,8 @@ for SRC in $SOURCES
 do
 	echo -en "\r\033[KTESTING $SRC"
 	OUT="$(basename -s .c $SRC).s"
-	./cc $SRC test.s -Imusl -Isrc -D_POSIX_SOURCE
-	gcc test.s -o test -no-pie
+	./cc $SRC test_asm/$OUT -Imusl -Isrc -D_POSIX_SOURCE
+	gcc test_asm/$OUT -o test -no-pie
 	./test
 done
 echo -en "\r\033[KNo errors"

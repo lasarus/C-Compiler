@@ -65,6 +65,8 @@ struct constant {
 		unsigned long ulong_d;
 		long long llong_d;
 		unsigned long long ullong_d;
+
+		char *str_d;
 		// TODO: floating point.
 
 		label_id label;

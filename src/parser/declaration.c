@@ -792,6 +792,13 @@ struct type_ast *parse_declarator(int *was_abstract) {
 	return ast;
 }
 
+static struct initializer *initializer_init(void) {
+	struct initializer *init = malloc(sizeof *init);
+	*init = (struct initializer) { 0 };
+
+	return init;
+}
+
 void add_init_pair(struct initializer *init, struct init_pair pair) {
 	init->n++;
 	init->pairs = realloc(init->pairs, sizeof (*init->pairs) * init->n);
@@ -911,14 +918,38 @@ void parse_initializer_recursive(int offset, struct type **type, int set_type,
 			ERROR("Expected expression, got %s", token_to_str(T0->type));
 		}
 
-		add_init_pair(initializer, (struct init_pair){offset,
-				expression_cast(expr, *type)});
+		if ((*type)->type == TY_INCOMPLETE_ARRAY && set_type) {
+			if (expr->type != E_CONSTANT)
+				ERROR("Can't initialize incomplete array with non constant expression");
+
+			if (expr->data_type->type != TY_ARRAY)
+				ERROR("Can't initialize incomplete array with non-array expression of type");
+
+			if (expr->data_type->children[0] != (*type)->children[0])
+				ERROR("Can't initialize incomplete array with array of incompatible type");
+
+			struct constant c = expr->constant;
+
+			struct type complete_array_params = {
+				.type = TY_ARRAY,
+				.array.length = c.data_type->array.length,
+				.n = 1
+			};
+
+			struct type *ntype = type_create(&complete_array_params, (*type)->children);
+			*type = ntype;
+
+			add_init_pair(initializer, (struct init_pair){offset, expr});
+		} else {
+			add_init_pair(initializer, (struct init_pair){offset,
+					expression_cast(expr, *type)});
+		}
+
 	}
 }
 
 struct initializer *parse_initializer(struct type **type) {
-	struct initializer *init = malloc(sizeof *init);
-	*init = (struct initializer) { 0 };
+	struct initializer *init = initializer_init();
 
 	parse_initializer_recursive(0, type, 1, init);
 

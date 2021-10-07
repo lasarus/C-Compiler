@@ -43,25 +43,34 @@ int round_up_to_nearest(int num, int div) {
 	return num;
 }
 
-int escaped_to_str(const char *str) {
-	if (str[0] != '\\')
-		return str[0];
-	else {
-		switch (str[1]) {
-		case 'n':
-			return '\n';
-		case '\'':
-			return '\'';
-		case '\"':
-			return '\"';
-		case 't':
-			return '\t';
-		case '0':
-			return '\0';
-		case '\\':
-			return '\\';
-		default:
-			ERROR("Invalid escape sequence %c%c", str[0], str[1]);
-		}
+int get_escape(char nc) {
+	switch (nc) {
+	case 'n':
+		return '\n';
+	case '\'':
+		return '\'';
+	case '\"':
+		return '\"';
+	case 't':
+		return '\t';
+	case '0':
+		return '\0';
+	case '\\':
+		return '\\';
+	default:
+		ERROR("Invalid escape sequence \\%c", nc);
 	}
+}
+
+int take_character(const char **str) {
+	if (**str != '\\')
+		return *(*str)++;
+	else {
+		(*str)++;
+		return get_escape(*(*str)++);
+	}
+}
+
+int escaped_to_str(const char *str) {
+	return take_character(&str);
 }
