@@ -330,13 +330,11 @@ int builtin_macros(struct token *t) {
 struct token expander_next() {
 	struct token t = expander_take();
 
-	if (t.type != PP_IDENT) {
+	if (t.type != PP_IDENT)
 		return t;
-	}
 
-	if (string_set_index_of(t.hs, t.str) != -1) {
+	if (string_set_contains(t.hs, t.str))
 		return t;
-	}
 
 	struct define *def = NULL;
 	if (builtin_macros(&t)) {
