@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
+#include <stdarg.h>
 
 int calling_convention[] = {REG_RDI, REG_RSI, REG_RDX, REG_RCX, REG_R8, REG_R9};
 
@@ -957,7 +958,7 @@ void codegen_function(struct instruction *is,
 	emit("%s:", is->function.name);
 	emit("pushq %%rbp");
 	emit("movq %%rsp, %%rbp");
-	emit("subq $%d, %%rsp", round_up16(stack_count));
+	emit("subq $%d, %%rsp", round_up_to_nearest(stack_count, 16));
 
 	if (return_type != type_simple(ST_VOID) &&
 		return_classification.pass_in_memory) {
