@@ -269,6 +269,7 @@ void codegen_call(var_id variable, int n_args, var_id *args, var_id result) {
 
 struct reg_save_info {
 	int reg_save_position;
+	int overflow_position;
 	int gp_offset;
 	int fp_offset;
 };
@@ -771,73 +772,87 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 		scalar_to_reg(variable_info[ins.va_start_.result].stack_location, ins.va_start_.result, REG_RAX);
 		emit("movl $%d, %d(%%rax)", reg_save_info.gp_offset, gp_offset_offset);
 		emit("movl $%d, %d(%%rax)", 0, fp_offset_offset);
-		emit("movq $%d, %d(%%rax)", 0, overflow_arg_area_offset);
+		emit("leaq %d(%%rbp), %%rdi", reg_save_info.overflow_position);
+		emit("movq %%rdi, %d(%%rax)", overflow_arg_area_offset);
 
 		emit("leaq -%d(%%rbp), %%rdi", reg_save_info.reg_save_position);
 		emit("movq %%rdi, %d(%%rax)", reg_save_area_offset);
 	} break;
 
 	case IR_VA_ARG: {
-		static int va_arg_labels = 0;
-		if (ins.va_arg_.type == type_simple(ST_INT)) {
-			int gp_offset_offset = builtin_va_list->offsets[0];
-			//int fp_offset_offset = builtin_va_list->offsets[1];
-			int overflow_arg_area_offset = builtin_va_list->offsets[2];
-			int reg_save_area_offset = builtin_va_list->offsets[3];
-			scalar_to_reg(variable_info[ins.va_arg_.array].stack_location, ins.va_arg_.array, REG_RDI);
-			emit("movl %d(%%rdi), %%eax", gp_offset_offset);
-			emit("cmpl $48, %%eax");
-			va_arg_labels++;
-			emit("jae .va_arg_stack%d", va_arg_labels);
-			emit("leal 8(%%rax), %%edx");
-			emit("addq %d(%%rdi), %%rax", reg_save_area_offset);
-			emit("movl %%edx, %d(%%rdi)", gp_offset_offset);
-			emit("jmp .va_arg_fetch%d", va_arg_labels);
-			emit(".va_arg_stack%d:", va_arg_labels);
-			emit("movq %d(%%rdi), %%rax", overflow_arg_area_offset);
-			emit("leaq 8(%%rax), %%rdx");
-			emit("movq %%rdx, %d(%%rdi)", overflow_arg_area_offset);
-			emit(".va_arg_fetch%d:", va_arg_labels);
-			emit("movl (%%rax), %%eax");
-			
-			reg_to_scalar(REG_RAX, variable_info[ins.va_arg_.result].stack_location, ins.va_arg_.result);
+		struct type *type = ins.va_arg_.type;
+		int n_parts;
+		enum parameter_class classes[4];
+		classify(type, &n_parts, classes);
 
-			// movl l->gp_offset, %%eax
-			// cmpl $48, %%eax
-			// jae stack
-			// leal $8(%%rax), %%edx
-			// addq l->reg_save_area, %%rax
-			// movl %%edx, l->gp_offset
-			// jmp fetch
-			// stack: movq l->overflow_arg_area, %%rax
-			// leaq 8(%%rax), %%rdx
-			// movq %%rdx, l->overflow_arg_area
-			// fetch: movl (%%rax), %%eax
-		} else if (ins.va_arg_.type->type == TY_POINTER) {
-			int gp_offset_offset = builtin_va_list->offsets[0];
-			//int fp_offset_offset = builtin_va_list->offsets[1];
-			int overflow_arg_area_offset = builtin_va_list->offsets[2];
-			int reg_save_area_offset = builtin_va_list->offsets[3];
-			scalar_to_reg(variable_info[ins.va_arg_.array].stack_location, ins.va_arg_.array, REG_RDI);
+		static int va_arg_labels = 0;
+		int gp_offset_offset = builtin_va_list->offsets[0];
+		int reg_save_area_offset = builtin_va_list->offsets[3];
+		int overflow_arg_area_offset = builtin_va_list->offsets[2];
+		va_arg_labels++;
+		// 1. Determine whether type may be passed in the registers. If not go to step 7
+		scalar_to_reg(variable_info[ins.va_arg_.array].stack_location, ins.va_arg_.array, REG_RDI);
+		if (classes[0] != CLASS_MEMORY) {
+			// 2. Compute num_gp to hold the number of general purpose registers needed
+			// to pass type and num_fp to hold the number of floating point registers needed.
+
+			int num_gp = 0;
+			//int num_fp = 0;
+			for (int i = 0; i < n_parts; i++) {
+				if (classes[i] == CLASS_INTEGER)
+					num_gp++;
+				else
+					NOTIMP();
+			}
+
+			// 3. Verify whether arguments fit into registers. In the case:
+			//     l->gp_offset > 48 − num_gp ∗ 8
+			// or
+			//     l->fp_offset > 304 − num_fp ∗ 16
+			// go to step 7.
+
 			emit("movl %d(%%rdi), %%eax", gp_offset_offset);
-			emit("cmpl $48, %%eax");
-			va_arg_labels++;
-			emit("jae .va_arg_stack%d", va_arg_labels);
-			emit("leal 8(%%rax), %%edx");
+			emit("cmpl $%d, %%eax", 48 - 8 * num_gp);
+			emit("ja .va_arg_stack%d", va_arg_labels);
+
+			// 4. Fetch type from l->reg_save_area with an offset of l->gp_offset
+			// and/or l->fp_offset. This may require copying to a temporary loca-
+			// tion in case the parameter is passed in different register classes or requires
+			// an alignment greater than 8 for general purpose registers and 16 for XMM
+			// registers. [Note: Alignment is largely ignored in this implementation]
+
+			// 5. Set:
+			// l->gp_offset = l->gp_offset + num_gp ∗ 8
+			// l->fp_offset = l->fp_offset + num_fp ∗ 16.
+			// 6. Return the fetched type.
+
+			emit("leal %d(%%rax), %%edx", num_gp * 8);
 			emit("addq %d(%%rdi), %%rax", reg_save_area_offset);
 			emit("movl %%edx, %d(%%rdi)", gp_offset_offset);
 			emit("jmp .va_arg_fetch%d", va_arg_labels);
-			emit(".va_arg_stack%d:", va_arg_labels);
-			emit("movq %d(%%rdi), %%rax", overflow_arg_area_offset);
-			emit("leaq 8(%%rax), %%rdx");
-			emit("movq %%rdx, %d(%%rdi)", overflow_arg_area_offset);
-			emit(".va_arg_fetch%d:", va_arg_labels);
-			emit("movq (%%rax), %%rax");
-			
-			reg_to_scalar(REG_RAX, variable_info[ins.va_arg_.result].stack_location, ins.va_arg_.result);
-		} else {
-			NOTIMP();
 		}
+		// 7. Align l->overflow_arg_area upwards to a 16 byte boundary if align-
+		//ment needed by type exceeds 8 byte boundary. [This is ignored.]
+		emit(".va_arg_stack%d:", va_arg_labels);
+
+		// 8. Fetch type from l->overflow_arg_area.
+
+		emit("movq %d(%%rdi), %%rax", overflow_arg_area_offset);
+
+		// 9. Set l->overflow_arg_area to:
+		// l->overflow_arg_area + sizeof(type)
+		// 10. Align l->overflow_arg_area upwards to an 8 byte boundary.
+		emit("leaq %d(%%rax), %%rdx", round_up_to_nearest(calculate_size(type), 8));
+		emit("movq %%rdx, %d(%%rdi)", overflow_arg_area_offset);
+
+		// 11. Return the fetched type.
+		emit(".va_arg_fetch%d:", va_arg_labels);
+
+		// Address is now in %%rax.
+		emit("movq %%rax, %%rdi");
+		emit("leaq -%d(%%rbp), %%rsi", variable_info[ins.va_arg_.result].stack_location);
+
+		codegen_memcpy(calculate_size(type));
 	} break;
 
 	case IR_SET_ZERO:
@@ -913,6 +928,7 @@ void codegen_function(struct instruction *is,
 	struct reg_save_info reg_save_info;
 	reg_save_info.fp_offset = 0;
 	reg_save_info.gp_offset = (current_gp_reg) * 8;
+	reg_save_info.overflow_position = 16;
 
 	int reg_save = 0;
 	for (int i = 1; i < count; i++) {
@@ -988,6 +1004,8 @@ void codegen_function(struct instruction *is,
 			}
 		}
 	}
+
+	reg_save_info.overflow_position = total_memory_argument_size + 16;
 
 	for (int i = 1; i < count; i++) {
 		if (is[i].type == IR_ALLOCA)
