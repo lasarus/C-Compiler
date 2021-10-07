@@ -9,7 +9,6 @@
 #include <common.h>
 
 #include <precedence.h>
-#include <list.h>
 
 #include <assert.h>
 #include <stdio.h>
