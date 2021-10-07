@@ -20,7 +20,7 @@ for SRC in $SOURCES
 do
 	echo -en "\r\033[KCOMPILING $SRC"
 	OUT="$(basename -s .c $SRC).s"
-	./cc $SRC asm/$OUT -Imusl -Isrc -D_POSIX_SOURCE -D__STRICT_ANSI__
+	./cc $SRC asm/$OUT -Imusl -Isrc -D_POSIX_SOURCE
 done
 echo -en "\r\033[KDONE!"
 echo
@@ -39,7 +39,7 @@ do
 	do
 		echo -en "\r\033[KCOMPILING $SRC"
 		OUT="$(basename -s .c $SRC).s"
-		./cc_self $SRC asm2/$OUT -Imusl -Isrc -D_POSIX_SOURCE -D__STRICT_ANSI__
+		./cc_self $SRC asm2/$OUT -Imusl -Isrc -D_POSIX_SOURCE
 	done
 	echo -en "\r\033[KDONE!"
 	echo
