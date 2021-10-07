@@ -1,0 +1,14 @@
+#include <stdio.h>
+#include <assert.h>
+#include <string.h>
+
+#define STR(X) #X
+#define GLUE(X, Y) X ## Y
+int main() {
+	// Testing strcmp first, just to be sure.
+	assert(strcmp("Hello", "Hello") == 0);
+	assert(strcmp("Fr5tlPS93T", "Fr5tlPS93T") == 0);
+	// Testing STR(X)
+	assert(strcmp(STR(HELLO THERE!), "HELLO THERE!") == 0);
+	assert(strcmp(STR(GLUE(AAA, BBB)), "GLUE(AAA, BBB)") == 0);
+}

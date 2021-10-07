@@ -45,4 +45,6 @@ do
 	echo
 
 	gcc asm2/*.s -o cc_self -no-pie -g
+
+	[ ! -z "$1" ] && [ "$NUM" -eq "$1" ] && break
 done
