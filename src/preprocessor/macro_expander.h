@@ -2,6 +2,7 @@
 #define MACRO_EXPANDER_H
 
 #include "preprocessor.h"
+#include "token_list.h"
 
 struct define {
 	struct define *next;
@@ -9,7 +10,7 @@ struct define {
 	int func;
 	int vararg;
 
-	struct token_list *def, *par;
+	struct token_list def, par;
 };
 
 struct define define_init(char *name);

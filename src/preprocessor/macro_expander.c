@@ -1,4 +1,5 @@
 #include "macro_expander.h"
+#include "token_list.h"
 
 #include <common.h>
 
@@ -62,19 +63,15 @@ void define_map_remove(char *str) {
 	}
 }
 
-#define TOK_EQ(T1, T2) (T1.type == T2.type && strcmp(T1.str, T2.str) == 0)
-LIST_FREE_EQ(token_list, struct token, NULL_FREE, TOK_EQ);
-
 struct define define_init(char *name) {
-	struct define d = {
+	return (struct define) {
 		.name = name,
 	};
-	return d;
 }
 
 void define_free(struct define *d) {
-	token_list_free(d->def);
-	token_list_free(d->par);
+	token_list_free(&d->def);
+	token_list_free(&d->par);
 	d->func = 0;
 }
 
@@ -88,14 +85,14 @@ void define_add_par(struct define *d, struct token t) {
 }
 
 struct expander {
-	struct token_list *stack;
-} expander = {.stack = NULL};
+	struct token_list stack;
+} expander;
 
 struct token expander_take(void) {
 	struct token t;
 
-	if (LIST_SIZE(expander.stack) > 0) {
-		t = token_move(token_list_top(expander.stack));
+	if (expander.stack.n > 0) {
+		t = token_move(token_list_top(&expander.stack));
 		token_list_pop(&expander.stack);
 	} else {
 		t = NEXT();
@@ -112,9 +109,9 @@ void expander_push_front(struct token t) {
 }
 
 // Returns true if done.
-int expander_parse_argument(struct token_list **tl, int ignore_comma) {
+int expander_parse_argument(struct token_list *tl, int ignore_comma) {
 	int depth = 1;
-	*tl = NULL;
+	*tl = (struct token_list) {0};
 	struct token t;
 	do {
 		t = expander_take();
@@ -141,7 +138,7 @@ int get_param(struct define *def, struct token tok) {
 	if (!def->func || tok.type != PP_IDENT)
 		return -1;
 
-	return token_list_index_of(def->par, tok);
+	return token_list_index_of(&def->par, tok);
 }
 
 struct token glue(struct token a, struct token b) {
@@ -164,11 +161,11 @@ void expander_subs(struct define *def, struct str_list **hs,
 	str_list_insert(hs, strdup(def->name));
 
 	// Parse function macro.
-	int n_args = LIST_SIZE(def->par);
+	int n_args = def->par.n;
 	if (n_args > 16)
 		ERROR("Unsupported number of elements");
-	struct token_list *arguments[16];
-	struct token_list *vararg = NULL;
+	struct token_list arguments[16] = {0};
+	struct token_list vararg = {0};
 	int vararg_included = 0;
 	if(def->func) {
 		struct token lpar = expander_take();
@@ -202,15 +199,15 @@ void expander_subs(struct define *def, struct str_list **hs,
 	}
 
 	int concat_with_prev = 0;
-	for(int i = LIST_SIZE(def->def) - 1; i >= 0; i--) {
-		struct token t = def->def->list[i];
+	for(int i = def->def.n - 1; i >= 0; i--) {
+		struct token t = def->def.list[i];
 
 		int concat = 0;
 		int stringify = 0;
 
 		if (i != 0) {
-			concat = (def->def->list[i - 1].type == PP_HHASH);
-			stringify = (def->def->list[i - 1].type == PP_HASH);
+			concat = (def->def.list[i - 1].type == PP_HHASH);
+			stringify = (def->def.list[i - 1].type == PP_HASH);
 		}
 
 		if (t.type == PP_HHASH)
@@ -225,23 +222,23 @@ void expander_subs(struct define *def, struct str_list **hs,
 
 		if (is_va_args) {
 			if (concat && i - 2 >= 0 &&
-				def->def->list[i - 2].type == PP_COMMA &&
+				def->def.list[i - 2].type == PP_COMMA &&
 				!vararg_included) {
 				i--; // There is an additional i-- at the end of the loop.
 			} else if (vararg_included) {
-				struct token_list *tl = vararg;
+				struct token_list tl = vararg;
 
-				int start_it = LIST_SIZE(tl) - 1;
+				int start_it = tl.n - 1;
 
-				if (concat_with_prev && LIST_SIZE(tl)) {
-					struct token *end = &expander.stack->list[
-						expander.stack->n - 1
+				if (concat_with_prev && tl.n) {
+					struct token *end = &expander.stack.list[
+						expander.stack.n - 1
 						];
-					*end = glue(*end, tl->list[start_it--]);
+					*end = glue(*end, tl.list[start_it--]);
 				}
 
 				for(int i = start_it; i >= 0; i--) {
-					struct token t = tl->list[i];
+					struct token t = tl.list[i];
 					t.pos = new_pos;
 					expander_push(t);
 				}
@@ -251,12 +248,12 @@ void expander_subs(struct define *def, struct str_list **hs,
 				NOTIMP();
 			}
 		} else if (idx >= 0 && stringify) {
-			struct token_list *tl = arguments[idx];
+			struct token_list tl = arguments[idx];
 			char *str = "";
 
-			int start_it = LIST_SIZE(tl) - 1;
+			int start_it = tl.n - 1;
 			for(int i = start_it; i >= 0; i--) {
-				struct token t = tl->list[i];
+				struct token t = tl.list[i];
 				t.pos = new_pos;
 
 				str = allocate_printf("%s%s", t.str, str);
@@ -268,24 +265,24 @@ void expander_subs(struct define *def, struct str_list **hs,
 			t.hs = NULL;
 			expander_push(t);
 		} else if(idx >= 0) {
-			struct token_list *tl = arguments[idx];
+			struct token_list tl = arguments[idx];
 
-			int start_it = LIST_SIZE(tl) - 1;
+			int start_it = tl.n - 1;
 
-			if (concat_with_prev && LIST_SIZE(tl)) {
-				struct token *end = &expander.stack->list[
-					expander.stack->n - 1
+			if (concat_with_prev && tl.n) {
+				struct token *end = &expander.stack.list[
+					expander.stack.n - 1
 					];
-				*end = glue(*end, tl->list[start_it--]);
+				*end = glue(*end, tl.list[start_it--]);
 			}
 
 			for(int i = start_it; i >= 0; i--) {
-				struct token t = tl->list[i];
+				struct token t = tl.list[i];
 				t.pos = new_pos;
 				expander_push(t);
 			}
 
-			if (LIST_SIZE(tl))
+			if (tl.n)
 				concat_with_prev = concat;
 		} else {
 			if (concat_with_prev) {
@@ -307,7 +304,7 @@ void expander_subs(struct define *def, struct str_list **hs,
 	}
 
 	for(int i = 0; i < n_args; i++) {
-		token_list_free(arguments[i]);
+		token_list_free(&arguments[i]);
 	}
 }
 

@@ -1,5 +1,6 @@
 #include "splitter.h"
 #include "macro_expander.h"
+#include "token_list.h"
 
 #include <common.h>
 
@@ -12,12 +13,9 @@ static char *str_move(char **from) {
 	return str;
 }
 
-#define TOK_EQ(T1, T2) (T1.type == T2.type && strcmp(T1.str, T2.str) == 0)
-LIST_FREE_EQ(token_list, struct token, NULL_FREE, TOK_EQ);
-
 struct splitter {
-	struct token_list *stack;
-} splitter = { .stack = NULL };
+	struct token_list stack;
+} splitter;
 
 enum ttype get_ident(char *str) {
 #define X(A, B)
@@ -71,8 +69,8 @@ enum ttype get_punct(char **in_str) {
 }
 
 struct token splitter_next(void) {
-	if (LIST_SIZE(splitter.stack) > 0) {
-		struct token t = token_move(token_list_top(splitter.stack));
+	if (splitter.stack.n) {
+		struct token t = token_move(token_list_top(&splitter.stack));
 		token_list_pop(&splitter.stack);
 		return t;
 	}
@@ -103,8 +101,8 @@ struct token splitter_next(void) {
 }
 
 struct token splitter_next_unexpanded() {
-	if (LIST_SIZE(splitter.stack) > 0) {
-		struct token t = token_move(token_list_top(splitter.stack));
+	if (splitter.stack.n) {
+		struct token t = token_move(token_list_top(&splitter.stack));
 		token_list_pop(&splitter.stack);
 		return t;
 	} else {

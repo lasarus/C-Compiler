@@ -4,7 +4,7 @@
 #include "splitter.h"
 #include "directives.h"
 #include "string_concat.h"
-
+#include "token_list.h"
 
 #include <common.h>
 
@@ -16,9 +16,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-
-#define TOK_EQ(T1, T2) (T1.type == T2.type && strcmp(T1.str, T2.str) == 0)
-LIST_FREE_EQ(token_list, struct token, NULL_FREE, TOK_EQ);
 
 struct token_stream {
     struct token t, nt;
