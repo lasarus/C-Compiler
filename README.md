@@ -20,3 +20,7 @@ And run
     ./self_compile.sh
 The compiler will then compile itself, and the resulting compiler will in turn also compile itself, and so on in an infinite loop.
 Assembly output from the first generation compiler will be put in asm/, and the output from the following generations is put in asm2/. Currently the outputs of all generations of the compiler are identical (anything else would be a bug.)
+## Testing
+There is a very basic test suite implemented. It runs all `*.c` files in `tests/` and aborts if any of them fails, either during compilation, or runtime. It also self-compiles twice, and checks that the outputs are identical. Use the following command to run the tests:
+
+    ./run_tests.sh
