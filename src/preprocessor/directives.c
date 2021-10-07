@@ -149,6 +149,15 @@ intmax_t evaluate_expression(int prec) {
 			expr = expr < evaluate_expression(new_prec);
 		} else if (t.type == T_G) {
 			expr = expr > evaluate_expression(new_prec);
+		} else if (t.type == T_SUB) {
+			expr = expr - evaluate_expression(new_prec);
+		} else if (t.type == T_ADD) {
+			expr = expr + evaluate_expression(new_prec);
+		} else if (t.type == T_QUEST) {
+			int mid = evaluate_expression(0);
+			struct token colon = NEXT_E();
+			assert(colon.type == T_COLON);
+			expr = expr ? mid : evaluate_expression(new_prec);
 		} else {
 			ERROR("Invalid infix %s", token_to_str(t.type));
 		}

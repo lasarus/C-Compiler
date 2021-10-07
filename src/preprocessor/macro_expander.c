@@ -285,9 +285,11 @@ void expander_subs(struct define *def, struct string_set *hs,
 				concat_with_prev = concat;
 		} else {
 			if (concat_with_prev) {
-				PRINT_POS(t.pos);
-				NOTIMP();
-			} if (stringify) {
+				struct token *end = &expander.stack.list[
+					expander.stack.n - 1
+					];
+				*end = glue(*end, t);
+			} else if (stringify) {
 				ERROR("# Should be followed by macro parameter");
 			} else {
 				t.hs = string_set_union(*hs, t.hs);
