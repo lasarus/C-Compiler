@@ -80,6 +80,7 @@ KEY(T_KVA_START, "__builtin_va_start")
 KEY(T_KVA_END, "__builtin_va_end")
 KEY(T_KVA_ARG, "__builtin_va_arg")
 KEY(T_KVA_COPY, "__builtin_va_copy")
+KEY(T_KFUNC, "__func__")
 
 // Punctuation with 3 characters.
 // Tokenization of punctuation is dependent on them beeing in this order.

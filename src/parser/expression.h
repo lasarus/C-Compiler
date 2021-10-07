@@ -32,6 +32,14 @@ struct expr *expr_new(struct expr expr);
 			.args = {(RHS)}									\
 		})
 
+#define EXPR_STR(STR) expr_new((struct expr) {							\
+			.type = E_CONSTANT,											\
+			.constant = {												\
+				.type = CONSTANT_LABEL,									\
+				.data_type = type_array(type_simple(ST_CHAR), strlen(STR) + 1),	\
+				.label = register_string(STR)							\
+			}});
+
 #define EXPR_INT(I) expr_new((struct expr) {							\
 			.type = E_CONSTANT,											\
 			.constant = {.type = CONSTANT_TYPE, .data_type = type_simple(ST_INT), .int_d = (I)} \

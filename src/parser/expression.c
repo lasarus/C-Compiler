@@ -5,6 +5,7 @@
 #include "symbols.h"
 #include <codegen/rodata.h>
 #include <precedence.h>
+#include "function_parser.h"
 
 // Type conversions
 enum simple_type get_arithmetic_type(enum simple_type a,
@@ -688,6 +689,8 @@ struct expr *parse_builtins(void) {
 				.type = E_BUILTIN_VA_ARG,
 				.va_arg_ = {v, t}
 			});
+	} else if (TACCEPT(T_KFUNC)) {
+		return EXPR_STR(get_current_function());
 	} else {
 		return NULL;
 	}
@@ -745,16 +748,8 @@ struct expr *parse_primary_expression(int starts_with_lpar) {
 			});
 	} else if (T_ISNEXT(T_STRING)) {
 		const char *str = T0->str;
-		struct constant c = {
-			.type = CONSTANT_LABEL,
-			.data_type = type_array(type_simple(ST_CHAR), strlen(str) + 1),
-			.label = register_string(str)
-		};
 		TNEXT();
-		return expr_new((struct expr) {
-				.type = E_CONSTANT,
-				.constant = c
-			});
+		return EXPR_STR(str);
 	} else if (T_ISNEXT(T_CHARACTER_CONSTANT)) {
 		const char *str = T0->str;
 		TNEXT();

@@ -387,7 +387,14 @@ int parse_statement(struct jump_blocks jump_blocks) {
 		TACCEPT(T_SEMI_COLON);
 }
 
+static const char *current_function = "";
+
+const char *get_current_function() {
+	return current_function;
+}
+
 void parse_function(const char *name, struct type *type, int arg_n, char **arg_names, int global) {
+	current_function = name;
 	struct symbol_identifier *symbol = symbols_get_identifier(name);
 
 	current_ret_val = type->children[0];
