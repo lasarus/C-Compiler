@@ -1,7 +1,7 @@
 #include "splitter.h"
-#include "../common.h"
-
 #include "macro_expander.h"
+
+#include <common.h>
 
 #define NEXT_U() expander_next_unexpanded()
 #define NEXT() expander_next()

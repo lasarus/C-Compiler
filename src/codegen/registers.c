@@ -1,7 +1,8 @@
 #include "registers.h"
-#include <parser/parser.h>
-
 #include "codegen.h"
+
+#include <common.h>
+#include <parser/parser.h>
 
 #include <assert.h>
 

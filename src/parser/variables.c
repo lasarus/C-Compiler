@@ -1,11 +1,11 @@
 #include "variables.h"
-#include <types.h>
+#include "expression.h"
 #include "parser.h"
+
 #include <common.h>
+#include <types.h>
 
 #include <stdlib.h>
-#include "expression.h"
-
 #include <assert.h>
 
 struct expr *construct_size_expression(struct type *type) {

@@ -1,9 +1,11 @@
 #include "parser.h"
-#include <stdlib.h>
-#include <string.h>
+#include "declaration.h"
+
 #include <common.h>
 #include <preprocessor/preprocessor.h>
-#include "declaration.h"
+
+#include <stdlib.h>
+#include <string.h>
 
 block_id new_block() {
 	static int block_counter = 1; // reserve space for null block.

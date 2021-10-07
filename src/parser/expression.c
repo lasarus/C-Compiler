@@ -1,11 +1,13 @@
 #include "expression.h"
-#include <common.h>
 #include "declaration.h"
-#include <assert.h>
+#include "function_parser.h"
 #include "symbols.h"
+
+#include <common.h>
 #include <codegen/rodata.h>
 #include <precedence.h>
-#include "function_parser.h"
+
+#include <assert.h>
 
 // Type conversions
 enum simple_type get_arithmetic_type(enum simple_type a,
@@ -266,7 +268,9 @@ void fix_binary_operator(struct expr *expr) {
 		}
 
 		if (!lhs_ptr && rhs_ptr) {
-			SWAP(struct expr *, expr->args[0], expr->args[1]);
+			struct expr *tmp = expr->args[0];
+			expr->args[0] = expr->args[1];
+			expr->args[1] = tmp;
 		}
 
 		// Left hand side is now a pointer.
@@ -301,7 +305,6 @@ int evaluate_constant_expression(struct expr *expr,
  								 struct constant *constant);
 
 struct expr *expr_new(struct expr expr) {
-
 	for (int i = 0; i < num_args[expr.type]; i++) {
 		if (!expr.args[i]) {
 			PRINT_POS(T0->pos);

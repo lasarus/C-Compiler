@@ -1,8 +1,9 @@
 #include "operators.h"
 
 #include <common.h>
-#include <string.h>
 #include <preprocessor/preprocessor.h>
+
+#include <string.h>
 
 struct type *operators_get_result_type(enum operator_type op,
 									   struct type *lhs_type,

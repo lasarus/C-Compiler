@@ -1,5 +1,6 @@
 #include "macro_expander.h"
-#include "../common.h"
+
+#include <common.h>
 
 struct token tokenizer_next();
 #define NEXT() tokenizer_next();

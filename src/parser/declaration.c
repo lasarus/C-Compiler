@@ -1,11 +1,13 @@
 #include "declaration.h"
-#include <preprocessor/preprocessor.h>
 #include "common.h"
-#include "assert.h"
 #include "expression.h"
 #include "symbols.h"
 #include "expression.h"
 #include "function_parser.h"
+
+#include <preprocessor/preprocessor.h>
+
+#include <assert.h>
 
 // Returns previous state of the bit.
 int set_sbit(struct type_specifiers *ts, int bit_n) {

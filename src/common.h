@@ -7,15 +7,10 @@
 #include <stdarg.h>
 
 #define ERROR(STR, ...) do { printf("Error on line %d file %s: \"" STR "\"\n", __LINE__, __FILE__, ##__VA_ARGS__); exit(1); } while(0)
-#define WARNING(STR, ...) do { printf("Warning on line %d file %s: \"" STR "\"\n", __LINE__, __FILE__, ##__VA_ARGS__); } while(0)
 #define NOTIMP() ERROR("Not implemented");
-#define NOTIMPWARN() WARNING("Not implemented");
 
 #define MAX(A, B) (((A) > (B)) ? (A) : (B))
 #define MIN(A, B) (((A) < (B)) ? (A) : (B))
-
-#define COUNTOF(X) (sizeof(X) / sizeof(*X))
-#define SWAP(TYPE, A, B) do { TYPE tmp = (A); (A) = (B); (B) = tmp; } while(0)
 
 static inline uint32_t hash32(uint32_t a) {
 	a = (a ^ 61) ^ (a >> 16);

@@ -1,13 +1,14 @@
 #include "tokenizer.h"
-#include <libgen.h>
-#include "../common.h"
-#include <string.h>
-#include <stdlib.h>
-#include <ctype.h>
-
 #include "syntax.h"
 #include "search_path.h"
 #include "input.h"
+
+#include <common.h>
+
+#include <libgen.h>
+#include <string.h>
+#include <stdlib.h>
+#include <ctype.h>
 
 struct tokenizer {
 	struct input_list *stack;

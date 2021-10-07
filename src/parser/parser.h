@@ -1,10 +1,10 @@
 #ifndef PARSER_H
 #define PARSER_H
 
-#include <types.h>
-
 #include "variables.h"
 #include "operators.h"
+
+#include <types.h>
 
 typedef int block_id;
 block_id new_block();

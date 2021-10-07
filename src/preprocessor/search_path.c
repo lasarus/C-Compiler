@@ -1,10 +1,10 @@
 #include "search_path.h"
 
+#include <common.h>
+
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
-
-#include <common.h>
 
 const char **include_paths = NULL;
 int n_include_paths = 0;

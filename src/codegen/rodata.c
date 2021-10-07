@@ -13,7 +13,7 @@ struct entry {
 struct entry *entries = NULL;
 int n_entries = 0;
 
-label_id register_string(const char *str) {
+label_id rodata_register(const char *str) {
 	for (int i = 0; i < n_entries; i++) {
 		if (strcmp(entries[i].name, str) == 0) {
 			return entries[i].id;
@@ -28,7 +28,7 @@ label_id register_string(const char *str) {
 	return n_entries - 1;
 }
 
-const char *get_label_name(label_id id) {
+const char *rodata_get_label_string(label_id id) {
 	static char *buffer = NULL;
 
 	if (!buffer)
@@ -38,9 +38,9 @@ const char *get_label_name(label_id id) {
 	return buffer;
 }
 
-void codegen_rodata(void) {
+void rodata_codegen(void) {
 	for (int i = 0; i < n_entries; i++) {
-		emit("%s:", get_label_name(entries[i].id));
+		emit("%s:", rodata_get_label_string(entries[i].id));
 		emit(".string \"%s\"", entries[i].name);
 	}
 }

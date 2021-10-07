@@ -2,10 +2,11 @@
 #define PARSER_EXPRESSION_H
 
 #include "preprocessor/preprocessor.h"
-#include <types.h>
 #include "parser.h"
 #include "declaration.h"
 #include "operators.h"
+
+#include <types.h>
 
 struct expr *expr_new(struct expr expr);
 
@@ -37,7 +38,7 @@ struct expr *expr_new(struct expr expr);
 			.constant = {												\
 				.type = CONSTANT_LABEL,									\
 				.data_type = type_array(type_simple(ST_CHAR), strlen(STR) + 1),	\
-				.label = register_string(STR)							\
+				.label = rodata_register(STR)							\
 			}});
 
 #define EXPR_INT(I) expr_new((struct expr) {							\

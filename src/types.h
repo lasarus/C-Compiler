@@ -1,8 +1,9 @@
 #ifndef TYPES_H
 #define TYPES_H
 
-#include <stdint.h>
 #include <parser/variables.h>
+
+#include <stdint.h>
 
 // This describes the types used for all parts of the compiler.
 // These should be able to describe all types of the C programming

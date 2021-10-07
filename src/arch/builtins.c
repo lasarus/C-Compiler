@@ -1,8 +1,9 @@
 #include "builtins.h"
-#include <stdlib.h>
-#include <common.h>
 
 #include <parser/symbols.h>
+
+#include <stdlib.h>
+#include <common.h>
 
 struct struct_data *builtin_va_list = NULL;
 

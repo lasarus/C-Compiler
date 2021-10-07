@@ -2,6 +2,7 @@
 #define TOKENIZER_H
 
 #include "preprocessor.h"
+
 #include <stdio.h>
 
 void tokenizer_push_input(const char *rel_path);

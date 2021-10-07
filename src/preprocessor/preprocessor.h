@@ -1,8 +1,13 @@
 #ifndef PREPROCESSOR_H
 #define PREPROCESSOR_H
 
-#include <stdio.h>
 #include "input.h"
+
+#include <list.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 enum ttype {
 #define X(A, B) A,
@@ -16,11 +21,6 @@ enum ttype {
 };
 
 int int_max(int a, int b);
-
-#include <stdlib.h>
-#include <string.h>
-
-#include "../list.h"
 
 #define STR_FREE(A) free(A)
 #define STR_EQUALS(A, B) (strcmp(A, B) == 0)

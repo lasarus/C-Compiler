@@ -1,11 +1,12 @@
 #include "directives.h"
-#include "../common.h"
-#include <stdint.h>
-#include "../precedence.h"
-#include <assert.h>
 #include "macro_expander.h"
 #include "tokenizer.h"
 #include "splitter.h"
+
+#include <common.h>
+#include <precedence.h>
+
+#include <assert.h>
 
 void unescape(char *str) {
 	char *escaped = str;

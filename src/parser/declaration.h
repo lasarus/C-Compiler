@@ -1,9 +1,10 @@
 #ifndef PARSER_DECLARATION_H
 #define PARSER_DECLARATION_H
 
-#include <types.h>
 #include "parser.h"
 #include "expression.h"
+
+#include <types.h>
 
 struct initializer {
 	int n;

@@ -1,23 +1,19 @@
-#include <stdio.h>
-#include <string.h>
-#include <arch/builtins.h>
-#include <arch/calling.h>
 #include "codegen.h"
 #include "registers.h"
-
-#include <assert.h>
-#include <stdarg.h>
-
 #include "binary_operators.h"
 #include "unary_operators.h"
 #include "cast_operators.h"
 
+#include <common.h>
+#include <arch/builtins.h>
+#include <arch/calling.h>
 #include <parser/declaration.h>
 
-int calling_convention[] = {REG_RDI, REG_RSI, REG_RDX, REG_RCX, REG_R8, REG_R9};
+#include <stdio.h>
+#include <string.h>
+#include <assert.h>
 
-/* int ir_pos = 0; */
-/* int ir_count = 0; */
+int calling_convention[] = {REG_RDI, REG_RSI, REG_RDX, REG_RCX, REG_R8, REG_R9};
 
 struct {
 	FILE *out;
@@ -427,7 +423,7 @@ void codegen_initializer(struct type *type,
 
 	for (int i = 0; i < size; i++) {
 		if (is_label[i]) {
-			emit(".quad %s", get_label_name(labels[i]));
+			emit(".quad %s", rodata_get_label_string(labels[i]));
 			i += 7;
 		} else {
 			//TODO: This shouldn't need an integer cast.
@@ -553,7 +549,7 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 		} break;
 
 		case CONSTANT_LABEL:
-			emit("movq $%s, -%d(%%rbp)", get_label_name(c.label), variable_info[ins.constant.result].stack_location);
+			emit("movq $%s, -%d(%%rbp)", rodata_get_label_string(c.label), variable_info[ins.constant.result].stack_location);
 			break;
 
 		default:
@@ -1050,7 +1046,7 @@ void codegen(const char *path) {
 		}
 	}
 
-	codegen_rodata();
+	rodata_codegen();
 
 	fclose(data.out);
 }

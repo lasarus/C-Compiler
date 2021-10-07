@@ -1,7 +1,8 @@
 #include "symbols.h"
 
-#include "list.h"
-#include "common.h"
+#include <list.h>
+#include <common.h>
+
 #include <string.h>
 
 struct identifier_storage {
