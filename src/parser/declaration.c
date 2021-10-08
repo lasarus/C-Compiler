@@ -210,7 +210,7 @@ int parse_enumerator(struct constant *prev, int first) {
 			
 		struct constant *ret = expression_to_constant(expr);
 		if (!ret)
-			ERROR("Could not evaluate constant expression");
+			ERROR("Could not evaluate constant expression, is of type %d", expr->type);
 
 		val = *ret;
 	} else {

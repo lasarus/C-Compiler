@@ -59,6 +59,9 @@ enum operand_type ot_from_st(enum simple_type st) {
 	}
 }
 
+void empty(void) {
+}
+
 void codegen_binary_operator(int operator_type, var_id out,
 							 var_id lhs, var_id rhs) {
 	struct type *data_type = get_variable_type(out);
@@ -550,9 +553,11 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 			case 4:
 				emit("movl $%s, -%d(%%rbp)", constant_to_string(c), variable_info[ins.constant.result].stack_location);
 				break;
-			case 8:
-				emit("movq $%s, -%d(%%rbp)", constant_to_string(c), variable_info[ins.constant.result].stack_location);
-				break;
+			case 8: {
+				const char *str = constant_to_string(c);
+				emit("movabsq $%s, %%rax", str);
+				emit("movq %%rax, -%d(%%rbp)", variable_info[ins.constant.result].stack_location);
+			} break;
 
 			case -1:
 				// TODO: Is this really right?

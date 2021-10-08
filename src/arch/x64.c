@@ -5,6 +5,7 @@
 
 #include <assert.h>
 #include <string.h>
+#include <limits.h>
 
 int sizeof_simple(enum simple_type type) {
 	switch (type) {
@@ -399,13 +400,80 @@ struct constant constant_one(struct type *type) {
 }
 
 struct constant constant_from_string(const char *str) {
-	// TODO: Manage all kinds of bases.
-	if (str[0] == '0' && str[1] == 'x') {
-		return (struct constant) {.type = CONSTANT_TYPE, .data_type = type_simple(ST_INT),
-			.int_d = strtol(str + 2, NULL, 16)};
-	} else {
-		return (struct constant) {.type = CONSTANT_TYPE, .data_type = type_simple(ST_INT), .int_d = atoi(str)};
+	unsigned long long parsed = 0;
+	const char *start = str;
+
+	int is_hex = str[0] == '0' && str[1] == 'x';
+	if (is_hex)
+		start += 2;
+
+	if (!is_hex && str[0] == '0' && str[1] >= '0' && str[1] <= '9')
+		ERROR("Octals are not implemented yet");
+
+	for (; *start; start++) {
+		int decimal_digit = (*start >= '0' && *start <= '9');
+		int low_hex_digit = (*start >= 'a' && *start <= 'f');
+		int high_hex_digit = (*start >= 'A' && *start <= 'F');
+		if (!decimal_digit &&
+			(!is_hex || !(low_hex_digit || high_hex_digit)))
+			break;
+
+		parsed *= is_hex ? 16 : 10;
+
+		if (decimal_digit)
+			parsed += *start - '0';
+		else if (low_hex_digit)
+			parsed += *start - 'a' + 10;
+		else if (high_hex_digit)
+			parsed += *start - 'A' + 10;
 	}
+
+	int allow_unsigned = is_hex;
+	int allow_signed = 1;
+	int allow_int = 1;
+	int allow_long = 1;
+	int allow_llong = 1;
+
+	while (*start) {
+		if ((start[0] == 'l' && start[1] == 'l') ||
+			(start[0] == 'L' && start[1] == 'L')) {
+			start += 2;
+			allow_int = allow_long = 0;
+		} else if (start[0] == 'l' || start[0] == 'L') {
+			start += 1;
+			allow_int = 0;
+		} else if (start[0] == 'u' || start[0] == 'U') {
+			start += 1;
+			allow_unsigned = 1;
+			allow_signed = 0;
+		}
+	}
+
+	struct constant res = { .type = CONSTANT_TYPE };
+
+	if (parsed <= INT_MAX && allow_int && allow_signed) {
+		res.data_type = type_simple(ST_INT);
+		res.int_d = parsed;
+	} else if (parsed <= UINT_MAX && allow_int && allow_unsigned) {
+		res.data_type = type_simple(ST_UINT);
+		res.uint_d = parsed;
+	} else if (parsed <= LONG_MAX && allow_long && allow_signed) {
+		res.data_type = type_simple(ST_LONG);
+		res.long_d = parsed;
+	} else if (parsed <= ULONG_MAX && allow_long && allow_unsigned) {
+		res.data_type = type_simple(ST_ULONG);
+		res.ulong_d = parsed;
+	} else if (parsed <= LLONG_MAX && allow_llong && allow_signed) {
+		res.data_type = type_simple(ST_LLONG);
+		res.llong_d = parsed;
+	} else if (parsed <= ULLONG_MAX && allow_llong && allow_unsigned) {
+		res.data_type = type_simple(ST_ULLONG);
+		res.ullong_d = parsed;
+	} else {
+		ERROR("Cant fit %llu (%s) into any type", parsed, str);
+	}
+
+	return res;
 }
 
 struct constant simple_cast(struct constant from, enum simple_type target) {
@@ -413,7 +481,7 @@ struct constant simple_cast(struct constant from, enum simple_type target) {
 	assert(from.data_type->type == TY_SIMPLE);
 
 #define CONVERT_TO(NAME)\
-		switch (target) {\
+		switch (from.data_type->simple) {\
 		case ST_VOID: break;							\
 		case ST_CHAR: from.NAME = from.char_d; break;\
 		case ST_UCHAR: from.NAME = from.uchar_d; break;\
@@ -429,7 +497,8 @@ struct constant simple_cast(struct constant from, enum simple_type target) {
 		default: ERROR("Trying to convert from %s to %s", strdup(type_to_string(from.data_type)), strdup(type_to_string(type_simple(target)))); \
 		}\
 
-	switch (from.data_type->simple) {
+	switch (target) {
+	case ST_VOID: break;
 	case ST_CHAR: CONVERT_TO(char_d); break;
 	case ST_SCHAR: CONVERT_TO(schar_d); break;
 	case ST_UCHAR: CONVERT_TO(uchar_d); break;
@@ -441,7 +510,7 @@ struct constant simple_cast(struct constant from, enum simple_type target) {
 	case ST_ULONG: CONVERT_TO(ulong_d); break;
 	case ST_LLONG: CONVERT_TO(llong_d); break;
 	case ST_ULLONG: CONVERT_TO(ullong_d); break;
-	default: NOTIMP();
+	default: ERROR("NOTIMP: %d\n", target);
 	}
 	from.data_type = type_simple(target);
 	return from;
@@ -464,16 +533,6 @@ struct constant constant_cast(struct constant a, struct type *target) {
 	if (type_is_pointer(target) && type_is_simple(a.data_type, ST_INT)) {
 		a.data_type = target;
 		a.long_d = a.int_d;
-		return a;
-	}
-
-	if (type_is_simple(a.data_type, ST_INT)) {
-		a.data_type = target;
-		return a;
-	}
-
-	if (type_is_simple(target, ST_INT)) {
-		a.data_type = target;
 		return a;
 	}
 

@@ -5,10 +5,12 @@
 mkdir -p asm
 mkdir -p asm2
 
+MUSL=true
+
 if [ ! -d "musl" ] 
 then
-    echo "Please put the musl headers into a directory called musl/"
-	exit 1
+	echo "Musl headers not provided, trying /usr/include instead"
+	MUSL=false
 fi
 
 echo "COMPILING FIRST GENERATION..."
@@ -20,7 +22,12 @@ for SRC in $SOURCES
 do
 	echo -en "\r\033[KCOMPILING $SRC"
 	OUT="$(basename -s .c $SRC).s"
-	./cc $SRC asm/$OUT -Imusl -Isrc -D_POSIX_SOURCE
+	if [ "$MUSL" = "true" ]
+	then
+		./cc $SRC asm/$OUT -Isrc -Imusl -D_POSIX_SOURCE
+	else
+		./cc $SRC asm/$OUT -Isrc -I/usr/include/ -Iinclude/
+	fi
 done
 echo -en "\r\033[KDONE!"
 echo
@@ -28,6 +35,8 @@ echo
 # GCC is used for assembling and linking.
 # No C code is compiled by GCC.
 gcc asm/*.s -o cc_self -no-pie -g
+
+[ ! -z "$1" ] && [ "1" -eq "$1" ] && exit
 
 NUM=1
 while true
@@ -39,7 +48,12 @@ do
 	do
 		echo -en "\r\033[KCOMPILING $SRC"
 		OUT="$(basename -s .c $SRC).s"
-		./cc_self $SRC asm2/$OUT -Imusl -Isrc -D_POSIX_SOURCE
+		if [ "$MUSL" = "true" ]
+		then
+			./cc_self $SRC asm2/$OUT -Isrc -Imusl -D_POSIX_SOURCE
+		else
+			./cc_self $SRC asm2/$OUT -Isrc -I/usr/include/ -Iinclude/
+		fi
 	done
 	echo -en "\r\033[KDONE!"
 	echo

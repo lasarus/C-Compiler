@@ -25,7 +25,7 @@ void token_list_pop(struct token_list *list) {
 
 void token_list_push_front(struct token_list *list, struct token t) {
 	token_list_add(list, t);
-	for (int i = list->n - 1; i >= 0; i--) {
+	for (int i = list->n - 1; i >= 1; i--) {
 		list->list[i] = list->list[i - 1];
 	}
 	list->list[0] = t;

@@ -57,6 +57,7 @@ int get_escape(char nc) {
 		return '\0';
 	case '\\':
 		return '\\';
+
 	default:
 		ERROR("Invalid escape sequence \\%c", nc);
 	}
@@ -67,7 +68,28 @@ int take_character(const char **str) {
 		return *(*str)++;
 	else {
 		(*str)++;
-		return get_escape(*(*str)++);
+		if (**str == 'x') {
+			int number = 0;
+			for (;**str; (*str)++) {
+				char c = **str;
+				int decimal_digit = (c >= '0' && c <= '9');
+				int low_hex_digit = (c >= 'a' && c <= 'f');
+				int high_hex_digit = (c >= 'A' && c <= 'F');
+
+				if (!(decimal_digit || low_hex_digit || high_hex_digit))
+					break;
+
+				number *= 16;
+				if (decimal_digit)
+					number += c - '0';
+				else if (low_hex_digit)
+					number += c - 'a' + 10;
+				else if (high_hex_digit)
+					number += c - 'A' + 10;
+			}
+			return number;
+		} else
+			return get_escape(*(*str)++);
 	}
 }
 

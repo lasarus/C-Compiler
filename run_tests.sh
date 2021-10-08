@@ -1,5 +1,14 @@
 #!/bin/bash
 
+MUSL=true
+
+if [ ! -d "musl" ] 
+then
+	echo "Musl headers not provided, trying /usr/include instead"
+	MUSL=false
+	#STDC_FLAGS=-I/usr/include -Iinclude -Isrc
+fi
+
 mkdir -p test_asm
 
 SOURCES=$(find tests -name '*.c')
@@ -11,7 +20,12 @@ for SRC in $SOURCES
 do
 	echo -en "\r\033[KTESTING $SRC"
 	OUT="$(basename -s .c $SRC).s"
-	./cc $SRC test_asm/$OUT -Imusl -Isrc -D_POSIX_SOURCE
+	if [ "$MUSL" = "true" ]
+	then
+		./cc $SRC test_asm/$OUT -Imusl -Isrc -D_POSIX_SOURCE
+	else
+		./cc $SRC test_asm/$OUT -I/usr/include -Iinclude -Isrc
+	fi
 	gcc test_asm/$OUT -o test -no-pie
 	./test
 done

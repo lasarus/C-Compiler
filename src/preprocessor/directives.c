@@ -123,8 +123,10 @@ intmax_t evaluate_expression(int prec) {
 		assert(rpar.type == T_RPAR);
 	} else if (t.type == T_NUM) {
 		expr = atoi(t.str);
+	} else if (t.type == PP_CHARACTER_CONSTANT) {
+		expr = escaped_to_str(t.str);
 	} else {
-		ERROR("Invalid token in preprocessor expression. %d %s", t.type, token_to_str(t.type));
+		ERROR("Invalid token in preprocessor expression. %d %s, in %s:%d", t.type, token_to_str(t.type), t.pos.path, t.pos.line);
 	}
 
 	t = NEXT_E();
@@ -132,34 +134,36 @@ intmax_t evaluate_expression(int prec) {
 	while (prec < precedence_get(t.type, PREC_INFIX, 1)) {
 		int new_prec = precedence_get(t.type, PREC_INFIX, 0);
 
-		if (t.type == T_OR) {
-			int rhs = evaluate_expression(new_prec);
-			expr = expr || rhs;
-		} else if (t.type == T_AND) {
-			int rhs = evaluate_expression(new_prec);
-			int lhs = expr;
-			expr = lhs && rhs;
-		} else if (t.type == T_GEQ) {
-			expr = expr >= evaluate_expression(new_prec);
-		} else if (t.type == T_LEQ) {
-			expr = expr <= evaluate_expression(new_prec);
-		} else if (t.type == T_EQ) {
-			expr = expr == evaluate_expression(new_prec);
-		} else if (t.type == T_L) {
-			expr = expr < evaluate_expression(new_prec);
-		} else if (t.type == T_G) {
-			expr = expr > evaluate_expression(new_prec);
-		} else if (t.type == T_SUB) {
-			expr = expr - evaluate_expression(new_prec);
-		} else if (t.type == T_ADD) {
-			expr = expr + evaluate_expression(new_prec);
-		} else if (t.type == T_QUEST) {
+		if (t.type == T_QUEST) {
 			int mid = evaluate_expression(0);
 			struct token colon = NEXT_E();
 			assert(colon.type == T_COLON);
 			expr = expr ? mid : evaluate_expression(new_prec);
 		} else {
+			// Standard binary operator.
+			int rhs = evaluate_expression(new_prec);
+			switch (t.type) {
+			case T_AND: expr = expr && rhs; break;
+			case T_OR: expr = expr || rhs; break;
+			case T_BOR: expr = expr | rhs; break;
+			case T_XOR: expr = expr ^ rhs; break;
+			case T_AMP: expr = expr & rhs; break;
+			case T_EQ: expr = expr == rhs; break;
+			case T_NEQ: expr = expr != rhs; break;
+			case T_LEQ: expr = expr <= rhs; break;
+			case T_GEQ: expr = expr >= rhs; break;
+			case T_L: expr = expr < rhs; break;
+			case T_G: expr = expr > rhs; break;
+			case T_LSHIFT: expr = expr << rhs; break;
+			case T_RSHIFT: expr = expr >> rhs; break;
+			case T_ADD: expr = expr + rhs; break;
+			case T_SUB: expr = expr - rhs; break;
+			case T_STAR: expr = expr * rhs; break;
+			case T_DIV: expr = expr / rhs; break;
+			case T_MOD: expr = expr % rhs; break;
+			default:
 			ERROR("Invalid infix %s", token_to_str(t.type));
+			}
 		}
 
 		t = NEXT_E();
@@ -229,7 +233,7 @@ struct token directiver_next(void) {
 		} else if (strcmp(name, "undef") == 0) {
 			define_map_remove(NEXT_U().str);
 		} else if (strcmp(name, "error") == 0) {
-			ERROR("#error directive was invoked");
+			ERROR("#error directive was invoked on %s:%d", directive.pos.path, directive.pos.line);
 		} else if (strcmp(name, "include") == 0) {
 			set_header(1);
 			struct token path_tok = NEXT_U();

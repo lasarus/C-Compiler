@@ -324,6 +324,8 @@ int builtin_macros(struct token *t) {
 		*t = token_init(PP_NUMBER, version_string, t->pos);
 	} else if (strcmp(t->str, "__STDC_TIME__") == 0) {
 		NOTIMP();
+	} else if (strcmp(t->str, "__WORDSIZE") == 0) {
+		*t = token_init(PP_NUMBER, "64", t->pos);
 	} else
 		return 0;
 	return 1;

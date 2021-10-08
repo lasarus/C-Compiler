@@ -572,6 +572,7 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 
 	case E_CONDITIONAL: {
 		var_id condition = expression_to_ir(expr->args[0]);
+		int is_void = type_is_simple(expr->data_type, ST_VOID);
 
 		block_id block_true = new_block(),
 			block_false = new_block(),
@@ -582,12 +583,14 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 
 		IR_PUSH_START_BLOCK(block_true);
 		var_id true_val = expression_to_ir(expr->args[1]);
-		IR_PUSH_COPY(res, true_val);
+		if (!is_void)
+			IR_PUSH_COPY(res, true_val);
 		IR_PUSH_GOTO(block_end);
 
 		IR_PUSH_START_BLOCK(block_false);
 		var_id false_val = expression_to_ir(expr->args[2]);
-		IR_PUSH_COPY(res, false_val);
+		if (!is_void)
+			IR_PUSH_COPY(res, false_val);
 		IR_PUSH_GOTO(block_end);
 
 		IR_PUSH_START_BLOCK(block_end);
@@ -1053,6 +1056,27 @@ int evaluate_constant_expression(struct expr *expr,
 			constant->data_type = type_pointer(expr->args[0]->data_type->children[0]);
 			constant->type = CONSTANT_LABEL;
 			constant->label = rodata_register(c.str_d);
+		}
+	} break;
+
+	case E_CONDITIONAL: {
+		struct constant lhs, mid, rhs;
+		if (!evaluate_constant_expression(expr->args[0], &lhs))
+			return 0;
+		if (!evaluate_constant_expression(expr->args[1], &mid))
+			return 0;
+		if (!evaluate_constant_expression(expr->args[2], &rhs))
+			return 0;
+
+		assert(lhs.type == CONSTANT_TYPE);
+		assert(mid.type == CONSTANT_TYPE);
+		assert(rhs.type == CONSTANT_TYPE);
+
+		assert(lhs.data_type == type_simple(ST_INT));
+		if (lhs.int_d) {
+			*constant = mid;
+		} else {
+			*constant = rhs;
 		}
 	} break;
 

@@ -23,4 +23,6 @@ int round_up_to_nearest(int num, int div);
 int escaped_to_str(const char *str);
 int take_character(const char **str);
 
+char *strdup(const char *s);
+
 #endif

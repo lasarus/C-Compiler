@@ -171,7 +171,30 @@ int parse_escape_sequence(void) {
 		input_next(tok.top);
 		input_next(tok.top);
 		break;
+
+	case 'x': {
+		buffer_write(c);
+		buffer_write(nc);
+		input_next(tok.top);
+		input_next(tok.top);
+
+		for (;;) {
+			char c = tok.top->c[0];
+			int decimal_digit = (c >= '0' && c <= '9');
+			int low_hex_digit = (c >= 'a' && c <= 'f');
+			int high_hex_digit = (c >= 'A' && c <= 'F');
+
+			if (!(decimal_digit || low_hex_digit || high_hex_digit))
+				break;
+
+			buffer_write(c);
+			input_next(tok.top);
+		}
+
+		break;
+	}
 	default:
+		PRINT_POS(tok.top->pos[0]);
 		ERROR("char not implemented as escape %c%c\n", c, nc);
 		NOTIMP();
 	}

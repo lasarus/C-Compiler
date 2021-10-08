@@ -121,6 +121,8 @@ const char *token_to_string(struct token *t) {
 
 	if (t->type == T_IDENT) {
 		PPRINT("%s", t->str);
+	} else if (t->type == T_NUM) {
+		PPRINT("%s", t->str);
 	} else {
 		switch(t->type) {
 #define PRINT(A, B) case A: PPRINT("%s", B); break;

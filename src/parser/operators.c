@@ -74,17 +74,41 @@ struct constant operators_constant(enum operator_type op,
 	if (type->type != TY_SIMPLE)
 		NOTIMP();
 
+#define OP(TYPE, FIELD) case TYPE: res.type = CONSTANT_TYPE; res.data_type = type_simple(TYPE); \
+		switch (op) {													\
+		case OP_ADD: res.FIELD = lhs.FIELD + rhs.FIELD; break;			\
+		case OP_SUB: res.FIELD = lhs.FIELD - rhs.FIELD; break;			\
+		case OP_MUL: res.FIELD = lhs.FIELD * rhs.FIELD; break;			\
+		case OP_DIV: res.FIELD = lhs.FIELD / rhs.FIELD; break;			\
+		case OP_MOD: res.FIELD = lhs.FIELD % rhs.FIELD; break;			\
+		case OP_BXOR: res.FIELD = lhs.FIELD ^ rhs.FIELD; break;			\
+		case OP_BOR: res.FIELD = lhs.FIELD | rhs.FIELD; break;			\
+		case OP_BAND: res.FIELD = lhs.FIELD & rhs.FIELD; break;			\
+		case OP_LSHIFT: res.FIELD = lhs.FIELD << rhs.FIELD; break;		\
+		case OP_RSHIFT: res.FIELD = lhs.FIELD >> rhs.FIELD; break;		\
+		case OP_LESS: res.FIELD = lhs.FIELD < rhs.FIELD; break;			\
+		case OP_GREATER: res.FIELD = lhs.FIELD > rhs.FIELD; break;		\
+		case OP_LESS_EQ: res.FIELD = lhs.FIELD <= rhs.FIELD; break;		\
+		case OP_GREATER_EQ: res.FIELD = lhs.FIELD >= rhs.FIELD; break;	\
+		case OP_EQUAL: res.FIELD = (lhs.FIELD == rhs.FIELD); break;		\
+		case OP_NOT_EQUAL: res.FIELD = lhs.FIELD != rhs.FIELD; break;	\
+		default: NOTIMP();									\
+		} break;											\
+
+	//struct constant res = { -1, NULL, .str_d = "WHAT?" };
+	struct constant res;
 	switch (type->simple) {
-	case ST_INT:
-		return (struct constant) {
-			.type = CONSTANT_TYPE,
-			.data_type = type_simple(ST_INT),
-			.int_d = op_integer(op, lhs.int_d, rhs.int_d)
-		};
-		break;
+		OP(ST_INT, int_d);
+		OP(ST_UINT, uint_d);
+		OP(ST_LONG, long_d);
+		OP(ST_ULONG, ulong_d);
+		OP(ST_LLONG, llong_d);
+		OP(ST_ULLONG, ullong_d);
 	default:
 		NOTIMP();
 	}
+
+	return res;
 }
 
 int uop_integer(enum unary_operator_type op, int rhs) {
@@ -106,15 +130,25 @@ struct constant operators_constant_unary(enum unary_operator_type op,
 	if (type->type != TY_SIMPLE)
 		NOTIMP();
 
+	struct constant res = { 0 };
+#define UOP(TYPE, FIELD) case TYPE: res.type = CONSTANT_TYPE; res.data_type = type_simple(TYPE); \
+	switch (op) {														\
+	case UOP_PLUS: res.FIELD = +rhs.FIELD; break;						\
+	case UOP_NEG: res.FIELD = -rhs.FIELD; break;						\
+	case UOP_BNOT: res.FIELD = ~rhs.FIELD; break;						\
+	default: NOTIMP();													\
+	} break;															\
+
 	switch (type->simple) {
-	case ST_INT:
-		return (struct constant) {
-			.type = CONSTANT_TYPE,
-			.data_type = type_simple(ST_INT),
-			.int_d = uop_integer(op, rhs.int_d)
-		};
-		break;
+		UOP(ST_INT, int_d);
+		UOP(ST_UINT, uint_d);
+		UOP(ST_LONG, long_d);
+		UOP(ST_ULONG, ulong_d);
+		UOP(ST_LLONG, llong_d);
+		UOP(ST_ULLONG, ullong_d);
 	default:
 		NOTIMP();
 	}
+
+	return res;
 }
