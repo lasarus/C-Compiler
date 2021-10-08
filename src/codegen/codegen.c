@@ -574,10 +574,10 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 		} break;
 
 		case CONSTANT_LABEL:
-			if (codegen_flags.cmodel == CMODEL_SMALL) {
+			if (codegen_flags.cmodel == CMODEL_LARGE) {
 				emit("movabsq $%s, %%rax", rodata_get_label_string(c.label));
 				emit("movq %%rax, -%d(%%rbp)", variable_info[ins.constant.result].stack_location);
-			} else {
+			} else if (codegen_flags.cmodel == CMODEL_SMALL) {
 				emit("movq $%s, -%d(%%rbp)", rodata_get_label_string(c.label), variable_info[ins.constant.result].stack_location);
 			}
 			break;
@@ -618,7 +618,6 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 				} else if (n_parts == 1 && classes[0] == CLASS_INTEGER) {
 					emit("movq -%d(%%rbp), %%rax", variable_info[ret].stack_location);
 				} else if (n_parts == 2) {
-					emit("# COMMENT");
 					emit("movq -%d(%%rbp), %%rax", variable_info[ret].stack_location);
 					emit("movq -%d(%%rbp), %%rdx", variable_info[ret].stack_location - 8);
 				} else {
