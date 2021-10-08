@@ -14,13 +14,17 @@
 #include <assert.h>
 #include <stdarg.h>
 
-int calling_convention[] = {REG_RDI, REG_RSI, REG_RDX, REG_RCX, REG_R8, REG_R9};
+static const int calling_convention[] = {REG_RDI, REG_RSI, REG_RDX, REG_RCX, REG_R8, REG_R9};
 
 struct {
 	FILE *out;
 	const char *current_section;
 	int local_counter;
 } data;
+
+struct codegen_flags codegen_flags = {
+	.cmodel = CMODEL_SMALL
+};
 
 void set_section(const char *section) {
 	if (strcmp(section, data.current_section) != 0)
@@ -570,7 +574,12 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 		} break;
 
 		case CONSTANT_LABEL:
-			emit("movq $%s, -%d(%%rbp)", rodata_get_label_string(c.label), variable_info[ins.constant.result].stack_location);
+			if (codegen_flags.cmodel == CMODEL_SMALL) {
+				emit("movabsq $%s, %%rax", rodata_get_label_string(c.label));
+				emit("movq %%rax, -%d(%%rbp)", variable_info[ins.constant.result].stack_location);
+			} else {
+				emit("movq $%s, -%d(%%rbp)", rodata_get_label_string(c.label), variable_info[ins.constant.result].stack_location);
+			}
 			break;
 
 		default:
@@ -908,7 +917,11 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 	} break;
 
 	case IR_GET_SYMBOL_PTR: {
-		emit("movq $%s, %%rax", ins.get_symbol_ptr.label);
+		if (codegen_flags.cmodel == CMODEL_SMALL) {
+			emit("movq $%s, %%rax", ins.get_symbol_ptr.label);
+		} else if (codegen_flags.cmodel == CMODEL_LARGE) {
+			emit("movabsq $%s, %%rax", ins.get_symbol_ptr.label);
+		}
 		reg_to_scalar(REG_RAX, variable_info[ins.get_symbol_ptr.result].stack_location, ins.get_symbol_ptr.result);
 	} break;
 

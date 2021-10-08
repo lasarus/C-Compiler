@@ -32,6 +32,15 @@ struct arguments parse_arguments(int argc, char **argv) {
 			argv[i][1] == 'D') {
 			struct define def = define_init(argv[i] + 2);
 			define_map_add(def);
+		} else if (argv[i][0] == '-' &&
+			argv[i][1] == 'f') {
+			if (strcmp(argv[i] + 2, "cmodel=small") == 0) {
+				codegen_flags.cmodel = CMODEL_SMALL;
+			} else if (strcmp(argv[i] + 2, "cmodel=large") == 0) {
+				codegen_flags.cmodel = CMODEL_LARGE;
+			} else {
+				ERROR("invalid flag %s", argv[i]);
+			}
 		} else {
 			switch (state) {
 			case STATE_INPUT:
