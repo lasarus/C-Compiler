@@ -16,6 +16,8 @@
 
 static const int calling_convention[] = {REG_RDI, REG_RSI, REG_RDX, REG_RCX, REG_R8, REG_R9};
 
+struct variable_info *variable_info;
+
 struct {
 	FILE *out;
 	const char *current_section;
@@ -41,15 +43,6 @@ void emit(const char *fmt, ...) {
 	fprintf(data.out, "\n");
 	va_end(args);
 }
-
-struct {
-	enum {
-		VAR_STOR_NONE,
-		VAR_STOR_STACK
-	} storage;
-
-	int stack_location;
-} *variable_info;
 
 enum operand_type ot_from_st(enum simple_type st) {
 	switch (st) {
@@ -86,12 +79,12 @@ void codegen_binary_operator(int operator_type, var_id out,
 		ot = ot_from_st(rhs_type->simple);
 	}
 
-	scalar_to_reg(variable_info[lhs].stack_location, lhs, REG_RDI);
-	scalar_to_reg(variable_info[rhs].stack_location, rhs, REG_RSI);
+	scalar_to_reg(lhs, REG_RDI);
+	scalar_to_reg(rhs, REG_RSI);
 
 	emit("%s", binary_operator_outputs[ot][operator_type]);
 
-	reg_to_scalar(REG_RAX, variable_info[out].stack_location, out);
+	reg_to_scalar(REG_RAX, out);
 }
 
 void codegen_unary_operator(int operator_type, var_id out,
@@ -108,11 +101,11 @@ void codegen_unary_operator(int operator_type, var_id out,
 
 	enum operand_type ot = ot_from_st(data_type->simple);
 
-	scalar_to_reg(variable_info[rhs].stack_location, rhs, REG_RDI);
+	scalar_to_reg(rhs, REG_RDI);
 
 	emit("%s", unary_operator_outputs[ot][operator_type]);
 
-	reg_to_scalar(REG_RAX, variable_info[out].stack_location, out);
+	reg_to_scalar(REG_RAX, out);
 }
 
 void codegen_simple_cast(var_id in, var_id out) {
@@ -122,11 +115,11 @@ void codegen_simple_cast(var_id in, var_id out) {
 	assert(in_type->type == TY_SIMPLE);
 	assert(out_type->type == TY_SIMPLE);
 
-	scalar_to_reg(variable_info[in].stack_location, in, REG_RDI);
+	scalar_to_reg(in, REG_RDI);
 
 	emit("%s", cast_operator_outputs[in_type->simple][out_type->simple]);
 
-	reg_to_scalar(REG_RAX, variable_info[out].stack_location, out);
+	reg_to_scalar(REG_RAX, out);
 }
 
 struct classification {
@@ -203,9 +196,7 @@ void codegen_call(var_id variable, int n_args, var_id *args, var_id result) {
 	int total_memory_argument_size, current_gp_reg;
 	struct type *return_type = get_variable_type(result);
 
-	scalar_to_reg(variable_info[variable].stack_location,
-				  variable,
-				  REG_RBX);
+	scalar_to_reg(variable, REG_RBX);
 
 	struct classification classifications[n_args];
 	struct classification return_classification;
@@ -644,19 +635,19 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 		struct type *index_type = get_variable_type(index);
 		if(index_type == type_simple(ST_INT) ||
 		   index_type == type_simple(ST_UINT)) {
-			scalar_to_reg(variable_info[index].stack_location, index, REG_RDX);
-			scalar_to_reg(variable_info[pointer].stack_location, pointer, REG_RSI);
+			scalar_to_reg(index, REG_RDX);
+			scalar_to_reg(pointer, REG_RSI);
 			emit("movslq %%edx, %%rdx");
 			emit("imulq $%d, %%rdx, %%rdx", size);
 			emit("leaq (%%rsi, %%rdx), %%rax");
-			reg_to_scalar(REG_RAX, variable_info[result].stack_location, result);
+			reg_to_scalar(REG_RAX, result);
 		} else if(index_type == type_simple(ST_LONG) ||
 				  index_type == type_simple(ST_ULONG)) {
-			scalar_to_reg(variable_info[index].stack_location, index, REG_RDX);
-			scalar_to_reg(variable_info[pointer].stack_location, pointer, REG_RSI);
+			scalar_to_reg(index, REG_RDX);
+			scalar_to_reg(pointer, REG_RSI);
 			emit("imulq $%d, %%rdx, %%rdx", size);
 			emit("leaq (%%rsi, %%rdx), %%rax");
-			reg_to_scalar(REG_RAX, variable_info[result].stack_location, result);
+			reg_to_scalar(REG_RAX, result);
 		} else {
 			ERROR("Pointer increment by %s not implemented",
 				  type_to_string(get_variable_type(index)));
@@ -670,22 +661,19 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 
 		int size = calculate_size(type_deref(get_variable_type(lhs)));
 
-		scalar_to_reg(variable_info[lhs].stack_location,
-					  lhs, REG_RAX);
-		scalar_to_reg(variable_info[rhs].stack_location,
-					  rhs, REG_RDX);
+		scalar_to_reg(lhs, REG_RAX);
+		scalar_to_reg(rhs, REG_RDX);
 		emit("subq %%rdx, %%rax");
 		emit("movq $%d, %%rdi", size);
 		emit("cqto");
 		emit("idivq %%rdi");
 
-		reg_to_scalar(REG_RAX, variable_info[result].stack_location,
-					  result);
+		reg_to_scalar(REG_RAX, result);
 	} break;
 
 	case IR_LOAD: {
 		struct type *type = get_variable_type(ins.load.result);
-		scalar_to_reg(variable_info[ins.load.pointer].stack_location, ins.load.pointer, REG_RDI);
+		scalar_to_reg(ins.load.pointer, REG_RDI);
 		emit("leaq -%d(%%rbp), %%rsi", variable_info[ins.load.result].stack_location);
 
 		codegen_memcpy(calculate_size(type));
@@ -694,7 +682,7 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 
 	case IR_STORE: {
 		struct type *type = get_variable_type(ins.store.value);
-		scalar_to_reg(variable_info[ins.store.pointer].stack_location, ins.store.pointer, REG_RSI);
+		scalar_to_reg(ins.store.pointer, REG_RSI);
 		emit("leaq -%d(%%rbp), %%rdi", variable_info[ins.store.value].stack_location);
 
 		codegen_memcpy(calculate_size(type));
@@ -715,7 +703,7 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 		struct type *type = get_variable_type(cond);
 		int size = calculate_size(type);
 		if (size == 1 || size == 2 || size == 4 || size == 8) {
-			scalar_to_reg(variable_info[cond].stack_location, cond, REG_RDI);
+			scalar_to_reg(cond, REG_RDI);
 			const char *reg_name = get_reg_name(REG_RDI, size);
 			emit("test%c %s, %s", size_to_suffix(size), reg_name, reg_name);
 			emit("je .LB%d", ins.if_selection.block_false);
@@ -739,8 +727,8 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 		}
 
 		if (is_scalar(type)) {
-			scalar_to_reg(variable_info[source].stack_location, source, REG_RAX);
-			reg_to_scalar(REG_RAX, variable_info[dest].stack_location, dest);
+			scalar_to_reg(source, REG_RAX);
+			reg_to_scalar(REG_RAX, dest);
 		} else {
 			emit("leaq -%d(%%rbp), %%rdi", variable_info[source].stack_location);
 			emit("leaq -%d(%%rbp), %%rsi", variable_info[dest].stack_location);
@@ -757,15 +745,15 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 		if (dest_type == type_simple(ST_VOID)) {
 			// No o .
 		} else if (type_is_pointer(dest_type) && type_is_pointer(source_type)) {
-			scalar_to_reg(variable_info[source].stack_location, source, REG_RAX);
-			reg_to_scalar(REG_RAX, variable_info[dest].stack_location, dest);
+			scalar_to_reg(source, REG_RAX);
+			reg_to_scalar(REG_RAX, dest);
 		} else if (dest_type->type == TY_SIMPLE &&
 				   source_type->type == TY_SIMPLE) {
 			codegen_simple_cast(source, dest);
 		} else if ((type_is_pointer(dest_type) && source_type->type == TY_SIMPLE) ||
 				   (type_is_pointer(source_type) && dest_type->type == TY_SIMPLE)) {
-			scalar_to_reg(variable_info[source].stack_location, source, REG_RAX);
-			reg_to_scalar(REG_RAX, variable_info[dest].stack_location, dest);
+			scalar_to_reg(source, REG_RAX);
+			reg_to_scalar(REG_RAX, dest);
 		} else {
 			ERROR("Trying to cast from : \"%s\" to \"%s\"",
 				  strdup(type_to_string(source_type)),
@@ -775,7 +763,7 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 
 	case IR_ADDRESS_OF:
 		emit("leaq -%d(%%rbp), %%rax", variable_info[ins.address_of.variable].stack_location);
-		reg_to_scalar(REG_RAX, variable_info[ins.address_of.result].stack_location, ins.address_of.result);
+		reg_to_scalar(REG_RAX, ins.address_of.result);
 		break;
 
 	case IR_GET_MEMBER: {
@@ -784,9 +772,9 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 		struct type *member_type;
 		type_select(type, ins.get_member.index, &member_offset, &member_type);
 
-		scalar_to_reg(variable_info[ins.get_member.pointer].stack_location, ins.get_member.pointer, REG_RAX);
+		scalar_to_reg(ins.get_member.pointer, REG_RAX);
 		emit("addq $%d, %%rax", member_offset);
-		reg_to_scalar(REG_RAX, variable_info[ins.get_member.result].stack_location, ins.get_member.result);
+		reg_to_scalar(REG_RAX, ins.get_member.result);
 	} break;
 
 	case IR_VA_START: {
@@ -794,7 +782,7 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 		int fp_offset_offset = builtin_va_list->offsets[1];
 		int overflow_arg_area_offset = builtin_va_list->offsets[2];
 		int reg_save_area_offset = builtin_va_list->offsets[3];
-		scalar_to_reg(variable_info[ins.va_start_.result].stack_location, ins.va_start_.result, REG_RAX);
+		scalar_to_reg(ins.va_start_.result, REG_RAX);
 		emit("movl $%d, %d(%%rax)", reg_save_info.gp_offset, gp_offset_offset);
 		emit("movl $%d, %d(%%rax)", 0, fp_offset_offset);
 		emit("leaq %d(%%rbp), %%rdi", reg_save_info.overflow_position);
@@ -816,7 +804,7 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 		int overflow_arg_area_offset = builtin_va_list->offsets[2];
 		va_arg_labels++;
 		// 1. Determine whether type may be passed in the registers. If not go to step 7
-		scalar_to_reg(variable_info[ins.va_arg_.array].stack_location, ins.va_arg_.array, REG_RDI);
+		scalar_to_reg(ins.va_arg_.array, REG_RDI);
 		if (classes[0] != CLASS_MEMORY) {
 			// 2. Compute num_gp to hold the number of general purpose registers needed
 			// to pass type and num_fp to hold the number of floating point registers needed.
@@ -894,7 +882,7 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 
 	case IR_SWITCH_SELECTION: {
 		var_id control = ins.switch_selection.condition;
-		scalar_to_reg(variable_info[control].stack_location, control, REG_RDI);
+		scalar_to_reg(control, REG_RDI);
 		for (int i = 0; i < ins.switch_selection.n; i++) {
 			emit("cmpl $%d, %%edi", ins.switch_selection.values[i].int_d);
 			emit("je .LB%d", ins.switch_selection.blocks[i]);
@@ -908,9 +896,9 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 		// TODO: Also free the stack allocation at the end of blocks.
 		//EMIT("pushq %%rsp");
 		//EMIT("subq $8, %%rsp");
-		scalar_to_reg(variable_info[ins.stack_alloc.length].stack_location, ins.stack_alloc.length, REG_RAX);
+		scalar_to_reg(ins.stack_alloc.length, REG_RAX);
 		emit("subq %%rax, %%rsp");
-		reg_to_scalar(REG_RSP, variable_info[ins.stack_alloc.pointer].stack_location, ins.stack_alloc.pointer);
+		reg_to_scalar(REG_RSP, ins.stack_alloc.pointer);
 		// Align %rsp to 16 boundary. (Remember stack grows downwards. So rounding down is actually correct.)
 		emit("andq $-16, %%rsp"); // Round down to nearest 16 by clearing last 4 bits.
 	} break;
@@ -921,7 +909,7 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 		} else if (codegen_flags.cmodel == CMODEL_LARGE) {
 			emit("movabsq $%s, %%rax", ins.get_symbol_ptr.label);
 		}
-		reg_to_scalar(REG_RAX, variable_info[ins.get_symbol_ptr.result].stack_location, ins.get_symbol_ptr.result);
+		reg_to_scalar(REG_RAX, ins.get_symbol_ptr.result);
 	} break;
 
 	case IR_STATIC_VAR:

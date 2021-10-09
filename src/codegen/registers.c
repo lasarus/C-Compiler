@@ -48,7 +48,7 @@ const char *get_reg_name(int id, int size) {
 	return registers[id][size_to_idx(size)];
 }
 
-void scalar_to_reg(int stack_pos, var_id scalar, int reg) {
+void scalar_to_reg(var_id scalar, int reg) {
 	struct type *type = get_variable_type(scalar);
 	assert(is_scalar(type));
 
@@ -57,10 +57,10 @@ void scalar_to_reg(int stack_pos, var_id scalar, int reg) {
 	int size = calculate_size(type);
 
 	emit("mov%c -%d(%%rbp), %s", size_to_suffix(size),
-		 stack_pos, registers[reg][size_to_idx(size)]);
+		 variable_info[scalar].stack_location, registers[reg][size_to_idx(size)]);
 }
 
-void reg_to_scalar(int reg, int stack_pos, var_id scalar) {
+void reg_to_scalar(int reg, var_id scalar) {
 	struct type *type = get_variable_type(scalar);
 
 	if (!is_scalar(type))
@@ -68,18 +68,18 @@ void reg_to_scalar(int reg, int stack_pos, var_id scalar) {
 
 	int size = calculate_size(type);
 	emit("mov%c %s, -%d(%%rbp)", size_to_suffix(size),
-		 registers[reg][size_to_idx(size)], stack_pos);
+		 registers[reg][size_to_idx(size)], variable_info[scalar].stack_location);
 }
 
-void load_address(struct type *type, int stack_pos, var_id result) {
+void load_address(struct type *type, var_id result) {
 	if (type_is_pointer(type)) {
 		emit("movq (%%rdi), %%rax");
-		reg_to_scalar(REG_RAX, stack_pos, result);
+		reg_to_scalar(REG_RAX, result);
 	} else if (type->type == TY_SIMPLE) {
 		switch (type->simple) {
 		case ST_INT:
 			emit("movl (%%rdi), %%eax");
-			reg_to_scalar(REG_RAX, stack_pos, result);
+			reg_to_scalar(REG_RAX, result);
 			break;
 
 		default:
@@ -90,14 +90,14 @@ void load_address(struct type *type, int stack_pos, var_id result) {
 	}
 }
 
-void store_address(struct type *type, int stack_pos, var_id result) {
+void store_address(struct type *type, var_id result) {
 	if (type_is_pointer(type)) {
-		scalar_to_reg(stack_pos, result, REG_RAX);
+		scalar_to_reg(result, REG_RAX);
 		emit("movq %%rax, (%%rdi)");
 	} else if (type->type == TY_SIMPLE) {
 		switch (type->simple) {
 		case ST_INT:
-			scalar_to_reg(stack_pos, result, REG_RAX);
+			scalar_to_reg(result, REG_RAX);
 			emit("movl %%eax, (%%rdi)");
 			break;
 
@@ -108,17 +108,3 @@ void store_address(struct type *type, int stack_pos, var_id result) {
 		NOTIMP();
 	}
 }
-
-#if 0
-
-void reg_to_stack(int reg, int size, int stack_offset) {
-	EMIT("mov%c %s, -%d(%%rbp)", size_to_suffix(size),
-		 registers[reg][size_to_idx(size)], stack_offset);
-}
-
-void stack_to_reg(int reg, int size, int stack_offset) {
-	EMIT("mov%c -%d(%%rbp), %s", size_to_suffix(size),
-		 stack_offset, registers[reg][size_to_idx(size)]);
-}
-
-#endif
