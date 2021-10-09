@@ -29,8 +29,12 @@ void split_path(char *path, const char **name,
 }
 
 int try_open_file(const char *path, struct file *file) {
-	char mutable_path[strlen(path) + 1];
-	strcpy(mutable_path, path);
+	#define MAX_STRING_BUFFER_SIZE 1024
+	char mutable_path[MAX_STRING_BUFFER_SIZE];
+	if (strlen(path) + 1 > MAX_STRING_BUFFER_SIZE)
+		ERROR("Path too long %s", path);
+	//char mutable_path[strlen(path) + 1];
+	strncpy(mutable_path, path, MAX_STRING_BUFFER_SIZE);
 
 	FILE *fp = fopen(mutable_path, "r");
 	if (fp) {

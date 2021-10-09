@@ -68,6 +68,8 @@ int parse_labeled_statement(struct jump_blocks jump_blocks) {
 		block_id block_default = new_block();
 		IR_PUSH_GOTO(block_default);
 		IR_PUSH_START_BLOCK(block_default);
+		if (!jump_blocks.case_labels)
+			ERROR("Not currently in a switch statement");
 		jump_blocks.case_labels->default_ = block_default;
 	}
 	return 0;
@@ -413,7 +415,7 @@ void parse_function(const char *name, struct type *type, int arg_n, char **arg_n
 
 	symbols_push_scope();
 
-	var_id *vars = malloc(sizeof(*vars) * arg_n);
+	var_id *vars = arg_n ? malloc(sizeof(*vars) * arg_n) : NULL;
 	
 	assert(type->type == TY_FUNCTION);
 	for (int i = 0; i < arg_n; i++) {

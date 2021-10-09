@@ -3,9 +3,9 @@
 
 #include "preprocessor.h"
 
-struct token splitter_next();
-struct token splitter_next_unexpanded();
-struct token splitter_next_translate();
+struct token splitter_next(void);
+struct token splitter_next_unexpanded(void);
+struct token splitter_next_translate(void);
 
 void splitter_keywords(int b);
 

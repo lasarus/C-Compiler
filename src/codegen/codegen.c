@@ -147,7 +147,9 @@ void classify_parameters(int n_args, var_id *args, struct type *return_type,
 			return_classification->pass_in_memory = 1;
 		} else {
 			return_classification->pass_in_memory = 0;
-			int return_convention[] = {REG_RAX, REG_RDX};
+			static const int return_convention[] = {REG_RAX, REG_RDX};
+			if (return_classification->n_parts > 2)
+				ERROR("Internal compiler error");
 			for (int j = 0; j < return_classification->n_parts; j++) {
 				if (return_classification->classes[j] == CLASS_INTEGER)
 					return_classification->regs[j] = return_convention[j];

@@ -183,12 +183,12 @@ struct type *calculate_type(struct expr *expr) {
 	}
 }
 
-int dont_decay_ptr[E_NUM_TYPES] = {
+static const int dont_decay_ptr[E_NUM_TYPES] = {
 	[E_ADDRESS_OF] = 1,
 	[E_ARRAY_PTR_DECAY] = 1,
 };
 
-int num_args[E_NUM_TYPES] = {
+static const int num_args[E_NUM_TYPES] = {
 	[E_POSTFIX_INC] = 1,
 	[E_POSTFIX_DEC] = 1,
 	[E_ADDRESS_OF] = 1,
@@ -202,7 +202,7 @@ int num_args[E_NUM_TYPES] = {
 	[E_ASSIGNMENT_OP] = 2,
 };
 
-int does_integer_conversion[E_NUM_TYPES] = {
+static const int does_integer_conversion[E_NUM_TYPES] = {
 	[E_UNARY_OP] = 1,
 	[E_BINARY_OP] = 1,
 	[E_ASSIGNMENT_OP] = 1,
@@ -524,10 +524,11 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 
 	case E_ASSIGNMENT_OP: {
 		struct expr *a_expr = expr->args[0];
+		int is_cast = a_expr->type == E_CAST;
 
 		var_id ac, aptr, a; // a is unused if not a_expr is not E_CAST.
 
-		if (a_expr->type == E_CAST) {
+		if (is_cast) {
 			aptr = expression_to_address(a_expr->cast.arg);
 			a = address_load(aptr);
 			ac = new_variable(a_expr->cast.target, 1);
@@ -542,7 +543,7 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		IR_PUSH_BINARY_OPERATOR(expr->binary_op,
 								ac, bc, ac);
 
-		if (a_expr->type == E_CAST) {
+		if (is_cast) {
 			IR_PUSH_CAST(a, ac, get_variable_type(a));
 			address_store(aptr, a);
 			return a;
@@ -816,8 +817,11 @@ struct expr *parse_postfix_expression(int starts_with_lpar, struct expr *startin
 			if (pos == 128)
 				NOTIMP();
 
-			struct expr **args = malloc(sizeof *args * pos);
-			memcpy(args, buffer, sizeof *args * pos);
+			struct expr **args = NULL;
+			if (pos) {
+				args = malloc(sizeof *args * pos);
+				memcpy(args, buffer, sizeof *args * pos);
+			}
 
 			lhs = expr_new((struct expr) {
 					.type = E_CALL,

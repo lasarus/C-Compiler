@@ -100,7 +100,7 @@ struct token splitter_next(void) {
 	}
 }
 
-struct token splitter_next_unexpanded() {
+struct token splitter_next_unexpanded(void) {
 	if (splitter.stack.n) {
 		struct token t = token_move(token_list_top(&splitter.stack));
 		token_list_pop(&splitter.stack);

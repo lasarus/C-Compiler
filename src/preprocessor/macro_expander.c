@@ -13,7 +13,7 @@ struct define_map {
 
 static struct define_map *define_map = NULL;
 
-void define_map_init() {
+void define_map_init(void) {
 	define_map = malloc(sizeof *define_map);
 
 	define_map->entries = malloc(sizeof *define_map->entries * MAP_SIZE);
@@ -331,7 +331,7 @@ int builtin_macros(struct token *t) {
 	return 1;
 }
 
-struct token expander_next() {
+struct token expander_next(void) {
 	struct token t = expander_take();
 
 	if (t.type != PP_IDENT)
@@ -351,7 +351,7 @@ struct token expander_next() {
 	return t;
 }
 
-struct token expander_next_unexpanded() {
+struct token expander_next_unexpanded(void) {
 	struct token t = expander_take();
 	return t;
 }

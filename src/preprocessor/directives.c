@@ -159,8 +159,18 @@ intmax_t evaluate_expression(int prec) {
 			case T_ADD: expr = expr + rhs; break;
 			case T_SUB: expr = expr - rhs; break;
 			case T_STAR: expr = expr * rhs; break;
-			case T_DIV: expr = expr / rhs; break;
-			case T_MOD: expr = expr % rhs; break;
+			case T_DIV:
+				if (rhs)
+					expr = expr / rhs;
+				else
+					ERROR("Division by zero");
+				break;
+			case T_MOD:
+				if (rhs)
+					expr = expr % rhs;
+				else
+					ERROR("Modulo by zero");
+				break;
 			default:
 			ERROR("Invalid infix %s", token_to_str(t.type));
 			}

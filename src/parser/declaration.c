@@ -178,12 +178,11 @@ int parse_specifiers(struct type_specifiers *ts,
 					 struct type_qualifiers *tq,
 					 struct function_specifiers *fs,
 					 struct alignment_specifiers *as) {
-#define CLEAR(X) if (X) memset(X, 0, sizeof(*X));
-	CLEAR(ts);
-	CLEAR(scs);
-	CLEAR(tq);
-	CLEAR(fs);
-	CLEAR(as);
+	if (ts) *ts = (struct type_specifiers){ 0 };
+	if (scs) *scs = (struct storage_class_specifiers){ 0 };
+	if (tq) *tq = (struct type_qualifiers){ 0 };
+	if (fs) *fs = (struct function_specifiers){ 0 };
+	if (as) *as = (struct alignment_specifiers){ 0 };
 
 	if (ts)
 		ts->pos = TPEEK(0)->pos;
@@ -338,7 +337,7 @@ int parse_struct(struct type_specifiers *ts) {
 
 				n++;
 				types = realloc(types, n * sizeof(*types));
-				names = realloc(names, n * sizeof(*types));
+				names = realloc(names, n * sizeof(*names));
 
 				types[n - 1] = ast_to_type(&s.ts, ast, &names[n - 1]);
 				TACCEPT(T_COMMA);
@@ -350,7 +349,7 @@ int parse_struct(struct type_specifiers *ts) {
 				if (s.ts.data_type->type == TY_STRUCT) {
 					n++;
 					types = realloc(types, n * sizeof(*types));
-					names = realloc(names, n * sizeof(*types));
+					names = realloc(names, n * sizeof(*names));
 					names[n - 1] = NULL;
 					types[n - 1] = s.ts.data_type;
 				} else {
