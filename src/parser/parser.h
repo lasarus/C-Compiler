@@ -80,8 +80,9 @@ struct instruction {
 #define IR_PUSH_UNARY_OPERATOR(TYPE, OPERAND, RESULT) IR_PUSH(.type = IR_UNARY_OPERATOR, .unary_operator = { (TYPE), (OPERAND), (RESULT)})
 		struct {
 			var_id result, pointer, index;
+			int decrement;
 		} pointer_increment;
-#define IR_PUSH_POINTER_INCREMENT(RESULT, POINTER, INDEX) IR_PUSH(.type = IR_POINTER_INCREMENT, .pointer_increment = {(RESULT), (POINTER), (INDEX)})
+#define IR_PUSH_POINTER_INCREMENT(RESULT, POINTER, INDEX, DECREMENT) IR_PUSH(.type = IR_POINTER_INCREMENT, .pointer_increment = {(RESULT), (POINTER), (INDEX), (DECREMENT)})
 		struct {
 			var_id result, lhs, rhs;
 		} pointer_diff;

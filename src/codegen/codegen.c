@@ -630,30 +630,29 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 		break;
 
 	case IR_POINTER_INCREMENT: {
+		int do_decrement = ins.pointer_increment.decrement;
 		var_id index = ins.pointer_increment.index,
 			pointer = ins.pointer_increment.pointer,
 			result = ins.pointer_increment.result;
 		int size = calculate_size(type_deref(get_variable_type(pointer)));
 		struct type *index_type = get_variable_type(index);
-		if(index_type == type_simple(ST_INT) ||
-		   index_type == type_simple(ST_UINT)) {
-			scalar_to_reg(index, REG_RDX);
-			scalar_to_reg(pointer, REG_RSI);
-			emit("movslq %%edx, %%rdx");
-			emit("imulq $%d, %%rdx, %%rdx", size);
-			emit("leaq (%%rsi, %%rdx), %%rax");
-			reg_to_scalar(REG_RAX, result);
-		} else if(index_type == type_simple(ST_LONG) ||
-				  index_type == type_simple(ST_ULONG)) {
-			scalar_to_reg(index, REG_RDX);
-			scalar_to_reg(pointer, REG_RSI);
-			emit("imulq $%d, %%rdx, %%rdx", size);
-			emit("leaq (%%rsi, %%rdx), %%rax");
-			reg_to_scalar(REG_RAX, result);
-		} else {
+
+		if (index_type->type != TY_SIMPLE) {
 			ERROR("Pointer increment by %s not implemented",
 				  type_to_string(get_variable_type(index)));
 		}
+
+		scalar_to_reg(index, REG_RDI);
+		emit("%s", cast_operator_outputs[ST_ULONG][index_type->simple]);
+		emit("imulq $%d, %%rax", size);
+		scalar_to_reg(pointer, REG_RSI);
+
+		if (do_decrement)
+			emit("subq %%rsi, %%rax");
+		else
+			emit("addq %%rsi, %%rax");
+
+		reg_to_scalar(REG_RAX, result);
 	} break;
 
 	case IR_POINTER_DIFF: {

@@ -142,6 +142,7 @@ struct type *calculate_type(struct expr *expr) {
 	case E_ASSIGNMENT:
 	case E_ASSIGNMENT_OP:
 	case E_ASSIGNMENT_POINTER_ADD:
+	case E_ASSIGNMENT_POINTER_SUB:
 	case E_POSTFIX_INC:
 	case E_POSTFIX_DEC:
 		return expr->args[0]->data_type;
@@ -295,7 +296,7 @@ void fix_assignment_operators(struct expr *expr) {
 		break;
 	case OP_SUB:
 		if (lhs_ptr)
-			NOTIMP();
+			expr->type = E_ASSIGNMENT_POINTER_SUB;
 		break;
 	default:
 		break;
@@ -386,7 +387,7 @@ var_id expression_to_address(struct expr *expr) {
 	} break;
 
 	default:
-		ERROR("NOt imp %d\n", expr->type);
+		ERROR("Not imp %d", expr->type);
 		NOTIMP();
 	}
 }
@@ -481,7 +482,7 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 
 	case E_POINTER_ADD:
 		IR_PUSH_POINTER_INCREMENT(res, expression_to_ir(expr->args[0]),
-								  expression_to_ir(expr->args[1]));
+								  expression_to_ir(expr->args[1]), 0);
 		break;
 
 	case E_POINTER_DIFF:
@@ -501,8 +502,9 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		if (type->type == TY_POINTER) {
 			var_id constant_one = expression_to_ir(EXPR_INT(1));
 			if (expr->type == E_POSTFIX_DEC)
-				NOTIMP();
-			IR_PUSH_POINTER_INCREMENT(value, value, constant_one);
+				IR_PUSH_POINTER_INCREMENT(value, value, constant_one, 1);
+			else
+				IR_PUSH_POINTER_INCREMENT(value, value, constant_one, 0);
 		} else {
 			var_id constant_one = expression_to_ir(expression_cast(EXPR_INT(1), type));
 			if (expr->type == E_POSTFIX_DEC)
@@ -553,6 +555,7 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		}
 	}
 
+	case E_ASSIGNMENT_POINTER_SUB:
 	case E_ASSIGNMENT_POINTER_ADD: {
 		var_id address = expression_to_address(expr->args[0]);
 		var_id rhs = expression_to_ir(expr->args[1]);
@@ -561,7 +564,10 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 
 		assert(type_is_pointer(get_variable_type(prev_val)));
 
-		IR_PUSH_POINTER_INCREMENT(prev_val, prev_val, rhs);
+		if (expr->type == E_ASSIGNMENT_POINTER_ADD)
+			IR_PUSH_POINTER_INCREMENT(prev_val, prev_val, rhs, 0);
+		else
+			IR_PUSH_POINTER_INCREMENT(prev_val, prev_val, rhs, 1);
 
 		address_store(address, prev_val);
 		return prev_val;
