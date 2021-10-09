@@ -517,8 +517,16 @@ struct constant simple_cast(struct constant from, enum simple_type target) {
 }
 
 struct constant constant_cast(struct constant a, struct type *target) {
-	if (a.type != CONSTANT_TYPE)
-		NOTIMP();
+	if (a.type == CONSTANT_LABEL) {
+		if (type_is_pointer(a.data_type) &&
+			type_is_pointer(target)) {
+			a.data_type = target;
+			return a;
+		} else {
+			NOTIMP();
+		}
+		return a;
+	}
 
 	if (a.data_type == target) {
 		return a;
