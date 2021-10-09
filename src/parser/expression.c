@@ -75,12 +75,11 @@ void decay_array(struct expr **expr) {
 	}
 }
 
-struct expr *do_integer_promotion(struct expr *expr) {
-	struct type *current_type = expr->data_type;
+void do_integer_promotion(struct expr **expr) {
+	struct type *current_type = (*expr)->data_type;
 	
-	if (current_type->type != TY_SIMPLE) {
-		return expr;
-	}
+	if (current_type->type != TY_SIMPLE)
+		return;
 
 	enum simple_type simple_type = current_type->simple;
 
@@ -91,9 +90,8 @@ struct expr *do_integer_promotion(struct expr *expr) {
 	case ST_UCHAR:
 	case ST_SHORT:
 	case ST_USHORT:
-		return expression_cast(expr, type_simple(ST_INT));
-	default:
-		return expr;
+		*expr = expression_cast(*expr, type_simple(ST_INT));
+	default: break;
 	}
 }
 
@@ -331,17 +329,17 @@ struct expr *expr_new(struct expr expr) {
 			decay_array(&expr.call.callee);
 		}
 	}
-	
-	cast_conditional(&expr);
-	fix_assignment_operators(&expr);
-	fix_binary_operator(&expr);
 
 	int integer_promotion = does_integer_conversion[expr.type];
 	if (integer_promotion) {
 		for (int i = 0; i < num_args[expr.type]; i++) {
-			expr.args[i] = do_integer_promotion(expr.args[i]);
+			do_integer_promotion(&expr.args[i]);
 		}
 	}
+	
+	cast_conditional(&expr);
+	fix_assignment_operators(&expr);
+	fix_binary_operator(&expr);
 
 	expr.data_type = calculate_type(&expr);
 
@@ -385,6 +383,9 @@ var_id expression_to_address(struct expr *expr) {
 		IR_PUSH_GET_SYMBOL_PTR(expr->symbol.name, ptr_result);
 		return ptr_result;
 	} break;
+
+	case E_CAST:
+		ERROR("Can't cast lvalue to %s", type_to_string(expr->cast.target));
 
 	default:
 		ERROR("Not imp %d", expr->type);
@@ -531,7 +532,13 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		var_id ac, aptr, a; // a is unused if not a_expr is not E_CAST.
 
 		if (is_cast) {
-			aptr = expression_to_address(a_expr->cast.arg);
+			if (a_expr->cast.arg->type == E_CAST) {
+				// A double cast can sometimes occur.
+				// char += long => (long)(int)char += long
+				aptr = expression_to_address(a_expr->cast.arg->cast.arg);
+			} else {
+				aptr = expression_to_address(a_expr->cast.arg);
+			}
 			a = address_load(aptr);
 			ac = new_variable(a_expr->cast.target, 1);
 			IR_PUSH_CAST(ac, a, a_expr->cast.target);
