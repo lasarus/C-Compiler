@@ -131,8 +131,8 @@ intmax_t evaluate_expression(int prec) {
 
 	t = NEXT_E();
 
-	while (prec < precedence_get(t.type, PREC_INFIX, 1)) {
-		int new_prec = precedence_get(t.type, PREC_INFIX, 0);
+	while (prec < precedence_get(t.type, 1)) {
+		int new_prec = precedence_get(t.type, 0);
 
 		if (t.type == T_QUEST) {
 			int mid = evaluate_expression(0);

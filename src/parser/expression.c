@@ -663,8 +663,156 @@ var_id expression_to_ir(struct expr *expr) {
 
 // Parsing.
 
-struct expr *parse_builtins(void) {
-	if (TACCEPT(T_KVA_START)) {
+void parse_call_parameters(struct expr ***args, int *n_args) {
+	#define MAX_ARGUMENTS 128
+	struct expr *buffer[MAX_ARGUMENTS];
+
+	int pos = 0;
+
+	for (; pos < MAX_ARGUMENTS; pos++) {
+		if (TACCEPT(T_RPAR))
+			break;
+
+		if (pos != 0)
+			TEXPECT(T_COMMA);
+
+		struct expr *expr = parse_assignment_expression();
+
+		if (!expr)
+			ERROR("Expected expression");
+
+		buffer[pos] = expr;
+	}
+
+	if (pos == MAX_ARGUMENTS)
+		ERROR("Too many arguments passed to function");
+
+	*args = NULL;
+	if (pos) {
+		*args = malloc(sizeof **args * pos);
+		memcpy(*args, buffer, sizeof **args * pos);
+	}
+
+	*n_args = pos;
+}
+
+struct expr *parse_pratt(int precedence);
+
+struct expr *parse_prefix() {
+	if (TACCEPT(T_LPAR)) {
+		struct type *cast_type = parse_type_name();
+
+		if (cast_type) {
+			TEXPECT(T_RPAR);
+			if (T0->type == T_LBRACE) {
+				struct initializer *init = parse_initializer(&cast_type);
+				return expr_new((struct expr) {
+						.type = E_COMPOUND_LITERAL,
+						.compound_literal = { cast_type, init }
+					});
+			} else {
+				struct expr *rhs = parse_pratt(PREFIX_PREC);
+				if (!rhs)
+					ERROR("Expected expression");
+				return expression_cast(rhs, cast_type);
+			}
+		} else {
+			struct expr *expr = parse_pratt(0);
+			TEXPECT(T_RPAR);
+			return expr;
+		}
+	} else if (TACCEPT(T_INC)) {
+ 		return EXPR_ASSIGNMENT_OP(OP_ADD, parse_pratt(PREFIX_PREC), EXPR_INT(1));
+	} else if (TACCEPT(T_DEC)) {
+ 		return EXPR_ASSIGNMENT_OP(OP_SUB, parse_pratt(PREFIX_PREC), EXPR_INT(1));
+ 	} else if (TACCEPT(T_STAR)) {
+ 		return EXPR_ARGS(E_INDIRECTION, parse_pratt(PREFIX_PREC));
+	} else if (TACCEPT(T_ADD)) {
+		return EXPR_UNARY_OP(UOP_PLUS, parse_pratt(PREFIX_PREC));
+	} else if (TACCEPT(T_SUB)) {
+		return EXPR_UNARY_OP(UOP_NEG, parse_pratt(PREFIX_PREC));
+	} else if (TACCEPT(T_NOT)) {
+		struct expr *rhs = parse_pratt(PREFIX_PREC);
+		return EXPR_ARGS(E_CONDITIONAL, rhs,
+						 EXPR_INT(0),
+						 EXPR_INT(1));
+	} else if (TACCEPT(T_BNOT)) {
+		return EXPR_UNARY_OP(UOP_BNOT, parse_pratt(PREFIX_PREC));
+	} else if (TACCEPT(T_AMP)) {
+ 		return EXPR_ARGS(E_ADDRESS_OF, parse_pratt(PREFIX_PREC));
+	} else if (TACCEPT(T_KSIZEOF)) {
+		struct type *type = NULL;
+		if (TACCEPT(T_LPAR)) {
+			type = parse_type_name();
+			if (!type)
+				type = parse_expression()->data_type;
+			TEXPECT(T_RPAR);
+		} else {
+			type = parse_pratt(PREFIX_PREC)->data_type;
+		}
+		// TODO: Size should perhaps not be an integer.
+		struct constant c = {.type = CONSTANT_TYPE, .data_type = type_simple(ST_INT), .int_d = calculate_size(type) };
+
+		return expr_new((struct expr) {
+				.type = E_CONSTANT,
+				.constant = c
+			});
+	} else if (TACCEPT(T_KALIGNOF)) {
+		NOTIMP();
+	} else if (T_ISNEXT(T_IDENT)) {
+		struct symbol_identifier *sym = symbols_get_identifier(T0->str);
+
+		if (!sym) {
+			PRINT_POS(T0->pos);
+			ERROR("Could not find identifier %s", T0->str);
+		}
+
+		switch (sym->type) {
+		case IDENT_LABEL:
+			TNEXT();
+			return expr_new((struct expr) {
+					.type = E_SYMBOL,
+					.symbol = { sym->label.name, sym->label.type }
+				});
+
+		case IDENT_VARIABLE:
+			TNEXT();
+			return expr_new((struct expr) {
+					.type = E_VARIABLE,
+					.variable = { sym->variable }
+				});
+
+		case IDENT_CONSTANT:
+			TNEXT();
+			return expr_new((struct expr) {
+					.type = E_CONSTANT,
+					.constant = sym->constant
+				});
+
+		default:
+			printf("%s\n", T0->str);
+			NOTIMP();
+		}
+	} else if (T_ISNEXT(T_STRING)) {
+		const char *str = T0->str;
+		TNEXT();
+		return EXPR_STR(str);
+	} else if (T_ISNEXT(T_NUM)) {
+		struct constant c = constant_from_string(T0->str);
+		TNEXT();
+		return expr_new((struct expr) {
+				.type = E_CONSTANT,
+				.constant = c
+			});
+	} else if (T_ISNEXT(T_CHARACTER_CONSTANT)) {
+		const char *str = T0->str;
+		TNEXT();
+		return EXPR_INT(escaped_to_str(str));
+	} else if (TACCEPT(T_CHAR)) {
+		NOTIMP();
+	} else if (TACCEPT(T_KGENERIC)) {
+		NOTIMP();
+	} else if (TACCEPT(T_KVA_START)) {
 		TEXPECT(T_LPAR);
 		struct expr *v = parse_assignment_expression();
 		TEXPECT(T_COMMA);
@@ -692,7 +840,7 @@ struct expr *parse_builtins(void) {
 		return expr_new((struct expr) {
 				.type = E_BUILTIN_VA_END,
 				.va_end_ = {v}
-			});
+		 	});
 	} else if (TACCEPT(T_KVA_ARG)) {
 		TEXPECT(T_LPAR);
 		struct expr *v = parse_assignment_expression();
@@ -706,250 +854,19 @@ struct expr *parse_builtins(void) {
 				.va_arg_ = {v, t}
 			});
 	} else if (TACCEPT(T_KFUNC)) {
-		return EXPR_STR(get_current_function());
-	} else {
-		return NULL;
+ 		return EXPR_STR(get_current_function());
 	}
-}
-
-struct expr *parse_primary_expression(int starts_with_lpar) {
-	if (starts_with_lpar || TACCEPT(T_LPAR)) {
-		struct expr *expr = parse_expression();
-		TEXPECT(T_RPAR);
-		return expr;
-	} else if (T_ISNEXT(T_IDENT)) {
-		struct symbol_identifier *sym = symbols_get_identifier(T0->str);
-
-		if (!sym) {
-			PRINT_POS(T0->pos);
-			ERROR("Could not find identifier %s", T0->str);
-		}
-
-		switch (sym->type) {
-		case IDENT_LABEL:
-			TNEXT();
-			return expr_new((struct expr) {
-					.type = E_SYMBOL,
-					.symbol = { sym->label.name, sym->label.type }
-				});
-			break;
-
-		case IDENT_VARIABLE:
-			TNEXT();
-			return expr_new((struct expr) {
-					.type = E_VARIABLE,
-					.variable = { sym->variable }
-				});
-			break;
-
-		case IDENT_CONSTANT:
-			TNEXT();
-			return expr_new((struct expr) {
-					.type = E_CONSTANT,
-					.constant = sym->constant
-				});
-
-		default:
-			printf("%s\n", T0->str);
-			NOTIMP();
-		}
-
-		NOTIMP();
-	} else if (T_ISNEXT(T_NUM)) {
-		struct constant c = constant_from_string(T0->str);
-		TNEXT();
-		return expr_new((struct expr) {
-				.type = E_CONSTANT,
-				.constant = c
-			});
-	} else if (T_ISNEXT(T_STRING)) {
-		const char *str = T0->str;
-		TNEXT();
-		return EXPR_STR(str);
-	} else if (T_ISNEXT(T_CHARACTER_CONSTANT)) {
-		const char *str = T0->str;
-		TNEXT();
-		return EXPR_INT(escaped_to_str(str));
-	} else if (T_ISNEXT(T_CHAR)) {
-		NOTIMP();
-	} else if (TACCEPT(T_KGENERIC)) {
-		NOTIMP();
-	} else {
-
-	}
-	return parse_builtins();
-}
-
-struct expr *parse_postfix_expression(int starts_with_lpar, struct expr *starting_lhs) {
-	struct expr *lhs = starting_lhs ? starting_lhs : parse_primary_expression(starts_with_lpar);
-
-	do {
-		if (TACCEPT(T_LBRACK)) {
-			struct expr *index = parse_expression();
-			TEXPECT(T_RBRACK);
-			lhs = expr_new((struct expr) {
-					.type = E_INDIRECTION,
-					.args = {
-						EXPR_BINARY_OP(OP_ADD, lhs, index)
-					}
-				});
-		} else if (TACCEPT(T_LPAR)) {
-			struct position position = T0->pos;
-			struct expr *buffer[128];
-
-			int pos = 0;
-
-			for (; pos < 128; pos++) {
-				if (TACCEPT(T_RPAR))
-					break;
-
-				if (pos != 0)
-					TEXPECT(T_COMMA);
-
-				struct expr *expr = parse_assignment_expression();
-
-				if (!expr)
-					ERROR("Expected expression");
-
-				buffer[pos] = expr;
-			}
-
-			if (pos == 128)
-				NOTIMP();
-
-			struct expr **args = NULL;
-			if (pos) {
-				args = malloc(sizeof *args * pos);
-				memcpy(args, buffer, sizeof *args * pos);
-			}
-
-			lhs = expr_new((struct expr) {
-					.type = E_CALL,
-					.call = { lhs, pos, args },
-					.pos = position
-				});
-		} else if (TACCEPT(T_DOT)) {
-			const char *identifier = T0->str;
-			TNEXT();
-			struct type *lhs_type = lhs->data_type;
-			int idx = type_member_idx(lhs_type, identifier);
-
-			lhs = expr_new((struct expr) {
-					.type = E_DOT_OPERATOR,
-					.member = { lhs, idx }
-				});
-		} else if (TACCEPT(T_ARROW)) {
-			const char *identifier = T0->str;
-			TNEXT();
-			struct type *lhs_type = type_deref(lhs->data_type);
-			int idx = type_member_idx(lhs_type, identifier);
-
-			lhs = expr_new((struct expr) {
-					.type = E_DOT_OPERATOR,
-					.member = {
-						EXPR_ARGS(E_INDIRECTION, lhs), idx
-					}
-				});
-		} else if (TACCEPT(T_INC)) {
-			lhs = EXPR_ARGS(E_POSTFIX_INC, lhs);
-		} else if (TACCEPT(T_DEC)) {
-			lhs = EXPR_ARGS(E_POSTFIX_DEC, lhs);
-		} else {
-			break;
-		}
-	} while (1);
-
-	return lhs;
-}
-
-struct expr *parse_cast_expression(void);
-struct expr *parse_unary_expression() {
-	if (TACCEPT(T_INC)) {
-		return EXPR_ASSIGNMENT_OP(OP_ADD, parse_unary_expression(), EXPR_INT(1));
-	} else if (TACCEPT(T_DEC)) {
-		return EXPR_ASSIGNMENT_OP(OP_SUB, parse_unary_expression(), EXPR_INT(1));
-	} else if (TACCEPT(T_STAR)) {
-		return EXPR_ARGS(E_INDIRECTION, parse_cast_expression());
-	} else if (TACCEPT(T_AMP)) {
-		return EXPR_ARGS(E_ADDRESS_OF, parse_cast_expression());
-	} else if (TACCEPT(T_ADD)) {
-		return EXPR_UNARY_OP(UOP_PLUS, parse_cast_expression());
-	} else if (TACCEPT(T_SUB)) {
-		return EXPR_UNARY_OP(UOP_NEG, parse_cast_expression());
-	} else if (TACCEPT(T_BNOT)) {
-		return EXPR_UNARY_OP(UOP_BNOT, parse_cast_expression());
-	} else if (TACCEPT(T_NOT)) {
-		struct expr *rhs = parse_cast_expression();
-		return EXPR_ARGS(E_CONDITIONAL, rhs,
-						 EXPR_INT(0),
-						 EXPR_INT(1));
-	} else if (TACCEPT(T_KSIZEOF)) {
-		struct type *type = NULL;
-		if (TACCEPT(T_LPAR)) {
-			type = parse_type_name();
-			if (!type)
-				type = parse_expression()->data_type;
-			TEXPECT(T_RPAR);
-		} else {
-			type = parse_unary_expression()->data_type;
-		}
-		// TODO: Size should perhaps not be an integer.
-		struct constant c = {.type = CONSTANT_TYPE, .data_type = type_simple(ST_INT), .int_d = calculate_size(type) };
-
-		return expr_new((struct expr) {
-				.type = E_CONSTANT,
-				.constant = c
-			});
-	} else if (TACCEPT(T_KALIGNOF)) {
-		NOTIMP();
-	} else {
-		return parse_postfix_expression(0, NULL);
-	}
-}
-
-struct expr *parse_paren_or_cast_expression() {
-	if (!TACCEPT(T_LPAR))
-		return NULL;
-
-	struct type *cast_type = parse_type_name();
-	if (cast_type) {
-		TEXPECT(T_RPAR);
-		if (T0->type == T_LBRACE) {
-			struct initializer *init = parse_initializer(&cast_type);
-
-			struct expr *compound = expr_new((struct expr) {
-					.type = E_COMPOUND_LITERAL,
-					.compound_literal = { cast_type, init }
-				});
-
-			return parse_postfix_expression(0, compound);
-		} else {
-			struct expr *rhs = parse_cast_expression();
-			if (!rhs)
-				ERROR("Expected expression");
-			return expression_cast(rhs, cast_type);
-		}
-	} else {
-		return parse_postfix_expression(1, NULL);
-	}
-}
-
-struct expr *parse_cast_expression(void) {
-	struct expr *ret = parse_paren_or_cast_expression();
-	if (ret)
-		return ret;
-
-	return parse_unary_expression();
+	return NULL;
 }
 
 struct expr *parse_pratt(int precedence) {
-	struct expr *lhs = parse_cast_expression();
+	struct expr *lhs = parse_prefix();
 
 	if (!lhs)
 		return NULL;
 
-	while (precedence < precedence_get(T0->type, PREC_INFIX, 1)) {
-		int new_prec = precedence_get(T0->type, PREC_INFIX, 0);
+	while (precedence < precedence_get(T0->type, 1)) {
+		int new_prec = precedence_get(T0->type, 0);
 
 		static int ops[T_COUNT][2] = {
 			[T_COMMA] = {1, E_COMMA},
@@ -1010,6 +927,56 @@ struct expr *parse_pratt(int precedence) {
 			lhs = EXPR_ARGS(E_CONDITIONAL, lhs,
 							EXPR_ARGS(E_CONDITIONAL, rhs, EXPR_INT(1), EXPR_INT(0)),
 							EXPR_INT(0));
+		}
+		// Postfix operators
+		else if (TACCEPT(T_LBRACK)) {
+			struct expr *index = parse_expression();
+			TEXPECT(T_RBRACK);
+			lhs = expr_new((struct expr) {
+					.type = E_INDIRECTION,
+					.args = {
+						EXPR_BINARY_OP(OP_ADD, lhs, index)
+					}
+				});
+		} else if (TACCEPT(T_LPAR)) {
+			struct expr **args = NULL;
+			int n_args;
+
+			parse_call_parameters(&args, &n_args);
+
+			lhs = expr_new((struct expr) {
+					.type = E_CALL,
+					.call = { lhs, n_args, args }
+				});
+
+		} else if (TACCEPT(T_DOT)) {
+			const char *identifier = T0->str;
+			TNEXT();
+			struct type *lhs_type = lhs->data_type;
+			int idx = type_member_idx(lhs_type, identifier);
+
+			lhs = expr_new((struct expr) {
+					.type = E_DOT_OPERATOR,
+					.member = { lhs, idx }
+				});
+		} else if (TACCEPT(T_ARROW)) {
+			const char *identifier = T0->str;
+			TNEXT();
+			struct type *lhs_type = type_deref(lhs->data_type);
+			int idx = type_member_idx(lhs_type, identifier);
+
+			lhs = expr_new((struct expr) {
+					.type = E_DOT_OPERATOR,
+					.member = {
+						EXPR_ARGS(E_INDIRECTION, lhs), idx
+					}
+				});
+		} else if (TACCEPT(T_INC)) {
+			lhs = EXPR_ARGS(E_POSTFIX_INC, lhs);
+		} else if (TACCEPT(T_DEC)) {
+			lhs = EXPR_ARGS(E_POSTFIX_DEC, lhs);
+		} else {
+			break;
 		}
 	}
 
