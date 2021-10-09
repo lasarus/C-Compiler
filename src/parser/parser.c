@@ -138,7 +138,8 @@ const char *instruction_to_str(struct instruction ins) {
 		break;
 
 	case IR_CAST:
-		PRINT("%d = cast %d", ins.cast.result, ins.cast.rhs);
+		PRINT("%d (%s)", ins.cast.result, type_to_string(ins.cast.type));
+		PRINT(" = cast %d (%s)", ins.cast.rhs, type_to_string(get_variable_type(ins.cast.rhs)));
 		break;
 
 	case IR_ADDRESS_OF:
