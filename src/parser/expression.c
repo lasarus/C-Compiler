@@ -205,6 +205,7 @@ int num_args[E_NUM_TYPES] = {
 int does_integer_conversion[E_NUM_TYPES] = {
 	[E_UNARY_OP] = 1,
 	[E_BINARY_OP] = 1,
+	[E_ASSIGNMENT_OP] = 1,
 	[E_CONDITIONAL] = 1,
 };
 
@@ -522,25 +523,33 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 	}
 
 	case E_ASSIGNMENT_OP: {
-		struct expr *lhs = expr->args[0];
-		if (lhs->type == E_CAST)
-			NOTIMP();
-		var_id address = expression_to_address(expr->args[0]);
-		var_id rhs = expression_to_ir(expr->args[1]);
+		struct expr *a_expr = expr->args[0];
 
-		var_id prev_val = address_load(address);
-		enum operator_type ot = expr->binary_op;
+		var_id ac, aptr, a; // a is unused if not a_expr is not E_CAST.
 
-		if (type_is_pointer(expr->args[0]->data_type) ||
-			type_is_pointer(expr->args[1]->data_type)) {
-			PRINT_POS(T0->pos);
-			ERROR("OP: %d\n", ot);
+		if (a_expr->type == E_CAST) {
+			aptr = expression_to_address(a_expr->cast.arg);
+			a = address_load(aptr);
+			ac = new_variable(a_expr->cast.target, 1);
+			IR_PUSH_CAST(ac, a, a_expr->cast.target);
+		} else {
+			aptr = expression_to_address(a_expr);
+			ac = address_load(aptr);
 		}
 
-		IR_PUSH_BINARY_OPERATOR(ot, prev_val, rhs, prev_val);
+		var_id bc = expression_to_ir(expr->args[1]);
 
-		address_store(address, prev_val);
-		return prev_val;
+		IR_PUSH_BINARY_OPERATOR(expr->binary_op,
+								ac, bc, ac);
+
+		if (a_expr->type == E_CAST) {
+			IR_PUSH_CAST(a, ac, get_variable_type(a));
+			address_store(aptr, a);
+			return a;
+		} else {
+			address_store(aptr, ac);
+			return ac;
+		}
 	}
 
 	case E_ASSIGNMENT_POINTER_ADD: {
