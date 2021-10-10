@@ -997,7 +997,7 @@ struct expr *parse_pratt(int precedence) {
 }
 
 struct expr *parse_assignment_expression() {
-	return parse_pratt(5);
+	return parse_pratt(ASSIGNMENT_PREC);
 }
 
 struct expr *parse_expression() {

@@ -3,10 +3,8 @@
 
 #include "preprocessor/preprocessor.h"
 
-enum {
-	POSTFIX_PREC = 18,
-	PREFIX_PREC = 17
-};
+#define PREFIX_PREC 13
+#define ASSIGNMENT_PREC 1
 
 int precedence_get(enum ttype token_type, int loop);
 
