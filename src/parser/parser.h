@@ -87,8 +87,9 @@ struct instruction {
 			var_id result, pointer, index;
 			int decrement;
 			struct type *ptr_type;
+			enum simple_type index_type;
 		} pointer_increment;
-#define IR_PUSH_POINTER_INCREMENT(RESULT, POINTER, INDEX, DECREMENT, PTR_TYPE) IR_PUSH(.type = IR_POINTER_INCREMENT, .pointer_increment = {(RESULT), (POINTER), (INDEX), (DECREMENT), (PTR_TYPE)})
+#define IR_PUSH_POINTER_INCREMENT(RESULT, POINTER, INDEX, DECREMENT, PTR_TYPE, INDEX_TYPE) IR_PUSH(.type = IR_POINTER_INCREMENT, .pointer_increment = {(RESULT), (POINTER), (INDEX), (DECREMENT), (PTR_TYPE), (INDEX_TYPE)})
 		struct {
 			var_id result, lhs, rhs;
 			struct type *ptr_type;
@@ -173,11 +174,12 @@ struct instruction {
 		struct {
 			var_id function;
 			struct type *function_type;
+			struct type **argument_types;
 			int n_args;
 			var_id *args;
 			var_id result;
 		} call_variable;
-#define IR_PUSH_CALL_VARIABLE(VARIABLE, FUNCTION_TYPE, N_ARGS, ARGS, RESULT) IR_PUSH(.type = IR_CALL_VARIABLE, .call_variable = {(VARIABLE), (FUNCTION_TYPE), (N_ARGS), (ARGS), (RESULT)})
+#define IR_PUSH_CALL_VARIABLE(VARIABLE, FUNCTION_TYPE, ARGUMENT_TYPES, N_ARGS, ARGS, RESULT) IR_PUSH(.type = IR_CALL_VARIABLE, .call_variable = {(VARIABLE), (FUNCTION_TYPE), (ARGUMENT_TYPES), (N_ARGS), (ARGS), (RESULT)})
 		struct {
 			var_id result;
 			var_id rhs;

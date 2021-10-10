@@ -83,7 +83,7 @@ struct classification {
 	};
 };
 
-void classify_parameters(int n_args, var_id *args, struct type *return_type,
+void classify_parameters(struct type *return_type, int n_args, struct type **types,
 						 struct classification *classifications,
 						 struct classification *return_classification,
 						 int *total_memory_argument_size,
@@ -115,8 +115,9 @@ void classify_parameters(int n_args, var_id *args, struct type *return_type,
 	*current_gp_reg = 0;
 	if (return_classification->pass_in_memory)
 		(*current_gp_reg)++;
+
 	for (int i = 0; i < n_args; i++) {
-		struct type *type = get_variable_type(args[i]);
+		struct type *type = types[i];
 		struct classification *classification = classifications + i;
 
 		int size_rounded = round_up_to_nearest(calculate_size(type), 8);
@@ -144,15 +145,16 @@ void classify_parameters(int n_args, var_id *args, struct type *return_type,
 	}
 }
 
-void codegen_call(var_id variable, int n_args, var_id *args, var_id result) {
+void codegen_call(var_id variable, struct type *function_type, struct type **argument_types, int n_args, var_id *args, var_id result) {
 	int total_memory_argument_size, current_gp_reg;
-	struct type *return_type = get_variable_type(result);
+	struct type *return_type = function_type->children[0];
 
 	scalar_to_reg(variable, REG_RBX);
 
 	struct classification classifications[n_args];
 	struct classification return_classification;
-	classify_parameters(n_args, args, return_type,
+
+	classify_parameters(return_type, n_args, argument_types,
 						classifications,
 						&return_classification,
 						&total_memory_argument_size,
@@ -195,7 +197,7 @@ void codegen_call(var_id variable, int n_args, var_id *args, var_id result) {
 	emit("callq *%%rbx");
 
 	if (!return_classification.pass_in_memory && return_type != type_simple(ST_VOID)) {
-		int var_size = calculate_size(get_variable_type(result));
+		int var_size = get_variable_size(result);
 		for (int i = 0; i < return_classification.n_parts; i++) {
 			int size = var_size - 8 * i;
 			if (size > 8) size = 8;
@@ -574,6 +576,8 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 
 	case IR_CALL_VARIABLE:
 		codegen_call(ins.call_variable.function,
+					 ins.call_variable.function_type,
+					 ins.call_variable.argument_types,
 					 ins.call_variable.n_args,
 					 ins.call_variable.args,
 					 ins.call_variable.result);
@@ -585,15 +589,9 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 			pointer = ins.pointer_increment.pointer,
 			result = ins.pointer_increment.result;
 		int size = calculate_size(type_deref(ins.pointer_increment.ptr_type));
-		struct type *index_type = get_variable_type(index);
-
-		if (index_type->type != TY_SIMPLE) {
-			ERROR("Pointer increment by %s not implemented",
-				  type_to_string(get_variable_type(index)));
-		}
 
 		scalar_to_reg(index, REG_RDI);
-		emit("%s", cast_operator_outputs[ST_ULONG][index_type->simple]);
+		emit("%s", cast_operator_outputs[ST_ULONG][ins.pointer_increment.index_type]);
 		emit("imulq $%d, %%rax", size);
 		scalar_to_reg(pointer, REG_RSI);
 
@@ -785,14 +783,14 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 
 	case IR_SET_ZERO:
 		emit("leaq -%d(%%rbp), %%rdi", variable_info[ins.set_zero.variable].stack_location);
-		codegen_memzero(calculate_size(get_variable_type(ins.set_zero.variable)));
+		codegen_memzero(get_variable_size(ins.set_zero.variable));
 		break;
 
 	case IR_ASSIGN_CONSTANT_OFFSET:
 		emit("leaq -%d(%%rbp), %%rsi", variable_info[ins.assign_constant_offset.variable].stack_location);
 		emit("leaq %d(%%rsi), %%rsi", ins.assign_constant_offset.offset);
 		emit("leaq -%d(%%rbp), %%rdi", variable_info[ins.assign_constant_offset.value].stack_location);
-		codegen_memcpy(calculate_size(get_variable_type(ins.assign_constant_offset.value)));
+		codegen_memcpy(get_variable_size(ins.assign_constant_offset.value));
 		break;
 
 	case IR_SWITCH_SELECTION: {
@@ -846,7 +844,8 @@ void codegen_function(struct instruction *is,
 	int total_memory_argument_size, current_gp_reg;
 	struct classification classifications[n_args];
 	struct classification return_classification;
-	classify_parameters(n_args, is->function.named_arguments, return_type,
+
+	classify_parameters(return_type, is->function.signature->n - 1, is->function.signature->children + 1,
 						classifications,
 						&return_classification,
 						&total_memory_argument_size,
@@ -868,7 +867,7 @@ void codegen_function(struct instruction *is,
 		case IR_ALLOCA: {
 			var_id var = is[i].alloca.variable;
 
-			int size = calculate_size(get_variable_type(var));
+			int size = get_variable_size(var);
 
 			stack_count += size;
 
@@ -914,7 +913,7 @@ void codegen_function(struct instruction *is,
 	for (int i = 0; i < n_args; i++) {
 		struct classification *classification = classifications + i;
 		var_id var = is->function.named_arguments[i];
-		int var_size = calculate_size(get_variable_type(var));
+		int var_size = get_variable_size(var);
 
 		if (classification->pass_in_memory) {
 			// TODO: This doesn't have to copy memory at all.

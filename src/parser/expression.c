@@ -458,12 +458,15 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		}
 
 		var_id *args = malloc(sizeof *args * expr->call.n_args);
+		struct type **arg_types = malloc(sizeof *arg_types * expr->call.n_args);
 		for (int i = 0; i < expr->call.n_args; i++) {
 			if (i + 1 < signature->n) {
 				args[i] = expression_to_ir(expression_cast(expr->call.args[i],
 														   signature->children[i + 1]));
+				arg_types[i] = signature->children[i + 1];
 			} else {
 				args[i] = expression_to_ir(expr->call.args[i]);
+				arg_types[i] = expr->call.args[i]->data_type;
 			}
 		}
 
@@ -473,9 +476,8 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		if (func_type->type != TY_POINTER) {
 			ERROR("Can't call type %s", type_to_string(func_type));
 		}
-		assert(type_is_pointer(func_type));
 
-		IR_PUSH_CALL_VARIABLE(func_var, func_type, expr->call.n_args, args, res);
+		IR_PUSH_CALL_VARIABLE(func_var, type_deref(func_type), arg_types, expr->call.n_args, args, res);
 		return res;
 	}
 
@@ -499,7 +501,8 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 	case E_POINTER_ADD:
 		IR_PUSH_POINTER_INCREMENT(res, expression_to_ir(expr->args[0]),
 								  expression_to_ir(expr->args[1]), 0,
-								  expr->args[0]->data_type);
+								  expr->args[0]->data_type,
+								  expr->args[1]->data_type->simple);
 		break;
 
 	case E_POINTER_DIFF:
@@ -520,9 +523,9 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		if (type->type == TY_POINTER) {
 			var_id constant_one = expression_to_ir(EXPR_INT(1));
 			if (expr->type == E_POSTFIX_DEC)
-				IR_PUSH_POINTER_INCREMENT(value, value, constant_one, 1, expr->args[0]->data_type);
+				IR_PUSH_POINTER_INCREMENT(value, value, constant_one, 1, expr->args[0]->data_type, ST_INT);
 			else
-				IR_PUSH_POINTER_INCREMENT(value, value, constant_one, 0, expr->args[0]->data_type);
+				IR_PUSH_POINTER_INCREMENT(value, value, constant_one, 0, expr->args[0]->data_type, ST_INT);
 		} else {
 			var_id constant_one = expression_to_ir(expression_cast(EXPR_INT(1), type));
 
@@ -602,9 +605,9 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		assert(type_is_pointer(get_variable_type(prev_val)));
 
 		if (expr->type == E_ASSIGNMENT_POINTER_ADD)
-			IR_PUSH_POINTER_INCREMENT(prev_val, prev_val, rhs, 0, expr->args[0]->data_type);
+			IR_PUSH_POINTER_INCREMENT(prev_val, prev_val, rhs, 0, expr->args[0]->data_type, expr->args[1]->data_type->simple);
 		else
-			IR_PUSH_POINTER_INCREMENT(prev_val, prev_val, rhs, 1, expr->args[0]->data_type);
+			IR_PUSH_POINTER_INCREMENT(prev_val, prev_val, rhs, 1, expr->args[0]->data_type, expr->args[1]->data_type->simple);
 
 		address_store(address, prev_val);
 		return prev_val;
