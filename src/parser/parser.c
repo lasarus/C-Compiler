@@ -85,10 +85,7 @@ const char *instruction_to_str(struct instruction ins) {
 		break;
 
 	case IR_RETURN:
-		if (ins.return_.is_void)
-			PRINT("return");
-		else
-			PRINT("return %d", ins.return_.value);
+		PRINT("return %d", ins.return_.value);
 		break;
 
 	case IR_ALLOCA:
@@ -142,8 +139,8 @@ const char *instruction_to_str(struct instruction ins) {
 		break;
 
 	case IR_CAST:
-		PRINT("%d (%s)", ins.cast.result, type_to_string(ins.cast.type));
-		PRINT(" = cast %d (%s)", ins.cast.rhs, type_to_string(get_variable_type(ins.cast.rhs)));
+		PRINT("%d (%s)", ins.cast.result, type_to_string(ins.cast.result_type));
+		PRINT(" = cast %d (%s)", ins.cast.rhs, type_to_string(ins.cast.rhs_type));
 		break;
 
 	case IR_ADDRESS_OF:
@@ -151,8 +148,8 @@ const char *instruction_to_str(struct instruction ins) {
 		break;
 
 	case IR_GET_MEMBER:
-		PRINT("%d = get member %d of %d", ins.get_member.result,
-			   ins.get_member.index,
+		PRINT("%d = get offset %d of %d", ins.get_member.result,
+			   ins.get_member.offset,
 			   ins.get_member.pointer);
 		break;
 
@@ -216,5 +213,27 @@ void print_instruction(struct instruction instruction) {
 void print_parser_ir() {
 	for (int i = 0; i < program.size; i++) {
 		print_instruction(program.instructions[i]);
+	}
+}
+
+enum operand_type ot_from_st(enum simple_type st) {
+	switch (st) {
+	case ST_INT: return OT_INT;
+	case ST_UINT: return OT_UINT;
+	case ST_LONG: return OT_LONG;
+	case ST_ULONG: return OT_ULONG;
+	case ST_LLONG: return OT_LLONG;
+	case ST_ULLONG: return OT_ULLONG;
+	default: ERROR("Invalid operand type %d", st);
+	}
+}
+
+enum operand_type ot_from_type(struct type *type) {
+	if (type_is_pointer(type)) {
+		return OT_PTR;
+	} else if (type->type == TY_SIMPLE) {
+		return ot_from_st(type->simple);
+	} else {
+		ERROR("Invalid operand type");
 	}
 }

@@ -372,9 +372,15 @@ var_id expression_to_address(struct expr *expr) {
 	}
 
 	case E_DOT_OPERATOR: {
+		int field_offset;
+		struct type *field_type;
+
+		type_select(expr->member.lhs->data_type, expr->member.member_idx,
+					&field_offset, &field_type);
+
 		var_id address = expression_to_address(expr->member.lhs);
 		var_id member_address = new_variable(type_pointer(expr->data_type), 1);
-		IR_PUSH_GET_MEMBER(member_address, address, expr->member.member_idx);
+		IR_PUSH_GET_OFFSET(member_address, address, field_offset);
 		return member_address;
 	} break;
 
@@ -415,14 +421,22 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		res = new_variable(expr->data_type, 1);
 
 	switch(expr->type) {
-	case E_BINARY_OP:
-		IR_PUSH_BINARY_OPERATOR(expr->binary_op,
+	case E_BINARY_OP: {
+		enum operand_type ot;
+		if (type_is_pointer(expr->args[0]->data_type) && type_is_pointer(expr->args[1]->data_type)) {
+			ot = OT_PTR;
+		} else {
+			assert(expr->args[0]->data_type->type == TY_SIMPLE &&
+				   expr->args[1]->data_type->type == TY_SIMPLE);
+			ot = ot_from_st(expr->args[0]->data_type->simple);
+		}
+		IR_PUSH_BINARY_OPERATOR(expr->binary_op, ot,
 								expression_to_ir(expr->args[0]),
 								expression_to_ir(expr->args[1]), res);
-		break;
+		} break;
 
 	case E_UNARY_OP:
-		IR_PUSH_UNARY_OPERATOR(expr->unary_op, expression_to_ir(expr->args[0]), res);
+		IR_PUSH_UNARY_OPERATOR(expr->unary_op, ot_from_type(expr->args[0]->data_type), expression_to_ir(expr->args[0]), res);
 		break;
 
 	case E_CONSTANT:
@@ -478,18 +492,21 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		return expression_to_address(expr->args[0]);
 
 	case E_ARRAY_PTR_DECAY:
-		IR_PUSH_CAST(res, expression_to_address(expr->args[0]), expr->data_type);
+		IR_PUSH_CAST(res, expr->data_type,
+					 expression_to_address(expr->args[0]), type_pointer(expr->args[0]->data_type));
 		break;
 
 	case E_POINTER_ADD:
 		IR_PUSH_POINTER_INCREMENT(res, expression_to_ir(expr->args[0]),
-								  expression_to_ir(expr->args[1]), 0);
+								  expression_to_ir(expr->args[1]), 0,
+								  expr->args[0]->data_type);
 		break;
 
 	case E_POINTER_DIFF:
 		// TODO: Make this work on variable length objects.
 		IR_PUSH_POINTER_DIFF(res, expression_to_ir(expr->args[0]),
-							 expression_to_ir(expr->args[1]));
+							 expression_to_ir(expr->args[1]),
+							 expr->args[0]->data_type);
 		break;
 
 	case E_POSTFIX_DEC:
@@ -503,15 +520,27 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		if (type->type == TY_POINTER) {
 			var_id constant_one = expression_to_ir(EXPR_INT(1));
 			if (expr->type == E_POSTFIX_DEC)
-				IR_PUSH_POINTER_INCREMENT(value, value, constant_one, 1);
+				IR_PUSH_POINTER_INCREMENT(value, value, constant_one, 1, expr->args[0]->data_type);
 			else
-				IR_PUSH_POINTER_INCREMENT(value, value, constant_one, 0);
+				IR_PUSH_POINTER_INCREMENT(value, value, constant_one, 0, expr->args[0]->data_type);
 		} else {
 			var_id constant_one = expression_to_ir(expression_cast(EXPR_INT(1), type));
+
+			/* enum operand_type ot; */
+			/* if (type_is_pointer(expr->args[0]->data_type) && type_is_pointer(expr->args[1]->data_type)) { */
+			/* 	ot = OT_PTR; */
+			/* } else { */
+			/* 	assert(expr->args[0]->data_type->type == TY_SIMPLE && */
+			/* 		   expr->args[1]->data_type->type == TY_SIMPLE); */
+			/* 	ot = ot_from_st(expr->args[0]->data_type->simple); */
+			/* } */
+
+			// TODO: operand type is wrong here.
+
 			if (expr->type == E_POSTFIX_DEC)
-				IR_PUSH_BINARY_OPERATOR(OP_SUB, value, constant_one, value);
+				IR_PUSH_BINARY_OPERATOR(OP_SUB, OT_INT, value, constant_one, value);
 			else
-				IR_PUSH_BINARY_OPERATOR(OP_ADD, value, constant_one, value);
+				IR_PUSH_BINARY_OPERATOR(OP_ADD, OT_INT, value, constant_one, value);
 		}
 		address_store(address, value);
 		return res;
@@ -541,7 +570,7 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 			}
 			a = address_load(aptr);
 			ac = new_variable(a_expr->cast.target, 1);
-			IR_PUSH_CAST(ac, a, a_expr->cast.target);
+			IR_PUSH_CAST(ac, a_expr->cast.target, a, get_variable_type(a));
 		} else {
 			aptr = expression_to_address(a_expr);
 			ac = address_load(aptr);
@@ -550,10 +579,11 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		var_id bc = expression_to_ir(expr->args[1]);
 
 		IR_PUSH_BINARY_OPERATOR(expr->binary_op,
+								ot_from_type(get_variable_type(bc)),
 								ac, bc, ac);
 
 		if (is_cast) {
-			IR_PUSH_CAST(a, ac, get_variable_type(a));
+			IR_PUSH_CAST(a, get_variable_type(a), ac, get_variable_type(ac));
 			address_store(aptr, a);
 			return a;
 		} else {
@@ -572,24 +602,32 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		assert(type_is_pointer(get_variable_type(prev_val)));
 
 		if (expr->type == E_ASSIGNMENT_POINTER_ADD)
-			IR_PUSH_POINTER_INCREMENT(prev_val, prev_val, rhs, 0);
+			IR_PUSH_POINTER_INCREMENT(prev_val, prev_val, rhs, 0, expr->args[0]->data_type);
 		else
-			IR_PUSH_POINTER_INCREMENT(prev_val, prev_val, rhs, 1);
+			IR_PUSH_POINTER_INCREMENT(prev_val, prev_val, rhs, 1, expr->args[0]->data_type);
 
 		address_store(address, prev_val);
 		return prev_val;
 	}
 
 	case E_CAST:
-		IR_PUSH_CAST(res, expression_to_ir(expr->cast.arg), expr->cast.target);
+		IR_PUSH_CAST(res, expr->cast.target, expression_to_ir(expr->cast.arg), expr->cast.arg->data_type);
 		break;
 
 	case E_DOT_OPERATOR: {
+		int field_offset;
+		struct type *field_type;
+
+		type_select(expr->member.lhs->data_type, expr->member.member_idx,
+					&field_offset, &field_type);
+
 		var_id lhs = expression_to_ir(expr->member.lhs);
 		var_id address = new_variable(type_pointer(expr->member.lhs->data_type), 1);
+
 		var_id member_address = new_variable(type_pointer(expr->data_type), 1);
+
 		IR_PUSH_ADDRESS_OF(address, lhs);
-		IR_PUSH_GET_MEMBER(member_address, address, expr->member.member_idx);
+		IR_PUSH_GET_OFFSET(member_address, address, field_offset);
 		IR_PUSH_LOAD(res, member_address);
 	} break;
 

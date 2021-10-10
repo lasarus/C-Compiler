@@ -44,41 +44,8 @@ void emit(const char *fmt, ...) {
 	va_end(args);
 }
 
-enum operand_type ot_from_st(enum simple_type st) {
-	switch (st) {
-	case ST_INT: return OT_INT;
-	case ST_UINT: return OT_UINT;
-	case ST_LONG: return OT_LONG;
-	case ST_ULONG: return OT_ULONG;
-	case ST_LLONG: return OT_LLONG;
-	case ST_ULLONG: return OT_ULLONG;
-	default: ERROR("Invalid operand type %d", st);
-	}
-}
-
-void codegen_binary_operator(int operator_type, var_id out,
+void codegen_binary_operator(int operator_type, enum operand_type ot, var_id out,
 							 var_id lhs, var_id rhs) {
-	struct type *data_type = get_variable_type(out);
-	struct type *lhs_type = get_variable_type(lhs);
-	struct type *rhs_type = get_variable_type(rhs);
-
-	enum operand_type ot;
-
-	if (type_is_pointer(lhs_type) && type_is_pointer(rhs_type)) {
-		ot = OT_PTR;
-	} else {
-		if(rhs_type != lhs_type) {
-			ERROR("Can't codegen binary operator %d between %s and %s",
-				  operator_type, strdup(type_to_string(lhs_type)),
-				  strdup(type_to_string(rhs_type)));
-		}
-
-		assert(data_type->type == TY_SIMPLE);
-		assert(rhs_type->type == TY_SIMPLE);
-
-		ot = ot_from_st(rhs_type->simple);
-	}
-
 	scalar_to_reg(lhs, REG_RDI);
 	scalar_to_reg(rhs, REG_RSI);
 
@@ -87,20 +54,8 @@ void codegen_binary_operator(int operator_type, var_id out,
 	reg_to_scalar(REG_RAX, out);
 }
 
-void codegen_unary_operator(int operator_type, var_id out,
+void codegen_unary_operator(int operator_type, enum operand_type ot, var_id out,
 							var_id rhs) {
-	struct type *data_type = get_variable_type(out);
-	struct type *in_type = get_variable_type(rhs);
-
-	if(data_type->type != TY_SIMPLE || in_type->type != TY_SIMPLE) {
-		printf("Invalid types in \"%s\" and out \"%s\"\n",
-			   strdup(type_to_string(in_type)),
-			   strdup(type_to_string(data_type)));
-		NOTIMP();
-	}
-
-	enum operand_type ot = ot_from_st(data_type->simple);
-
 	scalar_to_reg(rhs, REG_RDI);
 
 	emit("%s", unary_operator_outputs[ot][operator_type]);
@@ -108,16 +63,11 @@ void codegen_unary_operator(int operator_type, var_id out,
 	reg_to_scalar(REG_RAX, out);
 }
 
-void codegen_simple_cast(var_id in, var_id out) {
-	struct type *in_type = get_variable_type(in);
-	struct type *out_type = get_variable_type(out);
-
-	assert(in_type->type == TY_SIMPLE);
-	assert(out_type->type == TY_SIMPLE);
-
+void codegen_simple_cast(var_id in, var_id out,
+						 enum simple_type st_in, enum simple_type st_out) {
 	scalar_to_reg(in, REG_RDI);
 
-	emit("%s", cast_operator_outputs[in_type->simple][out_type->simple]);
+	emit("%s", cast_operator_outputs[st_in][st_out]);
 
 	reg_to_scalar(REG_RAX, out);
 }
@@ -582,6 +532,7 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 
 	case IR_BINARY_OPERATOR:
 		codegen_binary_operator(ins.binary_operator.type,
+								ins.binary_operator.operand_type,
 								ins.binary_operator.result,
 								ins.binary_operator.lhs,
 								ins.binary_operator.rhs);
@@ -589,44 +540,43 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 
 	case IR_UNARY_OPERATOR:
 		codegen_unary_operator(ins.unary_operator.type,
+							   ins.unary_operator.operand_type,
 							   ins.unary_operator.result,
 							   ins.unary_operator.operand);
 		break;
 
-	case IR_RETURN:
-		if (!ins.return_.is_void) {
-			var_id ret = ins.return_.value;
-			struct type *ret_type = get_variable_type(ret);
-			if (ret_type != type_simple(ST_VOID)) {
-				enum parameter_class classes[4];
-				int n_parts = 0;
+	case IR_RETURN: {
+		var_id ret = ins.return_.value;
+		struct type *ret_type = ins.return_.type;
+		if (ret_type != type_simple(ST_VOID)) {
+			enum parameter_class classes[4];
+			int n_parts = 0;
 
-				classify(ret_type, &n_parts, classes);
+			classify(ret_type, &n_parts, classes);
 
-				if (n_parts == 1 && classes[0] == CLASS_MEMORY) {
-					emit("movq -%d(%%rbp), %%rsi", 8);
-					emit("leaq -%d(%%rbp), %%rdi", variable_info[ret].stack_location);
+			if (n_parts == 1 && classes[0] == CLASS_MEMORY) {
+				emit("movq -%d(%%rbp), %%rsi", 8);
+				emit("leaq -%d(%%rbp), %%rdi", variable_info[ret].stack_location);
 
-					codegen_memcpy(calculate_size(ret_type));
-				} else if (n_parts == 1 && classes[0] == CLASS_INTEGER) {
-					emit("movq -%d(%%rbp), %%rax", variable_info[ret].stack_location);
-				} else if (n_parts == 2) {
-					emit("movq -%d(%%rbp), %%rax", variable_info[ret].stack_location);
-					emit("movq -%d(%%rbp), %%rdx", variable_info[ret].stack_location - 8);
-				} else {
-					NOTIMP();
-				}
+				codegen_memcpy(calculate_size(ret_type));
+			} else if (n_parts == 1 && classes[0] == CLASS_INTEGER) {
+				emit("movq -%d(%%rbp), %%rax", variable_info[ret].stack_location);
+			} else if (n_parts == 2) {
+				emit("movq -%d(%%rbp), %%rax", variable_info[ret].stack_location);
+				emit("movq -%d(%%rbp), %%rdx", variable_info[ret].stack_location - 8);
+			} else {
+				NOTIMP();
 			}
 		}
 		emit("leave");
 		emit("ret");
-		break;
+	} break;
 
 	case IR_CALL_VARIABLE:
 		codegen_call(ins.call_variable.function,
-			ins.call_variable.n_args,
-			ins.call_variable.args,
-			ins.call_variable.result);
+					 ins.call_variable.n_args,
+					 ins.call_variable.args,
+					 ins.call_variable.result);
 		break;
 
 	case IR_POINTER_INCREMENT: {
@@ -634,7 +584,7 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 		var_id index = ins.pointer_increment.index,
 			pointer = ins.pointer_increment.pointer,
 			result = ins.pointer_increment.result;
-		int size = calculate_size(type_deref(get_variable_type(pointer)));
+		int size = calculate_size(type_deref(ins.pointer_increment.ptr_type));
 		struct type *index_type = get_variable_type(index);
 
 		if (index_type->type != TY_SIMPLE) {
@@ -656,37 +606,28 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 	} break;
 
 	case IR_POINTER_DIFF: {
-		var_id result = ins.pointer_diff.result,
-			lhs = ins.pointer_diff.lhs,
-			rhs = ins.pointer_diff.rhs;
-
-		int size = calculate_size(type_deref(get_variable_type(lhs)));
-
-		scalar_to_reg(lhs, REG_RAX);
-		scalar_to_reg(rhs, REG_RDX);
+		scalar_to_reg(ins.pointer_diff.lhs, REG_RAX);
+		scalar_to_reg(ins.pointer_diff.rhs, REG_RDX);
 		emit("subq %%rdx, %%rax");
-		emit("movq $%d, %%rdi", size);
+		emit("movq $%d, %%rdi", calculate_size(type_deref(ins.pointer_diff.ptr_type)));
 		emit("cqto");
 		emit("idivq %%rdi");
 
-		reg_to_scalar(REG_RAX, result);
+		reg_to_scalar(REG_RAX, ins.pointer_diff.result);
 	} break;
 
 	case IR_LOAD: {
-		struct type *type = get_variable_type(ins.load.result);
 		scalar_to_reg(ins.load.pointer, REG_RDI);
 		emit("leaq -%d(%%rbp), %%rsi", variable_info[ins.load.result].stack_location);
 
-		codegen_memcpy(calculate_size(type));
-
+		codegen_memcpy(get_variable_size(ins.load.result));
 	} break;
 
 	case IR_STORE: {
-		struct type *type = get_variable_type(ins.store.value);
 		scalar_to_reg(ins.store.pointer, REG_RSI);
 		emit("leaq -%d(%%rbp), %%rdi", variable_info[ins.store.value].stack_location);
 
-		codegen_memcpy(calculate_size(type));
+		codegen_memcpy(get_variable_size(ins.store.value));
 	} break;
 
 	case IR_START_BLOCK: {
@@ -701,8 +642,7 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 
 	case IR_IF_SELECTION: {
 		var_id cond = ins.if_selection.condition;
-		struct type *type = get_variable_type(cond);
-		int size = calculate_size(type);
+		int size = get_variable_size(cond);
 		if (size == 1 || size == 2 || size == 4 || size == 8) {
 			scalar_to_reg(cond, REG_RDI);
 			const char *reg_name = get_reg_name(REG_RDI, size);
@@ -716,49 +656,28 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 		}
 	} break;
 
-	case IR_COPY: {
-		var_id source = ins.copy.source,
-			dest = ins.copy.result;
-		struct type *type = get_variable_type(source);
-
-		struct type *dest_type = get_variable_type(dest);
-		if (calculate_size(type) != calculate_size(dest_type)) {
-			printf("\"%s\" != \"%s\"\n", strdup(type_to_string(type)), strdup(type_to_string(dest_type)));
-			ERROR("Incorrect types");
-		}
-
-		if (is_scalar(type)) {
-			scalar_to_reg(source, REG_RAX);
-			reg_to_scalar(REG_RAX, dest);
-		} else {
-			emit("leaq -%d(%%rbp), %%rdi", variable_info[source].stack_location);
-			emit("leaq -%d(%%rbp), %%rsi", variable_info[dest].stack_location);
-			codegen_memcpy(calculate_size(type));
-		}
-	} break;
+	case IR_COPY:
+		codegen_stackcpy(-variable_info[ins.copy.result].stack_location,
+						 -variable_info[ins.copy.source].stack_location,
+						 get_variable_size(ins.copy.source));
+		break;
 
 	case IR_CAST: {
 		var_id source = ins.cast.rhs,
 			dest = ins.cast.result;
-		struct type *dest_type = get_variable_type(dest);
-		struct type *source_type = get_variable_type(source);
+		struct type *dest_type = ins.cast.result_type;
+		struct type *source_type = ins.cast.rhs_type;
 
 		if (dest_type == type_simple(ST_VOID)) {
-			// No o .
-		} else if (type_is_pointer(dest_type) && type_is_pointer(source_type)) {
-			scalar_to_reg(source, REG_RAX);
-			reg_to_scalar(REG_RAX, dest);
+			// No op.
 		} else if (dest_type->type == TY_SIMPLE &&
 				   source_type->type == TY_SIMPLE) {
-			codegen_simple_cast(source, dest);
-		} else if ((type_is_pointer(dest_type) && source_type->type == TY_SIMPLE) ||
-				   (type_is_pointer(source_type) && dest_type->type == TY_SIMPLE)) {
+			codegen_simple_cast(source, dest,
+								source_type->simple, dest_type->simple);
+		} else {
+			// All other casts are just copies.
 			scalar_to_reg(source, REG_RAX);
 			reg_to_scalar(REG_RAX, dest);
-		} else {
-			ERROR("Trying to cast from : \"%s\" to \"%s\"",
-				  strdup(type_to_string(source_type)),
-				  strdup(type_to_string(dest_type)));
 		}
 	} break;
 
@@ -768,13 +687,8 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 		break;
 
 	case IR_GET_MEMBER: {
-		struct type *type = type_deref(get_variable_type(ins.get_member.pointer));
-		int member_offset;
-		struct type *member_type;
-		type_select(type, ins.get_member.index, &member_offset, &member_type);
-
 		scalar_to_reg(ins.get_member.pointer, REG_RAX);
-		emit("addq $%d, %%rax", member_offset);
+		emit("addq $%d, %%rax", ins.get_member.offset);
 		reg_to_scalar(REG_RAX, ins.get_member.result);
 	} break;
 

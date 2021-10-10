@@ -85,6 +85,10 @@ struct type *get_variable_type(var_id variable) {
 	return variable_types[variable];
 }
 
+int get_variable_size(var_id variable) {
+	return calculate_size(get_variable_type(variable));
+}
+
 void init_variables(void) {
 	variable_types_n = 0;
 	new_variable(type_simple(ST_VOID), 0);

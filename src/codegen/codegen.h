@@ -22,7 +22,6 @@ extern struct variable_info *variable_info;
 void set_section(const char *section);
 void emit(const char *fmt, ...);
 
-
 void codegen(const char *path);
 
 #endif

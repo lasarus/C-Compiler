@@ -21,6 +21,9 @@ enum operand_type {
 	OT_TYPE_COUNT
 };
 
+enum operand_type ot_from_st(enum simple_type st);
+enum operand_type ot_from_type(struct type *type);
+
 struct instruction;
 void push_ir(struct instruction instruction);
 #define IR_PUSH(...) do { push_ir((struct instruction) { __VA_ARGS__ }); } while(0)
@@ -70,23 +73,27 @@ struct instruction {
 #define IR_PUSH_FUNCTION(SIGNATURE, ARGS, NAME, GLOBAL) IR_PUSH(.type = IR_FUNCTION, .function.global = (GLOBAL), .function.signature = (SIGNATURE), .function.named_arguments = (ARGS), .function.name = (NAME))
 		struct {
 			enum operator_type type;
+			enum operand_type operand_type;
 			var_id lhs, rhs, result;
 		} binary_operator;
-#define IR_PUSH_BINARY_OPERATOR(TYPE, LHS, RHS, RESULT) IR_PUSH(.type = IR_BINARY_OPERATOR, .binary_operator = { .type = (TYPE), .lhs = (LHS), .rhs = (RHS), .result = (RESULT)})
+#define IR_PUSH_BINARY_OPERATOR(TYPE, OPERAND_TYPE, LHS, RHS, RESULT) IR_PUSH(.type = IR_BINARY_OPERATOR, .binary_operator = {(TYPE), (OPERAND_TYPE), (LHS), (RHS), (RESULT)})
 		struct {
 			enum unary_operator_type type;
+			enum operand_type operand_type;
 			var_id operand, result;
 		} unary_operator;
-#define IR_PUSH_UNARY_OPERATOR(TYPE, OPERAND, RESULT) IR_PUSH(.type = IR_UNARY_OPERATOR, .unary_operator = { (TYPE), (OPERAND), (RESULT)})
+#define IR_PUSH_UNARY_OPERATOR(TYPE, OPERAND_TYPE, OPERAND, RESULT) IR_PUSH(.type = IR_UNARY_OPERATOR, .unary_operator = { (TYPE), (OPERAND_TYPE), (OPERAND), (RESULT)})
 		struct {
 			var_id result, pointer, index;
 			int decrement;
+			struct type *ptr_type;
 		} pointer_increment;
-#define IR_PUSH_POINTER_INCREMENT(RESULT, POINTER, INDEX, DECREMENT) IR_PUSH(.type = IR_POINTER_INCREMENT, .pointer_increment = {(RESULT), (POINTER), (INDEX), (DECREMENT)})
+#define IR_PUSH_POINTER_INCREMENT(RESULT, POINTER, INDEX, DECREMENT, PTR_TYPE) IR_PUSH(.type = IR_POINTER_INCREMENT, .pointer_increment = {(RESULT), (POINTER), (INDEX), (DECREMENT), (PTR_TYPE)})
 		struct {
 			var_id result, lhs, rhs;
+			struct type *ptr_type;
 		} pointer_diff;
-#define IR_PUSH_POINTER_DIFF(RESULT, LHS, RHS) IR_PUSH(.type = IR_POINTER_DIFF, .pointer_diff = {(RESULT), (LHS), (RHS)})
+#define IR_PUSH_POINTER_DIFF(RESULT, LHS, RHS, PTR_TYPE) IR_PUSH(.type = IR_POINTER_DIFF, .pointer_diff = {(RESULT), (LHS), (RHS), (PTR_TYPE)})
 		struct {
 			var_id result, pointer;
 		} load;
@@ -109,9 +116,10 @@ struct instruction {
 #define IR_PUSH_ARRAY_PTR_DECAY(RESULT, ARRAY) IR_PUSH(.type = IR_ARRAY_PTR_DECAY, .address_of = {(RESULT), (ARRAY)})
 		struct {
 			var_id result, pointer;
-			int index;
+			int offset;
 		} get_member;
-#define IR_PUSH_GET_MEMBER(RESULT, POINTER, INDEX) IR_PUSH(.type = IR_GET_MEMBER, .get_member = {(RESULT), (POINTER), (INDEX)})
+//#define IR_PUSH_GET_MEMBER(RESULT, POINTER, INDEX) IR_PUSH(.type = IR_GET_MEMBER, .get_member = {(RESULT), (POINTER), (INDEX)})
+#define IR_PUSH_GET_OFFSET(RESULT, POINTER, OFFSET) IR_PUSH(.type = IR_GET_MEMBER, .get_member = {(RESULT), (POINTER), (OFFSET)})
 
 		struct {
 			var_id variable;
@@ -143,11 +151,11 @@ struct instruction {
 		} start_block;
 #define IR_PUSH_START_BLOCK(BLOCK) IR_PUSH(.type = IR_START_BLOCK, .start_block.block = (BLOCK))
 		struct {
-			int is_void;
+			struct type *type;
 			var_id value;
 		} return_;
-#define IR_PUSH_RETURN_VALUE(VALUE) IR_PUSH(.type = IR_RETURN, .return_ = {.value = (VALUE), .is_void = 0} )
-#define IR_PUSH_RETURN_VOID() IR_PUSH(.type = IR_RETURN, .return_ = {.value = 0, .is_void = 1} )
+#define IR_PUSH_RETURN_VALUE(VALUE) IR_PUSH(.type = IR_RETURN, .return_ = { .type = get_variable_type((VALUE)), .value = (VALUE) } )
+#define IR_PUSH_RETURN_VOID() IR_PUSH(.type = IR_RETURN, .return_ = { .type = type_simple(ST_VOID), .value = 0 } )
 		struct {
 			var_id variable;
 		} alloca;
@@ -173,9 +181,9 @@ struct instruction {
 		struct {
 			var_id result;
 			var_id rhs;
-			struct type *type;
+			struct type *result_type, *rhs_type;
 		} cast;
-#define IR_PUSH_CAST(RESULT, RHS, TYPE) IR_PUSH(.type = IR_CAST, .cast = {(RESULT), (RHS), (TYPE)})
+#define IR_PUSH_CAST(RESULT, RESULT_TYPE, RHS, RHS_TYPE) IR_PUSH(.type = IR_CAST, .cast = {(RESULT), (RHS), (RESULT_TYPE), (RHS_TYPE)})
 
 		struct {
 			var_id result;
