@@ -1037,7 +1037,8 @@ int parse_init_declarator(struct specifiers s, int global, int *was_func) {
 			is_static = 1;
 		else {
 			symbol->type = IDENT_VARIABLE;
-			symbol->variable = new_variable(type, 1);
+			symbol->variable.id = new_variable(type, 1);
+			symbol->variable.type = get_variable_type(symbol->variable.id);
 		}
 	}
 
@@ -1066,14 +1067,16 @@ int parse_init_declarator(struct specifiers s, int global, int *was_func) {
 			}
 		} else {
 			// TODO: This doesn't feel very robust.
-			if (prev_type != type)
-				change_variable_type(symbol->variable, type);
+			if (prev_type != type) {
+				change_variable_type(symbol->variable.id, type);
+				symbol->variable.type = type;
+			}
 
 			if (init) {
-				IR_PUSH_SET_ZERO(symbol->variable);
+				IR_PUSH_SET_ZERO(symbol->variable.id);
 
 				for (int i = 0; i < init->n; i++) {
-					IR_PUSH_ASSIGN_CONSTANT_OFFSET(symbol->variable, expression_to_ir(init->pairs[i].expr), init->pairs[i].offset);
+					IR_PUSH_ASSIGN_CONSTANT_OFFSET(symbol->variable.id, expression_to_ir(init->pairs[i].expr), init->pairs[i].offset);
 				}
 				symbol->variable = symbol->variable;
 			}

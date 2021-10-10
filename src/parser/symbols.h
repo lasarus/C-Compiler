@@ -24,7 +24,10 @@ struct symbol_identifier {
 
 	union {
 		struct constant constant;
-		var_id variable;
+		struct {
+			struct type *type;
+			var_id id;
+		} variable;
 		struct {
 			struct type *type;
 			const char *name;

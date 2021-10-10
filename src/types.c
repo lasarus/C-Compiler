@@ -476,7 +476,7 @@ const char *type_to_string(struct type *type) {
 			type = type->children[0];
 			break;
 		case TY_VARIABLE_LENGTH_ARRAY:
-			PRINT("VARIABLE LENGTH ARRAY ARRAY OF ");
+			PRINT("VARIABLE LENGTH ARRAY OF ");
 			type = type->children[0];
 			break;
 		case TY_POINTER:

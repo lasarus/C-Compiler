@@ -125,7 +125,7 @@ struct type *calculate_type(struct expr *expr) {
 	}
 
 	case E_VARIABLE:
-		return get_variable_type(expr->variable.id);
+		return expr->variable.type;
 
 	case E_INDIRECTION:
 		return type_deref(expr->args[0]->data_type);
@@ -399,12 +399,7 @@ var_id expression_to_address(struct expr *expr) {
 	}
 }
 
-struct type *get_address_type(var_id address) {
-	return type_deref(get_variable_type(address));
-}
-
-var_id address_load(var_id address) {
-	struct type *type = get_address_type(address);
+var_id address_load(var_id address, struct type *type) {
 	var_id ret = new_variable(type, 1);
 
 	IR_PUSH_LOAD(ret, address);
@@ -471,7 +466,7 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		}
 
 		var_id func_var = expression_to_ir(callee);
-		struct type *func_type = get_variable_type(func_var);
+		struct type *func_type = callee->data_type;
 
 		if (func_type->type != TY_POINTER) {
 			ERROR("Can't call type %s", type_to_string(func_type));
@@ -514,10 +509,10 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 
 	case E_POSTFIX_DEC:
 	case E_POSTFIX_INC: {
-		struct type *type = get_variable_type(res);
+		struct type *type = expr->data_type;
 
 		var_id address = expression_to_address(expr->args[0]);
-		var_id value = address_load(address);
+		var_id value = address_load(address, expr->args[0]->data_type);
 		IR_PUSH_COPY(res, value);
 
 		if (type->type == TY_POINTER) {
@@ -528,16 +523,6 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 				IR_PUSH_POINTER_INCREMENT(value, value, constant_one, 0, expr->args[0]->data_type, ST_INT);
 		} else {
 			var_id constant_one = expression_to_ir(expression_cast(EXPR_INT(1), type));
-
-			/* enum operand_type ot; */
-			/* if (type_is_pointer(expr->args[0]->data_type) && type_is_pointer(expr->args[1]->data_type)) { */
-			/* 	ot = OT_PTR; */
-			/* } else { */
-			/* 	assert(expr->args[0]->data_type->type == TY_SIMPLE && */
-			/* 		   expr->args[1]->data_type->type == TY_SIMPLE); */
-			/* 	ot = ot_from_st(expr->args[0]->data_type->simple); */
-			/* } */
-
 			// TODO: operand type is wrong here.
 
 			if (expr->type == E_POSTFIX_DEC)
@@ -563,30 +548,33 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 
 		var_id ac, aptr, a; // a is unused if not a_expr is not E_CAST.
 
+		struct type *inner_type = NULL;
 		if (is_cast) {
 			if (a_expr->cast.arg->type == E_CAST) {
 				// A double cast can sometimes occur.
 				// char += long => (long)(int)char += long
 				aptr = expression_to_address(a_expr->cast.arg->cast.arg);
+				inner_type = a_expr->cast.arg->cast.arg->data_type;
 			} else {
 				aptr = expression_to_address(a_expr->cast.arg);
+				inner_type = a_expr->cast.arg->data_type;
 			}
-			a = address_load(aptr);
+			a = address_load(aptr, inner_type);
 			ac = new_variable(a_expr->cast.target, 1);
-			IR_PUSH_CAST(ac, a_expr->cast.target, a, get_variable_type(a));
+			IR_PUSH_CAST(ac, a_expr->cast.target, a, inner_type);
 		} else {
 			aptr = expression_to_address(a_expr);
-			ac = address_load(aptr);
+			ac = address_load(aptr, expr->data_type);
 		}
 
 		var_id bc = expression_to_ir(expr->args[1]);
 
 		IR_PUSH_BINARY_OPERATOR(expr->binary_op,
-								ot_from_type(get_variable_type(bc)),
+								ot_from_type(expr->args[1]->data_type),
 								ac, bc, ac);
 
 		if (is_cast) {
-			IR_PUSH_CAST(a, get_variable_type(a), ac, get_variable_type(ac));
+			IR_PUSH_CAST(a, inner_type, ac, expr->args[1]->data_type);
 			address_store(aptr, a);
 			return a;
 		} else {
@@ -600,9 +588,9 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		var_id address = expression_to_address(expr->args[0]);
 		var_id rhs = expression_to_ir(expr->args[1]);
 
-		var_id prev_val = address_load(address);
+		var_id prev_val = address_load(address, expr->args[0]->data_type);
 
-		assert(type_is_pointer(get_variable_type(prev_val)));
+		assert(type_is_pointer(expr->args[0]->data_type));
 
 		if (expr->type == E_ASSIGNMENT_POINTER_ADD)
 			IR_PUSH_POINTER_INCREMENT(prev_val, prev_val, rhs, 0, expr->args[0]->data_type, expr->args[1]->data_type->simple);
@@ -677,7 +665,7 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		var_id dest = expression_to_ir(expr->va_copy_.d);
 		var_id source = expression_to_ir(expr->va_copy_.s);
 
-		var_id tmp = new_variable(type_deref(get_variable_type(dest)), 1);
+		var_id tmp = new_variable(type_deref(expr->va_copy_.d->data_type), 1);
 
 		IR_PUSH_LOAD(tmp, source);
 		IR_PUSH_STORE(tmp, dest);
@@ -833,7 +821,7 @@ struct expr *parse_prefix() {
 			TNEXT();
 			return expr_new((struct expr) {
 					.type = E_VARIABLE,
-					.variable = { sym->variable }
+					.variable = { sym->variable.id, sym->variable.type }
 				});
 
 		case IDENT_CONSTANT:

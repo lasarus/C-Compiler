@@ -11,7 +11,7 @@
 struct expr *construct_size_expression(struct type *type) {
 	switch (type->type) {
 	case TY_VARIABLE_LENGTH_ARRAY:
-		return EXPR_BINARY_OP(OP_MUL, EXPR_VAR(type->variable_length_array.length),
+		return EXPR_BINARY_OP(OP_MUL, EXPR_VAR(type->variable_length_array.length, get_variable_type(type->variable_length_array.length)),
 						   construct_size_expression(type->children[0]));
 	case TY_ARRAY:
 		return EXPR_BINARY_OP(OP_MUL, EXPR_INT(type->array.length),

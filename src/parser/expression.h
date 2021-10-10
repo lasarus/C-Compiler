@@ -45,9 +45,9 @@ struct expr *expr_new(struct expr expr);
 			.type = E_CONSTANT,											\
 			.constant = {.type = CONSTANT_TYPE, .data_type = type_simple(ST_INT), .int_d = (I)} \
 		})
-#define EXPR_VAR(V) expr_new((struct expr) {	\
+#define EXPR_VAR(V, TYPE) expr_new((struct expr) {				\
 			.type = E_VARIABLE,								\
-			.variable = {(V)}			\
+			.variable = {(V), (TYPE)}						\
 		})
 
 struct expr {
@@ -111,6 +111,7 @@ struct expr {
 
 		struct {
 			var_id id;
+			struct type *type;
 		} variable;
 
 		struct {

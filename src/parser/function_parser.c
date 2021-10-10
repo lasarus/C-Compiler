@@ -426,7 +426,8 @@ void parse_function(const char *name, struct type *type, int arg_n, char **arg_n
 		struct symbol_identifier *arg_sym = symbols_add_identifier(arg_name);
 
 		arg_sym->type = IDENT_VARIABLE;
-		arg_sym->variable = arg_var;
+		arg_sym->variable.id = arg_var;
+		arg_sym->variable.type = arg_type;
 		vars[i] = arg_var;
 	}
 
