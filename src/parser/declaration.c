@@ -482,6 +482,7 @@ struct type *specifiers_to_type(const struct type_specifiers *ts) {
 
 	SPEC(ST_SHORT, TSF_SHORT);
 	SPEC(ST_SHORT, TSF_SIGNED | TSF_SHORT);
+	SPEC(ST_SHORT, TSF_SHORT | TSF_INT);
 	SPEC(ST_SHORT, TSF_SIGNED | TSF_SHORT | TSF_INT);
 
 	SPEC(ST_USHORT, TSF_UNSIGNED | TSF_SHORT);

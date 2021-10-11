@@ -2,7 +2,7 @@
 
 This is a compiler written from scratch in C, with fully supporting C18 as a goal.
 It can currently compile itself, and most simple programs.
-Some features are lacking, like _Generic, but most have some level of support (including variable length arrays.)
+Some features are missing, but most have some level of support (including variable length arrays and _Generic.)
 Avert your eyes from the source code. It is not very nice.
 ## Build instructions
 Just run

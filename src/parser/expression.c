@@ -853,7 +853,44 @@ struct expr *parse_prefix() {
 	} else if (TACCEPT(T_CHAR)) {
 		NOTIMP();
 	} else if (TACCEPT(T_KGENERIC)) {
-		NOTIMP();
+		TEXPECT(T_LPAR);
+		struct expr *expr = parse_assignment_expression();
+		if (!expr)
+			ERROR("Expected expression.");
+		decay_array(&expr);
+
+		struct expr *res = NULL;
+
+		while (TACCEPT(T_COMMA)) {
+			int default_ = 0;
+			struct type *type = NULL;
+			if (TACCEPT(T_KDEFAULT)) {
+				default_ = 1;
+			} else {
+				type = parse_type_name();
+			}
+			TEXPECT(T_COLON);
+			struct expr *rhs = parse_assignment_expression();
+			if (default_) {
+				if (!res)
+					res = rhs;
+			} else {
+				if (type == expr->data_type) {
+					if (res)
+						ERROR("More than one compatible type in _Generic association list");
+					res = rhs;
+				}
+			}
+		}
+
+		if (!res)
+			ERROR("No type matched the expresison in _Generic");
+
+		//ERROR("Got expression of type %s\n", type_to_string(expr->data_type));
+
+		//if (!default_res)
+		TEXPECT(T_RPAR);
+		return res;
 	} else if (TACCEPT(T_KVA_START)) {
 		TEXPECT(T_LPAR);
 		struct expr *v = parse_assignment_expression();
