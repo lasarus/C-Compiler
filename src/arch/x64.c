@@ -286,7 +286,6 @@ int calculate_alignment(struct type *type) {
 	default:
 		NOTIMP();
 	}
-	printf("SHOULD NOT BE HERE!!! %d\n", type->type);
 }
 
 int calculate_size(struct type *type) {
