@@ -278,7 +278,7 @@ void codegen_stackcpy(int dest, int source, int len) {
 	}
 }
 
-void codegen_instruction(struct instruction ins, struct instruction next_ins, struct reg_save_info reg_save_info) {
+void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_info) {
 	const char *ins_str = instruction_to_str(ins);
 	emit("#instruction start \"%s\":", ins_str);
 	switch (ins.type) {
@@ -345,33 +345,6 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 							   ins.unary_operator.operand);
 		break;
 
-	case IR_RETURN: {
-		var_id ret = ins.return_.value;
-		struct type *ret_type = ins.return_.type;
-		if (ret_type != type_simple(ST_VOID)) {
-			enum parameter_class classes[4];
-			int n_parts = 0;
-
-			classify(ret_type, &n_parts, classes);
-
-			if (n_parts == 1 && classes[0] == CLASS_MEMORY) {
-				emit("movq -%d(%%rbp), %%rsi", 8);
-				emit("leaq -%d(%%rbp), %%rdi", variable_info[ret].stack_location);
-
-				codegen_memcpy(calculate_size(ret_type));
-			} else if (n_parts == 1 && classes[0] == CLASS_INTEGER) {
-				emit("movq -%d(%%rbp), %%rax", variable_info[ret].stack_location);
-			} else if (n_parts == 2) {
-				emit("movq -%d(%%rbp), %%rax", variable_info[ret].stack_location);
-				emit("movq -%d(%%rbp), %%rdx", variable_info[ret].stack_location - 8);
-			} else {
-				NOTIMP();
-			}
-		}
-		emit("leave");
-		emit("ret");
-	} break;
-
 	case IR_CALL_VARIABLE:
 		codegen_call(ins.call_variable.function,
 					 ins.call_variable.function_type,
@@ -424,32 +397,6 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 		emit("leaq -%d(%%rbp), %%rdi", variable_info[ins.store.value].stack_location);
 
 		codegen_memcpy(get_variable_size(ins.store.value));
-	} break;
-
-	case IR_START_BLOCK: {
-		emit(".LB%d:\n", ins.start_block.block);
-	} break;
-
-	case IR_GOTO: {
-		if (!(next_ins.type == IR_START_BLOCK &&
-			  next_ins.start_block.block == ins.goto_.block))
-			emit("jmp .LB%d\n", ins.goto_.block);
-	} break;
-
-	case IR_IF_SELECTION: {
-		var_id cond = ins.if_selection.condition;
-		int size = get_variable_size(cond);
-		if (size == 1 || size == 2 || size == 4 || size == 8) {
-			scalar_to_reg(cond, REG_RDI);
-			const char *reg_name = get_reg_name(REG_RDI, size);
-			emit("test%c %s, %s", size_to_suffix(size), reg_name, reg_name);
-			emit("je .LB%d", ins.if_selection.block_false);
-			if (!(next_ins.type == IR_START_BLOCK &&
-				  next_ins.start_block.block == ins.if_selection.block_true))
-				emit("jmp .LB%d", ins.if_selection.block_true);
-		} else {
-			ERROR("Invalid argument to if selection");
-		}
 	} break;
 
 	case IR_COPY:
@@ -591,18 +538,6 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 		codegen_memcpy(get_variable_size(ins.assign_constant_offset.value));
 		break;
 
-	case IR_SWITCH_SELECTION: {
-		var_id control = ins.switch_selection.condition;
-		scalar_to_reg(control, REG_RDI);
-		for (int i = 0; i < ins.switch_selection.n; i++) {
-			emit("cmpl $%d, %%edi", ins.switch_selection.values[i].int_d);
-			emit("je .LB%d", ins.switch_selection.blocks[i]);
-		}
-		if (ins.switch_selection.default_) {
-			emit("jmp .LB%d", ins.switch_selection.default_);
-		}
-	} break;
-
 	case IR_STACK_ALLOC: {
 		// TODO: Also free the stack allocation at the end of blocks.
 		//EMIT("pushq %%rsp");
@@ -626,6 +561,88 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 	default:
 		printf("%d\n", ins.type);
 		NOTIMP();
+	}
+}
+
+void codegen_block(struct block *block, struct reg_save_info reg_save_info) {
+	emit(".LB%d:", block->id);
+
+	for (int i = 0; i < block->n; i++) {
+		codegen_instruction(block->instructions[i], reg_save_info);
+	}
+
+	struct block_exit *block_exit = &block->exit;
+	emit("# EXIT IS OF TYPE : %d", block_exit->type);
+	switch (block_exit->type) {
+	case BLOCK_EXIT_JUMP:
+		emit("jmp .LB%d", block_exit->jump);
+		break;
+
+	case BLOCK_EXIT_IF: {
+		var_id cond = block_exit->if_.condition;
+		int size = get_variable_size(cond);
+		if (size == 1 || size == 2 || size == 4 || size == 8) {
+			scalar_to_reg(cond, REG_RDI);
+			const char *reg_name = get_reg_name(REG_RDI, size);
+			emit("test%c %s, %s", size_to_suffix(size), reg_name, reg_name);
+			emit("je .LB%d", block_exit->if_.block_false);
+			/* if (!(next_ins.type == IR_START_BLOCK && */
+			/* 	  next_ins.start_block.block == ins.if_selection.block_true)) */
+			emit("jmp .LB%d", block_exit->if_.block_true);
+		} else {
+			ERROR("Invalid argument to if selection");
+		}
+	} break;
+
+	case BLOCK_EXIT_RETURN: {
+		var_id ret = block_exit->return_.value;
+		struct type *ret_type = block_exit->return_.type;
+		if (ret_type != type_simple(ST_VOID)) {
+			enum parameter_class classes[4];
+			int n_parts = 0;
+
+			classify(ret_type, &n_parts, classes);
+
+			if (n_parts == 1 && classes[0] == CLASS_MEMORY) {
+				emit("movq -%d(%%rbp), %%rsi", 8);
+				emit("leaq -%d(%%rbp), %%rdi", variable_info[ret].stack_location);
+
+				codegen_memcpy(calculate_size(ret_type));
+			} else if (n_parts == 1 && classes[0] == CLASS_INTEGER) {
+				emit("movq -%d(%%rbp), %%rax", variable_info[ret].stack_location);
+			} else if (n_parts == 2) {
+				emit("movq -%d(%%rbp), %%rax", variable_info[ret].stack_location);
+				emit("movq -%d(%%rbp), %%rdx", variable_info[ret].stack_location - 8);
+			} else {
+				NOTIMP();
+			}
+		}
+		emit("leave");
+		emit("ret");
+	} break;
+
+	case BLOCK_EXIT_RETURN_ZERO: {
+		emit("xor %%rax, %%rax");
+		emit("leave");
+		emit("ret");
+	} break;
+
+	case BLOCK_EXIT_SWITCH: {
+		emit("#SWITCH");
+		var_id control = block_exit->switch_.condition;
+		scalar_to_reg(control, REG_RDI);
+		for (int i = 0; i < block_exit->switch_.n; i++) {
+			emit("cmpl $%d, %%edi", block_exit->switch_.values[i].int_d);
+			emit("je .LB%d", block_exit->switch_.blocks[i]);
+		}
+		if (block_exit->switch_.default_) {
+			emit("jmp .LB%d", block_exit->switch_.default_);
+		}
+	} break;
+
+	case BLOCK_EXIT_NONE:
+		emit("ud2");
+		break;
 	}
 }
 
@@ -654,33 +671,20 @@ void codegen_function(struct function *func) {
 	reg_save_info.gp_offset = (current_gp_reg) * 8;
 	reg_save_info.overflow_position = 16;
 
-	int reg_save = 0;
-	for (int i = 0; i < func->n; i++) {
-		switch (func->instructions[i].type) {
-		case IR_ALLOCA: {
-			var_id var = func->instructions[i].alloca.variable;
+	for (int i = 0; i < func->var_n; i++) {
+		var_id var = func->vars[i];
+		int size = get_variable_size(var);
 
-			int size = get_variable_size(var);
+		stack_count += size;
 
-			stack_count += size;
-			if (size < 0) {
-				ERROR("This should not happen!!!! var_id: %d\n", var);
-			}
+		variable_info[var].storage = VAR_STOR_STACK;
+		variable_info[var].stack_location = stack_count;
+	}
 
-			variable_info[var].storage = VAR_STOR_STACK;
-			variable_info[var].stack_location = stack_count;
-		} break;
-
-		case IR_VA_START:
-			reg_save = 1;
-			stack_count += 304; // Magic number, size of register save area.
-			// According to Figure 3.33 in sysV AMD64 ABI.
-			reg_save_info.reg_save_position = stack_count;
-			break;
-
-		default:
-			break;
-		}
+	if (func->uses_va) {
+		stack_count += 304; // Magic number, size of register save area.
+		// According to Figure 3.33 in sysV AMD64 ABI.
+		reg_save_info.reg_save_position = stack_count;
 	}
 
 	if (func->is_global)
@@ -695,7 +699,7 @@ void codegen_function(struct function *func) {
 		emit("movq %%rdi, -%d(%%rbp)", 8);
 	}
 
-	if (reg_save) {
+	if (func->uses_va) {
 		emit("leaq -%d(%%rbp), %%rax", reg_save_info.reg_save_position);
 		emit("movq %%rdi, %d(%%rax)", 0);
 		emit("movq %%rsi, %d(%%rax)", 8);
@@ -735,16 +739,13 @@ void codegen_function(struct function *func) {
 	reg_save_info.overflow_position = total_memory_argument_size + 16;
 
 	for (int i = 0; i < func->n; i++) {
-		if (func->instructions[i].type == IR_ALLOCA)
-			continue;
-		
-		codegen_instruction(func->instructions[i], i + 1 < func->n ? func->instructions[i + 1] : (struct instruction) {0}, reg_save_info);
+		codegen_block(func->blocks + i, reg_save_info);
 	}
 
 	// Allocate all variables.
-	emit("xor %%rax, %%rax");
-	emit("leave");
-	emit("ret");
+	/* emit("xor %%rax, %%rax"); */
+	/* emit("leave"); */
+	/* emit("ret"); */
 }
 
 void codegen(const char *path) {

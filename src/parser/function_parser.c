@@ -53,8 +53,8 @@ int parse_labeled_statement(struct jump_blocks jump_blocks) {
 			ERROR("Not currently in a switch statement");
 
 		block_id block_case = new_block();
-		IR_PUSH_GOTO(block_case);
-		IR_PUSH_START_BLOCK(block_case);
+		ir_goto(block_case);
+		ir_block_start(block_case);
 
 		labels->n++;
 		labels->blocks = realloc(labels->blocks, sizeof (*labels->blocks) * labels->n);
@@ -66,8 +66,8 @@ int parse_labeled_statement(struct jump_blocks jump_blocks) {
 	} else if (TACCEPT(T_KDEFAULT)) {
 		TEXPECT(T_COLON);
 		block_id block_default = new_block();
-		IR_PUSH_GOTO(block_default);
-		IR_PUSH_START_BLOCK(block_default);
+		ir_goto(block_default);
+		ir_block_start(block_default);
 		if (!jump_blocks.case_labels)
 			ERROR("Not currently in a switch statement");
 		jump_blocks.case_labels->default_ = block_default;
@@ -111,8 +111,8 @@ int parse_switch(struct jump_blocks jump_blocks) {
 		block_control = new_block(),
 		block_end = new_block();
 
-	IR_PUSH_GOTO(block_control);
-	IR_PUSH_START_BLOCK(block_body);
+	ir_goto(block_control);
+	ir_block_start(block_body);
 
 	struct case_labels labels = { 0 };
 	jump_blocks.case_labels = &labels;
@@ -121,20 +121,12 @@ int parse_switch(struct jump_blocks jump_blocks) {
 	// Parse body
 	parse_statement(jump_blocks);
 
-	IR_PUSH_GOTO(block_end);
-	IR_PUSH_START_BLOCK(block_control);
+	ir_goto(block_end);
+	ir_block_start(block_control);
 
-	IR_PUSH(.type = IR_SWITCH_SELECTION,
-			.switch_selection = {
-				.condition = expression_to_ir(expression_cast(condition, type_simple(ST_INT))),
-				.n = labels.n,
-				.values = labels.values,
-				.blocks = labels.blocks,
-				.default_ = labels.default_
-			});
+	ir_switch_selection(expression_to_ir(expression_cast(condition, type_simple(ST_INT))), labels.n, labels.values, labels.blocks, labels.default_);
 
-	IR_PUSH_GOTO(block_end);
-	IR_PUSH_START_BLOCK(block_end);
+	ir_block_start(block_end);
 
 	return 1;
 }
@@ -152,25 +144,24 @@ int parse_selection_statement(struct jump_blocks jump_blocks) {
 		block_id block_true = new_block(),
 			block_false = new_block();
 
-		IR_PUSH(.type = IR_IF_SELECTION,
-				.if_selection = {condition, block_true, block_false});
+		ir_if_selection(condition, block_true, block_false);
 
-		IR_PUSH_START_BLOCK(block_true);
+		ir_block_start(block_true);
 
 		parse_statement(jump_blocks);
 
 		if (TACCEPT(T_KELSE)) {
 			int block_end = new_block();
-			IR_PUSH_GOTO(block_end);
-			IR_PUSH_START_BLOCK(block_false);
+			ir_goto(block_end);
+			ir_block_start(block_false);
 
 			parse_statement(jump_blocks);
 
-			IR_PUSH_GOTO(block_end);
-			IR_PUSH_START_BLOCK(block_end);
+			ir_goto(block_end);
+			ir_block_start(block_end);
 		} else {
-			IR_PUSH_GOTO(block_false);
-			IR_PUSH_START_BLOCK(block_false);
+			ir_goto(block_false);
+			ir_block_start(block_false);
 		}
 
 		return 1;
@@ -189,14 +180,15 @@ int parse_do_while_statement(struct jump_blocks jump_blocks) {
 		block_control = new_block(),
 		block_end = new_block();
 
-	IR_PUSH_START_BLOCK(block_body);
-
+	ir_goto(block_body);
+	ir_block_start(block_body);
 
 	jump_blocks.block_break = block_end;
 	jump_blocks.block_continue = block_control;
 	parse_statement(jump_blocks);
 
-	IR_PUSH_START_BLOCK(block_control);
+	ir_goto(block_control);
+	ir_block_start(block_control);
 
 	TEXPECT(T_KWHILE);
 	TEXPECT(T_LPAR);
@@ -209,10 +201,9 @@ int parse_do_while_statement(struct jump_blocks jump_blocks) {
 
 	TEXPECT(T_RPAR);
 
-	IR_PUSH(.type = IR_IF_SELECTION,
-			.if_selection = {control_variable, block_body, block_end});
+	ir_if_selection(control_variable, block_body, block_end);
 
-	IR_PUSH_START_BLOCK(block_end);
+	ir_block_start(block_end);
 
 	TEXPECT(T_SEMI_COLON);
 
@@ -238,7 +229,8 @@ int parse_while_statement(struct jump_blocks jump_blocks) {
 		block_control = new_block(),
 		block_end = new_block();
 
-	IR_PUSH_START_BLOCK(block_control);
+	ir_goto(block_control);
+	ir_block_start(block_control);
 
 	struct expr *control_expression = parse_expression();
 	if (!control_expression)
@@ -248,17 +240,16 @@ int parse_while_statement(struct jump_blocks jump_blocks) {
 
 	var_id control_variable = expression_to_ir(control_expression);
 
-	IR_PUSH(.type = IR_IF_SELECTION,
-			.if_selection = {control_variable, block_body, block_end});
+	ir_if_selection(control_variable, block_body, block_end);
 
-	IR_PUSH_START_BLOCK(block_body);
+	ir_block_start(block_body);
 
 	jump_blocks.block_break = block_end;
 	jump_blocks.block_continue = block_control;
 	parse_statement(jump_blocks);
 
-	IR_PUSH_GOTO(block_control);
-	IR_PUSH_START_BLOCK(block_end);
+	ir_goto(block_control);
+	ir_block_start(block_end);
 
 	return 1;
 }
@@ -295,36 +286,36 @@ int parse_for_statement(struct jump_blocks jump_blocks) {
 		block_body = new_block(),
 		block_end = new_block();
 
-	IR_PUSH_START_BLOCK(block_init); // not really necessary?
+	ir_goto(block_init);
+	ir_block_start(block_init); // not really necessary?
 
 	if (!(TACCEPT(T_SEMI_COLON) ||
 		  parse_declaration(0) ||
 		  parse_expression_statement()))
 		ERROR("Invalid first part of for loop");
 
-	IR_PUSH_GOTO(block_control);
-	IR_PUSH_START_BLOCK(block_control);
+	ir_goto(block_control);
+	ir_block_start(block_control);
 
 	struct expr *condition = parse_expression();
 	if (condition) {
 		var_id condition_variable = expression_to_ir(condition);
 
-		IR_PUSH(.type = IR_IF_SELECTION,
-				.if_selection = {condition_variable, block_body, block_end});
+		ir_if_selection(condition_variable, block_body, block_end);
 	} else {
-		IR_PUSH_GOTO(block_body);
+		ir_goto(block_body);
 	}
 
 	TEXPECT(T_SEMI_COLON);
 
-	IR_PUSH_START_BLOCK(block_advance);
+	ir_block_start(block_advance);
 
 	struct expr *advance_expression = parse_expression();
 	if (advance_expression) // Can be empty
 		expression_to_ir(advance_expression);
 
-	IR_PUSH_GOTO(block_control);
-	IR_PUSH_START_BLOCK(block_body);
+	ir_goto(block_control);
+	ir_block_start(block_body);
 
 	TEXPECT(T_RPAR);
 
@@ -332,8 +323,8 @@ int parse_for_statement(struct jump_blocks jump_blocks) {
 	jump_blocks.block_continue = block_advance;
 	parse_statement(jump_blocks);
 
-	IR_PUSH_GOTO(block_advance);
-	IR_PUSH_START_BLOCK(block_end);
+	ir_goto(block_advance);
+	ir_block_start(block_end);
 
 	symbols_pop_scope();
 	return 1;
@@ -356,11 +347,13 @@ int parse_jump_statement(struct jump_blocks jump_blocks) {
 		ERROR("Not implemented");
 		return 1;
 	} else if (TACCEPT(T_KCONTINUE)) {
-		IR_PUSH_GOTO(jump_blocks.block_continue);
+		ir_goto(jump_blocks.block_continue);
+		ir_block_start(new_block());
 		TEXPECT(T_SEMI_COLON);
 		return 1;
 	} else if (TACCEPT(T_KBREAK)) {
-		IR_PUSH_GOTO(jump_blocks.block_break);
+		ir_goto(jump_blocks.block_break);
+		ir_block_start(new_block());
 		TEXPECT(T_SEMI_COLON);
 		return 1;
 	} else if (TACCEPT(T_KRETURN)) {
@@ -368,12 +361,13 @@ int parse_jump_statement(struct jump_blocks jump_blocks) {
 		TEXPECT(T_SEMI_COLON);
 
 		if (!expr) {
-			IR_PUSH_RETURN_VOID();
+			ir_return_void();
 		} else {
 			var_id return_variable = expression_to_ir(
 				expression_cast(expr, current_ret_val));
-			IR_PUSH_RETURN_VALUE(current_ret_val, return_variable);
+			ir_return(return_variable, current_ret_val);
 		}
+		ir_block_start(new_block());
 		return 1;
 	} else {
 		return 0;
@@ -392,7 +386,7 @@ int parse_statement(struct jump_blocks jump_blocks) {
 
 static const char *current_function = "";
 
-const char *get_current_function() {
+const char *get_current_function_name() {
 	return current_function;
 }
 
@@ -432,6 +426,7 @@ void parse_function(const char *name, struct type *type, int arg_n, char **arg_n
 	}
 
 	ir_new_function(type, vars, name, global);
+	ir_block_start(new_block());
 
 	for (int i = 0; i < arg_n; i++) {
 		allocate_var(vars[i]);
@@ -440,4 +435,12 @@ void parse_function(const char *name, struct type *type, int arg_n, char **arg_n
 	struct jump_blocks jump_blocks = { 0 };
 	parse_compound_statement(jump_blocks);
 	symbols_pop_scope();
+
+	if (strcmp(name, "main") == 0) {
+		struct block *b = get_current_block();
+		if (b->exit.type == BLOCK_EXIT_NONE)
+			b->exit.type = BLOCK_EXIT_RETURN_ZERO;
+	} else if (current_ret_val == type_simple(ST_VOID)) {
+		ir_return_void();
+	}
 }

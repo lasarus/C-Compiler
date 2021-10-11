@@ -630,22 +630,21 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 			block_false = new_block(),
 			block_end = new_block();
 
-		IR_PUSH(.type = IR_IF_SELECTION,
-				.if_selection = { condition, block_true, block_false });
+		ir_if_selection(condition, block_true, block_false);
 
-		IR_PUSH_START_BLOCK(block_true);
+		ir_block_start(block_true);
 		var_id true_val = expression_to_ir(expr->args[1]);
 		if (!is_void)
 			IR_PUSH_COPY(res, true_val);
-		IR_PUSH_GOTO(block_end);
+		ir_goto(block_end);
 
-		IR_PUSH_START_BLOCK(block_false);
+		ir_block_start(block_false);
 		var_id false_val = expression_to_ir(expr->args[2]);
 		if (!is_void)
 			IR_PUSH_COPY(res, false_val);
-		IR_PUSH_GOTO(block_end);
+		ir_goto(block_end);
 
-		IR_PUSH_START_BLOCK(block_end);
+		ir_block_start(block_end);
 	} break;
 
 	case E_BUILTIN_VA_END:
@@ -653,6 +652,7 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 
 	case E_BUILTIN_VA_START: {
 		var_id ptr = expression_to_ir(expr->va_start_.array);
+		get_current_function()->uses_va = 1;
 		IR_PUSH_VA_START(ptr);
 	} break;
 
@@ -933,7 +933,7 @@ struct expr *parse_prefix() {
 				.va_arg_ = {v, t}
 			});
 	} else if (TACCEPT(T_KFUNC)) {
- 		return EXPR_STR(get_current_function());
+ 		return EXPR_STR(get_current_function_name());
 	}
 	return NULL;
 }

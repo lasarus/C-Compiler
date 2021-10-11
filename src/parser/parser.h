@@ -38,12 +38,7 @@ struct instruction {
 		IR_STORE,
 		IR_ADDRESS_OF,
 		IR_CONSTANT,
-		IR_GOTO,
-		IR_RETURN,
-		IR_START_BLOCK,
-		IR_ALLOCA,
 		IR_SWITCH_SELECTION,
-		IR_IF_SELECTION,
 		IR_CALL_VARIABLE,
 		IR_COPY,
 		IR_CAST,
@@ -110,7 +105,6 @@ struct instruction {
 			var_id result, pointer;
 			int offset;
 		} get_member;
-//#define IR_PUSH_GET_MEMBER(RESULT, POINTER, INDEX) IR_PUSH(.type = IR_GET_MEMBER, .get_member = {(RESULT), (POINTER), (INDEX)})
 #define IR_PUSH_GET_OFFSET(RESULT, POINTER, OFFSET) IR_PUSH(.type = IR_GET_MEMBER, .get_member = {(RESULT), (POINTER), (OFFSET)})
 
 		struct {
@@ -134,34 +128,6 @@ struct instruction {
 			var_id result;
 		} get_symbol_ptr;
 #define IR_PUSH_GET_SYMBOL_PTR(STR, RESULT) IR_PUSH(.type = IR_GET_SYMBOL_PTR, .get_symbol_ptr = {(STR), (RESULT)})
-		struct {
-			block_id block;
-		} goto_;
-#define IR_PUSH_GOTO(BLOCK) IR_PUSH(.type = IR_GOTO, .goto_.block = (BLOCK))
-		struct {
-			block_id block;
-		} start_block;
-#define IR_PUSH_START_BLOCK(BLOCK) IR_PUSH(.type = IR_START_BLOCK, .start_block.block = (BLOCK))
-		struct {
-			struct type *type;
-			var_id value;
-		} return_;
-#define IR_PUSH_RETURN_VALUE(TYPE, VALUE) IR_PUSH(.type = IR_RETURN, .return_ = { (TYPE), (VALUE) } )
-#define IR_PUSH_RETURN_VOID() IR_PUSH(.type = IR_RETURN, .return_ = { .type = type_simple(ST_VOID), .value = 0 } )
-		struct {
-			var_id variable;
-		} alloca;
-		struct {
-			var_id condition;
-			int n;
-			struct constant *values;
-			block_id *blocks;
-			block_id default_;
-		} switch_selection;
-		struct {
-			var_id condition;
-			block_id block_true, block_false;
-		} if_selection;
 		struct {
 			var_id function;
 			struct type *function_type;
@@ -213,12 +179,69 @@ struct function {
 	var_id *named_arguments;
 	const char *name;
 
+	int var_n, var_cap;
+	var_id *vars;
+
+	int uses_va;
+
+	int n, cap;
+	struct block *blocks;
+};
+
+struct block_exit {
+	enum {
+		BLOCK_EXIT_NONE,
+		BLOCK_EXIT_RETURN,
+		BLOCK_EXIT_JUMP,
+		BLOCK_EXIT_IF,
+		BLOCK_EXIT_RETURN_ZERO,
+		BLOCK_EXIT_SWITCH
+	} type;
+
+	union {
+		struct {
+			var_id condition;
+			int n;
+			struct constant *values;
+			block_id *blocks;
+			block_id default_;
+		} switch_;
+
+		struct {
+			var_id condition;
+			block_id block_true, block_false;
+		} if_;
+
+		block_id jump;
+
+		struct {
+			struct type *type;
+			var_id value;
+		} return_;
+	};
+};
+
+struct block {
+	block_id id;
 	int n, cap;
 	struct instruction *instructions;
+
+	struct block_exit exit;
 };
 
 void ir_new_function(struct type *signature, var_id *arguments, const char *name, int is_global);
 
 struct program *get_program(void);
+
+void ir_block_start(block_id id);
+
+void ir_if_selection(var_id condition, block_id block_true, block_id block_false);
+void ir_switch_selection(var_id condition, int n, struct constant *values, block_id *blocks, block_id default_);
+void ir_goto(block_id jump);
+void ir_return(var_id value, struct type *type);
+void ir_return_void(void);
+
+struct function *get_current_function(void);
+struct block *get_current_block(void);
 
 #endif

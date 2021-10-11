@@ -42,10 +42,6 @@ var_id allocate_vla(struct type **type) {
 	return ptr;
 }
 
-void allocate_var(var_id var) {
-	IR_PUSH(.type = IR_ALLOCA, .alloca = {var});
-}
-
 var_id new_variable_sz(int size, int allocate) {
 	// A bit of a shortcut.
 	if (variables_n && size == 0)
