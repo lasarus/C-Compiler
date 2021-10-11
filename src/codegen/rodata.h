@@ -8,4 +8,9 @@ const char *rodata_get_label_string(label_id id);
 
 void rodata_codegen(void);
 
+struct type;
+struct initializer;
+void data_register_static_var(const char *label, struct type *type, struct initializer *init, int global);
+void data_codegen(void);
+
 #endif

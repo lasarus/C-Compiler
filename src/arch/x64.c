@@ -556,3 +556,138 @@ struct constant constant_cast(struct constant a, struct type *target) {
 
 	NOTIMP();
 }
+
+void constant_to_buffer(uint8_t *buffer, struct constant constant) {
+	assert(constant.type == CONSTANT_TYPE);
+
+	if (type_is_pointer(constant.data_type)) {
+		*buffer = constant.long_d;
+		return;
+	}
+
+	if (constant.data_type->type == TY_ARRAY) {
+		if (constant.data_type->children[0] != type_simple(ST_CHAR))
+			NOTIMP();
+
+		const char *str = constant.str_d;
+		int i = 0;
+		for (; *str; i++) {
+			buffer[i] = take_character(&str);
+		}
+		buffer[i] = 0;
+		return;
+	}
+	assert(constant.data_type->type == TY_SIMPLE);
+
+	switch (constant.data_type->simple) {
+	case ST_CHAR:
+		*buffer = constant.char_d;
+		break;
+	case ST_SCHAR:
+		*buffer = constant.char_d;
+		break;
+	case ST_UCHAR:
+		*buffer = constant.char_d;
+		break;
+	case ST_SHORT:
+		*(uint16_t *)buffer = constant.short_d;
+		break;
+	case ST_USHORT:
+		*(uint16_t *)buffer = constant.ushort_d;
+		break;
+	case ST_INT:
+		*(uint32_t *)buffer = constant.int_d;
+		break;
+	case ST_UINT:
+		*(uint32_t *)buffer = constant.uint_d;
+		break;
+	case ST_LONG:
+		*(uint64_t *)buffer = constant.long_d;
+		break;
+	case ST_ULONG:
+		*(uint64_t *)buffer = constant.ulong_d;
+		break;
+	case ST_LLONG:
+		*(uint64_t *)buffer = constant.llong_d;
+		break;
+	case ST_ULLONG:
+		*(uint64_t *)buffer = constant.ullong_d;
+		break;
+
+	case ST_FLOAT:
+	case ST_DOUBLE:
+	case ST_LDOUBLE:
+	case ST_BOOL:
+	case ST_FLOAT_COMPLEX:
+	case ST_DOUBLE_COMPLEX:
+	case ST_LDOUBLE_COMPLEX:
+		NOTIMP();
+	default:
+		break;
+	}
+}
+
+const char *constant_to_string(struct constant constant) {
+	static char buffer[256];
+	assert(constant.type == CONSTANT_TYPE);
+
+	if (type_is_pointer(constant.data_type)) {
+		sprintf(buffer, "%ld", constant.long_d);
+		return buffer;
+	}
+
+	enum simple_type st;
+	if (constant.data_type->type == TY_SIMPLE)
+		st = constant.data_type->simple;
+	else
+		ERROR("Tried to print type %s to number\n", type_to_string(constant.data_type));
+
+	switch (st) {
+	case ST_CHAR:
+		sprintf(buffer, "%d", (int)constant.char_d);
+		break;
+	case ST_SCHAR:
+		sprintf(buffer, "%d", (int)constant.schar_d);
+		break;
+	case ST_UCHAR:
+		sprintf(buffer, "%d", (int)constant.uchar_d);
+		break;
+	case ST_SHORT:
+		sprintf(buffer, "%d", (int)constant.short_d);
+		break;
+	case ST_USHORT:
+		sprintf(buffer, "%d", (int)constant.ushort_d);
+		break;
+	case ST_INT:
+		sprintf(buffer, "%d", constant.int_d);
+		break;
+	case ST_UINT:
+		sprintf(buffer, "%u", constant.uint_d);
+		break;
+	case ST_LONG:
+		sprintf(buffer, "%ld", constant.long_d);
+		break;
+	case ST_ULONG:
+		sprintf(buffer, "%lu", constant.ulong_d);
+		break;
+	case ST_LLONG:
+		sprintf(buffer, "%lld", constant.llong_d);
+		break;
+	case ST_ULLONG:
+		sprintf(buffer, "%llu", constant.ullong_d);
+		break;
+
+	case ST_FLOAT:
+	case ST_DOUBLE:
+	case ST_LDOUBLE:
+	case ST_BOOL:
+	case ST_FLOAT_COMPLEX:
+	case ST_DOUBLE_COMPLEX:
+	case ST_LDOUBLE_COMPLEX:
+		NOTIMP();
+	default:
+		break;
+	}
+
+	return buffer;
+}

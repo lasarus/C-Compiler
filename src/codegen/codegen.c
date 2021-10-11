@@ -278,208 +278,6 @@ void codegen_stackcpy(int dest, int source, int len) {
 	}
 }
 
-void constant_to_buffer(uint8_t *buffer, struct constant constant) {
-	assert(constant.type == CONSTANT_TYPE);
-
-	if (type_is_pointer(constant.data_type)) {
-		*buffer = constant.long_d;
-		return;
-	}
-
-	if (constant.data_type->type == TY_ARRAY) {
-		if (constant.data_type->children[0] != type_simple(ST_CHAR))
-			NOTIMP();
-
-		const char *str = constant.str_d;
-		int i = 0;
-		for (; *str; i++) {
-			buffer[i] = take_character(&str);
-		}
-		buffer[i] = 0;
-		return;
-	}
-	assert(constant.data_type->type == TY_SIMPLE);
-
-	switch (constant.data_type->simple) {
-	case ST_CHAR:
-		*buffer = constant.char_d;
-		break;
-	case ST_SCHAR:
-		*buffer = constant.char_d;
-		break;
-	case ST_UCHAR:
-		*buffer = constant.char_d;
-		break;
-	case ST_SHORT:
-		*(uint16_t *)buffer = constant.short_d;
-		break;
-	case ST_USHORT:
-		*(uint16_t *)buffer = constant.ushort_d;
-		break;
-	case ST_INT:
-		*(uint32_t *)buffer = constant.int_d;
-		break;
-	case ST_UINT:
-		*(uint32_t *)buffer = constant.uint_d;
-		break;
-	case ST_LONG:
-		*(uint64_t *)buffer = constant.long_d;
-		break;
-	case ST_ULONG:
-		*(uint64_t *)buffer = constant.ulong_d;
-		break;
-	case ST_LLONG:
-		*(uint64_t *)buffer = constant.llong_d;
-		break;
-	case ST_ULLONG:
-		*(uint64_t *)buffer = constant.ullong_d;
-		break;
-
-	case ST_FLOAT:
-	case ST_DOUBLE:
-	case ST_LDOUBLE:
-	case ST_BOOL:
-	case ST_FLOAT_COMPLEX:
-	case ST_DOUBLE_COMPLEX:
-	case ST_LDOUBLE_COMPLEX:
-		NOTIMP();
-	default:
-		break;
-	}
-}
-
-void codegen_initializer(struct type *type,
-						 struct initializer *init) {
-	// TODO: Make this more portable.
-	int size = calculate_size(type);
-	if (size > 4096) {
-		printf("Size: %d\n", size);
-		NOTIMP();
-	}
-	uint8_t buffer[size];
-	label_id labels[size];
-	int is_label[size];
-	for (int i = 0; i < size; i++) {
-		buffer[i] = 0;
-		is_label[i] = 0;
-		labels[i] = 1337;
-	}
-
-	for (int i = 0; i < init->n; i++) {
-		struct init_pair *pair = init->pairs + i;
-		int offset = pair->offset;
-
-		struct constant *c = expression_to_constant(pair->expr);
-		if (!c)
-			ERROR("Static initialization can't contain non constant expressions!");
-
-		switch (c->type) {
-		case CONSTANT_TYPE:
-			constant_to_buffer(buffer + offset, *c);
-			break;
-
-		case CONSTANT_LABEL:
-			is_label[offset] = 1;
-			labels[offset] = c->label;
-			break;
-		}
-	}
-
-	for (int i = 0; i < size; i++) {
-		if (is_label[i]) {
-			emit(".quad %s", rodata_get_label_string(labels[i]));
-			i += 7;
-		} else {
-			//TODO: This shouldn't need an integer cast.
-			// But right now I can't be bothered to implement
-			// implicit integer casts for variadic functions.
-			emit(".byte %d", (int)buffer[i]);
-		}
-	}
-}
-
-void codegen_static_var(struct instruction ins) {
-	set_section(".data");
-	if (ins.static_var.global)
-		emit(".global %s", ins.static_var.label);
-	if (ins.static_var.init) {
-		emit("%s:", ins.static_var.label);
-
-		codegen_initializer(ins.static_var.type,
-							ins.static_var.init);
-	} else {
-		emit("%s:", ins.static_var.label);
-
-		emit(".zero %d", calculate_size(ins.static_var.type));
-	}
-	set_section(".text");
-}
-
-const char *constant_to_string(struct constant constant) {
-	static char buffer[256];
-	assert(constant.type == CONSTANT_TYPE);
-
-	if (type_is_pointer(constant.data_type)) {
-		sprintf(buffer, "%ld", constant.long_d);
-		return buffer;
-	}
-
-	enum simple_type st;
-	if (constant.data_type->type == TY_SIMPLE)
-		st = constant.data_type->simple;
-	else
-		ERROR("Tried to print type %s to number\n", type_to_string(constant.data_type));
-
-	switch (st) {
-	case ST_CHAR:
-		sprintf(buffer, "%d", (int)constant.char_d);
-		break;
-	case ST_SCHAR:
-		sprintf(buffer, "%d", (int)constant.schar_d);
-		break;
-	case ST_UCHAR:
-		sprintf(buffer, "%d", (int)constant.uchar_d);
-		break;
-	case ST_SHORT:
-		sprintf(buffer, "%d", (int)constant.short_d);
-		break;
-	case ST_USHORT:
-		sprintf(buffer, "%d", (int)constant.ushort_d);
-		break;
-	case ST_INT:
-		sprintf(buffer, "%d", constant.int_d);
-		break;
-	case ST_UINT:
-		sprintf(buffer, "%u", constant.uint_d);
-		break;
-	case ST_LONG:
-		sprintf(buffer, "%ld", constant.long_d);
-		break;
-	case ST_ULONG:
-		sprintf(buffer, "%lu", constant.ulong_d);
-		break;
-	case ST_LLONG:
-		sprintf(buffer, "%lld", constant.llong_d);
-		break;
-	case ST_ULLONG:
-		sprintf(buffer, "%llu", constant.ullong_d);
-		break;
-
-	case ST_FLOAT:
-	case ST_DOUBLE:
-	case ST_LDOUBLE:
-	case ST_BOOL:
-	case ST_FLOAT_COMPLEX:
-	case ST_DOUBLE_COMPLEX:
-	case ST_LDOUBLE_COMPLEX:
-		NOTIMP();
-	default:
-		break;
-	}
-
-	return buffer;
-}
-
 void codegen_instruction(struct instruction ins, struct instruction next_ins, struct reg_save_info reg_save_info) {
 	const char *ins_str = instruction_to_str(ins);
 	emit("#instruction start \"%s\":", ins_str);
@@ -825,10 +623,6 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 		reg_to_scalar(REG_RAX, ins.get_symbol_ptr.result);
 	} break;
 
-	case IR_STATIC_VAR:
-		codegen_static_var(ins);
-		break;
-
 	default:
 		printf("%d\n", ins.type);
 		NOTIMP();
@@ -975,9 +769,6 @@ void codegen(const char *path) {
 			codegen_function(is + ir_pos, end_pos - ir_pos);
 			ir_pos = end_pos;
 		} break;
-		case IR_STATIC_VAR:
-			codegen_static_var(is[ir_pos++]);
-			break;
 		default:
 			ERROR("Not imp %d", is[ir_pos].type);
 			NOTIMP();
@@ -985,6 +776,7 @@ void codegen(const char *path) {
 	}
 
 	rodata_codegen();
+	data_codegen();
 
 	fclose(data.out);
 }

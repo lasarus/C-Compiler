@@ -85,5 +85,8 @@ struct constant constant_or(struct constant a, struct constant b);
 
 void convert_rax(enum simple_type from, enum simple_type to);
 
+void constant_to_buffer(uint8_t *buffer, struct constant constant);
+const char *constant_to_string(struct constant constant);
+
 #endif
 

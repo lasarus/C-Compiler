@@ -58,7 +58,6 @@ struct instruction {
 		IR_STACK_ALLOC,
 		IR_POP_STACK_ALLOC,
 		IR_GET_SYMBOL_PTR,
-		IR_STATIC_VAR,
 
 		IR_TYPE_COUNT
 	} type;
@@ -203,14 +202,6 @@ struct instruction {
 		} stack_alloc;
 #define IR_PUSH_STACK_ALLOC(POINTER, LENGTH) IR_PUSH(.type = IR_STACK_ALLOC, .stack_alloc = {(POINTER), (LENGTH)})
 #define IR_PUSH_POP_STACK_ALLOC() IR_PUSH(.type = IR_POP_STACK_ALLOC)
-
-		struct {
-			const char *label;
-			struct type *type;
-			struct initializer *init;
-			int global;
-		} static_var;
-#define IR_PUSH_STATIC_VAR(LABEL, TYPE, INIT, GLOBAL) IR_PUSH(.type = IR_STATIC_VAR, .static_var = {(LABEL), (TYPE), (INIT), (GLOBAL)})
 	};
 };
 

@@ -1093,7 +1093,7 @@ int parse_init_declarator(struct specifiers s, int global, int *was_func) {
 
 			if (!s.scs.extern_n) {
 				// init can be NULL
-				IR_PUSH_STATIC_VAR(name, type, init, is_global);
+				data_register_static_var(name, type, init, is_global);
 			}
 		} else {
 			// TODO: This doesn't feel very robust.

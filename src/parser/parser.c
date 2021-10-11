@@ -184,10 +184,6 @@ const char *instruction_to_str(struct instruction ins) {
 			  ins.get_symbol_ptr.label);
 		break;
 
-	case IR_STATIC_VAR:
-		PRINT("%s = static alloc", ins.static_var.label);
-		break;
-
 	case IR_POINTER_DIFF:
 		PRINT("%d = pointer_diff(%d - %d)", ins.pointer_diff.result,
 			  ins.pointer_diff.lhs,
