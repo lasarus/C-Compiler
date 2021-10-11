@@ -30,7 +30,6 @@ void push_ir(struct instruction instruction);
 
 struct instruction {
 	enum {
-		IR_FUNCTION,
 		IR_BINARY_OPERATOR,
 		IR_UNARY_OPERATOR,
 		IR_POINTER_INCREMENT,
@@ -63,13 +62,6 @@ struct instruction {
 	} type;
 
 	union {
-		struct {
-			int global;
-			struct type *signature;
-			var_id *named_arguments;
-			const char *name;
-		} function;
-#define IR_PUSH_FUNCTION(SIGNATURE, ARGS, NAME, GLOBAL) IR_PUSH(.type = IR_FUNCTION, .function.global = (GLOBAL), .function.signature = (SIGNATURE), .function.named_arguments = (ARGS), .function.name = (NAME))
 		struct {
 			enum operator_type type;
 			enum operand_type operand_type;
@@ -211,9 +203,21 @@ void parse_into_ir();
 void print_parser_ir();
 
 struct program {
-	int size, capacity;
+	int n, cap;
+	struct function *functions;
+};
+
+struct function {
+	int is_global;
+	struct type *signature;
+	var_id *named_arguments;
+	const char *name;
+
+	int n, cap;
 	struct instruction *instructions;
 };
+
+void ir_new_function(struct type *signature, var_id *arguments, const char *name, int is_global);
 
 struct program *get_program(void);
 

@@ -629,17 +629,16 @@ void codegen_instruction(struct instruction ins, struct instruction next_ins, st
 	}
 }
 
-void codegen_function(struct instruction *is,
-					  int count) {
+void codegen_function(struct function *func) {
 	int stack_count = 0;
 
-	struct type *return_type = is->function.signature->children[0];
-	int n_args = is->function.signature->n - 1;
+	struct type *return_type = func->signature->children[0];
+	int n_args = func->signature->n - 1;
 	int total_memory_argument_size, current_gp_reg;
 	struct classification classifications[n_args];
 	struct classification return_classification;
 
-	classify_parameters(return_type, is->function.signature->n - 1, is->function.signature->children + 1,
+	classify_parameters(return_type, func->signature->n - 1, func->signature->children + 1,
 						classifications,
 						&return_classification,
 						&total_memory_argument_size,
@@ -656,10 +655,10 @@ void codegen_function(struct instruction *is,
 	reg_save_info.overflow_position = 16;
 
 	int reg_save = 0;
-	for (int i = 1; i < count; i++) {
-		switch (is[i].type) {
+	for (int i = 0; i < func->n; i++) {
+		switch (func->instructions[i].type) {
 		case IR_ALLOCA: {
-			var_id var = is[i].alloca.variable;
+			var_id var = func->instructions[i].alloca.variable;
 
 			int size = get_variable_size(var);
 
@@ -684,9 +683,9 @@ void codegen_function(struct instruction *is,
 		}
 	}
 
-	if (is->function.global)
-		emit(".global %s", is->function.name);
-	emit("%s:", is->function.name);
+	if (func->is_global)
+		emit(".global %s", func->name);
+	emit("%s:", func->name);
 	emit("pushq %%rbp");
 	emit("movq %%rsp, %%rbp");
 	emit("subq $%d, %%rsp", round_up_to_nearest(stack_count, 16));
@@ -709,7 +708,7 @@ void codegen_function(struct instruction *is,
 
 	for (int i = 0; i < n_args; i++) {
 		struct classification *classification = classifications + i;
-		var_id var = is->function.named_arguments[i];
+		var_id var = func->named_arguments[i];
 		int var_size = get_variable_size(var);
 
 		if (classification->pass_in_memory) {
@@ -735,11 +734,11 @@ void codegen_function(struct instruction *is,
 
 	reg_save_info.overflow_position = total_memory_argument_size + 16;
 
-	for (int i = 1; i < count; i++) {
-		if (is[i].type == IR_ALLOCA)
+	for (int i = 0; i < func->n; i++) {
+		if (func->instructions[i].type == IR_ALLOCA)
 			continue;
 		
-		codegen_instruction(is[i], i + 1 < count ? is[i + 1] : (struct instruction) {0}, reg_save_info);
+		codegen_instruction(func->instructions[i], i + 1 < func->n ? func->instructions[i + 1] : (struct instruction) {0}, reg_save_info);
 	}
 
 	// Allocate all variables.
@@ -758,22 +757,9 @@ void codegen(const char *path) {
 		ERROR("Could not open file %s", path);
 
 	struct program *program = get_program();
-	int ir_pos = 0;
-	struct instruction *is = program->instructions;
 
-	while (ir_pos < program->size) {
-		switch (is[ir_pos].type) {
-		case IR_FUNCTION: {
-			int end_pos = ir_pos + 1;
-			for (; end_pos < program->size && is[end_pos].type != IR_FUNCTION; end_pos++);
-			codegen_function(is + ir_pos, end_pos - ir_pos);
-			ir_pos = end_pos;
-		} break;
-		default:
-			ERROR("Not imp %d", is[ir_pos].type);
-			NOTIMP();
-		}
-	}
+	for (int i = 0; i < program->n; i++)
+		codegen_function(program->functions + i);
 
 	rodata_codegen();
 	data_codegen();

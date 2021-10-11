@@ -27,12 +27,30 @@ void parse_into_ir() {
 struct program program;
 
 void push_ir(struct instruction instruction) {
-	if (program.size >= program.capacity) {
-		program.capacity = MAX(program.capacity * 2, 2);
-		program.instructions = realloc(program.instructions,
-									   sizeof (*program.instructions) * program.capacity);
+	struct function *func = &program.functions[program.n - 1];
+
+	if (func->n >= func->cap) {
+		func->cap = MAX(func->cap * 2, 2);
+		func->instructions = realloc(func->instructions,
+									   sizeof (*func->instructions) * func->cap);
 	}
-	program.instructions[program.size++] = instruction;
+	func->instructions[func->n++] = instruction;
+}
+
+void ir_new_function(struct type *signature, var_id *arguments, const char *name, int is_global) {
+	if (program.n >= program.cap) {
+		program.cap = MAX(program.cap * 2, 2);
+		program.functions = realloc(program.functions,
+									   sizeof (*program.functions) * program.cap);
+	}
+	program.functions[program.n++] = (struct function) {
+		.signature = signature,
+		.named_arguments = arguments,
+		.name = name,
+		.is_global = is_global,
+
+		.n = 0, .cap = 0, .instructions = NULL
+	};
 }
 
 struct program *get_program(void) {
@@ -61,14 +79,6 @@ const char *instruction_to_str(struct instruction ins) {
 	} while (0)
 
 	switch (ins.type) {
-	case IR_FUNCTION:
-		PRINT("START OF FUNCTION: %s \"", ins.function.name);
-		PRINT("\" with named arguments: ");
-		for (int i = 0; i < ins.function.signature->n - 1; i++) {
-			PRINT("%d ", ins.function.named_arguments[i]);
-		}
-		break;
-
 	case IR_CONSTANT:
 		PRINT("%d = constant", ins.constant.result);
 		break;
@@ -204,8 +214,17 @@ void print_instruction(struct instruction instruction) {
 }
 
 void print_parser_ir() {
-	for (int i = 0; i < program.size; i++) {
-		print_instruction(program.instructions[i]);
+	for (int i = 0; i < program.n; i++) {
+		struct function *func = program.functions + i;
+		printf("START OF FUNCTION: %s \"", func->name);
+		printf("\" with named arguments: ");
+		for (int j = 0; j < func->signature->n - 1; j++) {
+			printf("%d ", func->named_arguments[j]);
+		}
+
+		for (int j = 0; j < func->n; j++) {
+			print_instruction(func->instructions[j]);
+		}
 	}
 }
 
