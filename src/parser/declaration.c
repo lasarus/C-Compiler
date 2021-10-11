@@ -1008,7 +1008,24 @@ int parse_init_declarator(struct specifiers s, int global, int *was_func) {
 		return 1;
 	}
 
+	// TODO: This system is not robust at all.
+	// For example, defining variable twice in the same local
+	// scope is allowed, even though it shouldn't.
+
 	struct symbol_identifier *symbol = symbols_get_identifier_in_current_scope(name);
+
+	struct type *prev_type = NULL;
+	if (symbol) {
+		if (symbol->type == IDENT_LABEL)
+			prev_type = symbol->label.type;
+		else if (symbol->type == IDENT_CONSTANT)
+			prev_type = symbol->constant.data_type;
+		else if (symbol->type == IDENT_VARIABLE)
+			prev_type = symbol->variable.type;
+		else
+			NOTIMP();
+	}
+
 	if (!symbol)
 		symbol = symbols_add_identifier(name);
 
@@ -1024,6 +1041,10 @@ int parse_init_declarator(struct specifiers s, int global, int *was_func) {
 			symbol->label.type = type;
 			return 1;
 		} else {
+			if (prev_type && type != prev_type) {
+				type = prev_type;
+			}
+
 			is_static = 1;
 			symbol->type = IDENT_LABEL;
 			symbol->label.name = name;
