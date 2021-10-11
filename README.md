@@ -4,6 +4,8 @@ This is a compiler written from scratch in C, with fully supporting C18 as a goa
 It can currently compile itself, and most simple programs.
 Some features are missing, but most have some level of support (including variable length arrays and _Generic.)
 Avert your eyes from the source code. It is not very nice.
+
+You can read the tests or (if you dare) the source code to get a sense of what this compiler currently supports.
 ## Build instructions
 Just run
 
