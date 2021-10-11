@@ -1102,14 +1102,8 @@ int parse_init_declarator(struct specifiers s, int global, int *was_func) {
 				symbol->variable.type = type;
 			}
 
-			if (init) {
-				IR_PUSH_SET_ZERO(symbol->variable.id);
-
-				for (int i = 0; i < init->n; i++) {
-					IR_PUSH_ASSIGN_CONSTANT_OFFSET(symbol->variable.id, expression_to_ir(init->pairs[i].expr), init->pairs[i].offset);
-				}
-				symbol->variable = symbol->variable;
-			}
+			if (init)
+				ir_init_var(init, symbol->variable.id);
 		}
 	}
 

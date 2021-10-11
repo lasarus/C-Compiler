@@ -531,13 +531,6 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 		codegen_memzero(get_variable_size(ins.result));
 		break;
 
-	case IR_ASSIGN_CONSTANT_OFFSET:
-		emit("leaq -%d(%%rbp), %%rsi", variable_info[ins.assign_constant_offset.variable].stack_location);
-		emit("leaq %d(%%rsi), %%rsi", ins.assign_constant_offset.offset);
-		emit("leaq -%d(%%rbp), %%rdi", variable_info[ins.assign_constant_offset.value].stack_location);
-		codegen_memcpy(get_variable_size(ins.assign_constant_offset.value));
-		break;
-
 	case IR_STACK_ALLOC: {
 		// TODO: Also free the stack allocation at the end of blocks.
 		//EMIT("pushq %%rsp");

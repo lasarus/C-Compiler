@@ -173,14 +173,6 @@ const char *instruction_to_str(struct instruction ins) {
 		PRINT("%d = zero", ins.result);
 		break;
 
-	case IR_ASSIGN_CONSTANT_OFFSET:
-		PRINT(" %d [at offset %d] = %d",
-			   ins.assign_constant_offset.variable,
-			   ins.assign_constant_offset.offset,
-			   ins.assign_constant_offset.value
-			);
-		break;
-
 	case IR_STACK_ALLOC:
 		PRINT("%d = allocate %d on stack", ins.result,
 			  ins.stack_alloc.length);
@@ -315,3 +307,15 @@ void ir_return_void(void) {
 	block->exit.return_.value = 0;
 }
 
+
+void ir_init_var(struct initializer *init, var_id result) {
+	IR_PUSH_SET_ZERO(result);
+	var_id base_address = new_variable(type_pointer(type_simple(ST_VOID)), 1);
+	IR_PUSH_ADDRESS_OF(base_address, result);
+	var_id member_address = new_variable(type_pointer(type_simple(ST_VOID)), 1);
+
+	for (int i = 0; i < init->n; i++) {
+		IR_PUSH_GET_OFFSET(member_address, base_address, init->pairs[i].offset);
+		IR_PUSH_STORE(expression_to_ir(init->pairs[i].expr), member_address);
+	}
+}

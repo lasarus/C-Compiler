@@ -44,7 +44,6 @@ struct instruction {
 		IR_CAST,
 		IR_GET_MEMBER,
 		IR_ARRAY_PTR_DECAY,
-		IR_ASSIGN_CONSTANT_OFFSET,
 		IR_SET_ZERO,
 		IR_VA_START,
 		IR_VA_END,
@@ -108,14 +107,6 @@ struct instruction {
 			int offset;
 		} get_member;
 #define IR_PUSH_GET_OFFSET(RESULT, POINTER, OFFSET) IR_PUSH(.type = IR_GET_MEMBER, .result = (RESULT), .get_member = {(POINTER), (OFFSET)})
-
-		// TODO: This should have a result type.
-		struct {
-			var_id variable;
-			var_id value;
-			int offset;
-		} assign_constant_offset;
-#define IR_PUSH_ASSIGN_CONSTANT_OFFSET(VARIABLE, VALUE, OFFSET) IR_PUSH(.type = IR_ASSIGN_CONSTANT_OFFSET, .assign_constant_offset = { (VARIABLE), (VALUE), (OFFSET) })
 
 #define IR_PUSH_SET_ZERO(RESULT) IR_PUSH(.type = IR_SET_ZERO, .result = (RESULT))
 		struct {
@@ -233,6 +224,8 @@ void ir_switch_selection(var_id condition, int n, struct constant *values, block
 void ir_goto(block_id jump);
 void ir_return(var_id value, struct type *type);
 void ir_return_void(void);
+
+void ir_init_var(struct initializer *init, var_id result);
 
 struct function *get_current_function(void);
 struct block *get_current_block(void);

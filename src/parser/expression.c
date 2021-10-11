@@ -673,11 +673,7 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 
 	case E_COMPOUND_LITERAL: {
 		struct initializer *init = expr->compound_literal.init;
-		IR_PUSH_SET_ZERO(res);
-
-		for (int i = 0; i < init->n; i++) {
-			IR_PUSH_ASSIGN_CONSTANT_OFFSET(res, expression_to_ir(init->pairs[i].expr), init->pairs[i].offset);
-		}
+		ir_init_var(init, res);
 	} break;
 
 	case E_SYMBOL: {
