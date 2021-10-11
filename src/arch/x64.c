@@ -36,11 +36,12 @@ int sizeof_simple(enum simple_type type) {
 		return 16;
 
 	case ST_VOID:
-		return -1;
+		return 0;
 
 	case ST_FLOAT_COMPLEX:
 	case ST_DOUBLE_COMPLEX:
 	case ST_LDOUBLE_COMPLEX:
+		NOTIMP();
 		return -1;
 
 	default:

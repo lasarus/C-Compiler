@@ -155,7 +155,7 @@ struct instruction {
 			struct type *type;
 			var_id value;
 		} return_;
-#define IR_PUSH_RETURN_VALUE(VALUE) IR_PUSH(.type = IR_RETURN, .return_ = { .type = get_variable_type((VALUE)), .value = (VALUE) } )
+#define IR_PUSH_RETURN_VALUE(TYPE, VALUE) IR_PUSH(.type = IR_RETURN, .return_ = { (TYPE), (VALUE) } )
 #define IR_PUSH_RETURN_VOID() IR_PUSH(.type = IR_RETURN, .return_ = { .type = type_simple(ST_VOID), .value = 0 } )
 		struct {
 			var_id variable;

@@ -49,24 +49,16 @@ const char *get_reg_name(int id, int size) {
 }
 
 void scalar_to_reg(var_id scalar, int reg) {
-	struct type *type = get_variable_type(scalar);
-	assert(is_scalar(type));
-
 	emit("xor %s, %s", registers[reg][0], registers[reg][0]);
 
-	int size = calculate_size(type);
+	int size = get_variable_size(scalar);
 
 	emit("mov%c -%d(%%rbp), %s", size_to_suffix(size),
 		 variable_info[scalar].stack_location, registers[reg][size_to_idx(size)]);
 }
 
 void reg_to_scalar(int reg, var_id scalar) {
-	struct type *type = get_variable_type(scalar);
-
-	if (!is_scalar(type))
-		ERROR("%s should be scalar", type_to_string(type));
-
-	int size = calculate_size(type);
+	int size = get_variable_size(scalar);
 	emit("mov%c %s, -%d(%%rbp)", size_to_suffix(size),
 		 registers[reg][size_to_idx(size)], variable_info[scalar].stack_location);
 }

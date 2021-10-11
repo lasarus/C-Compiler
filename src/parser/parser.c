@@ -115,10 +115,7 @@ const char *instruction_to_str(struct instruction ins) {
 		break;
 
 	case IR_COPY: {
-		PRINT("%d = %d [(%s) = (%s)]", ins.copy.result, ins.copy.source,
-			  strdup(type_to_string(get_variable_type(ins.copy.result))),
-			  strdup(type_to_string(get_variable_type(ins.copy.source)))
-			);
+		PRINT("%d = %d", ins.copy.result, ins.copy.source);
 	} break;
 
 	case IR_START_BLOCK:

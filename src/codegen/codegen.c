@@ -870,6 +870,9 @@ void codegen_function(struct instruction *is,
 			int size = get_variable_size(var);
 
 			stack_count += size;
+			if (size < 0) {
+				ERROR("This should not happen!!!! var_id: %d\n", var);
+			}
 
 			variable_info[var].storage = VAR_STOR_STACK;
 			variable_info[var].stack_location = stack_count;

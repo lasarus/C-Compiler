@@ -372,7 +372,7 @@ int parse_jump_statement(struct jump_blocks jump_blocks) {
 		} else {
 			var_id return_variable = expression_to_ir(
 				expression_cast(expr, current_ret_val));
-			IR_PUSH_RETURN_VALUE(return_variable);
+			IR_PUSH_RETURN_VALUE(current_ret_val, return_variable);
 		}
 		return 1;
 	} else {

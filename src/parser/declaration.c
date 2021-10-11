@@ -588,7 +588,8 @@ struct type *ast_to_type(const struct type_specifiers *ts, struct type_ast *ast,
 					// Normally, IR isn't generated during type parsing.
 					// This is an exception.
 					// TODO: Safeguard against VLA in global scope.
-					var_id length = expression_to_ir(ast->array.expr);
+					// TODO: Don't cast to integer.
+					var_id length = expression_to_ir(expression_cast(ast->array.expr, type_simple(ST_INT)));
 
 					struct type params = {
 						.type = TY_VARIABLE_LENGTH_ARRAY,
@@ -1037,8 +1038,15 @@ int parse_init_declarator(struct specifiers s, int global, int *was_func) {
 			is_static = 1;
 		else {
 			symbol->type = IDENT_VARIABLE;
-			symbol->variable.id = new_variable(type, 1);
-			symbol->variable.type = get_variable_type(symbol->variable.id);
+			if (has_variable_size(type)) {
+				struct type *n_type = type;
+				symbol->variable.id = allocate_vla(&n_type);
+				symbol->variable.type = n_type;
+				definition = 0;
+			} else {
+				symbol->variable.id = new_variable(type, 1);
+				symbol->variable.type = type;
+			}
 		}
 	}
 
@@ -1068,7 +1076,7 @@ int parse_init_declarator(struct specifiers s, int global, int *was_func) {
 		} else {
 			// TODO: This doesn't feel very robust.
 			if (prev_type != type) {
-				change_variable_type(symbol->variable.id, type);
+				change_variable_size(symbol->variable.id, calculate_size(type));
 				symbol->variable.type = type;
 			}
 

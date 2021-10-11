@@ -11,89 +11,77 @@
 struct expr *construct_size_expression(struct type *type) {
 	switch (type->type) {
 	case TY_VARIABLE_LENGTH_ARRAY:
-		return EXPR_BINARY_OP(OP_MUL, EXPR_VAR(type->variable_length_array.length, get_variable_type(type->variable_length_array.length)),
-						   construct_size_expression(type->children[0]));
+		return EXPR_BINARY_OP(OP_MUL, EXPR_VAR(type->variable_length_array.length, type_simple(ST_INT)),
+							  construct_size_expression(type->children[0]));
 	case TY_ARRAY:
 		return EXPR_BINARY_OP(OP_MUL, EXPR_INT(type->array.length),
-						   construct_size_expression(type->children[0]));
+							  construct_size_expression(type->children[0]));
 	default:
 		return EXPR_INT(calculate_size(type));
 	}
 }
 
-struct type **variable_types = NULL;
-static int variable_types_n = 0;
-static int variable_types_cap = 0;
+struct variable_data {
+	int size;
+} *variables = NULL;
 
-void variable_set_type(var_id var, struct type *type, int allocate) {
-	if (has_variable_size(type)) {
-		if (type->type != TY_VARIABLE_LENGTH_ARRAY)
-			NOTIMP();
-		variable_types[var] = type_pointer(type->children[0]);
+static int variables_n, variables_cap = 0;
 
-		if (!allocate)
-			ERROR("Must allocate variable length");
-
-		allocate_var(var);
-
-		struct expr *size_expr = construct_size_expression(type);
-		var_id size = expression_to_ir(size_expr);
-		IR_PUSH_STACK_ALLOC(var, size);
-		// Should be represented as a pointer.
-	} else {
-		variable_types[var] = type;
-
-		if (allocate)
-			allocate_var(var);
-	}
-}
 
 var_id new_variable(struct type *type, int allocate) {
+	return new_variable_sz(calculate_size(type), allocate);
+}
+
+var_id allocate_vla(struct type **type) {
+	struct type *n_type = type_pointer((*type)->children[0]);
+	struct expr *size_expr = construct_size_expression(*type);
+	var_id size = expression_to_ir(size_expr);
+	var_id ptr = new_variable(n_type, 1);
+	IR_PUSH_STACK_ALLOC(ptr, size);
+	*type = n_type;
+	return ptr;
+}
+
+void allocate_var(var_id var) {
+	IR_PUSH(.type = IR_ALLOCA, .alloca = {var});
+}
+
+var_id new_variable_sz(int size, int allocate) {
 	// A bit of a shortcut.
-	if (variable_types_n && type->type == TY_SIMPLE && type->simple == ST_VOID)
+	if (variables_n && size == 0)
 		return VOID_VAR;
 
-	if (variable_types_n >= variable_types_cap) {
-		variable_types_cap *= 2;
-		if (variable_types_cap == 0)
-			variable_types_cap = 4;
-		variable_types = realloc(variable_types, sizeof (*variable_types) * variable_types_cap);
+	if (variables_n >= variables_cap) {
+		variables_cap *= 2;
+		if (variables_cap == 0)
+			variables_cap = 4;
+		variables = realloc(variables, sizeof (*variables) * variables_cap);
 	}
 
+	var_id new_id = variables_n++;
 
-	var_id new_id = variable_types_n++;
-	variable_set_type(new_id, type, allocate);
+	variables[new_id].size = size;
+
+	if (allocate)
+		allocate_var(new_id);
+	//variable_set_type(new_id, type, allocate);
 
 	return new_id;
 }
 
 int get_n_vars(void) {
-	return variable_types_n;
-}
-
-void allocate_var(var_id var) {
-	struct type *type = get_variable_type(var);
-
-	if (has_variable_size(type)) {
-		ERROR("Can't statically allocate storage of variable size");
-	} else {
-		IR_PUSH(.type = IR_ALLOCA, .alloca = {var});
-	}
-}
-
-struct type *get_variable_type(var_id variable) {
-	return variable_types[variable];
+	return variables_n;
 }
 
 int get_variable_size(var_id variable) {
-	return calculate_size(get_variable_type(variable));
+	return variables[variable].size;
 }
 
 void init_variables(void) {
-	variable_types_n = 0;
+	variables_n = 0;
 	new_variable(type_simple(ST_VOID), 0);
 }
 
-void change_variable_type(var_id var, struct type *type) {
-	variable_set_type(var, type, 0);
+void change_variable_size(var_id var, int size) {
+	variables[var].size = size;
 }
