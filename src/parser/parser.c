@@ -106,22 +106,22 @@ const char *instruction_to_str(struct instruction ins) {
 
 	switch (ins.type) {
 	case IR_CONSTANT:
-		PRINT("%d = constant", ins.constant.result);
+		PRINT("%d = constant", ins.result);
 		break;
 
 	case IR_BINARY_OPERATOR:
-		PRINT("%d = binary_op(%d, %d)", ins.binary_operator.result,
+		PRINT("%d = binary_op(%d, %d)", ins.result,
 			   ins.binary_operator.lhs,
 			   ins.binary_operator.rhs);
 		break;
 
 	case IR_UNARY_OPERATOR:
-		PRINT("%d = unary_op(%d)", ins.unary_operator.result,
+		PRINT("%d = unary_op(%d)", ins.result,
 			   ins.unary_operator.operand);
 		break;
 
 	case IR_CALL_VARIABLE:
-		PRINT("%d = %d (", ins.call_variable.result, ins.call_variable.function);
+		PRINT("%d = %d (", ins.result, ins.call_variable.function);
 		for (int i = 0; i < ins.call_variable.n_args; i++) {
 			if (i)
 				PRINT(", ");
@@ -131,7 +131,7 @@ const char *instruction_to_str(struct instruction ins) {
 		break;
 
 	case IR_LOAD:
-		PRINT("%d = load %d", ins.load.result, ins.load.pointer);
+		PRINT("%d = load %d", ins.result, ins.load.pointer);
 		break;
 
 	case IR_STORE:
@@ -139,38 +139,38 @@ const char *instruction_to_str(struct instruction ins) {
 		break;
 
 	case IR_POINTER_INCREMENT:
-		PRINT("%d = increment %d by %d", ins.pointer_increment.result, ins.pointer_increment.pointer, ins.pointer_increment.index);
+		PRINT("%d = increment %d by %d", ins.result, ins.pointer_increment.pointer, ins.pointer_increment.index);
 		break;
 
 	case IR_COPY: {
-		PRINT("%d = %d", ins.copy.result, ins.copy.source);
+		PRINT("%d = %d", ins.result, ins.copy.source);
 	} break;
 
 	case IR_CAST:
-		PRINT("%d (%s)", ins.cast.result, type_to_string(ins.cast.result_type));
+		PRINT("%d (%s)", ins.result, type_to_string(ins.cast.result_type));
 		PRINT(" = cast %d (%s)", ins.cast.rhs, type_to_string(ins.cast.rhs_type));
 		break;
 
 	case IR_ADDRESS_OF:
-		PRINT("%d = address of %d", ins.address_of.result, ins.address_of.variable);
+		PRINT("%d = address of %d", ins.result, ins.address_of.variable);
 		break;
 
 	case IR_GET_MEMBER:
-		PRINT("%d = get offset %d of %d", ins.get_member.result,
+		PRINT("%d = get offset %d of %d", ins.result,
 			   ins.get_member.offset,
 			   ins.get_member.pointer);
 		break;
 
 	case IR_VA_ARG:
-		PRINT("%d = v_arg", ins.va_arg_.result);
+		PRINT("%d = v_arg", ins.result);
 		break;
 
 	case IR_VA_START:
-		PRINT("%d = v_start", ins.va_start_.result);
+		PRINT("%d = v_start", ins.result);
 		break;
 
 	case IR_SET_ZERO:
-		PRINT("%d = zero", ins.set_zero.variable);
+		PRINT("%d = zero", ins.result);
 		break;
 
 	case IR_ASSIGN_CONSTANT_OFFSET:
@@ -182,7 +182,7 @@ const char *instruction_to_str(struct instruction ins) {
 		break;
 
 	case IR_STACK_ALLOC:
-		PRINT("%d = allocate %d on stack", ins.stack_alloc.pointer,
+		PRINT("%d = allocate %d on stack", ins.result,
 			  ins.stack_alloc.length);
 		break;
 
@@ -191,12 +191,12 @@ const char *instruction_to_str(struct instruction ins) {
 		break;
 
 	case IR_GET_SYMBOL_PTR:
-		PRINT("%d = get symbol %s", ins.get_symbol_ptr.result,
+		PRINT("%d = get symbol %s", ins.result,
 			  ins.get_symbol_ptr.label);
 		break;
 
 	case IR_POINTER_DIFF:
-		PRINT("%d = pointer_diff(%d - %d)", ins.pointer_diff.result,
+		PRINT("%d = pointer_diff(%d - %d)", ins.result,
 			  ins.pointer_diff.lhs,
 			  ins.pointer_diff.rhs);
 		break;

@@ -289,18 +289,18 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 			int size = calculate_size(c.data_type);
 			switch (size) {
 			case 1:
-				emit("movb $%s, -%d(%%rbp)", constant_to_string(c), variable_info[ins.constant.result].stack_location);
+				emit("movb $%s, -%d(%%rbp)", constant_to_string(c), variable_info[ins.result].stack_location);
 				break;
 			case 2:
-				emit("movw $%s, -%d(%%rbp)", constant_to_string(c), variable_info[ins.constant.result].stack_location);
+				emit("movw $%s, -%d(%%rbp)", constant_to_string(c), variable_info[ins.result].stack_location);
 				break;
 			case 4:
-				emit("movl $%s, -%d(%%rbp)", constant_to_string(c), variable_info[ins.constant.result].stack_location);
+				emit("movl $%s, -%d(%%rbp)", constant_to_string(c), variable_info[ins.result].stack_location);
 				break;
 			case 8: {
 				const char *str = constant_to_string(c);
 				emit("movabsq $%s, %%rax", str);
-				emit("movq %%rax, -%d(%%rbp)", variable_info[ins.constant.result].stack_location);
+				emit("movq %%rax, -%d(%%rbp)", variable_info[ins.result].stack_location);
 			} break;
 
 			case -1:
@@ -311,7 +311,7 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 				uint8_t buffer[size];
 				constant_to_buffer(buffer, c);
 				for (int i = 0; i < size; i++)
-					emit("movb $%d, -%d(%%rbp)", buffer[i], variable_info[ins.constant.result].stack_location - i);
+					emit("movb $%d, -%d(%%rbp)", buffer[i], variable_info[ins.result].stack_location - i);
 			}
 			}
 		} break;
@@ -319,9 +319,9 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 		case CONSTANT_LABEL:
 			if (codegen_flags.cmodel == CMODEL_LARGE) {
 				emit("movabsq $%s, %%rax", rodata_get_label_string(c.label));
-				emit("movq %%rax, -%d(%%rbp)", variable_info[ins.constant.result].stack_location);
+				emit("movq %%rax, -%d(%%rbp)", variable_info[ins.result].stack_location);
 			} else if (codegen_flags.cmodel == CMODEL_SMALL) {
-				emit("movq $%s, -%d(%%rbp)", rodata_get_label_string(c.label), variable_info[ins.constant.result].stack_location);
+				emit("movq $%s, -%d(%%rbp)", rodata_get_label_string(c.label), variable_info[ins.result].stack_location);
 			}
 			break;
 
@@ -333,7 +333,7 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 	case IR_BINARY_OPERATOR:
 		codegen_binary_operator(ins.binary_operator.type,
 								ins.binary_operator.operand_type,
-								ins.binary_operator.result,
+								ins.result,
 								ins.binary_operator.lhs,
 								ins.binary_operator.rhs);
 		break;
@@ -341,7 +341,7 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 	case IR_UNARY_OPERATOR:
 		codegen_unary_operator(ins.unary_operator.type,
 							   ins.unary_operator.operand_type,
-							   ins.unary_operator.result,
+							   ins.result,
 							   ins.unary_operator.operand);
 		break;
 
@@ -351,14 +351,14 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 					 ins.call_variable.argument_types,
 					 ins.call_variable.n_args,
 					 ins.call_variable.args,
-					 ins.call_variable.result);
+					 ins.result);
 		break;
 
 	case IR_POINTER_INCREMENT: {
 		int do_decrement = ins.pointer_increment.decrement;
 		var_id index = ins.pointer_increment.index,
 			pointer = ins.pointer_increment.pointer,
-			result = ins.pointer_increment.result;
+			result = ins.result;
 		int size = calculate_size(type_deref(ins.pointer_increment.ptr_type));
 
 		scalar_to_reg(index, REG_RDI);
@@ -382,14 +382,14 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 		emit("cqto");
 		emit("idivq %%rdi");
 
-		reg_to_scalar(REG_RAX, ins.pointer_diff.result);
+		reg_to_scalar(REG_RAX, ins.result);
 	} break;
 
 	case IR_LOAD: {
 		scalar_to_reg(ins.load.pointer, REG_RDI);
-		emit("leaq -%d(%%rbp), %%rsi", variable_info[ins.load.result].stack_location);
+		emit("leaq -%d(%%rbp), %%rsi", variable_info[ins.result].stack_location);
 
-		codegen_memcpy(get_variable_size(ins.load.result));
+		codegen_memcpy(get_variable_size(ins.result));
 	} break;
 
 	case IR_STORE: {
@@ -400,14 +400,14 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 	} break;
 
 	case IR_COPY:
-		codegen_stackcpy(-variable_info[ins.copy.result].stack_location,
+		codegen_stackcpy(-variable_info[ins.result].stack_location,
 						 -variable_info[ins.copy.source].stack_location,
 						 get_variable_size(ins.copy.source));
 		break;
 
 	case IR_CAST: {
 		var_id source = ins.cast.rhs,
-			dest = ins.cast.result;
+			dest = ins.result;
 		struct type *dest_type = ins.cast.result_type;
 		struct type *source_type = ins.cast.rhs_type;
 
@@ -426,13 +426,13 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 
 	case IR_ADDRESS_OF:
 		emit("leaq -%d(%%rbp), %%rax", variable_info[ins.address_of.variable].stack_location);
-		reg_to_scalar(REG_RAX, ins.address_of.result);
+		reg_to_scalar(REG_RAX, ins.result);
 		break;
 
 	case IR_GET_MEMBER: {
 		scalar_to_reg(ins.get_member.pointer, REG_RAX);
 		emit("addq $%d, %%rax", ins.get_member.offset);
-		reg_to_scalar(REG_RAX, ins.get_member.result);
+		reg_to_scalar(REG_RAX, ins.result);
 	} break;
 
 	case IR_VA_START: {
@@ -440,7 +440,7 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 		int fp_offset_offset = builtin_va_list->offsets[1];
 		int overflow_arg_area_offset = builtin_va_list->offsets[2];
 		int reg_save_area_offset = builtin_va_list->offsets[3];
-		scalar_to_reg(ins.va_start_.result, REG_RAX);
+		scalar_to_reg(ins.result, REG_RAX);
 		emit("movl $%d, %d(%%rax)", reg_save_info.gp_offset, gp_offset_offset);
 		emit("movl $%d, %d(%%rax)", 0, fp_offset_offset);
 		emit("leaq %d(%%rbp), %%rdi", reg_save_info.overflow_position);
@@ -521,14 +521,14 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 
 		// Address is now in %%rax.
 		emit("movq %%rax, %%rdi");
-		emit("leaq -%d(%%rbp), %%rsi", variable_info[ins.va_arg_.result].stack_location);
+		emit("leaq -%d(%%rbp), %%rsi", variable_info[ins.result].stack_location);
 
 		codegen_memcpy(calculate_size(type));
 	} break;
 
 	case IR_SET_ZERO:
-		emit("leaq -%d(%%rbp), %%rdi", variable_info[ins.set_zero.variable].stack_location);
-		codegen_memzero(get_variable_size(ins.set_zero.variable));
+		emit("leaq -%d(%%rbp), %%rdi", variable_info[ins.result].stack_location);
+		codegen_memzero(get_variable_size(ins.result));
 		break;
 
 	case IR_ASSIGN_CONSTANT_OFFSET:
@@ -544,7 +544,7 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 		//EMIT("subq $8, %%rsp");
 		scalar_to_reg(ins.stack_alloc.length, REG_RAX);
 		emit("subq %%rax, %%rsp");
-		reg_to_scalar(REG_RSP, ins.stack_alloc.pointer);
+		reg_to_scalar(REG_RSP, ins.result);
 		// Align %rsp to 16 boundary. (Remember stack grows downwards. So rounding down is actually correct.)
 		emit("andq $-16, %%rsp"); // Round down to nearest 16 by clearing last 4 bits.
 	} break;
@@ -555,7 +555,7 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 		} else if (codegen_flags.cmodel == CMODEL_LARGE) {
 			emit("movabsq $%s, %%rax", ins.get_symbol_ptr.label);
 		}
-		reg_to_scalar(REG_RAX, ins.get_symbol_ptr.result);
+		reg_to_scalar(REG_RAX, ins.result);
 	} break;
 
 	default:
