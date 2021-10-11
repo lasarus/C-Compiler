@@ -39,28 +39,6 @@ struct type *operators_get_result_type(enum operator_type op,
 	return returns_int[op] ? type_simple(ST_INT) : lhs_type;
 }
 
-int op_integer(enum operator_type op, int lhs, int rhs) {
-	switch (op) {
-	case OP_ADD: return lhs + rhs;
-	case OP_SUB: return lhs - rhs;
-	case OP_MUL: return lhs * rhs;
-	case OP_DIV: return lhs / rhs;
-	case OP_MOD: return lhs % rhs;
-	case OP_BXOR: return lhs ^ rhs;
-	case OP_BOR: return lhs | rhs;
-	case OP_BAND: return lhs & rhs;
-	case OP_LSHIFT: return lhs << rhs;
-	case OP_RSHIFT: return lhs >> rhs;
-	case OP_LESS: return lhs < rhs;
-	case OP_GREATER: return lhs > rhs;
-	case OP_LESS_EQ: return lhs <= rhs;
-	case OP_GREATER_EQ: return lhs >= rhs;
-	case OP_EQUAL: return lhs == rhs;
-	case OP_NOT_EQUAL: return lhs != rhs;
-	default: NOTIMP();
-	}
-}
-
 struct constant operators_constant(enum operator_type op,
 								   struct constant lhs, struct constant rhs) {
 	if (lhs.type != CONSTANT_TYPE ||
@@ -74,7 +52,7 @@ struct constant operators_constant(enum operator_type op,
 	if (type->type != TY_SIMPLE)
 		NOTIMP();
 
-#define OP(TYPE, FIELD) case TYPE: res.type = CONSTANT_TYPE; res.data_type = type_simple(TYPE); \
+#define OP(TYPE, FIELD) case TYPE:										\
 		switch (op) {													\
 		case OP_ADD: res.FIELD = lhs.FIELD + rhs.FIELD; break;			\
 		case OP_SUB: res.FIELD = lhs.FIELD - rhs.FIELD; break;			\
@@ -86,17 +64,20 @@ struct constant operators_constant(enum operator_type op,
 		case OP_BAND: res.FIELD = lhs.FIELD & rhs.FIELD; break;			\
 		case OP_LSHIFT: res.FIELD = lhs.FIELD << rhs.FIELD; break;		\
 		case OP_RSHIFT: res.FIELD = lhs.FIELD >> rhs.FIELD; break;		\
-		case OP_LESS: res.FIELD = lhs.FIELD < rhs.FIELD; break;			\
-		case OP_GREATER: res.FIELD = lhs.FIELD > rhs.FIELD; break;		\
-		case OP_LESS_EQ: res.FIELD = lhs.FIELD <= rhs.FIELD; break;		\
-		case OP_GREATER_EQ: res.FIELD = lhs.FIELD >= rhs.FIELD; break;	\
-		case OP_EQUAL: res.FIELD = (lhs.FIELD == rhs.FIELD); break;		\
-		case OP_NOT_EQUAL: res.FIELD = lhs.FIELD != rhs.FIELD; break;	\
+		case OP_LESS: res.int_d = lhs.FIELD < rhs.FIELD; break;			\
+		case OP_GREATER: res.int_d = lhs.FIELD > rhs.FIELD; break;		\
+		case OP_LESS_EQ: res.int_d = lhs.FIELD <= rhs.FIELD; break;		\
+		case OP_GREATER_EQ: res.int_d = lhs.FIELD >= rhs.FIELD; break;	\
+		case OP_EQUAL: res.int_d = lhs.FIELD == rhs.FIELD; break;		\
+		case OP_NOT_EQUAL: res.int_d = lhs.FIELD != rhs.FIELD; break;	\
 		default: NOTIMP();									\
 		} break;											\
 
 	//struct constant res = { -1, NULL, .str_d = "WHAT?" };
-	struct constant res;
+	struct constant res = {
+		.type = CONSTANT_TYPE,
+		.data_type = operators_get_result_type(op, lhs.data_type, rhs.data_type)
+	};
 	switch (type->simple) {
 		OP(ST_INT, int_d);
 		OP(ST_UINT, uint_d);

@@ -1122,8 +1122,35 @@ int parse_declaration(int global) {
 						  &s.tq,
 						  &s.fs,
 						  &s.as)) {
-		if (TPEEK(0)->type == T_KSTATIC_ASSERT)
-			ERROR("_Static_assert not implemented");
+		if (TACCEPT(T_KSTATIC_ASSERT)) {
+			TEXPECT(T_LPAR);
+			struct expr *expr = EXPR_BINARY_OP(OP_EQUAL, EXPR_INT(0), parse_assignment_expression());
+			struct constant *constant = expression_to_constant(expr);
+			if (!constant) {
+				ERROR("Expresison in _Static_assert must be constant.");
+			}
+
+			assert(constant->type == CONSTANT_TYPE);
+
+			if (!type_is_simple(constant->data_type, ST_INT)) {
+				ERROR("Invalid _Static_assert type: %s\n", type_to_string(constant->data_type));
+			}
+
+			TEXPECT(T_COMMA);
+			if (T0->type != T_STRING)
+				ERROR("Second argument to _Static_assert must be a string.");
+
+			const char *msg = T0->str;
+			TNEXT();
+
+			TEXPECT(T_RPAR);
+
+			TEXPECT(T_SEMI_COLON);
+
+			if (constant->int_d)
+				ERROR("Static assert failed: %s\n", msg);
+			return 1;
+		}
 		return 0;
 	}
 
