@@ -318,6 +318,16 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 
 		case CONSTANT_LABEL:
 			if (codegen_flags.cmodel == CMODEL_LARGE) {
+				emit("movabsq $%s, %%rdi", rodata_get_label_string(c.label));
+			} else if (codegen_flags.cmodel == CMODEL_SMALL) {
+				emit("movq $%s, %%rdi", rodata_get_label_string(c.label));
+			}
+			emit("leaq -%d(%%rbp), %%rsi", variable_info[ins.result].stack_location);
+			codegen_memcpy(get_variable_size(ins.result));
+			break;
+
+		case CONSTANT_LABEL_POINTER:
+			if (codegen_flags.cmodel == CMODEL_LARGE) {
 				emit("movabsq $%s, %%rax", rodata_get_label_string(c.label));
 				emit("movq %%rax, -%d(%%rbp)", variable_info[ins.result].stack_location);
 			} else if (codegen_flags.cmodel == CMODEL_SMALL) {

@@ -524,6 +524,9 @@ struct constant constant_cast(struct constant a, struct type *target) {
 			a.data_type = target;
 			return a;
 		} else {
+			printf("Can't do constant cast of the form %s to %s\n",
+				   strdup(type_to_string(a.data_type)),
+				   strdup(type_to_string(target)));
 			NOTIMP();
 		}
 		return a;

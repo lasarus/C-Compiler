@@ -6,6 +6,8 @@ typedef int label_id;
 label_id rodata_register(const char *str);
 const char *rodata_get_label_string(label_id id);
 
+label_id register_label_name(const char *str);
+
 void rodata_codegen(void);
 
 struct type;

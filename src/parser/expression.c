@@ -382,13 +382,22 @@ var_id expression_to_address(struct expr *expr) {
 		var_id member_address = new_variable(type_pointer(expr->data_type), 1);
 		IR_PUSH_GET_OFFSET(member_address, address, field_offset);
 		return member_address;
-	} break;
+	}
 
 	case E_SYMBOL: {
 		var_id ptr_result = new_variable(type_pointer(expr->data_type), 1);
 		IR_PUSH_GET_SYMBOL_PTR(expr->symbol.name, ptr_result);
 		return ptr_result;
-	} break;
+	}
+
+	case E_CONSTANT: {
+		struct constant *c = &expr->constant;
+		assert(c->type == CONSTANT_LABEL);
+
+		var_id ptr_result = new_variable(type_pointer(expr->data_type), 1);
+		IR_PUSH_GET_SYMBOL_PTR(rodata_get_label_string(c->label), ptr_result);
+		return ptr_result;
+	}
 
 	case E_CAST:
 		ERROR("Can't cast lvalue to %s", type_to_string(expr->cast.target));
@@ -809,9 +818,17 @@ struct expr *parse_prefix() {
 		case IDENT_LABEL:
 			TNEXT();
 			return expr_new((struct expr) {
-					.type = E_SYMBOL,
-					.symbol = { sym->label.name, sym->label.type }
+					.type = E_CONSTANT,
+					.constant = {
+						.type = CONSTANT_LABEL,
+						.data_type = sym->label.type,
+						.label = register_label_name(sym->label.name)
+					}
 				});
+			/* return expr_new((struct expr) { */
+			/* 		.type = E_SYMBOL, */
+			/* 		.symbol = { sym->label.name, sym->label.type } */
+			/* 	}); */
 
 		case IDENT_VARIABLE:
 			TNEXT();
@@ -1078,6 +1095,8 @@ int evaluate_constant_expression(struct expr *expr,
 		struct constant rhs;
 		if (!evaluate_constant_expression(expr->cast.arg, &rhs))
 			return 0;
+		if (rhs.type == CONSTANT_LABEL)
+			return 0;
 		*constant = constant_cast(rhs, expr->cast.target);
 	} break;
 
@@ -1087,12 +1106,17 @@ int evaluate_constant_expression(struct expr *expr,
 			return 0;
 		if (!evaluate_constant_expression(expr->args[1], &rhs))
 			return 0;
+		if (lhs.type == CONSTANT_LABEL ||
+			rhs.type == CONSTANT_LABEL)
+			return 0;
 		*constant = operators_constant(expr->binary_op, lhs, rhs);
 	} break;
 
 	case E_UNARY_OP: {
 		struct constant rhs;
 		if (!evaluate_constant_expression(expr->args[0], &rhs))
+			return 0;
+		if (rhs.type == CONSTANT_LABEL)
 			return 0;
 		*constant = operators_constant_unary(expr->unary_op, rhs);
 	} break;
@@ -1105,11 +1129,12 @@ int evaluate_constant_expression(struct expr *expr,
 
 		if (c.type == CONSTANT_LABEL) {
 			*constant = c;
+			constant->type = CONSTANT_LABEL_POINTER;
 			constant->data_type = type_pointer(expr->args[0]->data_type->children[0]);
 		} else {
 			*constant = c;
 			constant->data_type = type_pointer(expr->args[0]->data_type->children[0]);
-			constant->type = CONSTANT_LABEL;
+			constant->type = CONSTANT_LABEL_POINTER;
 			constant->label = rodata_register(c.str_d);
 		}
 	} break;
@@ -1123,6 +1148,11 @@ int evaluate_constant_expression(struct expr *expr,
 		if (!evaluate_constant_expression(expr->args[2], &rhs))
 			return 0;
 
+		if (lhs.type == CONSTANT_LABEL ||
+			mid.type == CONSTANT_LABEL ||
+			rhs.type == CONSTANT_LABEL)
+			return 0;
+
 		assert(lhs.type == CONSTANT_TYPE);
 		assert(mid.type == CONSTANT_TYPE);
 		assert(rhs.type == CONSTANT_TYPE);
@@ -1133,6 +1163,36 @@ int evaluate_constant_expression(struct expr *expr,
 		} else {
 			*constant = rhs;
 		}
+	} break;
+
+	case E_ADDRESS_OF: {
+		struct constant operand;
+		if (!evaluate_constant_expression(expr->args[0], &operand)) {
+			return 0;
+		}
+
+		if (operand.type == CONSTANT_LABEL) {
+			*constant = operand;
+			constant->type = CONSTANT_LABEL_POINTER;
+			constant->data_type = expr->data_type;
+		} else {
+			return 0;
+		}
+	} break;
+
+	case E_SYMBOL: {
+		NOTIMP();
+		const char *str = expr->symbol.name;
+		struct type *type = expr->symbol.type;
+
+		printf("\n \"%s\" into type: %s\n", str, type_to_string(type));
+
+		*constant = (struct constant) {
+			.type = CONSTANT_LABEL,
+			.data_type = type,
+			.label = register_label_name(str)
+		};
+		return 1;
 	} break;
 
 	default:

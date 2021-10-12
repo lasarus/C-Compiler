@@ -10,6 +10,10 @@
 #include <string.h>
 
 struct entry {
+	enum entry_type {
+		ENTRY_STR,
+		ENTRY_LABEL_NAME
+	} type;
 	const char *name;
 	label_id id;
 };
@@ -17,36 +21,55 @@ struct entry {
 static struct entry *entries = NULL;
 static int n_entries = 0;
 
-label_id rodata_register(const char *str) {
-	for (int i = 0; i < n_entries; i++) {
-		if (strcmp(entries[i].name, str) == 0) {
-			return entries[i].id;
-		}
+label_id label_register(enum entry_type type, const char *str) {
+	if (type == ENTRY_STR) {
+			for (int i = 0; i < n_entries; i++) {
+				if (strcmp(entries[i].name, str) == 0) {
+					return entries[i].id;
+				}
+			}
 	}
 
 	n_entries++;
 	entries = realloc(entries, n_entries * sizeof *entries);
 	entries[n_entries - 1].name = str;
 	entries[n_entries - 1].id = n_entries - 1;
+	entries[n_entries - 1].type = type;
 
 	return n_entries - 1;
 }
 
+label_id rodata_register(const char *str) {
+	return label_register(ENTRY_STR, str);
+}
+
 const char *rodata_get_label_string(label_id id) {
-	static char *buffer = NULL;
+	if (entries[id].type == ENTRY_STR) {
+		static char *buffer = NULL;
 
-	if (!buffer)
-		buffer = malloc(128);
+		if (!buffer)
+			buffer = malloc(128);
 
-	sprintf(buffer, ".L_rodata%d", id);
-	return buffer;
+		sprintf(buffer, ".L_rodata%d", id);
+		return buffer;
+	} else if (entries[id].type == ENTRY_LABEL_NAME) {
+		return entries[id].name;
+	} else {
+		NOTIMP();
+	}
 }
 
 void rodata_codegen(void) {
 	for (int i = 0; i < n_entries; i++) {
-		emit("%s:", rodata_get_label_string(entries[i].id));
-		emit(".string \"%s\"", entries[i].name);
+		if (entries[i].type == ENTRY_STR) {
+			emit("%s:", rodata_get_label_string(entries[i].id));
+			emit(".string \"%s\"", entries[i].name);
+		}
 	}
+}
+
+label_id register_label_name(const char *str) {
+	return label_register(ENTRY_LABEL_NAME, str);
 }
 
 struct static_var {
@@ -97,17 +120,24 @@ void codegen_initializer(struct type *type,
 
 		struct constant *c = expression_to_constant(pair->expr);
 		if (!c)
-			ERROR("Static initialization can't contain non constant expressions!");
+			ERROR("Static initialization can't contain non constant expressions! %d", pair->expr->type);
 
 		switch (c->type) {
 		case CONSTANT_TYPE:
 			constant_to_buffer(buffer + offset, *c);
 			break;
 
-		case CONSTANT_LABEL:
+		case CONSTANT_LABEL_POINTER:
 			is_label[offset] = 1;
 			labels[offset] = c->label;
 			break;
+
+		case CONSTANT_LABEL:
+			NOTIMP();
+			break;
+
+		default:
+			NOTIMP();
 		}
 	}
 

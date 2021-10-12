@@ -47,7 +47,8 @@ int calculate_offset(struct type *type, int index);
 
 struct constant {
 	enum {
-		CONSTANT_LABEL,
+		CONSTANT_LABEL, // $LABEL
+		CONSTANT_LABEL_POINTER, // (LABEL)
 		CONSTANT_TYPE
 	} type;
 

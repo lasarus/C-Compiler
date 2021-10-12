@@ -42,8 +42,10 @@ struct type *operators_get_result_type(enum operator_type op,
 struct constant operators_constant(enum operator_type op,
 								   struct constant lhs, struct constant rhs) {
 	if (lhs.type != CONSTANT_TYPE ||
-		rhs.type != CONSTANT_TYPE)
+		rhs.type != CONSTANT_TYPE) {
+		printf("Trying op %d between %d and %d\n", op, lhs.type, rhs.type);
 		NOTIMP();
+	}
 
 	struct type *type = lhs.data_type;
 	if (type != rhs.data_type)
