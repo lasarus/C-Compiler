@@ -457,6 +457,8 @@ void ast_get_parameters(struct type_ast *ast,
 				*n = ast->function.n;
 				*names = ast->function.names;
 				return;
+			} else {
+				ast = ast->parent;
 			}
 			break;
 
