@@ -64,7 +64,7 @@ int parse_labeled_statement(struct jump_blocks jump_blocks) {
 		TNEXT();
 		TNEXT();
 
-		for (int i = 0; function_scope.n; i++) {
+		for (int i = 0; i < function_scope.n; i++) {
 			if (strcmp(label, function_scope.labels[i].label) == 0) {
 				if (function_scope.labels[i].used)
 					ERROR("Label declared more than once %s", label);
@@ -386,7 +386,7 @@ int parse_jump_statement(struct jump_blocks jump_blocks) {
 		const char *label = T0->str;
 		TNEXT();
 		TEXPECT(T_SEMI_COLON);
-		for (int i = 0; function_scope.n; i++) {
+		for (int i = 0; i < function_scope.n; i++) {
 			if (strcmp(label, function_scope.labels[i].label) == 0) {
 				ir_goto(function_scope.labels[i].id);
 				ir_block_start(new_block());
@@ -446,6 +446,8 @@ const char *get_current_function_name() {
 void parse_function(const char *name, struct type *type, int arg_n, char **arg_names, int global) {
 	current_function = name;
 	struct symbol_identifier *symbol = symbols_get_identifier(name);
+
+	function_scope.n = 0;
 
 	current_ret_val = type->children[0];
 
