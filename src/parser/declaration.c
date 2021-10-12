@@ -921,26 +921,34 @@ void parse_initializer_recursive(int offset, struct type **type, int set_type,
 			ERROR("Expected expression, got %s", token_to_str(T0->type));
 		}
 
-		if ((*type)->type == TY_INCOMPLETE_ARRAY && set_type) {
-			if (expr->type != E_CONSTANT)
-				ERROR("Can't initialize incomplete array with non constant expression");
+		struct constant *c = expression_to_constant(expr);
+		if (c && c->data_type->type == TY_ARRAY &&
+			type_is_simple(c->data_type->children[0], ST_CHAR) &&
+			c->type == CONSTANT_TYPE &&
+			((*type)->type == TY_INCOMPLETE_ARRAY || (*type)->type == TY_ARRAY) &&
+			(type_is_simple((*type)->children[0], ST_CHAR))) {
+			// Assigning string array. This is a special case.
+			if ((*type)->type == TY_INCOMPLETE_ARRAY && set_type) {
+				if (expr->type != E_CONSTANT)
+					ERROR("Can't initialize incomplete array with non constant expression");
 
-			if (expr->data_type->type != TY_ARRAY)
-				ERROR("Can't initialize incomplete array with non-array expression of type");
+				if (expr->data_type->type != TY_ARRAY)
+					ERROR("Can't initialize incomplete array with non-array expression of type");
 
-			if (expr->data_type->children[0] != (*type)->children[0])
-				ERROR("Can't initialize incomplete array with array of incompatible type");
+				if (expr->data_type->children[0] != (*type)->children[0])
+					ERROR("Can't initialize incomplete array with array of incompatible type");
 
-			struct constant c = expr->constant;
+				struct constant c = expr->constant;
 
-			struct type complete_array_params = {
-				.type = TY_ARRAY,
-				.array.length = c.data_type->array.length,
-				.n = 1
-			};
+				struct type complete_array_params = {
+					.type = TY_ARRAY,
+					.array.length = c.data_type->array.length,
+					.n = 1
+				};
 
-			struct type *ntype = type_create(&complete_array_params, (*type)->children);
-			*type = ntype;
+				struct type *ntype = type_create(&complete_array_params, (*type)->children);
+				*type = ntype;
+			}
 
 			add_init_pair(initializer, (struct init_pair){offset, expr});
 		} else {
