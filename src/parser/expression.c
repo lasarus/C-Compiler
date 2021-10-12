@@ -134,6 +134,7 @@ struct type *calculate_type(struct expr *expr) {
 		return type_pointer(expr->args[0]->data_type->children[0]);
 
 	case E_POINTER_ADD:
+	case E_POINTER_SUB:
 	case E_ASSIGNMENT:
 	case E_ASSIGNMENT_OP:
 	case E_ASSIGNMENT_POINTER_ADD:
@@ -250,9 +251,9 @@ void fix_binary_operator(struct expr *expr) {
 		if (lhs_ptr && rhs_ptr) {
 			expr->type = E_POINTER_DIFF;
 		} else if (lhs_ptr) {
-			NOTIMP();
+			expr->type = E_POINTER_SUB;
 		} else if (rhs_ptr) {
-			NOTIMP();
+			ERROR("Can't subtract with pointer as rhs.");
 		}
 		break;
 
@@ -488,6 +489,13 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 	case E_POINTER_ADD:
 		IR_PUSH_POINTER_INCREMENT(res, expression_to_ir(expr->args[0]),
 								  expression_to_ir(expr->args[1]), 0,
+								  expr->args[0]->data_type,
+								  expr->args[1]->data_type->simple);
+		break;
+
+	case E_POINTER_SUB:
+		IR_PUSH_POINTER_INCREMENT(res, expression_to_ir(expr->args[0]),
+								  expression_to_ir(expr->args[1]), 1,
 								  expr->args[0]->data_type,
 								  expr->args[1]->data_type->simple);
 		break;

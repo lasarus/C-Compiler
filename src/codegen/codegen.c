@@ -377,11 +377,11 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 		scalar_to_reg(pointer, REG_RSI);
 
 		if (do_decrement)
-			emit("subq %%rsi, %%rax");
+			emit("subq %%rax, %%rsi");
 		else
-			emit("addq %%rsi, %%rax");
+			emit("addq %%rax, %%rsi");
 
-		reg_to_scalar(REG_RAX, result);
+		reg_to_scalar(REG_RSI, result);
 	} break;
 
 	case IR_POINTER_DIFF: {
