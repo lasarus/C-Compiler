@@ -25,6 +25,29 @@ struct jump_blocks {
 	struct case_labels *case_labels;
 };
 
+struct function_scope {
+	int n, cap;
+
+	struct {
+		const char *label;
+		block_id id;
+		int used;
+	} *labels;
+} function_scope;
+
+void add_function_scope_label(const char *label, block_id id, int used) {
+	if (function_scope.n >= function_scope.cap) {
+		function_scope.cap = MAX(function_scope.cap * 2, 4);
+		function_scope.labels = realloc(function_scope.labels,
+										sizeof *function_scope.labels * function_scope.cap);
+	}
+
+	int idx = function_scope.n++;
+	function_scope.labels[idx].label = label;
+	function_scope.labels[idx].id = id;
+	function_scope.labels[idx].used = used;
+}
+
 // See section 6.8 of standard.
 int parse_statement(struct jump_blocks jump_blocks);
 int parse_labeled_statement(struct jump_blocks jump_blocks);
@@ -37,7 +60,23 @@ int parse_jump_statement(struct jump_blocks jump_blocks);
 int parse_labeled_statement(struct jump_blocks jump_blocks) {
 	if (TPEEK(0)->type == T_IDENT &&
 		TPEEK(1)->type == T_COLON) {
-		ERROR("Not implemented");
+		const char *label = T0->str;
+		TNEXT();
+		TNEXT();
+
+		for (int i = 0; function_scope.n; i++) {
+			if (strcmp(label, function_scope.labels[i].label) == 0) {
+				if (function_scope.labels[i].used)
+					ERROR("Label declared more than once %s", label);
+				ir_block_start(function_scope.labels[i].id);
+				function_scope.labels[i].used = 1;
+				return 1;
+			}
+		}
+
+		block_id id = new_block();
+		add_function_scope_label(label, id, 1);
+		ir_block_start(id);
 		return 1;
 	} else if (TACCEPT(T_KCASE)) {
 		struct expr *value = parse_expression();
@@ -344,7 +383,21 @@ struct type *current_ret_val = NULL;
 
 int parse_jump_statement(struct jump_blocks jump_blocks) {
 	if (TACCEPT(T_KGOTO)) {
-		ERROR("Not implemented");
+		const char *label = T0->str;
+		TNEXT();
+		TEXPECT(T_SEMI_COLON);
+		for (int i = 0; function_scope.n; i++) {
+			if (strcmp(label, function_scope.labels[i].label) == 0) {
+				ir_goto(function_scope.labels[i].id);
+				ir_block_start(new_block());
+				return 1;
+			}
+		}
+
+		block_id id = new_block();
+		add_function_scope_label(label, id, 0);
+		ir_goto(id);
+		ir_block_start(new_block());
 		return 1;
 	} else if (TACCEPT(T_KCONTINUE)) {
 		ir_goto(jump_blocks.block_continue);
