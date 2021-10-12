@@ -107,9 +107,6 @@ struct type *calculate_type(struct expr *expr) {
 	case E_UNARY_OP:
 		return expr->args[0]->data_type;
 
-	case E_SYMBOL:
-		return expr->symbol.type;
-
 	case E_CALL: {
 		struct type *callee_type = expr->call.callee->data_type;
 		if (callee_type->type == TY_FUNCTION)
@@ -384,12 +381,6 @@ var_id expression_to_address(struct expr *expr) {
 		return member_address;
 	}
 
-	case E_SYMBOL: {
-		var_id ptr_result = new_variable(type_pointer(expr->data_type), 1);
-		IR_PUSH_GET_SYMBOL_PTR(expr->symbol.name, ptr_result);
-		return ptr_result;
-	}
-
 	case E_CONSTANT: {
 		struct constant *c = &expr->constant;
 		assert(c->type == CONSTANT_LABEL);
@@ -450,16 +441,8 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 	case E_CALL: {
 		struct expr *callee = expr->call.callee;
 
-		struct type *signature = NULL;
-		switch (callee->type) {
-		case E_SYMBOL:
-			signature = callee->symbol.type;
-			break;
-		default:
-			assert(type_is_pointer(callee->data_type));
-			signature = type_deref(callee->data_type);
-			break;
-		}
+		assert(type_is_pointer(callee->data_type));
+		struct type *signature = type_deref(callee->data_type);
 
 		var_id *args = malloc(sizeof *args * expr->call.n_args);
 		struct type **arg_types = malloc(sizeof *arg_types * expr->call.n_args);
@@ -684,13 +667,6 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		struct initializer *init = expr->compound_literal.init;
 		ir_init_var(init, res);
 	} break;
-
-	case E_SYMBOL: {
-		var_id ptr = new_variable(type_pointer(expr->symbol.type), 1);
-		IR_PUSH_GET_SYMBOL_PTR(expr->symbol.name, ptr);
-		IR_PUSH_LOAD(res, ptr);
-		break;
-	}
 
 	case E_COMMA:
 		expression_to_ir(expr->args[0]);
@@ -1178,21 +1154,6 @@ int evaluate_constant_expression(struct expr *expr,
 		} else {
 			return 0;
 		}
-	} break;
-
-	case E_SYMBOL: {
-		NOTIMP();
-		const char *str = expr->symbol.name;
-		struct type *type = expr->symbol.type;
-
-		printf("\n \"%s\" into type: %s\n", str, type_to_string(type));
-
-		*constant = (struct constant) {
-			.type = CONSTANT_LABEL,
-			.data_type = type,
-			.label = register_label_name(str)
-		};
-		return 1;
 	} break;
 
 	default:

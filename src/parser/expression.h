@@ -54,7 +54,6 @@ struct expr {
 	enum {
 		E_INVALID,
 		E_VARIABLE,
-		E_SYMBOL,
 		E_CALL,
 		E_CONSTANT,
 		E_GENERIC_SELECTION,
