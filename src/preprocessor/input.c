@@ -81,7 +81,6 @@ static int flush_comment(struct input *input) {
 			if (input->ic[0] == '\0')
 				ERROR("Comment reached end of file");
 		}
-		input_internal_next(input);
 	}
 	return did_something;
 }
