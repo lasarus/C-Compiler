@@ -558,7 +558,7 @@ struct type *ast_to_type(const struct type_specifiers *ts, struct type_ast *ast,
 
 			struct type *parameters[ast->function.n + 1];
 			for (int i = 0; i < ast->function.n; i++)
-				parameters[i + 1] = ast->function.types[i];
+				parameters[i + 1] = parameter_adjust(ast->function.types[i]);
 			parameters[0] = type;
 
 			type = type_create(&params, parameters);
@@ -657,7 +657,7 @@ struct parameter_list parse_parameter_list(void) {
 		ret.types = realloc(ret.types, ret.n * sizeof(*ret.types));
 		char *name = NULL;;
 		ret.types[ret.n - 1] = ast_to_type(&s.ts, ast, &name);
-		ret.types[ret.n - 1] = parameter_adjust(ret.types[ret.n - 1]);
+
 		if (!ret.abstract) {
 			ret.names = realloc(ret.names, ret.n * sizeof(*ret.names));
 			ret.names[ret.n - 1] = name;

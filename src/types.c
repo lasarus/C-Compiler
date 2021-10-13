@@ -237,42 +237,15 @@ int type_member_idx(struct type *type,
 	ERROR("%s has no member with name %s", type_to_string(type), name);
 }
 
+// Make arrays into pointers, and functions into function pointers.
 struct type *parameter_adjust(struct type *type) {
-	struct type *children[type->n];
-	struct type ntype = *type;
-
-	for (int i = 0; i < type->n; i++) {
-		children[i] = type->children[i];
-	}
-
-	switch (type->type) {
-	case TY_ARRAY:
-	case TY_INCOMPLETE_ARRAY:
-		ntype = (struct type) {
-			.type = TY_POINTER,
-			.n = 1
-		};
-		children[0] = parameter_adjust(children[0]);
-		break;
-
-	case TY_FUNCTION:
-		children[0] = parameter_adjust(children[0]);
-		break;
-
-	case TY_POINTER:
-		children[0] = parameter_adjust(children[0]);
-		break;
-
-	case TY_STRUCT:
-	case TY_SIMPLE:
-		break;
-
-	default:
-		ERROR("NOTIMP: %d", type->type);
-		NOTIMP();
-	}
-
-	return type_create(&ntype, children);
+	if (type->type == TY_ARRAY ||
+		type->type == TY_INCOMPLETE_ARRAY)
+		return type_pointer(type->children[0]);
+	else if (type->type == TY_FUNCTION)
+		return type_pointer(type);
+	else
+		return type;
 }
 
 int type_is_integer(struct type *type) {
