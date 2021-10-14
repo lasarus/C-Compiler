@@ -287,32 +287,36 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 		switch (c.type) {
 		case CONSTANT_TYPE: {
 			int size = calculate_size(c.data_type);
-			switch (size) {
-			case 1:
-				emit("movb $%s, -%d(%%rbp)", constant_to_string(c), variable_info[ins.result].stack_location);
-				break;
-			case 2:
-				emit("movw $%s, -%d(%%rbp)", constant_to_string(c), variable_info[ins.result].stack_location);
-				break;
-			case 4:
-				emit("movl $%s, -%d(%%rbp)", constant_to_string(c), variable_info[ins.result].stack_location);
-				break;
-			case 8: {
-				const char *str = constant_to_string(c);
-				emit("movabsq $%s, %%rax", str);
-				emit("movq %%rax, -%d(%%rbp)", variable_info[ins.result].stack_location);
-			} break;
+			if (c.data_type->type == TY_SIMPLE ||
+				type_is_pointer(c.data_type)) {
+				switch (size) {
+				case 1:
+					emit("movb $%s, -%d(%%rbp)", constant_to_string(c), variable_info[ins.result].stack_location);
+					break;
+				case 2:
+					emit("movw $%s, -%d(%%rbp)", constant_to_string(c), variable_info[ins.result].stack_location);
+					break;
+				case 4:
+					emit("movl $%s, -%d(%%rbp)", constant_to_string(c), variable_info[ins.result].stack_location);
+					break;
+				case 8: {
+					const char *str = constant_to_string(c);
+					emit("movabsq $%s, %%rax", str);
+					emit("movq %%rax, -%d(%%rbp)", variable_info[ins.result].stack_location);
+				} break;
 
-			case -1:
-				// TODO: Is this really right?
-				break;
+				case -1:
+				case 0:
+					// TODO: Is this really right?
+					break;
 
-			default: {
+				default: NOTIMP();
+				}
+			} else {
 				uint8_t buffer[size];
 				constant_to_buffer(buffer, c);
 				for (int i = 0; i < size; i++)
 					emit("movb $%d, -%d(%%rbp)", buffer[i], variable_info[ins.result].stack_location - i);
-			}
 			}
 		} break;
 
