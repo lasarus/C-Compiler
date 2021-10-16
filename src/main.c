@@ -84,11 +84,11 @@ void add_implementation_defs(void) {
 }
 
 int main(int argc, char **argv) {
+	struct arguments arguments = parse_arguments(argc, argv);
+
 	symbols_init();
 	add_implementation_defs();
 	builtins_init();
-   
-	struct arguments arguments = parse_arguments(argc, argv);
 
 	preprocessor_create(arguments.input);
 	parse_into_ir();
