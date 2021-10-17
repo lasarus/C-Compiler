@@ -370,11 +370,15 @@ var_id expression_to_address(struct expr *expr) {
 	}
 
 	case E_DOT_OPERATOR: {
-		int field_offset;
-		struct type *field_type;
+		struct type *lhs_type = expr->member.lhs->data_type;
+		assert(lhs_type->type == TY_STRUCT);
 
-		type_select(expr->member.lhs->data_type, expr->member.member_idx,
-					&field_offset, &field_type);
+		struct struct_data *data = lhs_type->struct_data;
+
+		int field_offset = data->offsets[expr->member.member_idx];
+
+		if (data->bitfields[expr->member.member_idx] != -1)
+			ERROR("Trying to take address of bit-field");
 
 		var_id address = expression_to_address(expr->member.lhs);
 		var_id member_address = new_variable(type_pointer(expr->data_type), 1);
@@ -410,6 +414,60 @@ var_id address_load(var_id address, struct type *type) {
 
 void address_store(var_id address, var_id value) {
 	IR_PUSH_STORE(value, address);
+}
+
+int write_to_bitfield(struct expr *member, var_id value) {
+	if (member->type != E_DOT_OPERATOR)
+		return 0;
+
+	struct struct_data *data = member->member.lhs->data_type->struct_data;
+	int idx = member->member.member_idx;
+
+	if (data->bitfields[idx] == -1)
+		return 0;
+
+	var_id address = expression_to_address(member->member.lhs);
+	int offset = data->offsets[idx];
+
+	IR_PUSH_GET_OFFSET(address, address, offset);
+
+	var_id prev = new_variable(data->types[idx], 1);
+	var_id tvalue = new_variable(data->types[idx], 1);
+
+	IR_PUSH_TRUNCATE(tvalue, value, 0);
+	IR_PUSH_LOAD(prev, address);
+
+	IR_PUSH_SET_BITS(prev, prev, tvalue, data->bit_offsets[idx], data->bitfields[idx]);
+
+	IR_PUSH_STORE(prev, address);
+
+	return 1;
+}
+
+int read_from_bitfield(struct expr *member, var_id value) {
+	if (member->type != E_DOT_OPERATOR)
+		return 0;
+
+	struct struct_data *data = member->member.lhs->data_type->struct_data;
+	int idx = member->member.member_idx;
+
+	if (data->bitfields[idx] == -1)
+		return 0;
+
+	assert(data->types[idx]->type == TY_SIMPLE);
+
+	var_id address = expression_to_address(member->member.lhs);
+	int offset = data->offsets[idx];
+
+	IR_PUSH_GET_OFFSET(address, address, offset);
+	var_id prev = new_variable(data->types[idx], 1);
+	IR_PUSH_LOAD(prev, address);
+
+	int sign_extend = is_signed(data->types[idx]->simple);
+
+	IR_PUSH_GET_BITS(value, prev, data->bit_offsets[idx], data->bitfields[idx], sign_extend);
+
+	return 1;
 }
 
 var_id expression_to_ir_result(struct expr *expr, var_id res) {
@@ -535,11 +593,20 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 	} break;
 
 	case E_ASSIGNMENT: {
-		var_id address = expression_to_address(expr->args[0]);
+		// write_to_bitfield(member_expr, value) value is var_id
+		// read_from_bitfield(member_expr, result) result is var_id?
 		var_id rhs = expression_to_ir(expression_cast(expr->args[1], expr->args[0]->data_type));
+		if (expr->args[0]->type == E_DOT_OPERATOR &&
+			expr->args[0]->member.lhs->data_type->type == TY_STRUCT &&
+			expr->args[0]->member.lhs->data_type->struct_data->bitfields[expr->args[0]->member.member_idx] != -1) {
+			write_to_bitfield(expr->args[0], rhs);
+			return rhs;
+		} else {
+			var_id address = expression_to_address(expr->args[0]);
 
-		address_store(address, rhs);
-		return rhs;
+			address_store(address, rhs);
+			return rhs;
+		}
 	}
 
 	case E_ASSIGNMENT_OP: {
@@ -606,11 +673,13 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		break;
 
 	case E_DOT_OPERATOR: {
-		int field_offset;
-		struct type *field_type;
+		struct type *lhs_type = expr->member.lhs->data_type;
+		assert(lhs_type->type == TY_STRUCT);
 
-		type_select(expr->member.lhs->data_type, expr->member.member_idx,
-					&field_offset, &field_type);
+		struct struct_data *data = lhs_type->struct_data;
+
+		int field_offset = data->offsets[expr->member.member_idx];
+		int field_bitfield = data->bitfields[expr->member.member_idx];
 
 		var_id lhs = expression_to_ir(expr->member.lhs);
 		var_id address = new_variable(type_pointer(expr->member.lhs->data_type), 1);
@@ -620,6 +689,13 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		IR_PUSH_ADDRESS_OF(address, lhs);
 		IR_PUSH_GET_OFFSET(member_address, address, field_offset);
 		IR_PUSH_LOAD(res, member_address);
+
+		if (field_bitfield != -1) {
+			int sign_extend = is_signed(data->types[expr->member.member_idx]->simple);
+			IR_PUSH_GET_BITS(res, res, data->bit_offsets[expr->member.member_idx], field_bitfield, sign_extend);
+			//printf("Invalid on %s\n", data->name);
+			//NOTIMP();
+		}
 	} break;
 
 	case E_CONDITIONAL: {

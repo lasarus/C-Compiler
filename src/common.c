@@ -96,3 +96,12 @@ int take_character(const char **str) {
 int escaped_to_str(const char *str) {
 	return take_character(&str);
 }
+
+uint64_t gen_mask(unsigned char left_pad, unsigned char right_pad) {
+    uint64_t start = ~0;
+
+    start = (start >> right_pad) << right_pad;
+    start = (start << left_pad) >> left_pad;
+
+    return ~start;
+}

@@ -565,6 +565,37 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 		reg_to_scalar(REG_RAX, ins.result);
 	} break;
 
+	case IR_TRUNCATE:
+		if (get_variable_size(ins.truncate.rhs) !=
+			get_variable_size(ins.result))
+			NOTIMP();
+
+		scalar_to_reg(ins.truncate.rhs, REG_RAX);
+		reg_to_scalar(REG_RAX, ins.result);
+		break;
+
+	case IR_SET_BITS: {
+		scalar_to_reg(ins.set_bits.field, REG_RAX);
+		scalar_to_reg(ins.set_bits.value, REG_RBX);
+		uint64_t mask = gen_mask(64 - ins.set_bits.offset - ins.set_bits.length,
+								 ins.set_bits.offset);
+		emit("andq $%d, %rax", mask);
+		emit("shl $%d, %rbx", ins.set_bits.offset);
+		emit("andq $%d, %rbx", ~mask);
+		emit("orq %rbx, %rax", ~mask);
+		reg_to_scalar(REG_RAX, ins.result);
+	} break;
+
+	case IR_GET_BITS:
+		scalar_to_reg(ins.get_bits.field, REG_RAX);
+		emit("shl $%d, %rax", 64 - ins.get_bits.offset - ins.get_bits.length);
+		if (ins.get_bits.sign_extend)
+			emit("sar $%d, %rax", 64 - ins.get_bits.length);
+		else
+			emit("shr $%d, %rax", 64 - ins.get_bits.length);
+		reg_to_scalar(REG_RAX, ins.result);
+		break;
+
 	default:
 		printf("%d\n", ins.type);
 		NOTIMP();

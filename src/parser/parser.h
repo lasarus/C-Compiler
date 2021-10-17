@@ -51,6 +51,9 @@ struct instruction {
 		IR_STACK_ALLOC,
 		IR_POP_STACK_ALLOC,
 		IR_GET_SYMBOL_PTR,
+		IR_TRUNCATE,
+		IR_SET_BITS,
+		IR_GET_BITS,
 
 		IR_TYPE_COUNT
 	} type;
@@ -130,6 +133,11 @@ struct instruction {
 			struct type *result_type, *rhs_type;
 		} cast;
 #define IR_PUSH_CAST(RESULT, RESULT_TYPE, RHS, RHS_TYPE) IR_PUSH(.type = IR_CAST, .result = (RESULT), .cast = {(RHS), (RESULT_TYPE), (RHS_TYPE)})
+		struct {
+			var_id rhs;
+			int sign_extend;
+		} truncate;
+#define IR_PUSH_TRUNCATE(RESULT, RHS, SIGN_EXTEND) IR_PUSH(.type = IR_TRUNCATE, .result = (RESULT), .truncate = {(RHS), (SIGN_EXTEND)})
 
 #define IR_PUSH_VA_START(RESULT) IR_PUSH(.type = IR_VA_START, .result = (RESULT))
 
@@ -144,6 +152,18 @@ struct instruction {
 		} stack_alloc;
 #define IR_PUSH_STACK_ALLOC(RESULT, LENGTH) IR_PUSH(.type = IR_STACK_ALLOC, .result = (RESULT), .stack_alloc = {(LENGTH)})
 #define IR_PUSH_POP_STACK_ALLOC() IR_PUSH(.type = IR_POP_STACK_ALLOC)
+
+		struct {
+			var_id field, value;
+			int offset, length;
+		} set_bits;
+#define IR_PUSH_SET_BITS(RESULT, FIELD, VALUE, OFFSET, LENGTH) IR_PUSH(.type = IR_SET_BITS, .result = (RESULT), .set_bits = {(FIELD), (VALUE), (OFFSET), (LENGTH)})
+
+		struct {
+			var_id field;
+			int offset, length, sign_extend;
+		} get_bits;
+#define IR_PUSH_GET_BITS(RESULT, FIELD, OFFSET, LENGTH, SIGN_EXTEND) IR_PUSH(.type = IR_GET_BITS, .result = (RESULT), .get_bits = {(FIELD), (OFFSET), (LENGTH), (SIGN_EXTEND)})
 	};
 };
 

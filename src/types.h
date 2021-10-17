@@ -103,8 +103,10 @@ struct struct_data {
 	int n;
 	char **names;
 	struct type **types;
+	int *bitfields; // -1 means no bitfield.
 
 	int *offsets;
+	int *bit_offsets;
 	int alignment, size;
 
 	int flexible;

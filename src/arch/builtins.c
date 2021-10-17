@@ -15,6 +15,9 @@ void builtins_init(void) {
 	struct type *vptr = type_pointer(type_simple(ST_VOID));
 	struct type **members = malloc(sizeof(*members) * 4);
 	char **names = malloc(sizeof(*names) * 4);
+	int *bitfields = malloc(sizeof *bitfields * 4);
+	for (int i = 0; i < 4; i++)
+		bitfields[i] = -1;
 	members[0] = uint;
 	names[0] = "gp_offset";
 	members[1] = uint;
@@ -30,7 +33,8 @@ void builtins_init(void) {
 		.is_complete = 1,
 		.n = 4,
 		.types = members,
-		.names = names
+		.names = names,
+		.bitfields = bitfields
 	};
 
 	calculate_offsets(struct_data);

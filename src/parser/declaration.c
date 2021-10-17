@@ -322,6 +322,7 @@ int parse_struct(struct type_specifiers *ts) {
 	if (TACCEPT(T_LBRACE)) {
 		char **names = NULL;
 		struct type **types = NULL;
+		int *bitfields = NULL;
 		int n = 0;
 
 		struct specifiers s;
@@ -330,16 +331,46 @@ int parse_struct(struct type_specifiers *ts) {
 			int found_one = 0;
 			struct type_ast *ast = NULL;
 			int was_abstract = 1;
-			while ((ast = parse_declarator(&was_abstract))) {
-				found_one = 1;
-				if (was_abstract)
-					ERROR("Can't have abstract in struct declaration");
+			while (1) {
+				struct type *type = NULL;
+				char *name = NULL;
+				int bitfield = -1;
+				int needs_bitfield = 0;
+
+				if ((ast = parse_declarator(&was_abstract))) {
+					found_one = 1;
+					if (was_abstract)
+						ERROR("Can't have abstract in struct declaration");
+
+					type = ast_to_type(&s.ts, ast, &name);
+				} else {
+					needs_bitfield = 1;
+				}
+
+				if (TACCEPT(T_COLON)) {
+					type = ast_to_type(&s.ts, NULL, NULL);
+					struct expr *bitfield_expr = parse_assignment_expression();
+					struct constant *c = expression_to_constant(
+						expression_cast(bitfield_expr, type_simple(ST_INT)));
+					if (!c)
+						ERROR("Bit-field must be a constant expression");
+					if (!type_is_simple(c->data_type, ST_INT))
+						ERROR("Bit-field must an integer");
+					assert(c->type == CONSTANT_TYPE);
+					bitfield = c->int_d;
+				} else if (needs_bitfield) {
+					break;
+				}
 
 				n++;
 				types = realloc(types, n * sizeof(*types));
 				names = realloc(names, n * sizeof(*names));
+				bitfields = realloc(bitfields, n * sizeof(*bitfields));
 
-				types[n - 1] = ast_to_type(&s.ts, ast, &names[n - 1]);
+				types[n - 1] = type;
+				names[n - 1] = name;
+				bitfields[n - 1] = bitfield;
+
 				TACCEPT(T_COMMA);
 			}
 
@@ -350,8 +381,10 @@ int parse_struct(struct type_specifiers *ts) {
 					n++;
 					types = realloc(types, n * sizeof(*types));
 					names = realloc(names, n * sizeof(*names));
+					bitfields = realloc(bitfields, n * sizeof(*names));
 					names[n - 1] = NULL;
 					types[n - 1] = s.ts.data_type;
+					bitfields[n - 1] = -1;
 				} else {
 					ERROR("!!!");
 				}
@@ -391,6 +424,7 @@ int parse_struct(struct type_specifiers *ts) {
 
 			.names = names,
 			.types = types,
+			.bitfields = bitfields,
 
 			.name = name
 		};

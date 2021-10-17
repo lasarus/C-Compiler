@@ -25,4 +25,6 @@ int take_character(const char **str);
 
 char *strdup(const char *s);
 
+uint64_t gen_mask(unsigned char left_pad, unsigned char right_pad);
+
 #endif

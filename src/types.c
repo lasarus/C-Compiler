@@ -230,7 +230,7 @@ int type_member_idx(struct type *type,
 		ERROR("Member access on incomplete type not allowed");
 
 	for (int i = 0; i < data->n; i++) {
-		if (strcmp(name, data->names[i]) == 0)
+		if (data->names[i] && strcmp(name, data->names[i]) == 0)
 			return i;
 	}
 
@@ -384,6 +384,9 @@ void merge_anonymous(struct struct_data *data) {
 		int offset = data->offsets[i];
 		struct type *type = data->types[i];
 
+		if (type->type != TY_STRUCT)
+			continue; // It is probably an anonymous bit-field.
+
 		assert(type->type == TY_STRUCT);
 		struct struct_data *sub_data = type->struct_data;
 
@@ -398,11 +401,15 @@ void merge_anonymous(struct struct_data *data) {
 		data->names = realloc(data->names, sizeof *data->names * new_n);
 		data->types = realloc(data->types, sizeof *data->types * new_n);
 		data->offsets = realloc(data->offsets, sizeof *data->offsets * new_n);
+		data->bitfields = realloc(data->bitfields, sizeof *data->bitfields * new_n);
+		data->bit_offsets = realloc(data->bit_offsets, sizeof *data->bit_offsets * new_n);
 
 		for (int j = 0; j < data->n - i - 1; j++) {
 			data->names[i + n_new_elements + j] = data->names[i + 1 + j];
 			data->types[i + n_new_elements + j] = data->types[i + 1 + j];
 			data->offsets[i + n_new_elements + j] = data->offsets[i + 1 + j];
+			data->bitfields[i + n_new_elements + j] = data->bitfields[i + 1 + j];
+			data->bit_offsets[i + n_new_elements + j] = data->bit_offsets[i + 1 + j];
 		}
 
 		data->n = new_n;
@@ -411,6 +418,8 @@ void merge_anonymous(struct struct_data *data) {
 			data->names[i + j] = sub_data->names[j];
 			data->types[i + j] = sub_data->types[j];
 			data->offsets[i + j] = sub_data->offsets[j] + offset;
+			data->bitfields[i + j] = sub_data->bitfields[j];
+			data->bit_offsets[i + j] = sub_data->bit_offsets[j];
 		}
 
 		i += n_new_elements - 1;

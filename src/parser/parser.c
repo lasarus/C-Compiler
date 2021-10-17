@@ -193,6 +193,27 @@ const char *instruction_to_str(struct instruction ins) {
 			  ins.pointer_diff.rhs);
 		break;
 
+	case IR_GET_BITS:
+		PRINT("%d = get bits from %d, [%d - %d], se: %d", ins.result,
+			  ins.get_bits.field,
+			  ins.get_bits.offset,
+			  ins.get_bits.length,
+			  ins.get_bits.sign_extend);
+		break;
+
+	case IR_SET_BITS:
+		PRINT("%d = set bits to %d, value: %d, [%d - %d]", ins.result,
+			  ins.set_bits.field,
+			  ins.set_bits.value,
+			  ins.set_bits.offset,
+			  ins.set_bits.length);
+		break;
+
+	case IR_TRUNCATE:
+		PRINT("%d = truncate %d, se: %d", ins.result,
+			  ins.truncate.rhs, ins.truncate.sign_extend);
+		break;
+
 	default:
 		printf("%d", ins.type);
 		NOTIMP();
