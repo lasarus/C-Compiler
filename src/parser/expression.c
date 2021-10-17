@@ -450,33 +450,33 @@ void address_store(var_id address, var_id value) {
 	IR_PUSH_STORE(value, address);
 }
 
-int write_to_bitfield(struct expr *member, var_id value) {
-	if (member->type != E_DOT_OPERATOR)
-		return 0;
+/* int write_to_bitfield(struct expr *member, var_id value) { */
+/* 	if (member->type != E_DOT_OPERATOR) */
+/* 		return 0; */
 
-	struct struct_data *data = member->member.lhs->data_type->struct_data;
-	int idx = member->member.member_idx;
+/* 	struct struct_data *data = member->member.lhs->data_type->struct_data; */
+/* 	int idx = member->member.member_idx; */
 
-	if (data->bitfields[idx] == -1)
-		return 0;
+/* 	if (data->bitfields[idx] == -1) */
+/* 		return 0; */
 
-	var_id address = expression_to_address(member->member.lhs);
-	int offset = data->offsets[idx];
+/* 	var_id address = expression_to_address(member->member.lhs); */
+/* 	int offset = data->offsets[idx]; */
 
-	IR_PUSH_GET_OFFSET(address, address, offset);
+/* 	IR_PUSH_GET_OFFSET(address, address, offset); */
 
-	var_id prev = new_variable(data->types[idx], 1);
-	var_id tvalue = new_variable(data->types[idx], 1);
+/* 	var_id prev = new_variable(data->types[idx], 1); */
+/* 	var_id tvalue = new_variable(data->types[idx], 1); */
 
-	IR_PUSH_TRUNCATE(tvalue, value, 0);
-	IR_PUSH_LOAD(prev, address);
+/* 	IR_PUSH_TRUNCATE(tvalue, value, 0); */
+/* 	IR_PUSH_LOAD(prev, address); */
 
-	IR_PUSH_SET_BITS(prev, prev, tvalue, data->bit_offsets[idx], data->bitfields[idx]);
+/* 	IR_PUSH_SET_BITS(prev, prev, tvalue, data->bit_offsets[idx], data->bitfields[idx]); */
 
-	IR_PUSH_STORE(prev, address);
+/* 	IR_PUSH_STORE(prev, address); */
 
-	return 1;
-}
+/* 	return 1; */
+/* } */
 
 var_id bitfield_load(struct bitfield_address address, struct type *type) {
 	var_id ret = new_variable(type, 1);
@@ -643,20 +643,9 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 	} break;
 
 	case E_ASSIGNMENT: {
-		// write_to_bitfield(member_expr, value) value is var_id
-		// read_from_bitfield(member_expr, result) result is var_id?
 		var_id rhs = expression_to_ir(expression_cast(expr->args[1], expr->args[0]->data_type));
-		if (expr->args[0]->type == E_DOT_OPERATOR &&
-			expr->args[0]->member.lhs->data_type->type == TY_STRUCT &&
-			expr->args[0]->member.lhs->data_type->struct_data->bitfields[expr->args[0]->member.member_idx] != -1) {
-			write_to_bitfield(expr->args[0], rhs);
-			return rhs;
-		} else {
-			var_id address = expression_to_address(expr->args[0]);
-
-			address_store(address, rhs);
-			return rhs;
-		}
+		bitfield_store(expression_to_bitfield_address(expr->args[0]), rhs);
+		return rhs;
 	}
 
 	case E_ASSIGNMENT_OP: {
