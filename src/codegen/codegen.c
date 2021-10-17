@@ -579,9 +579,11 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 		scalar_to_reg(ins.set_bits.value, REG_RBX);
 		uint64_t mask = gen_mask(64 - ins.set_bits.offset - ins.set_bits.length,
 								 ins.set_bits.offset);
-		emit("andq $%d, %%rax", mask);
+		emit("movabsq $%lld, %%rdx", mask);
+		emit("andq %%rdx, %%rax");
 		emit("shl $%d, %%rbx", ins.set_bits.offset);
-		emit("andq $%d, %%rbx", ~mask);
+		emit("notq %%rdx");
+		emit("andq %%rdx, %%rbx");
 		emit("orq %%rbx, %%rax");
 		reg_to_scalar(REG_RAX, ins.result);
 	} break;
