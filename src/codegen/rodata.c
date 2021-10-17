@@ -101,13 +101,11 @@ void codegen_initializer(struct type *type,
 						 struct initializer *init) {
 	// TODO: Make this more portable.
 	int size = calculate_size(type);
-	if (size > 4096) {
-		printf("Size: %d\n", size);
-		NOTIMP();
-	}
-	uint8_t buffer[size];
-	label_id labels[size];
-	int is_label[size];
+
+	uint8_t *buffer = malloc(sizeof *buffer * size);
+	label_id *labels = malloc(sizeof *labels * size);
+	int *is_label = malloc(sizeof *is_label * size);
+
 	for (int i = 0; i < size; i++) {
 		buffer[i] = 0;
 		is_label[i] = 0;
@@ -152,6 +150,10 @@ void codegen_initializer(struct type *type,
 			emit(".byte %d", (int)buffer[i]);
 		}
 	}
+
+	free(buffer);
+	free(labels);
+	free(is_label);
 }
 
 void codegen_static_var(struct static_var *static_var) {
