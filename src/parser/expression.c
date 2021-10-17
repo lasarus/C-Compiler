@@ -404,6 +404,40 @@ var_id expression_to_address(struct expr *expr) {
 	}
 }
 
+struct bitfield_address {
+	var_id address;
+	int bitfield, offset, sign_extend;
+};
+
+struct bitfield_address expression_to_bitfield_address(struct expr *expr) {
+	struct bitfield_address out = { .bitfield = -1 };
+	if (expr->type != E_DOT_OPERATOR) {
+		out.address = expression_to_address(expr);
+	} else {
+		struct struct_data *data = expr->member.lhs->data_type->struct_data;
+		int idx = expr->member.member_idx;
+
+		if (data->bitfields[idx] == -1) {
+			out.address = expression_to_address(expr);
+		} else {
+			out.address = expression_to_address(expr->member.lhs);
+			int offset = data->offsets[idx];
+
+			IR_PUSH_GET_OFFSET(out.address, out.address, offset);
+
+			out.bitfield = data->bitfields[idx];
+			out.offset = data->bit_offsets[idx];
+
+			assert(data->types[idx]->type == TY_SIMPLE);
+
+			if (is_signed(data->types[idx]->simple))
+				out.sign_extend = 1;
+		}
+	}
+
+	return out;
+}
+
 var_id address_load(var_id address, struct type *type) {
 	var_id ret = new_variable(type, 1);
 
@@ -444,30 +478,46 @@ int write_to_bitfield(struct expr *member, var_id value) {
 	return 1;
 }
 
-int read_from_bitfield(struct expr *member, var_id value) {
-	if (member->type != E_DOT_OPERATOR)
-		return 0;
+var_id bitfield_load(struct bitfield_address address, struct type *type) {
+	var_id ret = new_variable(type, 1);
+	if (address.bitfield == -1) {
+		IR_PUSH_LOAD(ret, address.address);
+		return ret;
+	} else {
+		IR_PUSH_LOAD(ret, address.address);
+		IR_PUSH_GET_BITS(ret, ret, address.offset, address.bitfield, address.sign_extend);
+		return ret;
+	}
 
-	struct struct_data *data = member->member.lhs->data_type->struct_data;
-	int idx = member->member.member_idx;
+	/* return ret; */
 
-	if (data->bitfields[idx] == -1)
-		return 0;
+	/* assert(data->types[idx]->type == TY_SIMPLE); */
 
-	assert(data->types[idx]->type == TY_SIMPLE);
+	/* var_id address = expression_to_address(member->member.lhs); */
+	/* int offset = data->offsets[idx]; */
 
-	var_id address = expression_to_address(member->member.lhs);
-	int offset = data->offsets[idx];
+	/* IR_PUSH_GET_OFFSET(address, address, offset); */
+	/* var_id prev = new_variable(data->types[idx], 1); */
+	/* IR_PUSH_LOAD(prev, address); */
 
-	IR_PUSH_GET_OFFSET(address, address, offset);
-	var_id prev = new_variable(data->types[idx], 1);
-	IR_PUSH_LOAD(prev, address);
+	/* int sign_extend = is_signed(data->types[idx]->simple); */
 
-	int sign_extend = is_signed(data->types[idx]->simple);
+	/* IR_PUSH_GET_BITS(value, prev, data->bit_offsets[idx], data->bitfields[idx], sign_extend); */
 
-	IR_PUSH_GET_BITS(value, prev, data->bit_offsets[idx], data->bitfields[idx], sign_extend);
+	/* return 1; */
+}
 
-	return 1;
+void bitfield_store(struct bitfield_address address, var_id value) {
+	if (address.bitfield == -1) {
+		IR_PUSH_STORE(value, address.address);
+	} else {
+		var_id prev = new_variable_sz(get_variable_size(value), 1);
+		IR_PUSH_LOAD(prev, address.address);
+
+		IR_PUSH_SET_BITS(prev, prev, value, address.offset, address.bitfield);
+
+		IR_PUSH_STORE(prev, address.address);
+	}
 }
 
 var_id expression_to_ir_result(struct expr *expr, var_id res) {
@@ -569,8 +619,8 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 	case E_POSTFIX_INC: {
 		struct type *type = expr->data_type;
 
-		var_id address = expression_to_address(expr->args[0]);
-		var_id value = address_load(address, expr->args[0]->data_type);
+		struct bitfield_address address = expression_to_bitfield_address(expr->args[0]);
+		var_id value = bitfield_load(address, expr->args[0]->data_type);
 		IR_PUSH_COPY(res, value);
 
 		if (type->type == TY_POINTER) {
@@ -588,7 +638,7 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 			else
 				IR_PUSH_BINARY_OPERATOR(OP_ADD, OT_INT, value, constant_one, value);
 		}
-		address_store(address, value);
+		bitfield_store(address, value);
 		return res;
 	} break;
 
@@ -613,25 +663,31 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		struct expr *a_expr = expr->args[0];
 		int is_cast = a_expr->type == E_CAST;
 
-		var_id ac, aptr, a; // a is unused if not a_expr is not E_CAST.
+		var_id ac, a; // a is unused if not a_expr is not E_CAST.
+		struct bitfield_address address;
 
 		struct type *inner_type = NULL;
 		if (is_cast) {
 			if (a_expr->cast.arg->type == E_CAST) {
 				// A double cast can sometimes occur.
 				// char += long => (long)(int)char += long
-				aptr = expression_to_address(a_expr->cast.arg->cast.arg);
+				address = expression_to_bitfield_address(a_expr->cast.arg->cast.arg);
+				//aptr = expression_to_address(a_expr->cast.arg->cast.arg);
 				inner_type = a_expr->cast.arg->cast.arg->data_type;
 			} else {
-				aptr = expression_to_address(a_expr->cast.arg);
+				address = expression_to_bitfield_address(a_expr->cast.arg);
+				//aptr = expression_to_address(a_expr->cast.arg);
 				inner_type = a_expr->cast.arg->data_type;
 			}
-			a = address_load(aptr, inner_type);
+			a = bitfield_load(address, inner_type);
+			//a = address_load(aptr, inner_type);
 			ac = new_variable(a_expr->cast.target, 1);
 			IR_PUSH_CAST(ac, a_expr->cast.target, a, inner_type);
 		} else {
-			aptr = expression_to_address(a_expr);
-			ac = address_load(aptr, expr->data_type);
+			address = expression_to_bitfield_address(a_expr);
+				//aptr = expression_to_address(a_expr);
+			//ac = address_load(aptr, expr->data_type);
+			ac = bitfield_load(address, expr->data_type);
 		}
 
 		var_id bc = expression_to_ir(expr->args[1]);
@@ -639,13 +695,13 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		IR_PUSH_BINARY_OPERATOR(expr->binary_op,
 								ot_from_type(expr->args[1]->data_type),
 								ac, bc, ac);
-
+		
 		if (is_cast) {
 			IR_PUSH_CAST(a, inner_type, ac, expr->args[1]->data_type);
-			address_store(aptr, a);
+			bitfield_store(address, a);
 			return a;
 		} else {
-			address_store(aptr, ac);
+			bitfield_store(address, ac);
 			return ac;
 		}
 	}

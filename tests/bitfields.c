@@ -5,6 +5,7 @@
 struct S {
 	int a : 2, b : 2;
 	int : 1, k : 3,:2,:4;
+	unsigned int val : 2;
 	int l : 3, z : 12;
 	int c;
 	union {
@@ -14,27 +15,26 @@ struct S {
 	};
 };
 
-typedef union _ND_OPERAND_ACCESS
-{
-	uint8_t Access;
-	struct
-	{
-		uint8_t Read : 2; // The operand is read.
-		uint8_t Write : 2; // The operand is written.
-		uint8_t CondRead : 2; // The operand is read only under some conditions.
-		uint8_t CondWrite : 2; // The operand is written only under some conditions.
-		uint8_t Prefetch : 2; // The operand is prefetched.
-	};
-} ND_OPERAND_ACCESS;
-
 int main() {
 	struct S s;
-	s.b = 1 + 4;
+	s.val = 0;
+
+	for (int i = 0; i < 10; i++) {
+		assert(i % 4 == s.val);
+		s.val += 1;
+	}
+
+	s.val = 0;
+
+	for (int i = 0; i < 10; i++) {
+		assert(i % 4 == s.val);
+		s.val++;
+	}
+
+	s.a = 4 + 1;
+	assert(s.a == 1);
+
 	s.shared_1 = 3;
-
-	assert (s.b == 1);
-	assert (s.shared_2 == 3);
-	assert (s.shared_2 == s.shared_3);
-
-	return 0;
+	assert(s.shared_2 == s.shared_3);
+	assert(s.shared_2 == 3);
 }
