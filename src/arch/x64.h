@@ -70,7 +70,10 @@ struct constant {
 		char *str_d;
 		// TODO: floating point.
 
-		label_id label;
+		struct {
+			label_id label;
+			int64_t offset;
+		} label;
 	};
 };
 

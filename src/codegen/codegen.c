@@ -322,9 +322,17 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 
 		case CONSTANT_LABEL:
 			if (codegen_flags.cmodel == CMODEL_LARGE) {
-				emit("movabsq $%s, %%rdi", rodata_get_label_string(c.label));
+				if (c.label.offset == 0) {
+					emit("movabsq $%s, %%rdi", rodata_get_label_string(c.label.label));
+				} else
+					emit("movabsq $%s+%lld, %%rdi", rodata_get_label_string(c.label.label),
+						c.label.offset);
 			} else if (codegen_flags.cmodel == CMODEL_SMALL) {
-				emit("movq $%s, %%rdi", rodata_get_label_string(c.label));
+				if (c.label.offset == 0) {
+					emit("movq $%s, %%rdi", rodata_get_label_string(c.label.label));
+				} else
+					emit("movq $%s+%lld, %%rdi", rodata_get_label_string(c.label.label),
+						c.label.offset);
 			}
 			emit("leaq -%d(%%rbp), %%rsi", variable_info[ins.result].stack_location);
 			codegen_memcpy(get_variable_size(ins.result));
@@ -332,10 +340,18 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 
 		case CONSTANT_LABEL_POINTER:
 			if (codegen_flags.cmodel == CMODEL_LARGE) {
-				emit("movabsq $%s, %%rax", rodata_get_label_string(c.label));
+				if (c.label.offset == 0)
+					emit("movabsq $%s, %%rax", rodata_get_label_string(c.label.label));
+				else
+					emit("movabsq $%s+%lld, %%rax", rodata_get_label_string(c.label.label),
+						c.label.offset);
 				emit("movq %%rax, -%d(%%rbp)", variable_info[ins.result].stack_location);
 			} else if (codegen_flags.cmodel == CMODEL_SMALL) {
-				emit("movq $%s, -%d(%%rbp)", rodata_get_label_string(c.label), variable_info[ins.result].stack_location);
+				if (c.label.offset == 0) {
+					emit("movq $%s, -%d(%%rbp)", rodata_get_label_string(c.label.label), variable_info[ins.result].stack_location);
+				} else {
+					emit("movq $%s+%lld, -%d(%%rbp)", rodata_get_label_string(c.label.label), c.label.offset, variable_info[ins.result].stack_location);
+				}
 			}
 			break;
 
@@ -558,10 +574,21 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 
 	case IR_GET_SYMBOL_PTR: {
 		if (codegen_flags.cmodel == CMODEL_SMALL) {
-			emit("movq $%s, %%rax", ins.get_symbol_ptr.label);
+			if (ins.get_symbol_ptr.offset == 0) {
+				emit("movq $%s, %%rax", ins.get_symbol_ptr.label);
+			} else {
+				emit("movq $%s+%lld, %%rax", ins.get_symbol_ptr.label,
+					ins.get_symbol_ptr.offset);
+			}
 		} else if (codegen_flags.cmodel == CMODEL_LARGE) {
-			emit("movabsq $%s, %%rax", ins.get_symbol_ptr.label);
+			if (ins.get_symbol_ptr.offset == 0) {
+				emit("movabsq $%s, %%rax", ins.get_symbol_ptr.label);
+			} else {
+				emit("movabsq $%s+%lld, %%rax", ins.get_symbol_ptr.label,
+					ins.get_symbol_ptr.offset);
+			}
 		}
+
 		reg_to_scalar(REG_RAX, ins.result);
 	} break;
 

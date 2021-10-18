@@ -391,7 +391,7 @@ var_id expression_to_address(struct expr *expr) {
 		assert(c->type == CONSTANT_LABEL);
 
 		var_id ptr_result = new_variable(type_pointer(expr->data_type), 1);
-		IR_PUSH_GET_SYMBOL_PTR(rodata_get_label_string(c->label), ptr_result);
+		IR_PUSH_GET_SYMBOL_PTR(rodata_get_label_string(c->label.label), c->label.offset, ptr_result);
 		return ptr_result;
 	}
 
@@ -877,7 +877,8 @@ struct expr *parse_prefix() {
 					.constant = {
 						.type = CONSTANT_LABEL,
 						.data_type = sym->label.type,
-						.label = register_label_name(sym->label.name)
+						.label.label = register_label_name(sym->label.name),
+						.label.offset = 0
 					}
 				});
 			/* return expr_new((struct expr) { */
@@ -1152,7 +1153,39 @@ int evaluate_constant_expression(struct expr *expr,
 			return 0;
 		if (rhs.type == CONSTANT_LABEL)
 			return 0;
+		if (type_is_pointer(rhs.data_type) &&
+			!type_is_pointer(expr->cast.target))
+			return 0;
 		*constant = constant_cast(rhs, expr->cast.target);
+	} break;
+
+	case E_POINTER_SUB:
+	case E_POINTER_ADD: {
+		struct constant lhs, rhs;
+		if (!evaluate_constant_expression(expr->args[0], &lhs))
+			return 0;
+		if (!evaluate_constant_expression(expr->args[1], &rhs))
+			return 0;
+
+		if (lhs.type == CONSTANT_LABEL) {
+			return 0;
+		}
+
+		if (lhs.type == CONSTANT_LABEL_POINTER &&
+			type_is_simple(rhs.data_type, ST_INT)) {
+			*constant = lhs;
+			int size = calculate_size(type_deref(lhs.data_type));
+
+			if (expr->type == E_POINTER_ADD) {
+				constant->label.offset = rhs.int_d * size;
+			} else if (expr->type == E_POINTER_SUB) {
+				constant->label.offset = -rhs.int_d * size;
+			}
+
+			return 1;
+		}
+
+		return 0;
 	} break;
 
 	case E_BINARY_OP: {
@@ -1162,8 +1195,9 @@ int evaluate_constant_expression(struct expr *expr,
 		if (!evaluate_constant_expression(expr->args[1], &rhs))
 			return 0;
 		if (lhs.type == CONSTANT_LABEL ||
-			rhs.type == CONSTANT_LABEL)
+			rhs.type == CONSTANT_LABEL) {
 			return 0;
+		}
 		*constant = operators_constant(expr->binary_op, lhs, rhs);
 	} break;
 
@@ -1190,7 +1224,8 @@ int evaluate_constant_expression(struct expr *expr,
 			*constant = c;
 			constant->data_type = type_pointer(expr->args[0]->data_type->children[0]);
 			constant->type = CONSTANT_LABEL_POINTER;
-			constant->label = rodata_register(c.str_d);
+			constant->label.label = rodata_register(c.str_d);
+			constant->label.offset = 0;
 		}
 	} break;
 
@@ -1229,6 +1264,21 @@ int evaluate_constant_expression(struct expr *expr,
 		if (operand.type == CONSTANT_LABEL) {
 			*constant = operand;
 			constant->type = CONSTANT_LABEL_POINTER;
+			constant->data_type = expr->data_type;
+		} else {
+			return 0;
+		}
+	} break;
+
+	case E_INDIRECTION: {
+		struct constant operand;
+		if (!evaluate_constant_expression(expr->args[0], &operand)) {
+			return 0;
+		}
+
+		if (operand.type == CONSTANT_LABEL_POINTER) {
+			*constant = operand;
+			constant->type = CONSTANT_LABEL;
 			constant->data_type = expr->data_type;
 		} else {
 			return 0;

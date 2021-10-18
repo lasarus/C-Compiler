@@ -118,8 +118,9 @@ struct instruction {
 #define IR_PUSH_CONSTANT(CONSTANT, RESULT) IR_PUSH(.type = IR_CONSTANT, .result=(RESULT), .constant = {(CONSTANT)})
 		struct {
 			const char *label;
+			int64_t offset;
 		} get_symbol_ptr;
-#define IR_PUSH_GET_SYMBOL_PTR(STR, RESULT) IR_PUSH(.type = IR_GET_SYMBOL_PTR, .result=(RESULT), .get_symbol_ptr = {(STR)})
+#define IR_PUSH_GET_SYMBOL_PTR(STR, OFFSET, RESULT) IR_PUSH(.type = IR_GET_SYMBOL_PTR, .result=(RESULT), .get_symbol_ptr = {(STR), (OFFSET)})
 		struct {
 			var_id function;
 			struct type *function_type;

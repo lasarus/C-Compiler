@@ -104,12 +104,14 @@ void codegen_initializer(struct type *type,
 
 	uint8_t *buffer = malloc(sizeof *buffer * size);
 	label_id *labels = malloc(sizeof *labels * size);
+	int64_t *label_offsets = malloc(sizeof *label_offsets * size);
 	int *is_label = malloc(sizeof *is_label * size);
 
 	for (int i = 0; i < size; i++) {
 		buffer[i] = 0;
 		is_label[i] = 0;
-		labels[i] = 1337;
+		labels[i] = 0;
+		label_offsets[i] = 0;
 	}
 
 	for (int i = 0; i < init->n; i++) {
@@ -127,7 +129,8 @@ void codegen_initializer(struct type *type,
 
 		case CONSTANT_LABEL_POINTER:
 			is_label[offset] = 1;
-			labels[offset] = c->label;
+			labels[offset] = c->label.label;
+			label_offsets[offset] = c->label.offset;
 			break;
 
 		case CONSTANT_LABEL:
@@ -141,18 +144,33 @@ void codegen_initializer(struct type *type,
 
 	for (int i = 0; i < size; i++) {
 		if (is_label[i]) {
-			emit(".quad %s", rodata_get_label_string(labels[i]));
+			if (label_offsets[i] == 0)
+				emit(".quad %s", rodata_get_label_string(labels[i]));
+			else
+				emit(".quad %s+%lld", rodata_get_label_string(labels[i]),
+					label_offsets[i]);
 			i += 7;
 		} else {
+			int how_long = 0;
+			for (; how_long < 8; how_long++) {
+				if (is_label[i + how_long])
+					break;
+			}
 			//TODO: This shouldn't need an integer cast.
 			// But right now I can't be bothered to implement
 			// implicit integer casts for variadic functions.
-			emit(".byte %d", (int)buffer[i]);
+			if (how_long == 8) {
+				emit(".quad %ld", *(uint64_t *)(buffer + i));
+				i += how_long - 1;
+			} else {
+				emit(".byte %d", (int)buffer[i]);
+			}
 		}
 	}
 
 	free(buffer);
 	free(labels);
+	free(label_offsets);
 	free(is_label);
 }
 
