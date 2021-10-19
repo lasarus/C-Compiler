@@ -468,7 +468,7 @@ static struct constant integer_constant_from_string(const char *str) {
 	unsigned long long parsed = 0;
 	const char *start = str;
 
-	int is_hex = str[0] == '0' && str[1] == 'x';
+	int is_hex = str[0] == '0' && (str[1] == 'x' || str[1] == 'X');
 	if (is_hex)
 		start += 2;
 
