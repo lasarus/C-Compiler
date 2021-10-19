@@ -424,7 +424,47 @@ struct constant constant_one(struct type *type) {
 	return constant_increment(constant_zero(type));
 }
 
-struct constant constant_from_string(const char *str) {
+// Basically if string is not of the format (0x|0X)[0-9a-fA-F]+[ulUL]*
+int is_float(const char *str) {
+	if (str[0] == '0' && (str[1] == 'x' || str[1] == 'X'))
+		str += 2;
+	// [0-9]*
+	for (; *str; str++)
+		if (!((*str >= '0' && *str <= '9') ||
+			  (*str >= 'a' && *str <= 'f') ||
+			  (*str >= 'A' && *str <= 'F')))
+			break;
+
+	// [ulUL]*
+	for (; *str; str++) {
+		if (!(*str == 'u' || *str == 'U' ||
+			  *str == 'l' || *str == 'L')) {
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+static struct constant floating_point_constant_from_string(const char *str) {
+	double d = strtod(str, NULL);
+	char suffix = str[strlen(str) - 1];
+
+	struct constant res = { .type = CONSTANT_TYPE };
+	if (suffix == 'f' || suffix == 'F') {
+		res.data_type = type_simple(ST_FLOAT);
+		res.float_d = d;
+	} else if (suffix == 'l' || suffix == 'L') {
+		ERROR("Constants of type long double is not supported by this compiler. %s", str);
+	} else {
+		res.data_type = type_simple(ST_DOUBLE);
+		res.double_d = d;
+	}
+
+	return res;
+}
+
+static struct constant integer_constant_from_string(const char *str) {
 	unsigned long long parsed = 0;
 	const char *start = str;
 
@@ -471,6 +511,8 @@ struct constant constant_from_string(const char *str) {
 			start += 1;
 			allow_unsigned = 1;
 			allow_signed = 0;
+		} else {
+			ERROR("Invalid format of integer constant: %s", str);
 		}
 	}
 
@@ -501,6 +543,14 @@ struct constant constant_from_string(const char *str) {
 	return res;
 }
 
+struct constant constant_from_string(const char *str) {
+	if (is_float(str)) {
+		return floating_point_constant_from_string(str);
+	} else {
+		return integer_constant_from_string(str);
+	}
+}
+
 struct constant simple_cast(struct constant from, enum simple_type target) {
 	assert(from.type == CONSTANT_TYPE);
 	assert(from.data_type->type == TY_SIMPLE);
@@ -519,6 +569,8 @@ struct constant simple_cast(struct constant from, enum simple_type target) {
 		case ST_ULONG: from.NAME = from.ulong_d; break;\
 		case ST_LLONG: from.NAME = from.llong_d; break;\
 		case ST_ULLONG: from.NAME = from.ullong_d; break;\
+		case ST_FLOAT: from.NAME = from.float_d; break;\
+		case ST_DOUBLE: from.NAME = from.double_d; break;\
 		default: ERROR("Trying to convert from %s to %s", strdup(type_to_string(from.data_type)), strdup(type_to_string(type_simple(target)))); \
 		}\
 
@@ -535,6 +587,8 @@ struct constant simple_cast(struct constant from, enum simple_type target) {
 	case ST_ULONG: CONVERT_TO(ulong_d); break;
 	case ST_LLONG: CONVERT_TO(llong_d); break;
 	case ST_ULLONG: CONVERT_TO(ullong_d); break;
+	case ST_FLOAT: CONVERT_TO(float_d); break;
+	case ST_DOUBLE: CONVERT_TO(double_d); break;
 	default: ERROR("NOTIMP: %d\n", target);
 	}
 	from.data_type = type_simple(target);
@@ -704,8 +758,15 @@ const char *constant_to_string(struct constant constant) {
 		sprintf(buffer, "%llu", constant.ullong_d);
 		break;
 
+		// TODO: Avoid UB.
 	case ST_FLOAT:
+		sprintf(buffer, "%u", constant.uint_d);
+		break;
+
 	case ST_DOUBLE:
+		sprintf(buffer, "%lu", constant.ulong_d);
+		break;
+		
 	case ST_LDOUBLE:
 	case ST_BOOL:
 	case ST_FLOAT_COMPLEX:

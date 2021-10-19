@@ -14,6 +14,10 @@ int classify_non_recursive(struct type *type, enum parameter_class *class) {
 		case ST_USHORT: case ST_SHORT:
 			*class = CLASS_INTEGER;
 			break;
+		case ST_DOUBLE:
+		case ST_FLOAT:
+			*class = CLASS_SSE;
+			break;
 		default:
 			NOTIMP();
 		}

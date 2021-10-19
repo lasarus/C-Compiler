@@ -87,7 +87,8 @@ void classify_parameters(struct type *return_type, int n_args, struct type **typ
 						 struct classification *classifications,
 						 struct classification *return_classification,
 						 int *total_memory_argument_size,
-						 int *current_gp_reg) {
+						 int *current_gp_reg,
+						 int *current_sse_reg) {
 	if (return_type != type_simple(ST_VOID)) {
 		classify(return_type, &return_classification->n_parts,
 				 return_classification->classes);
@@ -101,10 +102,13 @@ void classify_parameters(struct type *return_type, int n_args, struct type **typ
 			if (return_classification->n_parts > 2)
 				ERROR("Internal compiler error");
 			for (int j = 0; j < return_classification->n_parts; j++) {
-				if (return_classification->classes[j] == CLASS_INTEGER)
+				if (return_classification->classes[j] == CLASS_INTEGER) {
 					return_classification->regs[j] = return_convention[j];
-				else
+				} else if (return_classification->classes[j] == CLASS_SSE) {
+					return_classification->regs[j] = j;
+				} else {
 					NOTIMP();
+				}
 			}
 		}
 	} else {
@@ -113,6 +117,7 @@ void classify_parameters(struct type *return_type, int n_args, struct type **typ
 
 	*total_memory_argument_size = 0;
 	*current_gp_reg = 0;
+	*current_sse_reg = 0;
 	if (return_classification->pass_in_memory)
 		(*current_gp_reg)++;
 
@@ -137,7 +142,16 @@ void classify_parameters(struct type *return_type, int n_args, struct type **typ
 				*total_memory_argument_size += size_rounded;
 			} else {
 				for (int j = 0; j < classification->n_parts; j++) {
-					classification->regs[j] = calling_convention[(*current_gp_reg)++];
+					switch (classification->classes[j]) {
+					case CLASS_INTEGER:
+						classification->regs[j] = calling_convention[(*current_gp_reg)++];
+						break;
+					case CLASS_SSE:
+						classification->regs[j] = (*current_sse_reg)++;
+						break;
+					default:
+						NOTIMP();
+					}
 				}
 				classification->pass_in_memory = 0;
 			}
@@ -146,7 +160,7 @@ void classify_parameters(struct type *return_type, int n_args, struct type **typ
 }
 
 void codegen_call(var_id variable, struct type *function_type, struct type **argument_types, int n_args, var_id *args, var_id result) {
-	int total_memory_argument_size, current_gp_reg;
+	int total_memory_argument_size, current_gp_reg, current_sse_reg;
 	struct type *return_type = function_type->children[0];
 
 	scalar_to_reg(variable, REG_RBX);
@@ -158,7 +172,8 @@ void codegen_call(var_id variable, struct type *function_type, struct type **arg
 						classifications,
 						&return_classification,
 						&total_memory_argument_size,
-						&current_gp_reg);
+						&current_gp_reg,
+						&current_sse_reg);
 
 	if (return_classification.pass_in_memory) {
 		emit("leaq -%d(%%rbp), %%rdi", variable_info[result].stack_location);
@@ -186,6 +201,10 @@ void codegen_call(var_id variable, struct type *function_type, struct type **arg
 					emit("movq -%d(%%rbp), %s",
 						 variable_info[var].stack_location - 8 * i,
 						 get_reg_name(classification->regs[i], 8));
+				} else if (classification->classes[i] == CLASS_SSE) {
+					emit("movsd -%d(%%rbp), %%xmm%d",
+						 variable_info[var].stack_location - 8 * i,
+						 classification->regs[i]);
 				} else {
 					NOTIMP();
 				}
@@ -193,7 +212,7 @@ void codegen_call(var_id variable, struct type *function_type, struct type **arg
 		}
 	}
 
-	emit("movl $0, %%eax");
+	emit("movl $%d, %%eax", current_sse_reg);
 	emit("callq *%%rbx");
 
 	if (!return_classification.pass_in_memory && return_type != type_simple(ST_VOID)) {
@@ -206,6 +225,16 @@ void codegen_call(var_id variable, struct type *function_type, struct type **arg
 					 size_to_suffix(size),
 					 get_reg_name(return_classification.regs[i], size),
 					 variable_info[result].stack_location - 8 * i);
+			} else if (return_classification.classes[i] == CLASS_SSE) {
+				if (get_variable_size(result) == 4) {
+					emit("movss %%xmm%d, -%d(%%rbp)",
+						 return_classification.regs[i],
+						 variable_info[result].stack_location - 8 * i);
+				} else {
+					emit("movsd %%xmm%d, -%d(%%rbp)",
+						 return_classification.regs[i],
+						 variable_info[result].stack_location - 8 * i);
+				}
 			} else {
 				NOTIMP();
 			}
@@ -677,9 +706,15 @@ void codegen_block(struct block *block, struct reg_save_info reg_save_info) {
 				codegen_memcpy(calculate_size(ret_type));
 			} else if (n_parts == 1 && classes[0] == CLASS_INTEGER) {
 				emit("movq -%d(%%rbp), %%rax", variable_info[ret].stack_location);
-			} else if (n_parts == 2) {
+			} else if (n_parts == 2 && classes[0] == CLASS_INTEGER) {
 				emit("movq -%d(%%rbp), %%rax", variable_info[ret].stack_location);
 				emit("movq -%d(%%rbp), %%rdx", variable_info[ret].stack_location - 8);
+			} else if (n_parts == 1 && classes[0] == CLASS_SSE) {
+				if (get_variable_size(ret) == 4) {
+					emit("movss -%d(%%rbp), %%xmm0", variable_info[ret].stack_location);
+				} else {
+					emit("movsd -%d(%%rbp), %%xmm0", variable_info[ret].stack_location);
+				}
 			} else {
 				NOTIMP();
 			}
@@ -718,7 +753,7 @@ void codegen_function(struct function *func) {
 
 	struct type *return_type = func->signature->children[0];
 	int n_args = func->signature->n - 1;
-	int total_memory_argument_size, current_gp_reg;
+	int total_memory_argument_size, current_gp_reg, current_sse_reg;
 	struct classification classifications[n_args];
 	struct classification return_classification;
 
@@ -726,7 +761,8 @@ void codegen_function(struct function *func) {
 						classifications,
 						&return_classification,
 						&total_memory_argument_size,
-						&current_gp_reg);
+						&current_gp_reg,
+						&current_sse_reg);
 
 	if (return_type != type_simple(ST_VOID) &&
 		return_classification.pass_in_memory) {
@@ -796,6 +832,16 @@ void codegen_function(struct function *func) {
 						 size_to_suffix(size),
 						 get_reg_name(classification->regs[i], size),
 						 variable_info[var].stack_location - 8 * i);
+				} else if (classification->classes[i] == CLASS_SSE) {
+					if (get_variable_size(var) == 4) {
+						emit("movss %%xmm%d, -%d(%%rbp)",
+							 classification->regs[i],
+							 variable_info[var].stack_location - 8 * i);
+					} else {
+						emit("movsd %%xmm%d, -%d(%%rbp)",
+							 classification->regs[i],
+							 variable_info[var].stack_location - 8 * i);
+					}
 				} else {
 					NOTIMP();
 				}

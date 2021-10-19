@@ -67,8 +67,10 @@ struct constant {
 		long long llong_d;
 		unsigned long long ullong_d;
 
+		float float_d;
+		double double_d;
+
 		char *str_d;
-		// TODO: floating point.
 
 		struct {
 			label_id label;

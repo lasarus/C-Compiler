@@ -73,7 +73,22 @@ struct constant operators_constant(enum operator_type op,
 		case OP_EQUAL: res.int_d = lhs.FIELD == rhs.FIELD; break;		\
 		case OP_NOT_EQUAL: res.int_d = lhs.FIELD != rhs.FIELD; break;	\
 		default: NOTIMP();									\
-		} break;											\
+		} break;											
+
+#define OPF(TYPE, FIELD) case TYPE:										\
+		switch (op) {													\
+		case OP_ADD: res.FIELD = lhs.FIELD + rhs.FIELD; break;			\
+		case OP_SUB: res.FIELD = lhs.FIELD - rhs.FIELD; break;			\
+		case OP_MUL: res.FIELD = lhs.FIELD * rhs.FIELD; break;			\
+		case OP_DIV: res.FIELD = lhs.FIELD / rhs.FIELD; break;			\
+		case OP_LESS: res.int_d = lhs.FIELD < rhs.FIELD; break;			\
+		case OP_GREATER: res.int_d = lhs.FIELD > rhs.FIELD; break;		\
+		case OP_LESS_EQ: res.int_d = lhs.FIELD <= rhs.FIELD; break;		\
+		case OP_GREATER_EQ: res.int_d = lhs.FIELD >= rhs.FIELD; break;	\
+		case OP_EQUAL: res.int_d = lhs.FIELD == rhs.FIELD; break;		\
+		case OP_NOT_EQUAL: res.int_d = lhs.FIELD != rhs.FIELD; break;	\
+		default: NOTIMP();									\
+		} break;											
 
 	//struct constant res = { -1, NULL, .str_d = "WHAT?" };
 	struct constant res = {
@@ -87,6 +102,8 @@ struct constant operators_constant(enum operator_type op,
 		OP(ST_ULONG, ulong_d);
 		OP(ST_LLONG, llong_d);
 		OP(ST_ULLONG, ullong_d);
+		OPF(ST_FLOAT, float_d);
+		OPF(ST_DOUBLE, double_d);
 	default:
 		NOTIMP();
 	}

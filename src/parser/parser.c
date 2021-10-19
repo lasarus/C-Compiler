@@ -255,6 +255,8 @@ enum operand_type ot_from_st(enum simple_type st) {
 	case ST_ULONG: return OT_ULONG;
 	case ST_LLONG: return OT_LLONG;
 	case ST_ULLONG: return OT_ULLONG;
+	case ST_FLOAT: return OT_FLOAT;
+	case ST_DOUBLE: return OT_DOUBLE;
 	default: ERROR("Invalid operand type %d", st);
 	}
 }

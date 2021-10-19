@@ -16,6 +16,8 @@ enum operand_type {
 	OT_ULONG,
 	OT_LLONG,
 	OT_ULLONG,
+	OT_FLOAT,
+	OT_DOUBLE,
 	OT_PTR,
 
 	OT_TYPE_COUNT
