@@ -558,6 +558,7 @@ struct constant simple_cast(struct constant from, enum simple_type target) {
 #define CONVERT_TO(NAME)\
 		switch (from.data_type->simple) {\
 		case ST_VOID: break;							\
+		case ST_BOOL: from.NAME = from.bool_d; break;\
 		case ST_CHAR: from.NAME = from.char_d; break;\
 		case ST_UCHAR: from.NAME = from.uchar_d; break;\
 		case ST_SCHAR: from.NAME = from.schar_d; break;\
@@ -576,6 +577,7 @@ struct constant simple_cast(struct constant from, enum simple_type target) {
 
 	switch (target) {
 	case ST_VOID: break;
+	case ST_BOOL: CONVERT_TO(bool_d); break;
 	case ST_CHAR: CONVERT_TO(char_d); break;
 	case ST_SCHAR: CONVERT_TO(schar_d); break;
 	case ST_UCHAR: CONVERT_TO(uchar_d); break;
@@ -724,6 +726,9 @@ const char *constant_to_string(struct constant constant) {
 		ERROR("Tried to print type %s to number\n", type_to_string(constant.data_type));
 
 	switch (st) {
+	case ST_BOOL:
+		sprintf(buffer, "%d", constant.bool_d ? 1 : 0);
+		break;
 	case ST_CHAR:
 		sprintf(buffer, "%d", (int)constant.char_d);
 		break;
@@ -768,7 +773,6 @@ const char *constant_to_string(struct constant constant) {
 		break;
 		
 	case ST_LDOUBLE:
-	case ST_BOOL:
 	case ST_FLOAT_COMPLEX:
 	case ST_DOUBLE_COMPLEX:
 	case ST_LDOUBLE_COMPLEX:

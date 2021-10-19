@@ -12,6 +12,7 @@ int classify_non_recursive(struct type *type, enum parameter_class *class) {
 		case ST_LONG: case ST_LLONG:
 		case ST_ULONG: case ST_ULLONG:
 		case ST_USHORT: case ST_SHORT:
+		case ST_BOOL:
 			*class = CLASS_INTEGER;
 			break;
 		case ST_DOUBLE:

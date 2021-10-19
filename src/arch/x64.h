@@ -55,6 +55,7 @@ struct constant {
 	struct type *data_type;
 
 	union {
+		_Bool bool_d;
 		char char_d;
 		signed char schar_d;
 		unsigned char uchar_d;
