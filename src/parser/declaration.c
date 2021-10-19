@@ -348,6 +348,8 @@ int parse_struct(struct type_specifiers *ts) {
 				}
 
 				if (TACCEPT(T_COLON)) {
+					found_one = 1; // Bit-fields can't declare anonymous structs.
+
 					type = ast_to_type(&s.ts, NULL, NULL);
 					struct expr *bitfield_expr = parse_assignment_expression();
 					struct constant *c = expression_to_constant(

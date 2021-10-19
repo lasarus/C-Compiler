@@ -3,6 +3,8 @@
 
 #include <common.h>
 
+#include <time.h>
+
 struct token tokenizer_next();
 #define NEXT() tokenizer_next();
 
@@ -315,15 +317,28 @@ int builtin_macros(struct token *t) {
 		*t = token_init(PP_NUMBER, allocate_printf("%d", t->pos.line), t->pos);
 	} else if (strcmp(t->str, "__FILE__") == 0) {
 		*t = token_init(PP_STRING, allocate_printf("%s", t->pos.path), t->pos);
+	} else if (strcmp(t->str, "__DATE__") == 0) {
+		static const char months[][4] = {
+			"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+			"Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+		};
+
+		time_t ti = time(NULL);
+		struct tm tm = *localtime(&ti);
+		*t = token_init(PP_STRING, allocate_printf("%s %2d %04d", months[tm.tm_mon], tm.tm_mday, 1900 + tm.tm_year), t->pos);
+	} else if (strcmp(t->str, "__TIME__") == 0) {
+		time_t ti = time(NULL);
+		struct tm tm = *localtime(&ti);
+		*t = token_init(PP_STRING, allocate_printf("%02d:%02d:%02d", tm.tm_hour, tm.tm_min, tm.tm_sec), t->pos);
 	} else if (strcmp(t->str, "__STDC__") == 0) {
-		NOTIMP();
+		*t = token_init(PP_NUMBER, "1", t->pos);
 	} else if (strcmp(t->str, "__STDC_HOSTED__") == 0) {
-		NOTIMP();
+		*t = token_init(PP_NUMBER, "0", t->pos);
 	} else if (strcmp(t->str, "__STDC_VERSION__") == 0) {
 		char *version_string = "201710L";
 		*t = token_init(PP_NUMBER, version_string, t->pos);
 	} else if (strcmp(t->str, "__STDC_TIME__") == 0) {
-		NOTIMP();
+		NOTIMP(); // Is this actually a macro that is required by anyone?
 	} else if (strcmp(t->str, "__WORDSIZE") == 0) {
 		*t = token_init(PP_NUMBER, "64", t->pos);
 	} else
