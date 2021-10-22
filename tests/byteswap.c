@@ -14,7 +14,7 @@ unsigned long byteswap(unsigned long x) {
 	return __bswap_constant_64(x);
 }
 
-unsigned long l = 0xff00000000000000ull;
+unsigned long l = 0Xff00000000000000ull;
 
 int main() {
 	assert(__bswap_constant_64(0x1490d7d3f094a6e3ull) == 0xe3a694f0d3d79014ull);
