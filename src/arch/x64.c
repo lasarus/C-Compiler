@@ -468,22 +468,44 @@ static struct constant integer_constant_from_string(const char *str) {
 	unsigned long long parsed = 0;
 	const char *start = str;
 
-	int is_hex = str[0] == '0' && (str[1] == 'x' || str[1] == 'X');
-	if (is_hex)
+	enum {
+		BASE_DECIMAL,
+		BASE_HEXADECIMAL,
+		BASE_OCTAL
+	} base = BASE_DECIMAL;
+	if (str[0] == '0') {
+		if (str[1] == 'x' || str[1] == 'X')
+			base = BASE_HEXADECIMAL;
+		else
+			base = BASE_OCTAL;
+	} else if (str[0] >= '1' && str[0] <= '9') {
+		base = BASE_DECIMAL;
+	} else {
+		ERROR("%s has unknown base encoding.", str);
+	}
+
+	if (base == BASE_HEXADECIMAL)
 		start += 2;
 
-	if (!is_hex && str[0] == '0' && str[1] >= '0' && str[1] <= '9')
-		ERROR("Octals are not implemented yet");
-
 	for (; *start; start++) {
+		int octal_digit = (*start >= '0' && *start <= '7');
 		int decimal_digit = (*start >= '0' && *start <= '9');
 		int low_hex_digit = (*start >= 'a' && *start <= 'f');
 		int high_hex_digit = (*start >= 'A' && *start <= 'F');
-		if (!decimal_digit &&
-			(!is_hex || !(low_hex_digit || high_hex_digit)))
-			break;
 
-		parsed *= is_hex ? 16 : 10;
+		if (base == BASE_DECIMAL) {
+			if (!decimal_digit)
+				break;
+			parsed *= 10;
+		} else if (base == BASE_HEXADECIMAL) {
+			if (!decimal_digit && !low_hex_digit && !high_hex_digit)
+				break;
+			parsed *= 16;
+		} else if (base == BASE_OCTAL) {
+			if (!octal_digit)
+				break;
+			parsed *= 8;
+		}
 
 		if (decimal_digit)
 			parsed += *start - '0';
@@ -493,7 +515,7 @@ static struct constant integer_constant_from_string(const char *str) {
 			parsed += *start - 'A' + 10;
 	}
 
-	int allow_unsigned = is_hex;
+	int allow_unsigned = base == BASE_HEXADECIMAL || base == BASE_OCTAL;
 	int allow_signed = 1;
 	int allow_int = 1;
 	int allow_long = 1;
