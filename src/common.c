@@ -43,20 +43,33 @@ int round_up_to_nearest(int num, int div) {
 	return num;
 }
 
-int get_escape(char nc) {
+int get_simple_escape_sequence(char nc) {
 	switch (nc) {
-	case 'n':
-		return '\n';
 	case '\'':
 		return '\'';
 	case '\"':
 		return '\"';
-	case 't':
-		return '\t';
-	case '0':
-		return '\0';
+	case '?':
+		return '\?';
 	case '\\':
 		return '\\';
+	case 'a':
+		return '\a';
+	case 'b':
+		return '\b';
+	case 'f':
+		return '\f';
+	case 'n':
+		return '\n';
+	case 'r':
+		return '\r';
+	case 't':
+		return '\t';
+	case 'v':
+		return '\v';
+
+	case '0': // This is an octal-escape-sequence, and should be handled seperately.
+		return '\0';
 
 	default:
 		ERROR("Invalid escape sequence \\%c", nc);
@@ -89,7 +102,7 @@ int take_character(const char **str) {
 			}
 			return number;
 		} else
-			return get_escape(*(*str)++);
+			return get_simple_escape_sequence(*(*str)++);
 	}
 }
 
