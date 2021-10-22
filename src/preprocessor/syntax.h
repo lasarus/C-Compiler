@@ -17,6 +17,14 @@ inline static int is_digit(char c) {
 	return c >= '0' && c <= '9';
 }
 
+inline static int is_octal_digit(char c) {
+	return c >= '0' && c <= '7';
+}
+
+inline static int is_hexadecimal_digit(char c) {
+	return is_digit(c) || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+}
+
 inline static int is_sign(char c) {
 	return c == '-' || c == '+';
 }

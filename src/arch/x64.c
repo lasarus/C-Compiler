@@ -676,8 +676,8 @@ void constant_to_buffer(uint8_t *buffer, struct constant constant) {
 
 		const char *str = constant.str_d;
 		int i = 0;
-		for (; *str; i++) {
-			buffer[i] = take_character(&str);
+		for (; str[i]; i++) {
+			buffer[i] = str[i];
 		}
 		buffer[i] = 0;
 		return;

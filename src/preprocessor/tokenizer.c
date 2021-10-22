@@ -147,75 +147,109 @@ int parse_pp_header_name(struct token *t) {
 	return 1;
 }
 
-int parse_escape_sequence(void) {
-	char c = tok.top->c[0];
-	char nc = tok.top->c[1];
-	if (c != '\\')
-		return 0;
-
+int get_simple_escape_sequence(char nc) {
 	switch (nc) {
 	case '\'':
+		return '\'';
 	case '\"':
+		return '\"';
 	case '?':
+		return '\?';
 	case '\\':
+		return '\\';
 	case 'a':
+		return '\a';
 	case 'b':
+		return '\b';
 	case 'f':
+		return '\f';
 	case 'n':
+		return '\n';
 	case 'r':
+		return '\r';
 	case 't':
+		return '\t';
 	case 'v':
-	case '0':
-		buffer_write(c);
-		buffer_write(nc);
-		input_next(tok.top);
-		input_next(tok.top);
-		break;
+		return '\v';
 
-	case 'x': {
-		buffer_write(c);
-		buffer_write(nc);
-		input_next(tok.top);
-		input_next(tok.top);
+	case '0': // This is an octal-escape-sequence, and should be handled seperately.
+		return '\0';
 
-		for (;;) {
-			char c = tok.top->c[0];
-			int decimal_digit = (c >= '0' && c <= '9');
-			int low_hex_digit = (c >= 'a' && c <= 'f');
-			int high_hex_digit = (c >= 'A' && c <= 'F');
+	default:
+		ERROR("Invalid escape sequence \\%c", nc);
+	}
+}
 
-			if (!(decimal_digit || low_hex_digit || high_hex_digit))
-				break;
+int parse_escape_sequence(int *character) {
+	if (tok.top->c[0] != '\\')
+		return 0;
 
-			buffer_write(c);
+	input_next(tok.top);
+
+	if (is_octal_digit(tok.top->c[0])) {
+		int result = 0;
+		for (int i = 0; i < 3 && is_octal_digit(tok.top->c[0]); i++) {
+			result *= 8;
+			result += tok.top->c[0] - '0';
 			input_next(tok.top);
 		}
 
-		break;
+		*character = result;
+
+		return 1;
+	} else if (tok.top->c[0] == 'x') {
+		input_next(tok.top);
+		int result = 0;
+
+		for (; is_hexadecimal_digit(tok.top->c[0]); input_next(tok.top)) {
+			result *= 16;
+			char digit = tok.top->c[0];
+			if (is_digit(digit)) {
+				result += digit - '0';
+			} else if (digit >= 'a' && digit <= 'f') {
+				result += digit - 'a' + 10;
+			} else if (digit >= 'A' && digit <= 'F') {
+				result += digit - 'A' + 10;
+			}
+		}
+
+		*character = result;
+		return 1;
 	}
+
+	switch (tok.top->c[0]) {
+	case '\'': *character = '\''; break;
+	case '\"': *character = '\"'; break;
+	case '\?': *character = '?'; break; // Trigraphs are stupid.
+	case '\\': *character = '\\'; break;
+	case 'a': *character = '\a'; break;
+	case 'b': *character = '\b'; break;
+	case 'f': *character = '\f'; break;
+	case 'n': *character = '\n'; break;
+	case 'r': *character = '\r'; break;
+	case 't': *character = '\t'; break;
+	case 'v': *character = '\v'; break;
+
 	default:
-		PRINT_POS(tok.top->pos[0]);
-		ERROR("char not implemented as escape %c%c\n", c, nc);
-		NOTIMP();
+		ERROR("Invalid escape sequence \\%c", tok.top->c[0]);
 	}
+
+	input_next(tok.top);
 
 	return 1;
 }
 
-int parse_schar(int in_str) {
+int parse_cs_char(int *character, int is_schar) {
 	char c = tok.top->c[0];
-	if (c != (in_str ? '"' : '\'') &&
-		c != '\\' &&
-		c != '\n') {
-		buffer_write(c);
+	if (parse_escape_sequence(character)) {
+		return 1;
+	} else if (c == '\n' || c == (is_schar ? '\"' : '\'')) {
+		return 0;
+	} else {
 		input_next(tok.top);
+		*character = c;
 		return 1;
 	}
-
-	if (parse_escape_sequence())
-		return 1;
-
-	return 0;
 }
 
 int parse_string(struct token *next) {
@@ -239,11 +273,13 @@ int parse_string(struct token *next) {
 
 	input_next(tok.top);
 
-	while(tok.top->c[0] != '"') {
-		if (!parse_schar(1)) {
-			ERROR("Invalid character %c", tok.top->c[0]);
-		}
-	}
+	//while(tok.top->c[0] != '"') {
+	int character;
+	while (parse_cs_char(&character, 1))
+		buffer_write((char)character);
+
+	if (tok.top->c[0] != '"')
+		ERROR("Expected \"");
 
 	buffer_write('\0');
 
@@ -263,13 +299,12 @@ int parse_character_constant(struct token *next) {
 
 	buffer_start();
 
-	while(tok.top->c[0] != '\'') {
-		if (!parse_schar(0)) {
-			ERROR("Invalid character %c", tok.top->c[0]);
-		}
-		/* buffer_write(tok.top->c[0]); */
-		/* input_next(tok.top); */
-	}
+	int character;
+	while (parse_cs_char(&character, 0))
+		buffer_write((char)character);
+
+	if (tok.top->c[0] != '\'')
+		ERROR("Expected \'");
 
 	buffer_write('\0');
 

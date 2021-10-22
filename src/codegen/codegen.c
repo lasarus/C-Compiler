@@ -44,6 +44,17 @@ void emit(const char *fmt, ...) {
 	va_end(args);
 }
 
+void emit_no_newline(const char *fmt, ...) {
+	va_list args;
+	va_start(args, fmt);
+	vfprintf(data.out, fmt, args);
+	va_end(args);
+}
+
+void emit_char(char c) {
+	fputc(c, data.out);
+}
+
 void codegen_binary_operator(int operator_type, enum operand_type ot, var_id out,
 							 var_id lhs, var_id rhs) {
 	scalar_to_reg(lhs, REG_RDI);

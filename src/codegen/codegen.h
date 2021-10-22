@@ -21,6 +21,8 @@ extern struct variable_info *variable_info;
 
 void set_section(const char *section);
 void emit(const char *fmt, ...);
+void emit_no_newline(const char *fmt, ...);
+void emit_char(char c); // Used for string printing.
 
 void codegen(const char *path);
 

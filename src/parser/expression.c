@@ -918,7 +918,7 @@ struct expr *parse_prefix() {
 	} else if (T_ISNEXT(T_CHARACTER_CONSTANT)) {
 		const char *str = T0->str;
 		TNEXT();
-		return EXPR_INT(escaped_to_str(str));
+		return EXPR_INT(character_constant_to_int(str));
 	} else if (TACCEPT(T_CHAR)) {
 		NOTIMP();
 	} else if (TACCEPT(T_KGENERIC)) {

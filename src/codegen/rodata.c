@@ -61,10 +61,18 @@ const char *rodata_get_label_string(label_id id) {
 
 void rodata_codegen(void) {
 	for (int i = 0; i < n_entries; i++) {
-		if (entries[i].type == ENTRY_STR) {
-			emit("%s:", rodata_get_label_string(entries[i].id));
-			emit(".string \"%s\"", entries[i].name);
+		if (entries[i].type != ENTRY_STR)
+			continue;
+		emit("%s:", rodata_get_label_string(entries[i].id));
+
+		emit_no_newline("\t.string \"", entries[i].name);
+		const char *str = entries[i].name;
+		for (; *str; str++) {
+			char buffer[5];
+			character_to_escape_sequence(*str, buffer);
+			emit_no_newline("%s", buffer);
 		}
+		emit_no_newline("\"\n");
 	}
 }
 

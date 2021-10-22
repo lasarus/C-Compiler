@@ -86,6 +86,8 @@ void add_implementation_defs(void) {
 int main(int argc, char **argv) {
 	struct arguments arguments = parse_arguments(argc, argv);
 
+	init_source_character_set();
+
 	symbols_init();
 	add_implementation_defs();
 	builtins_init();

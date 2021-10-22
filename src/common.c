@@ -1,6 +1,7 @@
 #include "common.h"
 
 #include <stdarg.h>
+#include <limits.h>
 
 uint32_t hash32(uint32_t a) {
 	a = (a ^ 61) ^ (a >> 16);
@@ -46,71 +47,48 @@ int round_up_to_nearest(int num, int div) {
 	return num;
 }
 
-int get_simple_escape_sequence(char nc) {
-	switch (nc) {
-	case '\'':
-		return '\'';
-	case '\"':
-		return '\"';
-	case '?':
-		return '\?';
-	case '\\':
-		return '\\';
-	case 'a':
-		return '\a';
-	case 'b':
-		return '\b';
-	case 'f':
-		return '\f';
-	case 'n':
-		return '\n';
-	case 'r':
-		return '\r';
-	case 't':
-		return '\t';
-	case 'v':
-		return '\v';
+int character_constant_to_int(const char *str) {
+	int constant = 0;
 
-	case '0': // This is an octal-escape-sequence, and should be handled seperately.
-		return '\0';
+	for (; *str; str++) {
+		constant <<= 8; // TODO: UB on overflow?
+		constant += *str;
+	}
 
-	default:
-		ERROR("Invalid escape sequence \\%c", nc);
+	return constant;
+}
+
+unsigned char needs_no_escape[CHAR_MAX];
+
+void init_source_character_set(void) {
+	const char *str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!#%&()*+,-./:;<=>?[]^_{|}~ ";
+	for (; *str; str++) {
+		int idx = *str;
+		if (idx >= 0 && idx < 128)
+			needs_no_escape[idx] = 1;
 	}
 }
 
-int take_character(const char **str) {
-	if (**str != '\\')
-		return *(*str)++;
-	else {
-		(*str)++;
-		if (**str == 'x') {
-			int number = 0;
-			for (;**str; (*str)++) {
-				char c = **str;
-				int decimal_digit = (c >= '0' && c <= '9');
-				int low_hex_digit = (c >= 'a' && c <= 'f');
-				int high_hex_digit = (c >= 'A' && c <= 'F');
+void character_to_escape_sequence(char character, char *output) {
+	int octal[3] = { 0 };
 
-				if (!(decimal_digit || low_hex_digit || high_hex_digit))
-					break;
-
-				number *= 16;
-				if (decimal_digit)
-					number += c - '0';
-				else if (low_hex_digit)
-					number += c - 'a' + 10;
-				else if (high_hex_digit)
-					number += c - 'A' + 10;
-			}
-			return number;
-		} else
-			return get_simple_escape_sequence(*(*str)++);
+	if ((int)character >= 0 && needs_no_escape[(int)character]) {
+		output[0] = character;
+		output[1] = '\0';
+		return;
 	}
-}
 
-int escaped_to_str(const char *str) {
-	return take_character(&str);
+	octal[2] = character % 8;
+	character /= 8;
+	octal[1] = character % 8;
+	character /= 8;
+	octal[0] = character % 8;
+	
+	output[0] = '\\';
+	output[1] = octal[0] + '0';
+	output[2] = octal[1] + '0';
+	output[3] = octal[2] + '0';
+	output[4] = '\0';
 }
 
 uint64_t gen_mask(unsigned char left_pad, unsigned char right_pad) {

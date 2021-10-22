@@ -20,11 +20,13 @@ int str_contains(const char *str, char c);
 
 int round_up_to_nearest(int num, int div);
 
-int escaped_to_str(const char *str);
-int take_character(const char **str);
-
 char *strdup(const char *s);
 
 uint64_t gen_mask(unsigned char left_pad, unsigned char right_pad);
+
+int character_constant_to_int(const char *str);
+void character_to_escape_sequence(char character, char *output);
+
+void init_source_character_set(void);
 
 #endif

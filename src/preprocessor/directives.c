@@ -124,7 +124,7 @@ intmax_t evaluate_expression(int prec) {
 	} else if (t.type == T_NUM) {
 		expr = atoi(t.str);
 	} else if (t.type == PP_CHARACTER_CONSTANT) {
-		expr = escaped_to_str(t.str);
+		expr = character_constant_to_int(t.str);
 	} else {
 		ERROR("Invalid token in preprocessor expression. %d %s, in %s:%d", t.type, token_to_str(t.type), t.pos.path, t.pos.line);
 	}
