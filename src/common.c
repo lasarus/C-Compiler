@@ -11,11 +11,14 @@ uint32_t hash32(uint32_t a) {
 	return a;
 }	
 
-// TODO: This is not a good hash function.
+// djb2 hash: http://www.cse.yorku.ca/~oz/hash.html
 uint32_t hash_str(const char *str) {
-	uint32_t hash = 0;
-	for (; *str; str++)
-		hash ^= hash32(*str);
+	uint32_t hash = 5381;
+	int c;
+	
+	while ((c = *str++))
+		hash = ((hash << 5) + hash) + c;
+
 	return hash;
 }
 
