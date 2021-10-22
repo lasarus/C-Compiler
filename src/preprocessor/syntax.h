@@ -29,6 +29,11 @@ inline static int is_sign(char c) {
 	return c == '-' || c == '+';
 }
 
+// 6.4p3
+inline static int is_space(char c) {
+	return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f';
+}
+
 inline static int is_identifier_nondigit(char c) {
 	// TODO: implement universal character names.
 	return is_nondigit(c) /* || is_universal_character_name(c) || other implementation-defined characters */;

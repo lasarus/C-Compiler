@@ -8,7 +8,6 @@
 #include <libgen.h>
 #include <string.h>
 #include <stdlib.h>
-#include <ctype.h>
 
 #define MAX_INCLUDE_DEPTH 16
 
@@ -70,7 +69,7 @@ static void tokenizer_pop_input(void) {
 int flush_whitespace(int *whitespace,
 					 int *first_of_line) {
 	int any_change = 0;
-	while (isspace(tok.top->c[0])) {
+	while (is_space(tok.top->c[0])) {
 		*whitespace = 1;
 
 		if(tok.top->c[0] == '\n')
