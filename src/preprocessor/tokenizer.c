@@ -20,6 +20,9 @@ struct tokenizer {
 } tok;
 // Tokenizer, abbreviated tok.
 
+unsigned disallowed_size, disallowed_cap;
+char **disallowed = NULL;
+
 void tokenizer_push_input_absolute(const char *path) {
 	struct file file;
 	if (!try_open_file(path, &file))
@@ -36,12 +39,26 @@ void tokenizer_push_input_absolute(const char *path) {
 void tokenizer_push_input(const char *rel_path) {
 	struct file file = search_include(&tok.top->file, rel_path);
 
+	for (unsigned i = 0; i < disallowed_size; i++) {
+		if (strcmp(disallowed[i], file.full) == 0)
+			return; // Do not open file. (Related to #pragma once.)
+	}
+
 	if (!tok.stack)
 		tok.stack = malloc(sizeof *tok.stack * MAX_INCLUDE_DEPTH);
 
 	tok.input_n++;
 	tok.stack[tok.input_n - 1] = input_create(file);
 	tok.top = &tok.stack[tok.input_n - 1];
+}
+
+void tokenizer_disable_current_path(void) {
+	if (disallowed_size >= disallowed_cap) {
+		disallowed_cap = MAX(disallowed_cap * 2, 4);
+		disallowed = realloc(disallowed, sizeof *disallowed * disallowed_cap);
+	}
+
+	disallowed[disallowed_size++] = strdup(tok.top->file.full);
 }
 
 static void tokenizer_pop_input(void) {

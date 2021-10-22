@@ -230,6 +230,16 @@ void directiver_flush_if(void) {
 	}
 }
 
+void directiver_handle_pragma(void) {
+	struct token command = NEXT_U();
+
+	if (strcmp(command.str, "once") == 0) {
+		tokenizer_disable_current_path();
+	} else {
+		ERROR("\"#pragma %s\" not supported", command.str);
+	}
+}
+
 struct token directiver_next(void) {
 	struct token t = NEXT_T();
 	if (t.type == PP_DIRECTIVE) {
@@ -262,6 +272,8 @@ struct token directiver_next(void) {
 			directiver_flush_if();
 		} else if (strcmp(name, "endif") == 0) {
 			// Do nothing.
+		} else if (strcmp(name, "pragma") == 0) {
+			directiver_handle_pragma();
 		} else {
 			ERROR("#%s not implemented", name);
 		}
