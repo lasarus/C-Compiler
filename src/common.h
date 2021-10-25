@@ -11,6 +11,10 @@
 #define MAX(A, B) (((A) > (B)) ? (A) : (B))
 #define MIN(A, B) (((A) < (B)) ? (A) : (B))
 
+// Add element to a dynamic array, with size and capacity.
+// Doubling is better than 1.5, or any other factor.
+#define ADD_ELEMENT(SIZE, CAP, PTR) *((void)(SIZE >= CAP ? (CAP = MAX(CAP * 2, 1)) : 0, PTR = realloc(PTR, sizeof *PTR * CAP)), PTR + SIZE++)
+
 uint32_t hash32(uint32_t a);
 
 uint32_t hash_str(const char *str);
