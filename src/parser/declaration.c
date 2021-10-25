@@ -20,6 +20,27 @@ int set_sbit(struct type_specifiers *ts, int bit_n) {
 	return 0;
 }
 
+void accept_attribute(int *is_packed) {
+	if (!TACCEPT(T_KATTRIBUTE))
+		return;
+
+	TEXPECT(T_LPAR);
+	TEXPECT(T_LPAR);
+
+	const char *attribute_name = T0->str;
+
+	TEXPECT(T_IDENT);
+
+	if (strcmp(attribute_name, "packed") == 0) {
+		*is_packed = 1;
+	} else {
+		NOTIMP();
+	}
+
+	TEXPECT(T_RPAR);
+	TEXPECT(T_RPAR);
+}
+
 struct type_ast {
 	enum {
 		TAST_TERMINAL,
@@ -303,7 +324,7 @@ int parse_enum(struct type_specifiers *ts) {
 }
 
 int parse_struct(struct type_specifiers *ts) {
-	int is_union = 0;
+	int is_union = 0, is_packed = 0;
 	if (TACCEPT(T_KSTRUCT))
 		is_union = 0;
 	else if (TACCEPT(T_KUNION))
@@ -311,6 +332,8 @@ int parse_struct(struct type_specifiers *ts) {
 	else
 		return 0;
 	char *name = NULL;
+
+	accept_attribute(&is_packed);
 
 	if (TPEEK(0)->type == T_IDENT) {
 		name = TPEEK(0)->str;
@@ -396,6 +419,8 @@ int parse_struct(struct type_specifiers *ts) {
 
 		TEXPECT(T_RBRACE);
 
+		accept_attribute(&is_packed);
+
 		struct struct_data *data = NULL;
 		struct symbol_struct *def = symbols_get_struct_in_current_scope(name);
 
@@ -424,6 +449,7 @@ int parse_struct(struct type_specifiers *ts) {
 			.n = n,
 			.is_complete = 1,
 			.is_union = is_union,
+			.is_packed = is_packed,
 
 			.names = names,
 			.types = types,

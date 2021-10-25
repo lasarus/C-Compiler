@@ -98,7 +98,8 @@ struct struct_data {
 	char *name;
 
 	int is_complete,
-		is_union;
+		is_union,
+		is_packed;
 
 	int n;
 	char **names;

@@ -342,7 +342,8 @@ void calculate_offsets(struct struct_data *data) {
 	int last_bit_offset = 0;
 	for (int i = 0; i < data->n; i++) {
 		struct type *field = data->types[i];
-		current_offset = round_up_to_nearest(current_offset, calculate_alignment(field));
+		if (!data->is_packed)
+			current_offset = round_up_to_nearest(current_offset, calculate_alignment(field));
 		data->offsets[i] = current_offset;
 		data->bit_offsets[i] = 0;
 
@@ -386,6 +387,10 @@ void calculate_offsets(struct struct_data *data) {
 				max_offset = new_size;
 		}
 	}
+
+	if (data->is_packed)
+		alignment = 1;
+
 	data->size = round_up_to_nearest(max_offset, alignment);
 	data->alignment = alignment;
 }
