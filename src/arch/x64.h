@@ -56,17 +56,17 @@ struct constant {
 
 	union {
 		_Bool bool_d;
-		char char_d;
-		signed char schar_d;
-		unsigned char uchar_d;
-		short short_d;
-		unsigned short ushort_d;
-		int int_d;
-		unsigned int uint_d;
-		long long_d;
-		unsigned long ulong_d;
-		long long llong_d;
-		unsigned long long ullong_d;
+		int8_t char_d;
+		int8_t schar_d;
+		uint8_t uchar_d;
+		int16_t short_d;
+		uint16_t ushort_d;
+		int32_t int_d;
+		uint32_t uint_d;
+		int64_t long_d;
+		uint64_t ulong_d;
+		int64_t llong_d;
+		uint64_t ullong_d;
 
 		float float_d;
 		double double_d;

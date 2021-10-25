@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <string.h>
 #include <limits.h>
+#include <inttypes.h>
 
 int sizeof_simple(enum simple_type type) {
 	switch (type) {
@@ -752,46 +753,46 @@ const char *constant_to_string(struct constant constant) {
 		sprintf(buffer, "%d", constant.bool_d ? 1 : 0);
 		break;
 	case ST_CHAR:
-		sprintf(buffer, "%d", (int)constant.char_d);
+		sprintf(buffer, "%" PRId8, (int)constant.char_d);
 		break;
 	case ST_SCHAR:
-		sprintf(buffer, "%d", (int)constant.schar_d);
+		sprintf(buffer, "%" PRId8, (int)constant.schar_d);
 		break;
 	case ST_UCHAR:
-		sprintf(buffer, "%d", (int)constant.uchar_d);
+		sprintf(buffer, "%" PRIu8, (int)constant.uchar_d);
 		break;
 	case ST_SHORT:
-		sprintf(buffer, "%d", (int)constant.short_d);
+		sprintf(buffer, "%" PRId16, (int)constant.short_d);
 		break;
 	case ST_USHORT:
-		sprintf(buffer, "%d", (int)constant.ushort_d);
+		sprintf(buffer, "%" PRIu16, (int)constant.ushort_d);
 		break;
 	case ST_INT:
-		sprintf(buffer, "%d", constant.int_d);
+		sprintf(buffer, "%" PRId32, constant.int_d);
 		break;
 	case ST_UINT:
-		sprintf(buffer, "%u", constant.uint_d);
+		sprintf(buffer, "%" PRIu32, constant.uint_d);
 		break;
 	case ST_LONG:
-		sprintf(buffer, "%ld", constant.long_d);
+		sprintf(buffer, "%" PRId64, constant.long_d);
 		break;
 	case ST_ULONG:
-		sprintf(buffer, "%lu", constant.ulong_d);
+		sprintf(buffer, "%" PRIu64, constant.ulong_d);
 		break;
 	case ST_LLONG:
-		sprintf(buffer, "%lld", constant.llong_d);
+		sprintf(buffer, "%" PRId64, constant.llong_d);
 		break;
 	case ST_ULLONG:
-		sprintf(buffer, "%llu", constant.ullong_d);
+		sprintf(buffer, "%" PRIu64, constant.ullong_d);
 		break;
 
 		// TODO: Avoid UB.
 	case ST_FLOAT:
-		sprintf(buffer, "%u", constant.uint_d);
+		sprintf(buffer, "%" PRIu32, constant.uint_d);
 		break;
 
 	case ST_DOUBLE:
-		sprintf(buffer, "%lu", constant.ulong_d);
+		sprintf(buffer, "%" PRIu64, constant.ulong_d);
 		break;
 		
 	case ST_LDOUBLE:
