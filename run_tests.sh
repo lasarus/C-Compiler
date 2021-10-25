@@ -36,3 +36,20 @@ echo "TESTING SELF COMPILATION"
 ./self_compile.sh 2
 diff asm/ asm2/
 echo "No errors"
+
+echo "TESTING SECOND GENERATION ON SOURCES IN tests/"
+for SRC in $SOURCES
+do
+	echo -en "\r\033[KTESTING $SRC"
+	OUT="$(basename -s .c $SRC).s"
+	if [ "$MUSL" = "true" ]
+	then
+		./cc_self $SRC test_asm/$OUT -Imusl -Isrc -D_POSIX_SOURCE
+	else
+		./cc_self $SRC test_asm/$OUT -I/usr/include -Iinclude -Isrc
+	fi
+	gcc test_asm/$OUT -o test -no-pie
+	./test
+done
+echo -en "\r\033[KNo errors"
+echo
