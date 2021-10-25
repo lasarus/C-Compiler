@@ -95,6 +95,13 @@ void do_integer_promotion(struct expr **expr) {
 	}
 }
 
+void do_default_argument_promotion(struct expr **expr) {
+	do_integer_promotion(expr);
+
+	if (type_is_simple((*expr)->data_type, ST_FLOAT))
+		*expr = expression_cast(*expr, type_simple(ST_DOUBLE));
+}
+
 struct type *calculate_type(struct expr *expr) {
 	switch (expr->type) {
 	case E_CONSTANT:
@@ -332,6 +339,15 @@ struct expr *expr_new(struct expr expr) {
 	if (integer_promotion) {
 		for (int i = 0; i < num_args[expr.type]; i++) {
 			do_integer_promotion(&expr.args[i]);
+		}
+	}
+
+	if (expr.type == E_CALL) {
+		assert(type_is_pointer(expr.call.callee->data_type));
+		struct type *signature = type_deref(expr.call.callee->data_type);
+
+		for (int i = signature->n - 1; i < expr.call.n_args; i++) {
+			do_default_argument_promotion(&expr.call.args[i]);
 		}
 	}
 	
