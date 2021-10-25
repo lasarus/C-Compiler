@@ -13,28 +13,25 @@ void builtins_init(void) {
 
 	struct type *uint = type_simple(ST_UINT);
 	struct type *vptr = type_pointer(type_simple(ST_VOID));
-	struct type **members = malloc(sizeof(*members) * 4);
-	char **names = malloc(sizeof(*names) * 4);
-	int *bitfields = malloc(sizeof *bitfields * 4);
+
+	struct field *fields = malloc(sizeof *fields * 4);
 	for (int i = 0; i < 4; i++)
-		bitfields[i] = -1;
-	members[0] = uint;
-	names[0] = "gp_offset";
-	members[1] = uint;
-	names[1] = "fp_offset";
-	members[2] = vptr;
-	names[2] = "overflow_arg_area";
-	members[3] = vptr;
-	names[3] = "reg_save_area";
+		fields[i].bitfield = -1;
+	fields[0].type = uint;
+	fields[0].name = "gp_offset";
+	fields[1].type = uint;
+	fields[1].name = "fp_offset";
+	fields[2].type = vptr;
+	fields[2].name = "overflow_arg_area";
+	fields[3].type = vptr;
+	fields[3].name = "reg_save_area";
 
 	struct struct_data *struct_data = register_struct();
 	*struct_data = (struct struct_data) {
 		.name = "<__builtin_va_list_struct>",
 		.is_complete = 1,
 		.n = 4,
-		.types = members,
-		.names = names,
-		.bitfields = bitfields
+		.fields = fields
 	};
 
 	calculate_offsets(struct_data);

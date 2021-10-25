@@ -253,7 +253,7 @@ int alignof_struct(struct struct_data *struct_data) {
 		ERROR("Struct %s not complete", struct_data->name);
 
 	for (int i = 0; i < struct_data->n; i++) {
-		struct type *type = struct_data->types[i];
+		struct type *type = struct_data->fields[i].type;
 		if (max_align < calculate_alignment(type))
 			max_align = calculate_alignment(type);
 	}
@@ -321,7 +321,7 @@ int calculate_size(struct type *type) {
 int calculate_offset(struct type *type, int index) {
 	switch (type->type) {
 	case TY_STRUCT:
-		return type->struct_data->offsets[index];
+		return type->struct_data->fields[index].offset;
 	case TY_ARRAY:
 	case TY_INCOMPLETE_ARRAY: // flexible array.
 		return calculate_size(type->children[0]) * index;
@@ -336,32 +336,27 @@ void calculate_offsets(struct struct_data *data) {
 	int max_offset = 0;
 	int alignment = 0;
 
-	data->offsets = malloc(sizeof *data->offsets * data->n);
-	data->bit_offsets = malloc(sizeof *data->bit_offsets * data->n);
-
 	int last_bit_offset = 0;
 	for (int i = 0; i < data->n; i++) {
-		struct type *field = data->types[i];
+		struct type *field = data->fields[i].type;
 		if (!data->is_packed)
 			current_offset = round_up_to_nearest(current_offset, calculate_alignment(field));
-		data->offsets[i] = current_offset;
-		data->bit_offsets[i] = 0;
+		data->fields[i].offset = current_offset;
+		data->fields[i].bit_offset = 0;
 
-		if (data->bitfields[i] != -1) {
-			int fits = last_bit_offset + data->bitfields[i] <= 8 * calculate_size(field);
+		if (data->fields[i].bitfield != -1) {
+			int fits = last_bit_offset + data->fields[i].bitfield <= 8 * calculate_size(field);
 			if (last_bit_offset != 0 && fits) {
-				data->bit_offsets[i] = last_bit_offset;
+				data->fields[i].bit_offset = last_bit_offset;
 
-				current_offset = data->offsets[i] = data->offsets[i - 1];
+				current_offset = data->fields[i].offset = data->fields[i - 1].offset;
 
 				if (!data->is_union)
-					last_bit_offset += data->bitfields[i];
+					last_bit_offset += data->fields[i].bitfield;
 				// Add to previous type.
 			} else {
 				if (!data->is_union)
-					last_bit_offset = data->bitfields[i];
-				//NOTIMP();
-				// Just 
+					last_bit_offset = data->fields[i].bitfield;
 			}
 		} else {
 			last_bit_offset = 0;

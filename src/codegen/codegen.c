@@ -506,10 +506,10 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 	} break;
 
 	case IR_VA_START: {
-		int gp_offset_offset = builtin_va_list->offsets[0];
-		int fp_offset_offset = builtin_va_list->offsets[1];
-		int overflow_arg_area_offset = builtin_va_list->offsets[2];
-		int reg_save_area_offset = builtin_va_list->offsets[3];
+		int gp_offset_offset = builtin_va_list->fields[0].offset;
+		int fp_offset_offset = builtin_va_list->fields[1].offset;
+		int overflow_arg_area_offset = builtin_va_list->fields[2].offset;
+		int reg_save_area_offset = builtin_va_list->fields[3].offset;
 		scalar_to_reg(ins.result, REG_RAX);
 		emit("movl $%d, %d(%%rax)", reg_save_info.gp_offset, gp_offset_offset);
 		emit("movl $%d, %d(%%rax)", 0, fp_offset_offset);
@@ -527,9 +527,9 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 		classify(type, &n_parts, classes);
 
 		static int va_arg_labels = 0;
-		int gp_offset_offset = builtin_va_list->offsets[0];
-		int reg_save_area_offset = builtin_va_list->offsets[3];
-		int overflow_arg_area_offset = builtin_va_list->offsets[2];
+		int gp_offset_offset = builtin_va_list->fields[0].offset;
+		int reg_save_area_offset = builtin_va_list->fields[3].offset;
+		int overflow_arg_area_offset = builtin_va_list->fields[2].offset;
 		va_arg_labels++;
 		// 1. Determine whether type may be passed in the registers. If not go to step 7
 		scalar_to_reg(ins.va_arg_.array, REG_RDI);

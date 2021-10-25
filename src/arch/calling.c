@@ -52,8 +52,8 @@ void classify_recursively(enum parameter_class *current,
 	case TY_STRUCT: {
 		struct struct_data *data = type->struct_data;
 		for (int i = 0; i < data->n; i++) {
-			int offset = data->offsets[i];
-			struct type *memb_type = data->types[i];
+			int offset = data->fields[i].offset;
+			struct type *memb_type = data->fields[i].type;
 			if (!(offset >= lower && offset < upper))
 				continue;
 

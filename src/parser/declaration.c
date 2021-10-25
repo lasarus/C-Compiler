@@ -344,10 +344,8 @@ int parse_struct(struct type_specifiers *ts) {
 	}
 
 	if (TACCEPT(T_LBRACE)) {
-		char **names = NULL;
-		struct type **types = NULL;
-		int *bitfields = NULL;
 		int n = 0;
+		struct field *fields = NULL;
 
 		struct specifiers s;
 
@@ -389,13 +387,13 @@ int parse_struct(struct type_specifiers *ts) {
 				}
 
 				n++;
-				types = realloc(types, n * sizeof(*types));
-				names = realloc(names, n * sizeof(*names));
-				bitfields = realloc(bitfields, n * sizeof(*bitfields));
+				fields = realloc(fields, sizeof *fields * n);
 
-				types[n - 1] = type;
-				names[n - 1] = name;
-				bitfields[n - 1] = bitfield;
+				fields[n - 1] = (struct field) {
+					.type = type,
+					.name = name,
+					.bitfield = bitfield
+				};
 
 				TACCEPT(T_COMMA);
 			}
@@ -405,12 +403,12 @@ int parse_struct(struct type_specifiers *ts) {
 			if (!found_one) {
 				if (s.ts.data_type->type == TY_STRUCT) {
 					n++;
-					types = realloc(types, n * sizeof(*types));
-					names = realloc(names, n * sizeof(*names));
-					bitfields = realloc(bitfields, n * sizeof(*names));
-					names[n - 1] = NULL;
-					types[n - 1] = s.ts.data_type;
-					bitfields[n - 1] = -1;
+					fields = realloc(fields, sizeof *fields * n);
+					fields[n - 1] = (struct field) {
+						.name = NULL,
+						.type = s.ts.data_type,
+						.bitfield = -1
+					};
 				} else {
 					ERROR("!!!");
 				}
@@ -451,9 +449,7 @@ int parse_struct(struct type_specifiers *ts) {
 			.is_union = is_union,
 			.is_packed = is_packed,
 
-			.names = names,
-			.types = types,
-			.bitfields = bitfields,
+			.fields = fields,
 
 			.name = name
 		};

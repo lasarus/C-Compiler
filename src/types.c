@@ -230,7 +230,7 @@ int type_member_idx(struct type *type,
 		ERROR("Member access on incomplete type not allowed");
 
 	for (int i = 0; i < data->n; i++) {
-		if (data->names[i] && strcmp(name, data->names[i]) == 0)
+		if (data->fields[i].name && strcmp(name, data->fields[i].name) == 0)
 			return i;
 	}
 
@@ -341,7 +341,7 @@ void type_select(struct type *type, int index,
 
 	switch (type->type) {
 	case TY_STRUCT:
-		*field_type = type->struct_data->types[index];
+		*field_type = type->struct_data->fields[index].type;
 		break;
 
 	case TY_ARRAY:
@@ -382,11 +382,11 @@ const char *simple_to_str(enum simple_type st) {
 void merge_anonymous(struct struct_data *data) {
 	// types names offsets need to be modified.
 	for (int i = 0; i < data->n; i++) {
-		if (data->names[i])
+		if (data->fields[i].name)
 			continue;
 
-		int offset = data->offsets[i];
-		struct type *type = data->types[i];
+		int offset = data->fields[i].offset;
+		struct type *type = data->fields[i].type;
 
 		if (type->type != TY_STRUCT)
 			continue; // It is probably an anonymous bit-field.
@@ -402,28 +402,17 @@ void merge_anonymous(struct struct_data *data) {
 		}
 
 		// Make place for new elements.
-		data->names = realloc(data->names, sizeof *data->names * new_n);
-		data->types = realloc(data->types, sizeof *data->types * new_n);
-		data->offsets = realloc(data->offsets, sizeof *data->offsets * new_n);
-		data->bitfields = realloc(data->bitfields, sizeof *data->bitfields * new_n);
-		data->bit_offsets = realloc(data->bit_offsets, sizeof *data->bit_offsets * new_n);
+		data->fields = realloc(data->fields, sizeof *data->fields * new_n);
 
 		for (int j = new_n - 1; j >= i + sub_data->n; j--) {
-			data->names[j] = data->names[j - sub_data->n + 1];
-			data->types[j] = data->types[j - sub_data->n + 1];
-			data->offsets[j] = data->offsets[j - sub_data->n + 1];
-			data->bitfields[j] = data->bitfields[j - sub_data->n + 1];
-			data->bit_offsets[j] = data->bit_offsets[j - sub_data->n + 1];
+			data->fields[j] = data->fields[j - sub_data->n + 1];
 		}
 
 		data->n = new_n;
 
 		for (int j = 0; j < sub_data->n; j++) {
-			data->names[i + j] = sub_data->names[j];
-			data->types[i + j] = sub_data->types[j];
-			data->offsets[i + j] = sub_data->offsets[j] + offset;
-			data->bitfields[i + j] = sub_data->bitfields[j];
-			data->bit_offsets[i + j] = sub_data->bit_offsets[j];
+			data->fields[i + j] = sub_data->fields[j];
+			data->fields[i + j].offset += offset;
 		}
 
 		i += n_new_elements - 1;

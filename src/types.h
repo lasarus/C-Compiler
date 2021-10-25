@@ -102,12 +102,14 @@ struct struct_data {
 		is_packed;
 
 	int n;
-	char **names;
-	struct type **types;
-	int *bitfields; // -1 means no bitfield.
+	struct field {
+		char *name;
+		struct type *type;
+		int bitfield; // -1 means no bit-field.
+		int offset;
+		int bit_offset;
+	} *fields;
 
-	int *offsets;
-	int *bit_offsets;
 	int alignment, size;
 
 	int flexible;

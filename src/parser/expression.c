@@ -391,9 +391,9 @@ var_id expression_to_address(struct expr *expr) {
 
 		struct struct_data *data = lhs_type->struct_data;
 
-		int field_offset = data->offsets[expr->member.member_idx];
+		int field_offset = data->fields[expr->member.member_idx].offset;
 
-		if (data->bitfields[expr->member.member_idx] != -1)
+		if (data->fields[expr->member.member_idx].bitfield != -1)
 			ERROR("Trying to take address of bit-field");
 
 		var_id address = expression_to_address(expr->member.lhs);
@@ -440,20 +440,20 @@ struct bitfield_address expression_to_bitfield_address(struct expr *expr) {
 		struct struct_data *data = expr->member.lhs->data_type->struct_data;
 		int idx = expr->member.member_idx;
 
-		if (data->bitfields[idx] == -1) {
+		if (data->fields[idx].bitfield == -1) {
 			out.address = expression_to_address(expr);
 		} else {
 			out.address = expression_to_address(expr->member.lhs);
-			int offset = data->offsets[idx];
+			int offset = data->fields[idx].offset;
 
 			IR_PUSH_GET_OFFSET(out.address, out.address, offset);
 
-			out.bitfield = data->bitfields[idx];
-			out.offset = data->bit_offsets[idx];
+			out.bitfield = data->fields[idx].bitfield;
+			out.offset = data->fields[idx].bit_offset;
 
-			assert(data->types[idx]->type == TY_SIMPLE);
+			assert(data->fields[idx].type->type == TY_SIMPLE);
 
-			if (is_signed(data->types[idx]->simple))
+			if (is_signed(data->fields[idx].type->simple))
 				out.sign_extend = 1;
 		}
 	}
@@ -696,8 +696,8 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 
 		struct struct_data *data = lhs_type->struct_data;
 
-		int field_offset = data->offsets[expr->member.member_idx];
-		int field_bitfield = data->bitfields[expr->member.member_idx];
+		int field_offset = data->fields[expr->member.member_idx].offset;
+		int field_bitfield = data->fields[expr->member.member_idx].bitfield;
 
 		var_id lhs = expression_to_ir(expr->member.lhs);
 		var_id address = new_variable(type_pointer(expr->member.lhs->data_type), 1);
@@ -709,10 +709,8 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		IR_PUSH_LOAD(res, member_address);
 
 		if (field_bitfield != -1) {
-			int sign_extend = is_signed(data->types[expr->member.member_idx]->simple);
-			IR_PUSH_GET_BITS(res, res, data->bit_offsets[expr->member.member_idx], field_bitfield, sign_extend);
-			//printf("Invalid on %s\n", data->name);
-			//NOTIMP();
+			int sign_extend = is_signed(data->fields[expr->member.member_idx].type->simple);
+			IR_PUSH_GET_BITS(res, res, data->fields[expr->member.member_idx].bit_offset, field_bitfield, sign_extend);
 		}
 	} break;
 
