@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <inttypes.h>
 
 struct entry {
 	enum entry_type {
@@ -168,7 +169,7 @@ void codegen_initializer(struct type *type,
 			// But right now I can't be bothered to implement
 			// implicit integer casts for variadic functions.
 			if (how_long == 8) {
-				emit(".quad %ld", *(uint64_t *)(buffer + i));
+				emit(".quad %" PRIu64, *(uint64_t *)(buffer + i));
 				i += how_long - 1;
 			} else {
 				emit(".byte %d", (int)buffer[i]);

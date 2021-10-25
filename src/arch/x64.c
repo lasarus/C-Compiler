@@ -738,7 +738,7 @@ const char *constant_to_string(struct constant constant) {
 	assert(constant.type == CONSTANT_TYPE);
 
 	if (type_is_pointer(constant.data_type)) {
-		sprintf(buffer, "%ld", constant.long_d);
+		sprintf(buffer, "%" PRIu64, constant.long_d);
 		return buffer;
 	}
 
