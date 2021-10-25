@@ -356,7 +356,7 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 				uint8_t buffer[size];
 				constant_to_buffer(buffer, c);
 				for (int i = 0; i < size; i++)
-					emit("movb $%d, -%d(%%rbp)", buffer[i], variable_info[ins.result].stack_location - i);
+					emit("movb $%d, -%d(%%rbp)", (int)buffer[i], variable_info[ins.result].stack_location - i);
 			}
 		} break;
 
