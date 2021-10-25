@@ -68,6 +68,7 @@ int parse_labeled_statement(struct jump_blocks jump_blocks) {
 			if (strcmp(label, function_scope.labels[i].label) == 0) {
 				if (function_scope.labels[i].used)
 					ERROR("Label declared more than once %s", label);
+				ir_goto(function_scope.labels[i].id);
 				ir_block_start(function_scope.labels[i].id);
 				function_scope.labels[i].used = 1;
 				return 1;
@@ -76,6 +77,7 @@ int parse_labeled_statement(struct jump_blocks jump_blocks) {
 
 		block_id id = new_block();
 		add_function_scope_label(label, id, 1);
+		ir_goto(id);
 		ir_block_start(id);
 		return 1;
 	} else if (TACCEPT(T_KCASE)) {
