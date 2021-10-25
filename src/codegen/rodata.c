@@ -160,7 +160,7 @@ void codegen_initializer(struct type *type,
 			i += 7;
 		} else {
 			int how_long = 0;
-			for (; how_long < 8; how_long++) {
+			for (; how_long < 8 && i + how_long < size; how_long++) {
 				if (is_label[i + how_long])
 					break;
 			}

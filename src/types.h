@@ -156,6 +156,8 @@ const char *type_to_string(struct type *type);
 void merge_anonymous(struct struct_data *data);
 int has_variable_size(struct type *type);
 
+int type_is_aggregate(struct type *type);
+
 #include <arch/x64.h>
 
 #endif

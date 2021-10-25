@@ -10,7 +10,7 @@ struct input input_create(struct file file) {
 		.pos = {{0}},
 		.iline = 1,
 		.icol = 1,
-		.c = {'\n', '\n', '\n'},
+		.c = {'\n', '\n', '\n'}
 	};
 
 	// Buffer should be initialized at the start.

@@ -39,7 +39,7 @@ struct expr *expr_new(struct expr expr);
 				.type = CONSTANT_TYPE,									\
 				.data_type = type_array(type_simple(ST_CHAR), strlen(STR) + 1),	\
 				.str_d = (strdup(STR))									\
-			}});
+			}})
 
 #define EXPR_INT(I) expr_new((struct expr) {							\
 			.type = E_CONSTANT,											\

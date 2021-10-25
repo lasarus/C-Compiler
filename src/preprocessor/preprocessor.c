@@ -17,7 +17,7 @@
 #include <ctype.h>
 
 struct token_stream {
-    struct token t, nt;
+    struct token t, nt, nnt;
 } ts;
 
 // Token functions.
@@ -63,12 +63,14 @@ void token_free(struct token *from) {
 
 void t_next() {
 	ts.t = ts.nt;
-	ts.nt = string_concat_next();
+	ts.nt = ts.nnt;
+	ts.nnt = string_concat_next();
 }
 
 void preprocessor_create(const char *path) {
 	tokenizer_push_input_absolute(path);
 
+	t_next();
 	t_next();
 	t_next();
 }
@@ -95,6 +97,8 @@ struct token *T_peek(int n) {
 		return &ts.t;
 	if (n == 1)
 		return &ts.nt;
+	if (n == 2)
+		return &ts.nnt;
 	ERROR("Can't peek that far");
 }
 

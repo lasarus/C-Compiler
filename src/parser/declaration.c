@@ -178,6 +178,7 @@ int parse_specifiers(struct type_specifiers *ts,
 					 struct type_qualifiers *tq,
 					 struct function_specifiers *fs,
 					 struct alignment_specifiers *as) {
+
 	if (ts) *ts = (struct type_specifiers){ 0 };
 	if (scs) *scs = (struct storage_class_specifiers){ 0 };
 	if (tq) *tq = (struct type_qualifiers){ 0 };
@@ -844,161 +845,336 @@ void add_init_pair(struct initializer *init, struct init_pair pair) {
 	init->pairs[init->n - 1] = pair;
 }
 
-int parse_designator_list(int *first_index, int *offset, struct type **type) {
-	int first = 0;
-	for (;;first = 1) {
-		if (TACCEPT(T_DOT)) {
-			char *ident = TPEEK(0)->str;
-			TEXPECT(T_IDENT);
+int expression_is_zero(struct expr *expr) {
+	struct constant *c = expression_to_constant(expr);
 
-			assert((*type)->type == TY_STRUCT);
+	if (!c)
+		return 0;
 
-			int mem_idx = type_member_idx(*type, ident);
+	if (c->type != CONSTANT_TYPE)
+		return 0;
 
-			int noffset;
-			struct type *ntype;
-			type_select(*type, mem_idx, &noffset, &ntype);
-
-			*offset += noffset;
-			*type = ntype;
-
-			if (!first)
-				*first_index = mem_idx;
-		} else if (TACCEPT(T_LBRACK)) {
-			struct expr *expr = parse_expression();
-			TEXPECT(T_RBRACK);
-
-			struct constant *constant = expression_to_constant(expr);
-			assert(constant);
-
-			size_t mem_idx = 0;
-			switch (constant->type) {
-			case CONSTANT_TYPE:
-				switch (constant->data_type->type) {
-				case TY_SIMPLE:
-					switch (constant->data_type->simple) {
-					case ST_INT:
-						mem_idx = constant->int_d;
-						break;
-
-					default:
-						NOTIMP();
-					}
-					break;
-				
-				default:
-					NOTIMP();
-					break;
-				}
-				break;
-			default:
-				NOTIMP();
-			}
-
-			int noffset;
-			struct type *ntype;
-			type_select(*type, mem_idx, &noffset, &ntype);
-
-			*offset += noffset;
-			*type = ntype;
-
-			if (!first)
-				*first_index = mem_idx;
-		} else {
-			break;
+	if (c->data_type->type == TY_SIMPLE) {
+		switch (c->data_type->simple) {
+		case ST_INT:
+			return c->int_d == 0;
+		case ST_UINT:
+			return c->uint_d == 0;
+		case ST_LONG:
+			return c->long_d == 0;
+		case ST_ULONG:
+			return c->ulong_d == 0;
+		case ST_LLONG:
+			return c->llong_d == 0;
+		case ST_ULLONG:
+			return c->ullong_d == 0;
+		case ST_CHAR:
+			return c->char_d == 0;
+		case ST_UCHAR:
+			return c->uchar_d == 0;
+		case ST_SCHAR:
+			return c->schar_d == 0;
+		case ST_SHORT:
+			return c->short_d == 0;
+		case ST_USHORT:
+			return c->ushort_d == 0;
+		default:
+			return 0;
 		}
+	} else if (c->data_type->type == TY_POINTER) {
+		return c->ulong_d == 0;
+	} else {
+		return 0;
 	}
-
-	return first;
 }
 
-void parse_initializer_recursive(int offset, struct type **type, int set_type,
-								 struct initializer *initializer) {
-	if (TACCEPT(T_LBRACE)) {
-		if (T0->type == T_NUM &&
-			strcmp(T0->str, "0") == 0 &&
-			TPEEK(1)->type == T_RBRACE) {
-			TNEXT();
-			TNEXT();
-			return;
+int parse_non_brace_initializer(struct type **type, int offset, struct initializer *init,
+	struct expr **failed_expr) {
+	if (failed_expr)
+		*failed_expr = NULL;
+	if (is_scalar(*type)) {
+		int has_braces = TACCEPT(T_LBRACE);
+
+		struct expr *expr = parse_assignment_expression();
+		if (!expr) {
+			printf("%s\n%d\n", type_to_string(*type), has_braces);
+			PRINT_POS(T0->pos);
+			ERROR("Expected expression, got: %s", token_to_string(T0));
 		}
 
-		int current_member = 0, max_member = 0;
-		while (!TACCEPT(T_RBRACE)) {
-			int noffset = 0;
-			struct type *ntype = *type;
-			if (parse_designator_list(&current_member, &noffset, &ntype)) {
-				TEXPECT(T_A);
-				current_member++;
-			} else {
-				type_select(*type, current_member++, &noffset, &ntype);
+		if (expr->data_type->type == TY_STRUCT) {
+			if (!failed_expr) {
+				ERROR("Got invalid rhs for type %s\n", type_to_string(*type));
 			}
-
-			parse_initializer_recursive(offset + noffset, &ntype, 0, initializer);
-			TACCEPT(T_COMMA);
-
-			if (current_member > max_member)
-				max_member = current_member;
+			assert(failed_expr);
+			*failed_expr = expr;
+			return 0;
+		} else {
+			struct expr *casted_expr = expression_cast(expr, *type);
+			if (!expression_is_zero(casted_expr)) {
+				add_init_pair(init, (struct init_pair){offset,
+						expression_cast(expr, *type)});
+			}
 		}
 
-		if ((*type)->type == TY_INCOMPLETE_ARRAY && set_type) {
+		if (has_braces)
+			TEXPECT(T_RBRACE);
+		return 1;
+	} else if (((*type)->type == TY_ARRAY || (*type)->type == TY_INCOMPLETE_ARRAY) &&
+			   type_is_simple((*type)->children[0], ST_CHAR)) {
+		char *str;
+		if (T0->type == T_LBRACE && TPEEK(1)->type == T_STRING &&
+			TPEEK(2)->type == T_RBRACE) {
+			str = TPEEK(1)->str;
+			TNEXT();
+			TNEXT();
+			TNEXT();
+		} else if (T0->type == T_STRING) {
+			str = T0->str;
+			TNEXT();
+		} else {
+			return 0;
+		}
+
+		if ((*type)->type == TY_INCOMPLETE_ARRAY) {
 			struct type complete_array_params = {
 				.type = TY_ARRAY,
-				.array.length = max_member,
+				.array.length = strlen(str) + 1,
 				.n = 1
 			};
 
-			struct type *ntype = type_create(&complete_array_params, (*type)->children);
-			*type = ntype;
-		}
-	} else {
-		struct expr *expr = parse_assignment_expression();
-		if (!expr) {
-			ERROR("Expected expression, got %s", token_to_str(T0->type));
+			*type = type_create(&complete_array_params, (*type)->children);
 		}
 
-		struct constant *c = expression_to_constant(expr);
-		if (c && c->data_type->type == TY_ARRAY &&
-			type_is_simple(c->data_type->children[0], ST_CHAR) &&
-			c->type == CONSTANT_TYPE &&
-			((*type)->type == TY_INCOMPLETE_ARRAY || (*type)->type == TY_ARRAY) &&
-			(type_is_simple((*type)->children[0], ST_CHAR))) {
-			// Assigning string array. This is a special case.
-			if ((*type)->type == TY_INCOMPLETE_ARRAY && set_type) {
-				if (expr->type != E_CONSTANT)
-					ERROR("Can't initialize incomplete array with non constant expression");
+		add_init_pair(init, (struct init_pair){offset, EXPR_STR(str)});
+		return 1;
+	}
 
-				if (expr->data_type->type != TY_ARRAY)
-					ERROR("Can't initialize incomplete array with non-array expression of type");
+	return 0;
+}
 
-				if (expr->data_type->children[0] != (*type)->children[0])
-					ERROR("Can't initialize incomplete array with array of incompatible type");
+int type_is_char_array(struct type *type) {
+	return (type->type == TY_ARRAY || type->type == TY_INCOMPLETE_ARRAY) &&
+		type_is_simple(type->children[0], ST_CHAR);
+}
 
-				struct constant c = expr->constant;
+// 6.7.9p17-6.7.8p23 and some surrounding paragraph.
+// TODO: Too many for(;;) in this function.
+int parse_brace_initializer(struct type **current_object, int offset, struct initializer *init) {
+	if (!TACCEPT(T_LBRACE))
+		return 0;
 
-				struct type complete_array_params = {
-					.type = TY_ARRAY,
-					.array.length = c.data_type->array.length,
-					.n = 1
-				};
+	int stack_count = 1;
+	int index_stack[32]; // TODO: Remove arbitrary (but very reasonable) limit.
+	int offset_stack[32];
+	struct type *type_stack[32];
 
-				struct type *ntype = type_create(&complete_array_params, (*type)->children);
-				*type = ntype;
+	index_stack[0] = 0;
+	type_stack[0] = *current_object;
+	offset_stack[0] = offset;
+
+	int max_index = 0;
+
+	int must_have_designator_list = 0;
+
+	do {
+		int has_designator_list = 0;
+		struct type *parent_type = *current_object;
+		int parent_offset = offset;
+		for (;;) {
+			if (T0->type == T_DOT || T0->type == T_LBRACK) {
+				has_designator_list = 1;
+				stack_count = 0;
 			}
 
-			add_init_pair(initializer, (struct init_pair){offset, expr});
-		} else {
-			add_init_pair(initializer, (struct init_pair){offset,
-					expression_cast(expr, *type)});
+			int index;
+
+			if (TACCEPT(T_DOT)) {
+				char *ident = T0->str;
+				TEXPECT(T_IDENT);
+
+				index = type_member_idx(parent_type, ident);
+			} else if (TACCEPT(T_LBRACK)) {
+				struct expr *expr = parse_expression();
+				TEXPECT(T_RBRACK);
+
+				struct constant *constant = expression_to_constant(expression_cast(expr, type_simple(ST_INT)));
+				if (!constant)
+					ERROR("Array designator must have constant expression.");
+				assert(type_is_simple(constant->data_type, ST_INT));
+
+				index = constant->int_d;
+			} else {
+				break;
+			}
+
+			int noffset;
+			struct type *ntype;
+			type_select(parent_type, index, &noffset, &ntype);
+
+			stack_count++;
+			index_stack[stack_count - 1] = index;
+			type_stack[stack_count - 1] = parent_type;
+			offset_stack[stack_count - 1] = parent_offset;
+
+			parent_type = ntype;
+			parent_offset += noffset;
 		}
 
+		if (must_have_designator_list && !has_designator_list) {
+			break;
+		}
+
+		if (has_designator_list)
+			TEXPECT(T_A);
+
+		if (type_is_simple(type_stack[stack_count - 1], ST_CHAR)) {
+			PRINT_POS(T0->pos);
+			ERROR("Should not be here");
+		}
+		struct type *selected_type = NULL;
+		int selected_offset = 0;
+		type_select(type_stack[stack_count - 1], index_stack[stack_count - 1], &selected_offset, &selected_type);
+		selected_offset += offset_stack[stack_count - 1];
+
+		if (type_is_char_array(selected_type) && parse_non_brace_initializer(&selected_type,
+																			 selected_offset,
+																			 init, NULL)) {
+		} else if (!(type_is_aggregate(selected_type) &&
+			  parse_brace_initializer(&selected_type, selected_offset, init))) {
+			// Recurse down until parse_non_brace_initializer matches.
+			int start_count = stack_count;
+			int found = 0;
+
+			struct type *current = selected_type;
+			while (type_is_aggregate(current)) {
+				struct expr *failed_expr = NULL;
+				if (parse_non_brace_initializer(&current, selected_offset,
+												init, &failed_expr)) {
+					found = 1;
+					break;
+				}
+
+				stack_count++;
+
+				type_stack[stack_count - 1] = current;
+				index_stack[stack_count - 1] = 0;
+				offset_stack[stack_count - 1] = selected_offset;
+
+				type_select(current, 0, NULL, &current);
+			}
+
+			struct expr *failed_expr = NULL;
+			if (!found && parse_non_brace_initializer(&current, selected_offset,
+													  init, &failed_expr)) {
+				found = 1;
+			}
+
+			if (!found) {
+				// This 
+				struct expr *expr = failed_expr ? failed_expr : parse_assignment_expression();
+				if (!expr)
+					ERROR("Expected expression");
+				if (!type_is_aggregate(expr->data_type))
+					ERROR("Expected expression of aggregate data type, but got %s", type_to_string(expr->data_type));
+
+				for (; stack_count > start_count; stack_count--) {
+					if (expr->data_type == type_stack[stack_count - 1]) {
+						add_init_pair(init, (struct init_pair) { selected_offset,
+								expr});
+						break;
+					}
+				}
+
+				if (stack_count == start_count) {
+					ERROR("Can't cast aggregate type");
+				}
+
+				stack_count--;
+			}
+		}
+
+		if (stack_count == 1) {
+			max_index = MAX(max_index, index_stack[0]);
+		}
+
+		// Advance one step.
+		while (stack_count > 0) {
+			index_stack[stack_count - 1]++;
+			struct type *top_type = type_stack[stack_count - 1];
+			int num_members = 0;
+			switch (top_type->type) {
+			case TY_ARRAY:
+				num_members = top_type->array.length;
+				break;
+			case TY_INCOMPLETE_ARRAY:
+				num_members = -1;
+				break;
+			case TY_STRUCT:
+				num_members = top_type->struct_data->n;
+				break;
+			default: ERROR("Invalid top type");
+			}
+
+			if (num_members >= 0 &&
+				index_stack[stack_count - 1] >= num_members) {
+				stack_count--;
+			} else {
+				break;
+			}
+		}
+
+		if (stack_count == 0) {
+			must_have_designator_list = 1;
+			TACCEPT(T_COMMA);
+			continue;
+		}
+
+		if (!TACCEPT(T_COMMA)) {
+			break;
+		}
+		if (T0->type == T_RBRACE) {
+			break;
+		}
+	} while (1);
+
+	if ((*current_object)->type == TY_INCOMPLETE_ARRAY) {
+		struct type complete_array_params = {
+			.type = TY_ARRAY,
+			.array.length = max_index + 1,
+			.n = 1
+		};
+
+		struct type *ntype = type_create(&complete_array_params, (*current_object)->children);
+		*current_object = ntype;
 	}
+
+	if (stack_count == 0)
+		TACCEPT(T_COMMA);
+
+	TEXPECT(T_RBRACE);
+	return 1;
 }
 
 struct initializer *parse_initializer(struct type **type) {
 	struct initializer *init = initializer_init();
 
-	parse_initializer_recursive(0, type, 1, init);
+	if (!parse_non_brace_initializer(type, 0, init, NULL)) {
+		struct expr *expr = parse_assignment_expression();
+
+		if (expr) {
+			add_init_pair(init, (struct init_pair) { 0,
+					expression_cast(expr, *type)});
+		} else {
+			parse_brace_initializer(type, 0, init);
+		}
+	}
+
+	if ((*type)->type == TY_INCOMPLETE_ARRAY) {
+		PRINT_POS(T0->pos);
+		ERROR("Should have completed");
+	}
+//parse_initializer_recursive(0, type, 1, init);
 
 	return init;
 }

@@ -333,7 +333,11 @@ int type_is_pointer(struct type *type) {
 
 void type_select(struct type *type, int index,
 				 int *field_offset, struct type **field_type) {
-	*field_offset = calculate_offset(type, index);
+	if (field_offset)
+		*field_offset = calculate_offset(type, index);
+
+	if (!field_type)
+		return;
 
 	switch (type->type) {
 	case TY_STRUCT:
@@ -511,4 +515,10 @@ int has_variable_size(struct type *type) {
 int type_is_simple(struct type *type, enum simple_type st) {
 	return type->type == TY_SIMPLE &&
 		type->simple == st;
+}
+
+int type_is_aggregate(struct type *type) {
+	return type->type == TY_STRUCT ||
+		type->type == TY_ARRAY ||
+		type->type == TY_INCOMPLETE_ARRAY;
 }
