@@ -408,12 +408,12 @@ void merge_anonymous(struct struct_data *data) {
 		data->bitfields = realloc(data->bitfields, sizeof *data->bitfields * new_n);
 		data->bit_offsets = realloc(data->bit_offsets, sizeof *data->bit_offsets * new_n);
 
-		for (int j = 0; j < data->n - i - 1; j++) {
-			data->names[i + n_new_elements + j] = data->names[i + 1 + j];
-			data->types[i + n_new_elements + j] = data->types[i + 1 + j];
-			data->offsets[i + n_new_elements + j] = data->offsets[i + 1 + j];
-			data->bitfields[i + n_new_elements + j] = data->bitfields[i + 1 + j];
-			data->bit_offsets[i + n_new_elements + j] = data->bit_offsets[i + 1 + j];
+		for (int j = new_n - 1; j >= i + sub_data->n; j--) {
+			data->names[j] = data->names[j - sub_data->n + 1];
+			data->types[j] = data->types[j - sub_data->n + 1];
+			data->offsets[j] = data->offsets[j - sub_data->n + 1];
+			data->bitfields[j] = data->bitfields[j - sub_data->n + 1];
+			data->bit_offsets[j] = data->bit_offsets[j - sub_data->n + 1];
 		}
 
 		data->n = new_n;
