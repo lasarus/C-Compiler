@@ -398,6 +398,13 @@ var_id expression_to_address(struct expr *expr) {
 	case E_CAST:
 		ERROR("Can't cast lvalue to %s", type_to_string(expr->cast.target));
 
+	case E_COMPOUND_LITERAL: {
+		var_id var = expression_to_ir(expr);
+		var_id address = new_variable(type_pointer(expr->data_type), 1);
+		IR_PUSH_ADDRESS_OF(address, var);
+		return address;
+	}
+
 	default:
 		ERROR("Not imp %d", expr->type);
 		NOTIMP();

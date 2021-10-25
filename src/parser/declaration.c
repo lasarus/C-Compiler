@@ -808,6 +808,12 @@ struct type_ast *parse_declarator(int *was_abstract) {
 				});
 			*was_abstract = 1;
 		}
+	} else if (T0->type == T_LBRACK) {
+		// Small hack to allow for type-names like int[].
+		ast = type_ast_new((struct type_ast) {
+				.type = TAST_TERMINAL,
+				.terminal.name = NULL
+			});
 	} else {
 		*was_abstract = 1; // Is this correct?
 		return NULL;
