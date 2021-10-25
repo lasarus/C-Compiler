@@ -539,6 +539,26 @@ struct type_ast *type_ast_new(struct type_ast ast) {
 }
 
 struct type *specifiers_to_type(const struct type_specifiers *ts) {
+	enum simple_type int_st = ST_INT, long_st = ST_LONG, llong_st = ST_LLONG,
+		uint_st = ST_UINT, ulong_st = ST_ULONG, ullong_st = ST_ULLONG;
+
+	switch (parser_flags.dmodel) {
+	case DMODEL_LP64:
+		int_st = ST_INT, long_st = ST_LONG, llong_st = ST_LLONG,
+			uint_st = ST_UINT, ulong_st = ST_ULONG, ullong_st = ST_ULLONG;
+		break;
+
+	case DMODEL_ILP64:
+		int_st = ST_LONG, long_st = ST_LONG, llong_st = ST_LLONG,
+			uint_st = ST_ULONG, ulong_st = ST_ULONG, ullong_st = ST_ULLONG;
+		break;
+
+	case DMODEL_LLP64:
+		int_st = ST_INT, long_st = ST_INT, llong_st = ST_LLONG,
+			uint_st = ST_UINT, ulong_st = ST_UINT, ullong_st = ST_ULLONG;
+		break;
+	}
+
 #define SPEC(A, B) if (ts->specifiers == (B)) return type_simple(A);
 	SPEC(ST_VOID, TSF_VOID);
 	SPEC(ST_CHAR, TSF_CHAR);
@@ -553,28 +573,28 @@ struct type *specifiers_to_type(const struct type_specifiers *ts) {
 	SPEC(ST_USHORT, TSF_UNSIGNED | TSF_SHORT);
 	SPEC(ST_USHORT, TSF_UNSIGNED | TSF_SHORT | TSF_INT);
 
-	SPEC(ST_INT, TSF_INT);
-	SPEC(ST_INT, TSF_SIGNED);
-	SPEC(ST_INT, TSF_INT | TSF_SIGNED);
+	SPEC(int_st, TSF_INT);
+	SPEC(int_st, TSF_SIGNED);
+	SPEC(int_st, TSF_INT | TSF_SIGNED);
 
-	SPEC(ST_UINT, TSF_UNSIGNED);
-	SPEC(ST_UINT, TSF_UNSIGNED | TSF_INT);
+	SPEC(uint_st, TSF_UNSIGNED);
+	SPEC(uint_st, TSF_UNSIGNED | TSF_INT);
 
-	SPEC(ST_LONG, TSF_LONG1);
-	SPEC(ST_LONG, TSF_LONG1 | TSF_SIGNED);
-	SPEC(ST_LONG, TSF_LONG1 | TSF_INT);
-	SPEC(ST_LONG, TSF_LONG1 | TSF_INT | TSF_SIGNED);
+	SPEC(long_st, TSF_LONG1);
+	SPEC(long_st, TSF_LONG1 | TSF_SIGNED);
+	SPEC(long_st, TSF_LONG1 | TSF_INT);
+	SPEC(long_st, TSF_LONG1 | TSF_INT | TSF_SIGNED);
 
-	SPEC(ST_ULONG, TSF_LONG1 | TSF_UNSIGNED);
-	SPEC(ST_ULONG, TSF_LONG1 | TSF_INT | TSF_UNSIGNED);
+	SPEC(ulong_st, TSF_LONG1 | TSF_UNSIGNED);
+	SPEC(ulong_st, TSF_LONG1 | TSF_INT | TSF_UNSIGNED);
 
-	SPEC(ST_LLONG, TSF_LONGB);
-	SPEC(ST_LLONG, TSF_LONGB | TSF_SIGNED);
-	SPEC(ST_LLONG, TSF_LONGB | TSF_INT);
-	SPEC(ST_LLONG, TSF_LONGB | TSF_INT | TSF_SIGNED);
+	SPEC(llong_st, TSF_LONGB);
+	SPEC(llong_st, TSF_LONGB | TSF_SIGNED);
+	SPEC(llong_st, TSF_LONGB | TSF_INT);
+	SPEC(llong_st, TSF_LONGB | TSF_INT | TSF_SIGNED);
 
-	SPEC(ST_ULLONG, TSF_LONGB | TSF_UNSIGNED);
-	SPEC(ST_ULLONG, TSF_LONGB | TSF_INT | TSF_UNSIGNED);
+	SPEC(ullong_st, TSF_LONGB | TSF_UNSIGNED);
+	SPEC(ullong_st, TSF_LONGB | TSF_INT | TSF_UNSIGNED);
 
 	SPEC(ST_FLOAT, TSF_FLOAT);
 	SPEC(ST_DOUBLE, TSF_DOUBLE);

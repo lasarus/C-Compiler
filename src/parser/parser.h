@@ -253,4 +253,14 @@ void ir_init_var(struct initializer *init, var_id result);
 struct function *get_current_function(void);
 struct block *get_current_block(void);
 
+struct parser_flags {
+	enum {
+		DMODEL_ILP64,
+		DMODEL_LLP64,
+		DMODEL_LP64
+	} dmodel;
+};
+
+extern struct parser_flags parser_flags;
+
 #endif

@@ -9,6 +9,10 @@
 #include <string.h>
 #include <assert.h>
 
+struct parser_flags parser_flags = {
+	.dmodel = DMODEL_LP64
+};
+
 block_id new_block() {
 	static int block_counter = 1; // reserve space for null block.
 	return block_counter++;

@@ -38,6 +38,12 @@ struct arguments parse_arguments(int argc, char **argv) {
 				codegen_flags.cmodel = CMODEL_SMALL;
 			} else if (strcmp(argv[i] + 2, "cmodel=large") == 0) {
 				codegen_flags.cmodel = CMODEL_LARGE;
+			} else if (strcmp(argv[i] + 2, "dmodel=ILP64") == 0) {
+				parser_flags.dmodel = DMODEL_ILP64;
+			} else if (strcmp(argv[i] + 2, "dmodel=LLP64") == 0) {
+				parser_flags.dmodel = DMODEL_LLP64;
+			} else if (strcmp(argv[i] + 2, "dmodel=LP64") == 0) {
+				parser_flags.dmodel = DMODEL_LP64;
 			} else {
 				ERROR("invalid flag %s", argv[i]);
 			}
