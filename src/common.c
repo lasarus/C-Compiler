@@ -59,14 +59,29 @@ int character_constant_to_int(const char *str) {
 }
 
 unsigned char needs_no_escape[CHAR_MAX];
+unsigned char has_simple_escape[CHAR_MAX];
 
 void init_source_character_set(void) {
-	const char *str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!#%&()*+,-./:;<=>?[]^_{|}~ ";
+	const char *str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!#%&()*+,-./:;<=>[]^_{|}~ ";
 	for (; *str; str++) {
 		int idx = *str;
 		if (idx >= 0 && idx < 128)
 			needs_no_escape[idx] = 1;
 	}
+
+	has_simple_escape['\n'] = 'n';
+	has_simple_escape['\t'] = 't';
+	has_simple_escape['\"'] = '\"';
+	has_simple_escape['\''] = '\'';
+	has_simple_escape['?'] = '?';
+	has_simple_escape['\\'] = '\\';
+	has_simple_escape['\a'] = 'a';
+	has_simple_escape['\b'] = 'b';
+	has_simple_escape['\f'] = 'f';
+	has_simple_escape['\n'] = 'n';
+	has_simple_escape['\r'] = 'r';
+	has_simple_escape['\t'] = 't';
+	has_simple_escape['\v'] = 'v';
 }
 
 void character_to_escape_sequence(char character, char *output) {
@@ -75,6 +90,11 @@ void character_to_escape_sequence(char character, char *output) {
 	if ((int)character >= 0 && needs_no_escape[(int)character]) {
 		output[0] = character;
 		output[1] = '\0';
+		return;
+	} else if ((int)character >= 0 && has_simple_escape[(int)character]) {
+		output[0] = '\\';
+		output[1] = has_simple_escape[(int)character];
+		output[2] = '\0';
 		return;
 	}
 

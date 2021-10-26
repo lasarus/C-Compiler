@@ -11,4 +11,6 @@ int main() {
 	// Testing STR(X)
 	assert(strcmp(STR(HELLO THERE!), "HELLO THERE!") == 0);
 	assert(strcmp(STR(GLUE(AAA, BBB)), "GLUE(AAA, BBB)") == 0);
+	// Testing stringification of strings.
+	assert(strcmp(STR("Hello World!\n"), "\"Hello World!\\n\"") == 0);
 }

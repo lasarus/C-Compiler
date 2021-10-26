@@ -158,6 +158,38 @@ struct token glue(struct token a, struct token b) {
 	return ret;
 }
 
+static size_t stringify_size, stringify_cap;
+static char *stringify_buffer;
+
+void stringify_start() {
+	stringify_size = 0;
+	ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = '\0';
+}
+
+void stringify_add(struct token *t, int start) {
+	stringify_size--;
+	
+	if (!start && t->whitespace)
+		ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = ' ';
+	switch (t->type) {
+	case PP_STRING:
+		ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = '"';
+		for (int i = 0; t->str[i]; i++) {
+			char escape_seq[5];
+			character_to_escape_sequence(t->str[i], escape_seq);
+			for (int j = 0; escape_seq[j]; j++)
+				ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = escape_seq[j];
+		}
+		ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = '"';
+		break;
+
+	default:
+		for (int i = 0; t->str[i]; i++)
+			ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = t->str[i];
+	}
+	ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = '\0';
+}
+
 void expander_subs(struct define *def, struct string_set *hs,
 				   struct position new_pos) {
 	string_set_insert(hs, strdup(def->name));
@@ -249,19 +281,12 @@ void expander_subs(struct define *def, struct string_set *hs,
 			}
 		} else if (idx >= 0 && stringify) {
 			struct token_list tl = arguments[idx];
-			char *str = "";
+			stringify_start();
 
-			int start_it = tl.size - 1;
-			for(int i = start_it; i >= 0; i--) {
-				struct token t = tl.list[i];
-				//t.pos = new_pos;
+			for(int i = 0; i < tl.size; i++)
+				stringify_add(tl.list + i, i == 0);
 
-				str = allocate_printf("%s%s", t.str, str);
-				if (i && t.whitespace)
-					str = allocate_printf(" %s", str);
-			}
-
-			struct token t = token_init(PP_STRING, str, (struct position) { 0 });
+			struct token t = token_init(PP_STRING, strdup(stringify_buffer), (struct position) { 0 });
 			expander_push(t);
 		} else if(idx >= 0) {
 			struct token_list tl = arguments[idx];
