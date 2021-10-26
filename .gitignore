@@ -1,0 +1,6 @@
+asm/*
+asm2/*
+test_asm/*
+cc
+cc_self
+musl/*
