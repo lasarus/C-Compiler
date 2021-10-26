@@ -20,24 +20,25 @@ struct entry {
 };
 
 static struct entry *entries = NULL;
-static int n_entries = 0;
+static int entries_size = 0, entries_cap = 0;
 
 label_id label_register(enum entry_type type, const char *str) {
 	if (type == ENTRY_STR) {
-			for (int i = 0; i < n_entries; i++) {
+			for (int i = 0; i < entries_size; i++) {
 				if (strcmp(entries[i].name, str) == 0) {
 					return entries[i].id;
 				}
 			}
 	}
 
-	n_entries++;
-	entries = realloc(entries, n_entries * sizeof *entries);
-	entries[n_entries - 1].name = str;
-	entries[n_entries - 1].id = n_entries - 1;
-	entries[n_entries - 1].type = type;
+	int id = entries_size;
+	ADD_ELEMENT(entries_size, entries_cap, entries) = (struct entry) {
+		.type = type,
+		.name = str,
+		.id = id
+	};
 
-	return n_entries - 1;
+	return id;
 }
 
 label_id rodata_register(const char *str) {
@@ -61,7 +62,7 @@ const char *rodata_get_label_string(label_id id) {
 }
 
 void rodata_codegen(void) {
-	for (int i = 0; i < n_entries; i++) {
+	for (int i = 0; i < entries_size; i++) {
 		if (entries[i].type != ENTRY_STR)
 			continue;
 		emit("%s:", rodata_get_label_string(entries[i].id));
@@ -89,16 +90,10 @@ struct static_var {
 };
 
 static struct static_var *static_vars = NULL;
-static int static_vars_n, static_vars_cap;
+static int static_vars_size, static_vars_cap;
 
 void data_register_static_var(const char *label, struct type *type, struct initializer *init, int global) {
-	if (static_vars_n >= static_vars_cap) {
-		static_vars_cap = MAX(static_vars_cap * 2, 4);
-		static_vars = realloc(static_vars,
-							  sizeof *static_vars * static_vars_cap);
-	}
-
-	static_vars[static_vars_n++] = (struct static_var) {
+	ADD_ELEMENT(static_vars_size, static_vars_cap, static_vars) = (struct static_var) {
 		.label = label,
 		.type = type,
 		.init = init,
@@ -123,7 +118,7 @@ void codegen_initializer(struct type *type,
 		label_offsets[i] = 0;
 	}
 
-	for (int i = 0; i < init->n; i++) {
+	for (int i = 0; i < init->size; i++) {
 		struct init_pair *pair = init->pairs + i;
 		int offset = pair->offset;
 
@@ -201,7 +196,7 @@ void codegen_static_var(struct static_var *static_var) {
 }
 
 void data_codegen(void) {
-	for (int i = 0; i < static_vars_n; i++) {
+	for (int i = 0; i < static_vars_size; i++) {
 		codegen_static_var(static_vars + i);
 	}
 }

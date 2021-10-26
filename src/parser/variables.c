@@ -25,7 +25,7 @@ struct variable_data {
 	int size;
 } *variables = NULL;
 
-static int variables_n, variables_cap = 0;
+static int variables_size, variables_cap = 0;
 
 
 var_id new_variable(struct type *type, int allocate) {
@@ -44,29 +44,20 @@ var_id allocate_vla(struct type **type) {
 
 var_id new_variable_sz(int size, int allocate) {
 	// A bit of a shortcut.
-	if (variables_n && size == 0)
+	if (variables_size && size == 0)
 		return VOID_VAR;
 
-	if (variables_n >= variables_cap) {
-		variables_cap *= 2;
-		if (variables_cap == 0)
-			variables_cap = 4;
-		variables = realloc(variables, sizeof (*variables) * variables_cap);
-	}
-
-	var_id new_id = variables_n++;
-
-	variables[new_id].size = size;
+	var_id id = variables_size;
+	ADD_ELEMENT(variables_size, variables_cap, variables).size = size;
 
 	if (allocate)
-		allocate_var(new_id);
-	//variable_set_type(new_id, type, allocate);
+		allocate_var(id);
 
-	return new_id;
+	return id;
 }
 
 int get_n_vars(void) {
-	return variables_n;
+	return variables_size;
 }
 
 int get_variable_size(var_id variable) {
@@ -74,7 +65,7 @@ int get_variable_size(var_id variable) {
 }
 
 void init_variables(void) {
-	variables_n = 0;
+	variables_size = 0;
 	new_variable(type_simple(ST_VOID), 0);
 }
 

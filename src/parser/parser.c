@@ -32,54 +32,35 @@ void parse_into_ir() {
 struct program program;
 
 struct function *get_current_function(void) {
-	return &program.functions[program.n - 1];
+	return &program.functions[program.size - 1];
 }
 
 struct block *get_current_block(void) {
 	struct function *func = get_current_function();
-	return &func->blocks[func->n - 1];
+	return &func->blocks[func->size - 1];
 }
 
 void push_ir(struct instruction instruction) {
 	struct block *block = get_current_block();
 
-	if (block->n >= block->cap) {
-		block->cap = MAX(block->cap * 2, 2);
-		block->instructions = realloc(block->instructions,
-									  sizeof (*block->instructions) * block->cap);
-	}
-	block->instructions[block->n++] = instruction;
+	ADD_ELEMENT(block->size, block->cap, block->instructions) = instruction;
 }
 
 void ir_block_start(block_id id) {
 	struct function *func = get_current_function();
 
-	if (func->n >= func->cap) {
-		func->cap = MAX(func->cap * 2, 2);
-		func->blocks = realloc(func->blocks,
-									  sizeof (*func->blocks) * func->cap);
-	}
-
-	func->blocks[func->n++] = (struct block) {
+	ADD_ELEMENT(func->size, func->cap, func->blocks) = (struct block) {
 		.id = id,
-		.n = 0, .cap = 0, .instructions = NULL,
 		.exit.type = BLOCK_EXIT_NONE
 	};
 }
 
 void ir_new_function(struct type *signature, var_id *arguments, const char *name, int is_global) {
-	if (program.n >= program.cap) {
-		program.cap = MAX(program.cap * 2, 2);
-		program.functions = realloc(program.functions,
-									   sizeof (*program.functions) * program.cap);
-	}
-	program.functions[program.n++] = (struct function) {
+	ADD_ELEMENT(program.size, program.cap, program.functions) = (struct function) {
 		.signature = signature,
 		.named_arguments = arguments,
 		.name = name,
-		.is_global = is_global,
-
-		.n = 0, .cap = 0, .blocks = NULL
+		.is_global = is_global
 	};
 }
 
@@ -232,7 +213,7 @@ void print_instruction(struct instruction instruction) {
 }
 
 void print_parser_ir() {
-	for (int i = 0; i < program.n; i++) {
+	for (int i = 0; i < program.size; i++) {
 		struct function *func = program.functions + i;
 		printf("START OF FUNCTION: %s \"", func->name);
 		printf("\" with named arguments: ");
@@ -240,10 +221,10 @@ void print_parser_ir() {
 			printf("%d ", func->named_arguments[j]);
 		}
 
-		for (int j = 0; j < func->n; j++) {
+		for (int j = 0; j < func->size; j++) {
 			struct block *block = func->blocks + j;
 			printf("START OF BLOCK:\n");
-			for (int k = 0; k < block->n; k++) {
+			for (int k = 0; k < block->size; k++) {
 				print_instruction(block->instructions[j]);
 			}
 			printf("__END_OF_BLOCK__\n");
@@ -277,13 +258,8 @@ enum operand_type ot_from_type(struct type *type) {
 
 
 void allocate_var(var_id var) {
-	struct function *func = &program.functions[program.n - 1];
-	if (func->var_n >= func->var_cap) {
-		func->var_cap = MAX(func->var_cap * 2, 4);
-		func->vars = realloc(func->vars, sizeof *func->vars * func->var_cap);
-	}
-
-	func->vars[func->var_n++] = var;
+	struct function *func = &program.functions[program.size - 1];
+	ADD_ELEMENT(func->var_size, func->var_cap, func->vars) = var;
 }
 
 void ir_if_selection(var_id condition, block_id block_true, block_id block_false) {
@@ -296,16 +272,13 @@ void ir_if_selection(var_id condition, block_id block_true, block_id block_false
 	block->exit.if_.block_false = block_false;
 }
 
-void ir_switch_selection(var_id condition, int n, struct constant *values, block_id *blocks, block_id default_) {
+void ir_switch_selection(var_id condition, struct case_labels labels) {
 	struct block *block = get_current_block();
 	assert(block->exit.type == BLOCK_EXIT_NONE);
 
 	block->exit.type = BLOCK_EXIT_SWITCH;
 	block->exit.switch_.condition = condition;
-	block->exit.switch_.n = n;
-	block->exit.switch_.values = values;
-	block->exit.switch_.blocks = blocks;
-	block->exit.switch_.default_ = default_;
+	block->exit.switch_.labels = labels;
 }
 
 void ir_goto(block_id jump) {
@@ -341,7 +314,7 @@ void ir_init_var(struct initializer *init, var_id result) {
 	IR_PUSH_ADDRESS_OF(base_address, result);
 	var_id member_address = new_variable(type_pointer(type_simple(ST_VOID)), 1);
 
-	for (int i = 0; i < init->n; i++) {
+	for (int i = 0; i < init->size; i++) {
 		IR_PUSH_GET_OFFSET(member_address, base_address, init->pairs[i].offset);
 		IR_PUSH_STORE(expression_to_ir(init->pairs[i].expr), member_address);
 	}

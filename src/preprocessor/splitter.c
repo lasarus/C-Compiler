@@ -69,7 +69,7 @@ enum ttype get_punct(char **in_str) {
 }
 
 struct token splitter_next(void) {
-	if (splitter.stack.n) {
+	if (splitter.stack.size) {
 		struct token t = token_move(token_list_top(&splitter.stack));
 		token_list_pop(&splitter.stack);
 		return t;
@@ -101,7 +101,7 @@ struct token splitter_next(void) {
 }
 
 struct token splitter_next_unexpanded(void) {
-	if (splitter.stack.n) {
+	if (splitter.stack.size) {
 		struct token t = token_move(token_list_top(&splitter.stack));
 		token_list_pop(&splitter.stack);
 		return t;

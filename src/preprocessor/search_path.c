@@ -6,8 +6,8 @@
 #include <errno.h>
 #include <string.h>
 
-const char **include_paths = NULL;
-int n_include_paths = 0;
+const char **paths = NULL;
+int paths_size = 0, paths_cap;
 
 // *dir is NULL if path contains no slash.
 void split_path(char *path, const char **name,
@@ -76,8 +76,8 @@ struct file search_include(struct file *current_file,
 			return out;
 	}
 
-	for (int i = 0; i < n_include_paths; i++) {
-		if (check_against_path(include_paths[i],
+	for (int i = 0; i < paths_size; i++) {
+		if (check_against_path(paths[i],
 							   path, &out))
 			return out;
 	}
@@ -86,10 +86,7 @@ struct file search_include(struct file *current_file,
 }
 
 void add_include_path(const char *path) {
-	n_include_paths++;
-	include_paths = realloc(include_paths, sizeof *include_paths * n_include_paths);
-
-	include_paths[n_include_paths - 1] = path;
+	ADD_ELEMENT(paths_size, paths_cap, paths) = path;
 }
 
 void file_free(struct file *file) {

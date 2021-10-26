@@ -93,7 +93,7 @@ struct expander {
 struct token expander_take(void) {
 	struct token t;
 
-	if (expander.stack.n > 0) {
+	if (expander.stack.size > 0) {
 		t = token_move(token_list_top(&expander.stack));
 		token_list_pop(&expander.stack);
 	} else {
@@ -163,7 +163,7 @@ void expander_subs(struct define *def, struct string_set *hs,
 	string_set_insert(hs, strdup(def->name));
 
 	// Parse function macro.
-	int n_args = def->par.n;
+	int n_args = def->par.size;
 	if (n_args > 16)
 		ERROR("Unsupported number of elements");
 	struct token_list arguments[16] = {0};
@@ -201,7 +201,7 @@ void expander_subs(struct define *def, struct string_set *hs,
 	}
 
 	int concat_with_prev = 0;
-	for(int i = def->def.n - 1; i >= 0; i--) {
+	for(int i = def->def.size - 1; i >= 0; i--) {
 		struct token t = def->def.list[i];
 
 		int concat = 0;
@@ -230,12 +230,10 @@ void expander_subs(struct define *def, struct string_set *hs,
 			} else if (vararg_included) {
 				struct token_list tl = vararg;
 
-				int start_it = tl.n - 1;
+				int start_it = tl.size - 1;
 
-				if (concat_with_prev && tl.n) {
-					struct token *end = &expander.stack.list[
-						expander.stack.n - 1
-						];
+				if (concat_with_prev && tl.size) {
+					struct token *end = token_list_top(&expander.stack);
 					*end = glue(*end, tl.list[start_it--]);
 				}
 
@@ -253,7 +251,7 @@ void expander_subs(struct define *def, struct string_set *hs,
 			struct token_list tl = arguments[idx];
 			char *str = "";
 
-			int start_it = tl.n - 1;
+			int start_it = tl.size - 1;
 			for(int i = start_it; i >= 0; i--) {
 				struct token t = tl.list[i];
 				t.pos = new_pos;
@@ -268,11 +266,11 @@ void expander_subs(struct define *def, struct string_set *hs,
 		} else if(idx >= 0) {
 			struct token_list tl = arguments[idx];
 
-			int start_it = tl.n - 1;
+			int start_it = tl.size - 1;
 
-			if (concat_with_prev && tl.n) {
+			if (concat_with_prev && tl.size) {
 				struct token *end = &expander.stack.list[
-					expander.stack.n - 1
+					expander.stack.size - 1
 					];
 				*end = glue(*end, tl.list[start_it--]);
 			}
@@ -283,13 +281,11 @@ void expander_subs(struct define *def, struct string_set *hs,
 				expander_push(t);
 			}
 
-			if (tl.n)
+			if (tl.size)
 				concat_with_prev = concat;
 		} else {
 			if (concat_with_prev) {
-				struct token *end = &expander.stack.list[
-					expander.stack.n - 1
-					];
+				struct token *end = token_list_top(&expander.stack);
 				*end = glue(*end, t);
 			} else if (stringify) {
 				ERROR("# Should be followed by macro parameter");

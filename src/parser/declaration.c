@@ -702,13 +702,7 @@ struct parameter_list {
 };
 
 struct parameter_list parse_parameter_list(void) {
-	struct parameter_list ret =
-		{
-			.n = 0,
-			.vararg = 0,
-			.types = NULL,
-			.names = NULL
-		};
+	struct parameter_list ret = { 0 };
 
 	struct specifiers s;
 	int first = 1;
@@ -883,9 +877,7 @@ static struct initializer *initializer_init(void) {
 }
 
 void add_init_pair(struct initializer *init, struct init_pair pair) {
-	init->n++;
-	init->pairs = realloc(init->pairs, sizeof (*init->pairs) * init->n);
-	init->pairs[init->n - 1] = pair;
+	ADD_ELEMENT(init->size, init->cap, init->pairs) = pair;
 }
 
 int expression_is_zero(struct expr *expr) {

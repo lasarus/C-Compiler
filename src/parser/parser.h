@@ -176,7 +176,7 @@ void parse_into_ir();
 void print_parser_ir();
 
 struct program {
-	int n, cap;
+	int size, cap;
 	struct function *functions;
 };
 
@@ -186,13 +186,24 @@ struct function {
 	var_id *named_arguments;
 	const char *name;
 
-	int var_n, var_cap;
+	int var_size, var_cap;
 	var_id *vars;
 
 	int uses_va;
 
-	int n, cap;
+	int size, cap;
 	struct block *blocks;
+};
+
+struct case_labels {
+	int size, cap;
+
+	struct case_label {
+		block_id block;
+		struct constant value;
+	} *labels;
+
+	block_id default_;
 };
 
 struct block_exit {
@@ -208,10 +219,7 @@ struct block_exit {
 	union {
 		struct {
 			var_id condition;
-			int n;
-			struct constant *values;
-			block_id *blocks;
-			block_id default_;
+			struct case_labels labels;
 		} switch_;
 
 		struct {
@@ -230,7 +238,7 @@ struct block_exit {
 
 struct block {
 	block_id id;
-	int n, cap;
+	int size, cap;
 	struct instruction *instructions;
 
 	struct block_exit exit;
@@ -243,7 +251,7 @@ struct program *get_program(void);
 void ir_block_start(block_id id);
 
 void ir_if_selection(var_id condition, block_id block_true, block_id block_false);
-void ir_switch_selection(var_id condition, int n, struct constant *values, block_id *blocks, block_id default_);
+void ir_switch_selection(var_id condition, struct case_labels labels);
 void ir_goto(block_id jump);
 void ir_return(var_id value, struct type *type);
 void ir_return_void(void);

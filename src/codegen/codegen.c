@@ -674,7 +674,7 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 void codegen_block(struct block *block, struct reg_save_info reg_save_info) {
 	emit(".LB%d:", block->id);
 
-	for (int i = 0; i < block->n; i++) {
+	for (int i = 0; i < block->size; i++) {
 		codegen_instruction(block->instructions[i], reg_save_info);
 	}
 
@@ -744,12 +744,12 @@ void codegen_block(struct block *block, struct reg_save_info reg_save_info) {
 		emit("#SWITCH");
 		var_id control = block_exit->switch_.condition;
 		scalar_to_reg(control, REG_RDI);
-		for (int i = 0; i < block_exit->switch_.n; i++) {
-			emit("cmpl $%d, %%edi", block_exit->switch_.values[i].int_d);
-			emit("je .LB%d", block_exit->switch_.blocks[i]);
+		for (int i = 0; i < block_exit->switch_.labels.size; i++) {
+			emit("cmpl $%d, %%edi", block_exit->switch_.labels.labels[i].value.int_d);
+			emit("je .LB%d", block_exit->switch_.labels.labels[i].block);
 		}
-		if (block_exit->switch_.default_) {
-			emit("jmp .LB%d", block_exit->switch_.default_);
+		if (block_exit->switch_.labels.default_) {
+			emit("jmp .LB%d", block_exit->switch_.labels.default_);
 		}
 	} break;
 
@@ -785,7 +785,7 @@ void codegen_function(struct function *func) {
 	reg_save_info.gp_offset = (current_gp_reg) * 8;
 	reg_save_info.overflow_position = 16;
 
-	for (int i = 0; i < func->var_n; i++) {
+	for (int i = 0; i < func->var_size; i++) {
 		var_id var = func->vars[i];
 		int size = get_variable_size(var);
 
@@ -862,14 +862,9 @@ void codegen_function(struct function *func) {
 
 	reg_save_info.overflow_position = total_memory_argument_size + 16;
 
-	for (int i = 0; i < func->n; i++) {
+	for (int i = 0; i < func->size; i++) {
 		codegen_block(func->blocks + i, reg_save_info);
 	}
-
-	// Allocate all variables.
-	/* emit("xor %%rax, %%rax"); */
-	/* emit("leave"); */
-	/* emit("ret"); */
 }
 
 void codegen(const char *path) {
@@ -883,7 +878,7 @@ void codegen(const char *path) {
 
 	struct program *program = get_program();
 
-	for (int i = 0; i < program->n; i++)
+	for (int i = 0; i < program->size; i++)
 		codegen_function(program->functions + i);
 
 	rodata_codegen();

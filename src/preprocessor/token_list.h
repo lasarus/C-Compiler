@@ -4,7 +4,7 @@
 #include "preprocessor.h"
 
 struct token_list {
-	int n, capacity;
+	int size, cap;
 	struct token *list;
 };
 

@@ -11,13 +11,6 @@
 #include <stdlib.h>
 #include <assert.h>
 
-struct case_labels {
-	int n;
-	block_id *blocks;
-	block_id default_;
-	struct constant *values;
-};
-
 struct jump_blocks {
 	block_id block_break,
 		block_continue;
@@ -26,9 +19,9 @@ struct jump_blocks {
 };
 
 struct function_scope {
-	int n, cap;
+	int size, cap;
 
-	struct {
+	struct function_scope_label {
 		const char *label;
 		block_id id;
 		int used;
@@ -36,16 +29,8 @@ struct function_scope {
 } function_scope;
 
 void add_function_scope_label(const char *label, block_id id, int used) {
-	if (function_scope.n >= function_scope.cap) {
-		function_scope.cap = MAX(function_scope.cap * 2, 4);
-		function_scope.labels = realloc(function_scope.labels,
-										sizeof *function_scope.labels * function_scope.cap);
-	}
-
-	int idx = function_scope.n++;
-	function_scope.labels[idx].label = label;
-	function_scope.labels[idx].id = id;
-	function_scope.labels[idx].used = used;
+	ADD_ELEMENT(function_scope.size, function_scope.cap, function_scope.labels) =
+		(struct function_scope_label) { label, id, used };
 }
 
 // See section 6.8 of standard.
@@ -64,7 +49,7 @@ int parse_labeled_statement(struct jump_blocks jump_blocks) {
 		TNEXT();
 		TNEXT();
 
-		for (int i = 0; i < function_scope.n; i++) {
+		for (int i = 0; i < function_scope.size; i++) {
 			if (strcmp(label, function_scope.labels[i].label) == 0) {
 				if (function_scope.labels[i].used)
 					ERROR("Label declared more than once %s", label);
@@ -97,11 +82,8 @@ int parse_labeled_statement(struct jump_blocks jump_blocks) {
 		ir_goto(block_case);
 		ir_block_start(block_case);
 
-		labels->n++;
-		labels->blocks = realloc(labels->blocks, sizeof (*labels->blocks) * labels->n);
-		labels->values = realloc(labels->values, sizeof (*labels->values) * labels->n);
-		labels->blocks[labels->n - 1] = block_case;
-		labels->values[labels->n - 1] = *constant;
+		ADD_ELEMENT(labels->size, labels->cap, labels->labels) =
+			(struct case_label) { block_case, *constant };
 
 		return 1;
 	} else if (TACCEPT(T_KDEFAULT)) {
@@ -165,7 +147,8 @@ int parse_switch(struct jump_blocks jump_blocks) {
 	ir_goto(block_end);
 	ir_block_start(block_control);
 
-	ir_switch_selection(expression_to_ir(expression_cast(condition, type_simple(ST_INT))), labels.n, labels.values, labels.blocks, labels.default_);
+	ir_switch_selection(expression_to_ir(expression_cast(condition, type_simple(ST_INT))),
+						labels);
 
 	ir_block_start(block_end);
 
@@ -388,7 +371,7 @@ int parse_jump_statement(struct jump_blocks jump_blocks) {
 		const char *label = T0->str;
 		TNEXT();
 		TEXPECT(T_SEMI_COLON);
-		for (int i = 0; i < function_scope.n; i++) {
+		for (int i = 0; i < function_scope.size; i++) {
 			if (strcmp(label, function_scope.labels[i].label) == 0) {
 				ir_goto(function_scope.labels[i].id);
 				ir_block_start(new_block());
@@ -449,7 +432,7 @@ void parse_function(const char *name, struct type *type, int arg_n, char **arg_n
 	current_function = name;
 	struct symbol_identifier *symbol = symbols_get_identifier(name);
 
-	function_scope.n = 0;
+	function_scope.size = 0;
 
 	current_ret_val = type->children[0];
 

@@ -180,42 +180,10 @@ struct type *type_deref(struct type *type) {
 // TODO: make this better.
 struct struct_data *register_struct(void) {
 	return malloc(sizeof (struct struct_data));
-
-	static struct struct_data *array = NULL;
-	static int capacity = 0;
-	static int n = 0;
-
-	if (n >= capacity) {
-		capacity *= 2;
-
-		if (capacity == 0)
-			capacity = 4;
-
-		array = realloc(array, capacity * sizeof (*array));
-	}
-
-	struct struct_data *ret = &array[n++];
-	*ret = (struct struct_data) { 0 };
-
-	return ret;
 }
 
 struct enum_data *register_enum(void) {
 	return malloc(sizeof (struct enum_data));
-	static struct enum_data *array = NULL;
-	static int capacity = 0;
-	static int n = 0;
-
-	if (n >= capacity) {
-		capacity *= 2;
-
-		if (capacity == 0)
-			capacity = 4;
-
-		array = realloc(array, capacity * sizeof (*array));
-	}
-
-	return &array[n++];
 }
 
 int type_member_idx(struct type *type,

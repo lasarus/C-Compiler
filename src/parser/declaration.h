@@ -7,7 +7,7 @@
 #include <types.h>
 
 struct initializer {
-	int n;
+	int size, cap;
 	struct init_pair {
 		int offset;
 		struct expr *expr;

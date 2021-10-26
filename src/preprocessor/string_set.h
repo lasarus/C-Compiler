@@ -6,7 +6,7 @@
 // way.
 
 struct string_set {
-	int n, capacity;
+	int size, cap;
 	char **strings;
 };
 

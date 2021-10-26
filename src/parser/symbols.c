@@ -36,7 +36,7 @@ static struct hash_table {
 } hash_table;
 
 static struct table {
-	int size, capacity;
+	int size, cap;
 	struct table_entry *entries;
 } table;
 
@@ -83,19 +83,17 @@ struct table_entry *get_entry(struct entry_id id) {
 }
 
 struct table_entry *add_entry(struct entry_id id) {
-	if (table.size >= table.capacity) {
-		table.capacity = MAX(table.capacity * 2, 4);
-		table.entries = realloc(table.entries, table.capacity * sizeof *table.entries);
-	}
-
-	struct table_entry *new_entry = &table.entries[table.size++];
-
 	uint32_t hash = hash_entry(id) % hash_table.size;
 
-	new_entry->id.name = id.name;
-	new_entry->id.type = id.type;
-	new_entry->block = current_block;
-	new_entry->link = hash_table.entries[hash];
+	struct table_entry *new_entry = &ADD_ELEMENT(table.size, table.cap, table.entries);
+
+	*new_entry = (struct table_entry) {
+		.id.name = id.name,
+		.id.type = id.type,
+		.block = current_block,
+		.link = hash_table.entries[hash],
+	};
+
 	hash_table.entries[hash] = table.size - 1;
 
 	return new_entry;

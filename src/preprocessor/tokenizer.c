@@ -52,12 +52,7 @@ void tokenizer_push_input(const char *rel_path) {
 }
 
 void tokenizer_disable_current_path(void) {
-	if (disallowed_size >= disallowed_cap) {
-		disallowed_cap = MAX(disallowed_cap * 2, 4);
-		disallowed = realloc(disallowed, sizeof *disallowed * disallowed_cap);
-	}
-
-	disallowed[disallowed_size++] = strdup(tok.top->file.full);
+	ADD_ELEMENT(disallowed_size, disallowed_cap, disallowed) = strdup(tok.top->file.full);
 }
 
 static void tokenizer_pop_input(void) {
@@ -83,28 +78,14 @@ int flush_whitespace(int *whitespace,
 }
 
 char *buffer = NULL;
-size_t buffer_cap = 0, buffer_pos = 0;
+size_t buffer_size = 0, buffer_cap = 0;
 
 void buffer_start(void) {
-	buffer_pos = 0;
+	buffer_size = 0;
 }
 
 void buffer_write(char c) {
-	if (buffer_cap == 0) {
-		buffer_cap = 4;
-		buffer = malloc(buffer_cap);
-	}
-
-	if (buffer_pos >= buffer_cap) {
-		buffer_cap = (buffer_cap > 0) ?
-			(buffer_cap * 2) :
-			16;
-
-		buffer = realloc(buffer, buffer_cap);
-	}
-
-	buffer[buffer_pos] = c;
-	buffer_pos++;
+	ADD_ELEMENT(buffer_size, buffer_cap, buffer) = c;
 }
 
 char *buffer_get(void) {
