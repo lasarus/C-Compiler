@@ -280,6 +280,31 @@ void fix_binary_operator(struct expr *expr) {
 
 		// Left hand side is now a pointer.
 		expr->type = E_POINTER_ADD;
+		break;
+
+	case OP_EQUAL:
+	case OP_NOT_EQUAL: {
+		// Expressions of the form ptr == 0 and ptr != 0 are allowed.
+		// But the right hand side must be a null pointer constant.
+		if (lhs_ptr != rhs_ptr) {
+			struct constant *non_ptr = NULL;
+			if (!rhs_ptr)
+				non_ptr = expression_to_constant(expr->args[1]);
+			if (!lhs_ptr)
+				non_ptr = expression_to_constant(expr->args[0]);
+
+			if (!non_ptr || non_ptr->type != CONSTANT_TYPE ||
+				!constant_is_zero(non_ptr)) {
+				ERROR("can only compare pointers with pointers or null pointer constant");
+			}
+
+			if (!rhs_ptr)
+				expr->args[1] = expression_cast(expr->args[1], type_pointer(type_simple(ST_VOID)));
+			if (!lhs_ptr)
+				expr->args[0] = expression_cast(expr->args[0], type_pointer(type_simple(ST_VOID)));
+		}
+	} break;
+
 	default: // Do nothing.
 		break;
 	}
@@ -1323,4 +1348,48 @@ struct expr *expression_cast(struct expr *expr, struct type *type) {
 
 struct constant *expression_to_constant(struct expr *expr) {
 	return expr->type == E_CONSTANT ? &expr->constant : NULL;
+}
+
+int constant_is_zero(struct constant *c) {
+	if (c->type != CONSTANT_TYPE)
+		return 0;
+
+	if (c->data_type->type == TY_SIMPLE) {
+		switch (c->data_type->simple) {
+		case ST_INT:
+			return c->int_d == 0;
+		case ST_UINT:
+			return c->uint_d == 0;
+		case ST_LONG:
+			return c->long_d == 0;
+		case ST_ULONG:
+			return c->ulong_d == 0;
+		case ST_LLONG:
+			return c->llong_d == 0;
+		case ST_ULLONG:
+			return c->ullong_d == 0;
+		case ST_CHAR:
+			return c->char_d == 0;
+		case ST_UCHAR:
+			return c->uchar_d == 0;
+		case ST_SCHAR:
+			return c->schar_d == 0;
+		case ST_SHORT:
+			return c->short_d == 0;
+		case ST_USHORT:
+			return c->ushort_d == 0;
+		default:
+			return 0;
+		}
+	} else if (c->data_type->type == TY_POINTER) {
+		return c->ulong_d == 0;
+	} else {
+		return 0;
+	}
+}
+
+int expression_is_zero(struct expr *expr) {
+	struct constant *c = expression_to_constant(expr);
+
+	return c && constant_is_zero(c);
 }

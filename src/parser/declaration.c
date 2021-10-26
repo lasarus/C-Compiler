@@ -880,49 +880,6 @@ void add_init_pair(struct initializer *init, struct init_pair pair) {
 	ADD_ELEMENT(init->size, init->cap, init->pairs) = pair;
 }
 
-int expression_is_zero(struct expr *expr) {
-	struct constant *c = expression_to_constant(expr);
-
-	if (!c)
-		return 0;
-
-	if (c->type != CONSTANT_TYPE)
-		return 0;
-
-	if (c->data_type->type == TY_SIMPLE) {
-		switch (c->data_type->simple) {
-		case ST_INT:
-			return c->int_d == 0;
-		case ST_UINT:
-			return c->uint_d == 0;
-		case ST_LONG:
-			return c->long_d == 0;
-		case ST_ULONG:
-			return c->ulong_d == 0;
-		case ST_LLONG:
-			return c->llong_d == 0;
-		case ST_ULLONG:
-			return c->ullong_d == 0;
-		case ST_CHAR:
-			return c->char_d == 0;
-		case ST_UCHAR:
-			return c->uchar_d == 0;
-		case ST_SCHAR:
-			return c->schar_d == 0;
-		case ST_SHORT:
-			return c->short_d == 0;
-		case ST_USHORT:
-			return c->ushort_d == 0;
-		default:
-			return 0;
-		}
-	} else if (c->data_type->type == TY_POINTER) {
-		return c->ulong_d == 0;
-	} else {
-		return 0;
-	}
-}
-
 int parse_non_brace_initializer(struct type **type, int offset, struct initializer *init,
 	struct expr **failed_expr) {
 	if (failed_expr)

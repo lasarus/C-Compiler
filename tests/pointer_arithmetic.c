@@ -17,5 +17,8 @@ int main() {
 
 	assert(arr[0] == 20);
 
+	int *null_ptr = NULL;
+	assert(null_ptr == 0);
+
 	func(NULL);
 }
