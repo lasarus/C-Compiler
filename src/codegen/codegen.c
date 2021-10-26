@@ -666,6 +666,10 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 		reg_to_scalar(REG_RAX, ins.result);
 		break;
 
+	case IR_CLEAR_STACK_BUCKET: // no-op
+	case IR_ADD_TEMPORARY:
+		break;
+
 	default:
 		printf("%d\n", ins.type);
 		NOTIMP();
@@ -761,7 +765,8 @@ void codegen_block(struct block *block, struct reg_save_info reg_save_info) {
 }
 
 void codegen_function(struct function *func) {
-	int stack_count = 0;
+	int temp_stack_count = 0, perm_stack_count = 0;
+	int max_temp_stack = 0;
 
 	struct type *return_type = func->signature->children[0];
 	int n_args = func->signature->n - 1;
@@ -778,7 +783,7 @@ void codegen_function(struct function *func) {
 
 	if (return_type != type_simple(ST_VOID) &&
 		return_classification.pass_in_memory) {
-		stack_count += 8;
+		perm_stack_count += 8;
 	}
 
 	struct reg_save_info reg_save_info;
@@ -788,26 +793,65 @@ void codegen_function(struct function *func) {
 
 	for (int i = 0; i < func->var_size; i++) {
 		var_id var = func->vars[i];
+		if (get_variable_stack_bucket(var))
+			continue;
+
 		int size = get_variable_size(var);
 
-		stack_count += size;
+		perm_stack_count += size;
 
 		variable_info[var].storage = VAR_STOR_STACK;
-		variable_info[var].stack_location = stack_count;
+		variable_info[var].stack_location = perm_stack_count;
 	}
 
 	if (func->uses_va) {
-		stack_count += 304; // Magic number, size of register save area.
+		perm_stack_count += 304; // Magic number, size of register save area.
 		// According to Figure 3.33 in sysV AMD64 ABI.
-		reg_save_info.reg_save_position = stack_count;
+		reg_save_info.reg_save_position = perm_stack_count;
 	}
+
+	for (int i = 0; i < func->size; i++) {
+		struct block *block = func->blocks + i;
+
+		for (int j = 0; j < block->size; j++) {
+			struct instruction *ins = block->instructions + j;
+
+			if (ins->type == IR_ADD_TEMPORARY) {
+				var_id var = ins->result;
+				if (!get_variable_stack_bucket(var))
+					continue;
+
+				int size = get_variable_size(var);
+
+				temp_stack_count += size;
+				max_temp_stack = MAX(max_temp_stack, temp_stack_count);
+
+				variable_info[var].storage = VAR_STOR_STACK;
+				variable_info[var].stack_location = temp_stack_count + perm_stack_count;
+			} else if (ins->type == IR_CLEAR_STACK_BUCKET) {
+				temp_stack_count = 0;
+			}
+		}
+	}
+	/* for (int i = 0; i < func->var_size; i++) { */
+	/* 	var_id var = func->vars[i]; */
+	/* 	if (!get_variable_stack_bucket(var)) */
+	/* 		continue; */
+
+	/* 	int size = get_variable_size(var); */
+
+	/* 	temp_stack_count += size; */
+
+	/* 	variable_info[var].storage = VAR_STOR_STACK; */
+	/* 	variable_info[var].stack_location = max_temp_stack + perm_stack_count; */
+	/* } */
 
 	if (func->is_global)
 		emit(".global %s", func->name);
 	emit("%s:", func->name);
 	emit("pushq %%rbp");
 	emit("movq %%rsp, %%rbp");
-	emit("subq $%d, %%rsp", round_up_to_nearest(stack_count, 16));
+	emit("subq $%d, %%rsp", round_up_to_nearest(perm_stack_count + max_temp_stack, 16));
 
 	if (return_type != type_simple(ST_VOID) &&
 		return_classification.pass_in_memory) {
@@ -868,7 +912,7 @@ void codegen_function(struct function *func) {
 	}
 
 	if (codegen_flags.debug_stack_size)
-		printf("Function %s has stack consumption: %d\n", func->name, stack_count);
+		printf("Function %s has stack consumption: %d\n", func->name, max_temp_stack + perm_stack_count);
 }
 
 void codegen(const char *path) {

@@ -199,6 +199,14 @@ const char *instruction_to_str(struct instruction ins) {
 			  ins.truncate.rhs, ins.truncate.sign_extend);
 		break;
 
+	case IR_CLEAR_STACK_BUCKET:
+		PRINT("clear stack bucket %d", ins.clear_stack_bucket.stack_bucket);
+		break;
+
+	case IR_ADD_TEMPORARY:
+		PRINT("%d <- temporary", ins.result);
+		break;
+
 	default:
 		printf("%d", ins.type);
 		NOTIMP();
@@ -310,9 +318,9 @@ void ir_return_void(void) {
 
 void ir_init_var(struct initializer *init, var_id result) {
 	IR_PUSH_SET_ZERO(result);
-	var_id base_address = new_variable(type_pointer(type_simple(ST_VOID)), 1);
+	var_id base_address = new_variable(type_pointer(type_simple(ST_VOID)), 1, 1);
 	IR_PUSH_ADDRESS_OF(base_address, result);
-	var_id member_address = new_variable(type_pointer(type_simple(ST_VOID)), 1);
+	var_id member_address = new_variable(type_pointer(type_simple(ST_VOID)), 1, 1);
 
 	for (int i = 0; i < init->size; i++) {
 		IR_PUSH_GET_OFFSET(member_address, base_address, init->pairs[i].offset);

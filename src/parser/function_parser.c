@@ -116,7 +116,7 @@ int parse_expression_statement(void) {
 	if (!expr)
 		return 0;
 	TEXPECT(T_SEMI_COLON);
-	expression_to_ir(expr);
+	expression_to_ir_clear_temp(expr);
 	return 1;
 }
 
@@ -147,7 +147,7 @@ int parse_switch(struct jump_blocks jump_blocks) {
 	ir_goto(block_end);
 	ir_block_start(block_control);
 
-	ir_switch_selection(expression_to_ir(expression_cast(condition, type_simple(ST_INT))),
+	ir_switch_selection(expression_to_ir_clear_temp(expression_cast(condition, type_simple(ST_INT))),
 						labels);
 
 	ir_block_start(block_end);
@@ -162,7 +162,7 @@ int parse_selection_statement(struct jump_blocks jump_blocks) {
 		if(!expr)
 			ERROR("Expected expression in if condition");
 
-		var_id condition = expression_to_ir(expr);
+		var_id condition = expression_to_ir_clear_temp(expr);
 
 		TEXPECT(T_RPAR);
 		block_id block_true = new_block(),
@@ -221,7 +221,7 @@ int parse_do_while_statement(struct jump_blocks jump_blocks) {
 	if (!control_expression)
 		ERROR("Expected expression");
 
-	var_id control_variable = expression_to_ir(control_expression);
+	var_id control_variable = expression_to_ir_clear_temp(control_expression);
 
 	TEXPECT(T_RPAR);
 
@@ -262,7 +262,7 @@ int parse_while_statement(struct jump_blocks jump_blocks) {
 
 	TEXPECT(T_RPAR);
 
-	var_id control_variable = expression_to_ir(control_expression);
+	var_id control_variable = expression_to_ir_clear_temp(control_expression);
 
 	ir_if_selection(control_variable, block_body, block_end);
 
@@ -323,7 +323,7 @@ int parse_for_statement(struct jump_blocks jump_blocks) {
 
 	struct expr *condition = parse_expression();
 	if (condition) {
-		var_id condition_variable = expression_to_ir(condition);
+		var_id condition_variable = expression_to_ir_clear_temp(condition);
 
 		ir_if_selection(condition_variable, block_body, block_end);
 	} else {
@@ -336,7 +336,7 @@ int parse_for_statement(struct jump_blocks jump_blocks) {
 
 	struct expr *advance_expression = parse_expression();
 	if (advance_expression) // Can be empty
-		expression_to_ir(advance_expression);
+		expression_to_ir_clear_temp(advance_expression);
 
 	ir_goto(block_control);
 	ir_block_start(block_body);
@@ -401,7 +401,7 @@ int parse_jump_statement(struct jump_blocks jump_blocks) {
 		if (!expr) {
 			ir_return_void();
 		} else {
-			var_id return_variable = expression_to_ir(
+			var_id return_variable = expression_to_ir_clear_temp(
 				expression_cast(expr, current_ret_val));
 			ir_return(return_variable, current_ret_val);
 		}
@@ -456,7 +456,7 @@ void parse_function(const char *name, struct type *type, int arg_n, char **arg_n
 		char *arg_name = arg_names[i];
 		struct type *arg_type = type->children[i + 1];
 
-		var_id arg_var = new_variable(arg_type, 0); // Don't allocate yet.
+		var_id arg_var = new_variable(arg_type, 0, 0); // Don't allocate yet.
 		struct symbol_identifier *arg_sym = symbols_add_identifier(arg_name);
 
 		arg_sym->type = IDENT_VARIABLE;

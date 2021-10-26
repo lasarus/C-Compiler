@@ -151,6 +151,7 @@ struct expr *expression_cast(struct expr *expr, struct type *type);
 
 struct constant *expression_to_constant(struct expr *expr);
 var_id expression_to_ir(struct expr *expr);
+var_id expression_to_ir_clear_temp(struct expr *expr);
 
 int expression_is_zero(struct expr *expr);
 int constant_is_zero(struct constant *c);

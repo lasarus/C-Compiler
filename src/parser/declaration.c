@@ -1280,7 +1280,7 @@ int parse_init_declarator(struct specifiers s, int global, int *was_func) {
 				symbol->variable.type = n_type;
 				definition = 0;
 			} else {
-				symbol->variable.id = new_variable(type, 1);
+				symbol->variable.id = new_variable(type, 1, 0);
 				symbol->variable.type = type;
 			}
 		}

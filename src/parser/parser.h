@@ -56,6 +56,8 @@ struct instruction {
 		IR_TRUNCATE,
 		IR_SET_BITS,
 		IR_GET_BITS,
+		IR_ADD_TEMPORARY,
+		IR_CLEAR_STACK_BUCKET,
 
 		IR_TYPE_COUNT
 	} type;
@@ -167,6 +169,13 @@ struct instruction {
 			int offset, length, sign_extend;
 		} get_bits;
 #define IR_PUSH_GET_BITS(RESULT, FIELD, OFFSET, LENGTH, SIGN_EXTEND) IR_PUSH(.type = IR_GET_BITS, .result = (RESULT), .get_bits = {(FIELD), (OFFSET), (LENGTH), (SIGN_EXTEND)})
+
+#define IR_PUSH_ADD_TEMPORARY(RESULT) IR_PUSH(.type = IR_ADD_TEMPORARY, .result = (RESULT))
+
+		struct {
+			int stack_bucket;
+		} clear_stack_bucket;
+#define IR_PUSH_CLEAR_STACK_BUCKET(STACK_BUCKET) IR_PUSH(.type = IR_CLEAR_STACK_BUCKET, .clear_stack_bucket = {(STACK_BUCKET)})
 	};
 };
 

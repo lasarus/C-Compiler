@@ -405,7 +405,7 @@ var_id expression_to_address(struct expr *expr) {
 		return expression_to_ir(expr->args[0]);
 
 	case E_VARIABLE: {
-		var_id address = new_variable(type_pointer(expr->data_type), 1);
+		var_id address = new_variable(type_pointer(expr->data_type), 1, 1);
 		IR_PUSH_ADDRESS_OF(address, expr->variable.id);
 		return address;
 	}
@@ -422,7 +422,7 @@ var_id expression_to_address(struct expr *expr) {
 			ERROR("Trying to take address of bit-field");
 
 		var_id address = expression_to_address(expr->member.lhs);
-		var_id member_address = new_variable(type_pointer(expr->data_type), 1);
+		var_id member_address = new_variable(type_pointer(expr->data_type), 1, 1);
 		IR_PUSH_GET_OFFSET(member_address, address, field_offset);
 		return member_address;
 	}
@@ -431,7 +431,7 @@ var_id expression_to_address(struct expr *expr) {
 		struct constant *c = &expr->constant;
 		assert(c->type == CONSTANT_LABEL);
 
-		var_id ptr_result = new_variable(type_pointer(expr->data_type), 1);
+		var_id ptr_result = new_variable(type_pointer(expr->data_type), 1, 1);
 		IR_PUSH_GET_SYMBOL_PTR(rodata_get_label_string(c->label.label), c->label.offset, ptr_result);
 		return ptr_result;
 	}
@@ -441,7 +441,7 @@ var_id expression_to_address(struct expr *expr) {
 
 	case E_COMPOUND_LITERAL: {
 		var_id var = expression_to_ir(expr);
-		var_id address = new_variable(type_pointer(expr->data_type), 1);
+		var_id address = new_variable(type_pointer(expr->data_type), 1, 1);
 		IR_PUSH_ADDRESS_OF(address, var);
 		return address;
 	}
@@ -487,7 +487,7 @@ struct bitfield_address expression_to_bitfield_address(struct expr *expr) {
 }
 
 var_id address_load(var_id address, struct type *type) {
-	var_id ret = new_variable(type, 1);
+	var_id ret = new_variable(type, 1, 1);
 
 	IR_PUSH_LOAD(ret, address);
 
@@ -499,7 +499,7 @@ void address_store(var_id address, var_id value) {
 }
 
 var_id bitfield_load(struct bitfield_address address, struct type *type) {
-	var_id ret = new_variable(type, 1);
+	var_id ret = new_variable(type, 1, 1);
 	if (address.bitfield == -1) {
 		IR_PUSH_LOAD(ret, address.address);
 		return ret;
@@ -514,7 +514,7 @@ void bitfield_store(struct bitfield_address address, var_id value) {
 	if (address.bitfield == -1) {
 		IR_PUSH_STORE(value, address.address);
 	} else {
-		var_id prev = new_variable_sz(get_variable_size(value), 1);
+		var_id prev = new_variable_sz(get_variable_size(value), 1, 1);
 		IR_PUSH_LOAD(prev, address.address);
 
 		IR_PUSH_SET_BITS(prev, prev, value, address.offset, address.bitfield);
@@ -525,7 +525,7 @@ void bitfield_store(struct bitfield_address address, var_id value) {
 
 var_id expression_to_ir_result(struct expr *expr, var_id res) {
 	if (!res)
-		res = new_variable(expr->data_type, 1);
+		res = new_variable(expr->data_type, 1, 1);
 
 	switch(expr->type) {
 	case E_BINARY_OP: {
@@ -670,7 +670,7 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 				inner_type = a_expr->cast.arg->data_type;
 			}
 			a = bitfield_load(address, inner_type);
-			ac = new_variable(a_expr->cast.target, 1);
+			ac = new_variable(a_expr->cast.target, 1, 1);
 			IR_PUSH_CAST(ac, a_expr->cast.target, a, inner_type);
 		} else {
 			address = expression_to_bitfield_address(a_expr);
@@ -725,9 +725,9 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		int field_bitfield = data->fields[expr->member.member_idx].bitfield;
 
 		var_id lhs = expression_to_ir(expr->member.lhs);
-		var_id address = new_variable(type_pointer(expr->member.lhs->data_type), 1);
+		var_id address = new_variable(type_pointer(expr->member.lhs->data_type), 1, 1);
 
-		var_id member_address = new_variable(type_pointer(expr->data_type), 1);
+		var_id member_address = new_variable(type_pointer(expr->data_type), 1, 1);
 
 		IR_PUSH_ADDRESS_OF(address, lhs);
 		IR_PUSH_GET_OFFSET(member_address, address, field_offset);
@@ -782,7 +782,7 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		var_id dest = expression_to_ir(expr->va_copy_.d);
 		var_id source = expression_to_ir(expr->va_copy_.s);
 
-		var_id tmp = new_variable(type_deref(expr->va_copy_.d->data_type), 1);
+		var_id tmp = new_variable(type_deref(expr->va_copy_.d->data_type), 1, 1);
 
 		IR_PUSH_LOAD(tmp, source);
 		IR_PUSH_STORE(tmp, dest);
@@ -791,6 +791,7 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 	case E_COMPOUND_LITERAL: {
 		struct initializer *init = expr->compound_literal.init;
 		ir_init_var(init, res);
+		variable_set_stack_bucket(res, 0); // compound literals live until end of block.
 	} break;
 
 	case E_COMMA:
@@ -806,7 +807,15 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 }
 
 var_id expression_to_ir(struct expr *expr) {
-	return expression_to_ir_result(expr, 0);
+	var_id res = expression_to_ir_result(expr, 0);
+	return res;
+}
+
+var_id expression_to_ir_clear_temp(struct expr *expr) {
+	var_id res = expression_to_ir(expr);
+	variable_set_stack_bucket(res, 0);
+	IR_PUSH_CLEAR_STACK_BUCKET(1);
+	return res;
 }
 
 // Parsing.
