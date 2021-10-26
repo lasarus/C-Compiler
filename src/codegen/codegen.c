@@ -25,7 +25,8 @@ struct {
 } data;
 
 struct codegen_flags codegen_flags = {
-	.cmodel = CMODEL_SMALL
+	.cmodel = CMODEL_SMALL,
+	.debug_stack_size = 0
 };
 
 void set_section(const char *section) {
@@ -865,6 +866,9 @@ void codegen_function(struct function *func) {
 	for (int i = 0; i < func->size; i++) {
 		codegen_block(func->blocks + i, reg_save_info);
 	}
+
+	if (codegen_flags.debug_stack_size)
+		printf("Function %s has stack consumption: %d\n", func->name, stack_count);
 }
 
 void codegen(const char *path) {

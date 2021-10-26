@@ -44,6 +44,8 @@ struct arguments parse_arguments(int argc, char **argv) {
 				parser_flags.dmodel = DMODEL_LLP64;
 			} else if (strcmp(argv[i] + 2, "dmodel=LP64") == 0) {
 				parser_flags.dmodel = DMODEL_LP64;
+			} else if (strcmp(argv[i] + 2, "debug-stack-size") == 0) {
+				codegen_flags.debug_stack_size = 1;
 			} else {
 				ERROR("invalid flag %s", argv[i]);
 			}
