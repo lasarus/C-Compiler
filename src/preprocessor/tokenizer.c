@@ -396,3 +396,21 @@ struct token tokenizer_next(void) {
 void set_header(int i) {
 	tok.header = i;
 }
+
+void set_line(int line) {
+	int diff = line - tok.top->pos[0].line;
+	for (int i = 0; i < N_BUFF; i++)
+		tok.top->pos[i].line += diff;
+	for (int i = 0; i < INT_BUFF; i++)
+		tok.top->ipos[i].line += diff;
+	tok.top->iline = tok.top->ipos[INT_BUFF - 1].line;
+}
+
+void set_filename(char *name) {
+	for (int i = 0; i < N_BUFF; i++)
+		tok.top->pos[i].path = name;
+	for (int i = 0; i < INT_BUFF; i++)
+		tok.top->ipos[i].path = name;
+	tok.top->file.full = name;
+}
+

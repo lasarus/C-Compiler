@@ -239,7 +239,7 @@ void expander_subs(struct define *def, struct string_set *hs,
 
 				for(int i = start_it; i >= 0; i--) {
 					struct token t = tl.list[i];
-					t.pos = new_pos;
+					//t.pos = new_pos;
 					expander_push(t);
 				}
 			} else {
@@ -254,7 +254,7 @@ void expander_subs(struct define *def, struct string_set *hs,
 			int start_it = tl.size - 1;
 			for(int i = start_it; i >= 0; i--) {
 				struct token t = tl.list[i];
-				t.pos = new_pos;
+				//t.pos = new_pos;
 
 				str = allocate_printf("%s%s", t.str, str);
 				if (i && t.whitespace)
@@ -277,7 +277,7 @@ void expander_subs(struct define *def, struct string_set *hs,
 
 			for(int i = start_it; i >= 0; i--) {
 				struct token t = tl.list[i];
-				t.pos = new_pos;
+				//t.pos = new_pos;
 				expander_push(t);
 			}
 
@@ -291,6 +291,7 @@ void expander_subs(struct define *def, struct string_set *hs,
 				ERROR("# Should be followed by macro parameter");
 			} else {
 				t.hs = string_set_union(*hs, t.hs);
+				t.pos = new_pos;
 				expander_push(t);
 
 				if (concat)

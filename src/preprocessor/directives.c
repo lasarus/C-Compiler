@@ -274,6 +274,23 @@ struct token directiver_next(void) {
 			// Do nothing.
 		} else if (strcmp(name, "pragma") == 0) {
 			directiver_handle_pragma();
+		} else if (strcmp(name, "line") == 0) {
+			// 6.10.4
+			struct token digit_seq = NEXT_E();
+			if (digit_seq.first_of_line || digit_seq.type != T_NUM)
+				ERROR("Expected digit sequence after #line");
+			set_line(atoi(digit_seq.str));
+
+			// TODO: Make this also use NEXT_E(), currently a bit buggy.
+			struct token s_char_seq = NEXT_U();
+
+			if (s_char_seq.first_of_line) {
+				PUSH(s_char_seq);
+			} else if (s_char_seq.type == PP_STRING) {
+				set_filename(s_char_seq.str);
+			} else {
+				ERROR("Expected s char sequence as second argument to #line");
+			}
 		} else {
 			ERROR("#%s not implemented", name);
 		}

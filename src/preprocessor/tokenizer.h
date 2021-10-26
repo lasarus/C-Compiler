@@ -12,5 +12,7 @@ void tokenizer_disable_current_path(void);
 
 struct token tokenizer_next(void);
 void set_header(int i);
+void set_line(int line);
+void set_filename(char *name);
 
 #endif
