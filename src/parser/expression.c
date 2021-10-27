@@ -399,15 +399,17 @@ struct expr *expr_new(struct expr expr) {
 }
 
 // Loads pointer into return value.
-var_id expression_to_address(struct expr *expr) {
+int try_expression_to_address(struct expr *expr, var_id *var) {
 	switch (expr->type) {
 	case E_INDIRECTION:
-		return expression_to_ir(expr->args[0]);
+		*var = expression_to_ir(expr->args[0]);
+		return 1;
 
 	case E_VARIABLE: {
 		var_id address = new_variable(type_pointer(expr->data_type), 1, 1);
 		IR_PUSH_ADDRESS_OF(address, expr->variable.id);
-		return address;
+		*var = address;
+		return 1;
 	}
 
 	case E_DOT_OPERATOR: {
@@ -419,12 +421,18 @@ var_id expression_to_address(struct expr *expr) {
 		int field_offset = data->fields[expr->member.member_idx].offset;
 
 		if (data->fields[expr->member.member_idx].bitfield != -1)
-			ERROR("Trying to take address of bit-field");
+			return 0;
 
-		var_id address = expression_to_address(expr->member.lhs);
+		var_id address;
+
+		if (!try_expression_to_address(expr->member.lhs, &address))
+			return 0;
+
 		var_id member_address = new_variable(type_pointer(expr->data_type), 1, 1);
 		IR_PUSH_GET_OFFSET(member_address, address, field_offset);
-		return member_address;
+
+		*var = member_address;
+		return 1;
 	}
 
 	case E_CONSTANT: {
@@ -433,23 +441,32 @@ var_id expression_to_address(struct expr *expr) {
 
 		var_id ptr_result = new_variable(type_pointer(expr->data_type), 1, 1);
 		IR_PUSH_GET_SYMBOL_PTR(rodata_get_label_string(c->label.label), c->label.offset, ptr_result);
-		return ptr_result;
+
+		*var = ptr_result;
+		return 1;
 	}
 
 	case E_CAST:
-		ERROR("Can't cast lvalue to %s", type_to_string(expr->cast.target));
+		return 0;
 
 	case E_COMPOUND_LITERAL: {
-		var_id var = expression_to_ir(expr);
+		var_id compound = expression_to_ir(expr);
 		var_id address = new_variable(type_pointer(expr->data_type), 1, 1);
-		IR_PUSH_ADDRESS_OF(address, var);
-		return address;
+		IR_PUSH_ADDRESS_OF(address, compound);
+		*var = address;
+		return 1;
 	}
 
 	default:
-		ERROR("Not imp %d", expr->type);
-		NOTIMP();
+		return 0;
 	}
+}
+
+var_id expression_to_address(struct expr *expr) {
+	var_id res;
+	if (!try_expression_to_address(expr, &res))
+		ERROR("Can't take expression as lvalue");
+	return res;
 }
 
 struct bitfield_address {
@@ -724,12 +741,16 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		int field_offset = data->fields[expr->member.member_idx].offset;
 		int field_bitfield = data->fields[expr->member.member_idx].bitfield;
 
-		var_id lhs = expression_to_ir(expr->member.lhs);
-		var_id address = new_variable(type_pointer(expr->member.lhs->data_type), 1, 1);
+
+		var_id address;
+		if (!try_expression_to_address(expr->member.lhs, &address)) {
+			var_id lhs = expression_to_ir(expr->member.lhs);
+			address = new_variable(type_pointer(expr->member.lhs->data_type), 1, 1);
+			IR_PUSH_ADDRESS_OF(address, lhs);
+		}
 
 		var_id member_address = new_variable(type_pointer(expr->data_type), 1, 1);
 
-		IR_PUSH_ADDRESS_OF(address, lhs);
 		IR_PUSH_GET_OFFSET(member_address, address, field_offset);
 		IR_PUSH_LOAD(res, member_address);
 
