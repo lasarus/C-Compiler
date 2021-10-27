@@ -83,7 +83,7 @@ struct type_ast {
 };
 
 struct type_ast *parse_declarator(int *was_abstract);
-struct type *ast_to_type(const struct type_specifiers *ts, struct type_ast *ast, char **name);
+struct type *ast_to_type(const struct type_specifiers *ts, const struct type_qualifiers *tq, struct type_ast *ast, char **name);
 
 int parse_struct(struct type_specifiers *ts);
 int parse_enum(struct type_specifiers *ts);
@@ -364,7 +364,7 @@ int parse_struct(struct type_specifiers *ts) {
 					if (was_abstract)
 						ERROR("Can't have abstract in struct declaration");
 
-					type = ast_to_type(&s.ts, ast, &name);
+					type = ast_to_type(&s.ts, &s.tq, ast, &name);
 				} else {
 					needs_bitfield = 1;
 				}
@@ -372,7 +372,7 @@ int parse_struct(struct type_specifiers *ts) {
 				if (TACCEPT(T_COLON)) {
 					found_one = 1; // Bit-fields can't declare anonymous structs.
 
-					type = ast_to_type(&s.ts, NULL, NULL);
+					type = ast_to_type(&s.ts, &s.tq, NULL, NULL);
 					struct expr *bitfield_expr = parse_assignment_expression();
 					struct constant *c = expression_to_constant(
 						expression_cast(bitfield_expr, type_simple(ST_INT)));
@@ -529,7 +529,7 @@ struct type_ast *type_ast_new(struct type_ast ast) {
 	return ret;
 }
 
-struct type *specifiers_to_type(const struct type_specifiers *ts) {
+static struct type *specifiers_to_type(const struct type_specifiers *ts) {
 	enum simple_type int_st = ST_INT, long_st = ST_LONG, llong_st = ST_LLONG,
 		uint_st = ST_UINT, ulong_st = ST_ULONG, ullong_st = ST_ULLONG;
 
@@ -610,8 +610,16 @@ int null_type_qualifier(struct type_qualifiers *tq) {
 		tq->volatile_n == 0;
 }
 
-struct type *ast_to_type(const struct type_specifiers *ts, struct type_ast *ast, char **name) {
+struct type *apply_tq(struct type *type, const struct type_qualifiers *tq) {
+	if (tq->const_n == 1)
+		type = type_make_const(type);
+	return type;
+}
+
+struct type *ast_to_type(const struct type_specifiers *ts, const struct type_qualifiers *tq, struct type_ast *ast, char **name) {
 	struct type *type = specifiers_to_type(ts);
+
+	type = apply_tq(type, tq);
 
 	if (!ast)
 		return type;
@@ -620,6 +628,7 @@ struct type *ast_to_type(const struct type_specifiers *ts, struct type_ast *ast,
 		switch (ast->type) {
 		case TAST_POINTER:
 			type = type_pointer(type);
+			type = apply_tq(type, &ast->pointer.tq);
 			ast = ast->parent;
 			break;
 
@@ -723,8 +732,8 @@ struct parameter_list parse_parameter_list(void) {
 
 		ret.n++;
 		ret.types = realloc(ret.types, ret.n * sizeof(*ret.types));
-		char *name = NULL;;
-		ret.types[ret.n - 1] = ast_to_type(&s.ts, ast, &name);
+		char *name = NULL;
+		ret.types[ret.n - 1] = ast_to_type(&s.ts, &s.tq, ast, &name);
 
 		if (!ret.abstract) {
 			ret.names = realloc(ret.names, ret.n * sizeof(*ret.names));
@@ -1183,12 +1192,11 @@ struct type *parse_type_name(void) {
 	if (!was_abstract)
 		ERROR("Type name must be abstract");
 
-	return ast_to_type(&s.ts, ast, NULL);
+	return ast_to_type(&s.ts, &s.tq, ast, NULL);
 }
 
 int parse_init_declarator(struct specifiers s, int global, int *was_func) {
 	*was_func = 0;
-	(void)global;
 	int was_abstract = 1;
 	struct type_ast *ast = parse_declarator(&was_abstract);
 
@@ -1203,7 +1211,7 @@ int parse_init_declarator(struct specifiers s, int global, int *was_func) {
 
 	struct type *type;
 	char *name;
-	type = ast_to_type(&s.ts, ast, &name);
+	type = ast_to_type(&s.ts, &s.tq, ast, &name);
 
 	if (TPEEK(0)->type == T_LBRACE) {
 		int arg_n = 0;

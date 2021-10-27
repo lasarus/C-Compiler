@@ -330,6 +330,20 @@ void fix_assignment_operators(struct expr *expr) {
 int evaluate_constant_expression(struct expr *expr,
  								 struct constant *constant);
 
+void check_const_correctness(struct expr *expr) {
+	switch (expr->type) {
+	case E_ASSIGNMENT:
+	case E_ASSIGNMENT_OP:
+	case E_ASSIGNMENT_POINTER:
+		if (expr->args[0]->data_type->is_const) {
+			ERROR("Can't modify constant variable");
+		}
+		break;
+	default:
+		break;
+	}
+}
+
 struct expr *expr_new(struct expr expr) {
 	for (int i = 0; i < num_args[expr.type]; i++) {
 		if (!expr.args[i]) {
@@ -387,6 +401,8 @@ struct expr *expr_new(struct expr expr) {
 				});
 		}
 	}
+
+	check_const_correctness(&expr);
 
 	struct expr *ret = malloc(sizeof *ret);
 	*ret = expr;

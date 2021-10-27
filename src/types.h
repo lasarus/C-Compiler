@@ -81,12 +81,14 @@ struct type {
 		struct {
 			int is_variadic;
 		} function;
-		struct {
-			int is_const;
-			// TODO: other qualifiers
-		} pointer;
+		/* struct { */
+		/* 	//int is_const; */
+		/* 	// TODO: other qualifiers */
+		/* } pointer; */
 		struct struct_data *struct_data;
 	};
+
+	int is_const;
 
 	struct type *next; // Used in hash-map.
 
@@ -133,6 +135,7 @@ struct type *type_pointer(struct type *type);
 struct type *type_array(struct type *type, int length);
 struct type *type_deref(struct type *type);
 struct type *type_struct(struct struct_data *struct_data);
+struct type *type_make_const(struct type *type);
 
 int type_member_idx(struct type *type,
 					const char *name);

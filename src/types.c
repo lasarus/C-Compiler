@@ -16,6 +16,9 @@ int compare_types(struct type *a, struct type **a_children,
 	if (a->n != b->n)
 		return 0;
 
+	if (a->is_const != b->is_const)
+		return 0;
+
 	switch(a->type) {
 	case TY_FUNCTION:
 		if (a->function.is_variadic != b->function.is_variadic)
@@ -23,8 +26,6 @@ int compare_types(struct type *a, struct type **a_children,
 		break;
 
 	case TY_POINTER:
-		if (a->pointer.is_const != b->pointer.is_const)
-			return 0;
 		break;
 
 	case TY_SIMPLE:
@@ -70,6 +71,8 @@ uint32_t type_hash(struct type *type, struct type **children) {
 
 	hash ^= hash32(type->type);
 
+	hash ^= hash32(type->is_const);
+
 	switch (type->type) {
 	case TY_SIMPLE:
 		hash ^= hash32(type->simple);
@@ -78,7 +81,6 @@ uint32_t type_hash(struct type *type, struct type **children) {
 		hash ^= hash32(type->function.is_variadic);
 		break;
 	case TY_POINTER:
-		hash ^= hash32(type->pointer.is_const);
 		break;
 	case TY_STRUCT:
 		hash ^= hash32((size_t)type->struct_data);
@@ -175,6 +177,12 @@ struct type *type_deref(struct type *type) {
 	if (type->type != TY_POINTER)
 		ERROR("Expected type to be pointer when dereffing %s", type_to_string(type));
 	return type->children[0];
+}
+
+struct type *type_make_const(struct type *type) {
+	struct type params = *type;
+	params.is_const = 1;
+	return type_create(&params, type->children);
 }
 
 // TODO: make this better.
