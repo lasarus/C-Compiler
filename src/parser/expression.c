@@ -144,10 +144,7 @@ struct type *calculate_type(struct expr *expr) {
 	case E_POINTER_SUB:
 	case E_ASSIGNMENT:
 	case E_ASSIGNMENT_OP:
-	case E_ASSIGNMENT_POINTER_ADD:
-	case E_ASSIGNMENT_POINTER_SUB:
-	case E_POSTFIX_INC:
-	case E_POSTFIX_DEC:
+	case E_ASSIGNMENT_POINTER:
 		return expr->args[0]->data_type;
 
 	case E_CAST:
@@ -193,8 +190,6 @@ static const int dont_decay_ptr[E_NUM_TYPES] = {
 };
 
 static const int num_args[E_NUM_TYPES] = {
-	[E_POSTFIX_INC] = 1,
-	[E_POSTFIX_DEC] = 1,
 	[E_ADDRESS_OF] = 1,
 	[E_INDIRECTION] = 1,
 	[E_UNARY_OP] = 1,
@@ -315,17 +310,24 @@ void fix_assignment_operators(struct expr *expr) {
 		return;
 
 	convert_arithmetic(&expr->args[0], &expr->args[1]);
+	// Reduce double cast into single cast. Always correct in this case.
+	if (expr->args[0]->type == E_CAST) {
+		if (expr->args[0]->cast.arg->type == E_CAST)
+			expr->args[0]->cast.arg = expr->args[0]->cast.arg->cast.arg;
+
+		expr->assignment_op.cast = expr->args[0]->cast.target;
+		expr->args[0] = expr->args[0]->cast.arg;
+	}
 	int lhs_ptr = type_is_pointer(expr->args[0]->data_type);
 
-	switch (expr->binary_op) {
+	switch (expr->assignment_op.op) {
 	case OP_ADD:
-		if (lhs_ptr)
-			expr->type = E_ASSIGNMENT_POINTER_ADD;
-		break;
 	case OP_SUB:
-		if (lhs_ptr)
-			expr->type = E_ASSIGNMENT_POINTER_SUB;
-		break;
+		if (lhs_ptr) {
+			expr->type = E_ASSIGNMENT_POINTER;
+			expr->assignment_pointer.postfix = expr->assignment_op.postfix;
+			expr->assignment_pointer.sub = expr->assignment_op.op == OP_SUB;
+		}
 	default:
 		break;
 	}
@@ -635,33 +637,6 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 							 expr->args[0]->data_type);
 		break;
 
-	case E_POSTFIX_DEC:
-	case E_POSTFIX_INC: {
-		struct type *type = expr->data_type;
-
-		struct bitfield_address address = expression_to_bitfield_address(expr->args[0]);
-		var_id value = bitfield_load(address, expr->args[0]->data_type);
-		IR_PUSH_COPY(res, value);
-
-		if (type->type == TY_POINTER) {
-			var_id constant_one = expression_to_ir(EXPR_INT(1));
-			if (expr->type == E_POSTFIX_DEC)
-				IR_PUSH_POINTER_INCREMENT(value, value, constant_one, 1, expr->args[0]->data_type, ST_INT);
-			else
-				IR_PUSH_POINTER_INCREMENT(value, value, constant_one, 0, expr->args[0]->data_type, ST_INT);
-		} else {
-			var_id constant_one = expression_to_ir(expression_cast(EXPR_INT(1), type));
-			// TODO: operand type is wrong here.
-
-			if (expr->type == E_POSTFIX_DEC)
-				IR_PUSH_BINARY_OPERATOR(OP_SUB, OT_INT, value, constant_one, value);
-			else
-				IR_PUSH_BINARY_OPERATOR(OP_ADD, OT_INT, value, constant_one, value);
-		}
-		bitfield_store(address, value);
-		return res;
-	} break;
-
 	case E_ASSIGNMENT: {
 		var_id rhs = expression_to_ir(expression_cast(expr->args[1], expr->args[0]->data_type));
 		bitfield_store(expression_to_bitfield_address(expr->args[0]), rhs);
@@ -670,62 +645,47 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 
 	case E_ASSIGNMENT_OP: {
 		struct expr *a_expr = expr->args[0];
-		int is_cast = a_expr->type == E_CAST;
 
-		var_id ac, a; // a is unused if not a_expr is not E_CAST.
-		struct bitfield_address address;
+		struct bitfield_address address = expression_to_bitfield_address(a_expr);
 
-		struct type *inner_type = NULL;
-		if (is_cast) {
-			if (a_expr->cast.arg->type == E_CAST) {
-				// A double cast can sometimes occur.
-				// char += long => (long)(int)char += long
-				address = expression_to_bitfield_address(a_expr->cast.arg->cast.arg);
-				inner_type = a_expr->cast.arg->cast.arg->data_type;
-			} else {
-				address = expression_to_bitfield_address(a_expr->cast.arg);
-				inner_type = a_expr->cast.arg->data_type;
-			}
-			a = bitfield_load(address, inner_type);
-			ac = new_variable(a_expr->cast.target, 1, 1);
-			IR_PUSH_CAST(ac, a_expr->cast.target, a, inner_type);
+		var_id a = bitfield_load(address, a_expr->data_type);
+		var_id b = expression_to_ir(expr->args[1]);
+
+		if (expr->assignment_op.postfix)
+			IR_PUSH_COPY(res, a);
+
+		if (expr->assignment_op.cast) {
+			var_id ac = new_variable(expr->assignment_op.cast, 1, 1);
+			IR_PUSH_CAST(ac, expr->assignment_op.cast, a, a_expr->data_type);
+			IR_PUSH_BINARY_OPERATOR(expr->assignment_op.op,
+									ot_from_type(expr->args[1]->data_type),
+									ac, b, ac);
+			IR_PUSH_CAST(a, a_expr->data_type, ac, expr->assignment_op.cast);
 		} else {
-			address = expression_to_bitfield_address(a_expr);
-			ac = bitfield_load(address, expr->data_type);
+			IR_PUSH_BINARY_OPERATOR(expr->assignment_op.op,
+									ot_from_type(expr->args[1]->data_type),
+									a, b, a);
 		}
 
-		var_id bc = expression_to_ir(expr->args[1]);
-
-		IR_PUSH_BINARY_OPERATOR(expr->binary_op,
-								ot_from_type(expr->args[1]->data_type),
-								ac, bc, ac);
-		
-		if (is_cast) {
-			IR_PUSH_CAST(a, inner_type, ac, expr->args[1]->data_type);
-			bitfield_store(address, a);
-			return a;
-		} else {
-			bitfield_store(address, ac);
-			return ac;
-		}
+		bitfield_store(address, a);
+		return expr->assignment_op.postfix ? res : a;
 	}
 
-	case E_ASSIGNMENT_POINTER_SUB:
-	case E_ASSIGNMENT_POINTER_ADD: {
+	case E_ASSIGNMENT_POINTER: {
 		var_id address = expression_to_address(expr->args[0]);
 		var_id rhs = expression_to_ir(expr->args[1]);
 
 		var_id prev_val = address_load(address, expr->args[0]->data_type);
 
+		if (expr->assignment_pointer.postfix)
+			IR_PUSH_COPY(res, prev_val);
+
 		assert(type_is_pointer(expr->args[0]->data_type));
 
-		if (expr->type == E_ASSIGNMENT_POINTER_ADD)
-			IR_PUSH_POINTER_INCREMENT(prev_val, prev_val, rhs, 0, expr->args[0]->data_type, expr->args[1]->data_type->simple);
-		else
-			IR_PUSH_POINTER_INCREMENT(prev_val, prev_val, rhs, 1, expr->args[0]->data_type, expr->args[1]->data_type->simple);
+		IR_PUSH_POINTER_INCREMENT(prev_val, prev_val, rhs, expr->assignment_pointer.sub, expr->args[0]->data_type, expr->args[1]->data_type->simple);
 
 		address_store(address, prev_val);
-		return prev_val;
+		return expr->assignment_pointer.postfix ? res : prev_val;
 	}
 
 	case E_CAST:
@@ -900,9 +860,9 @@ struct expr *parse_prefix() {
 			return expr;
 		}
 	} else if (TACCEPT(T_INC)) {
- 		return EXPR_ASSIGNMENT_OP(OP_ADD, parse_pratt(PREFIX_PREC), EXPR_INT(1));
+ 		return EXPR_ASSIGNMENT_OP(OP_ADD, parse_pratt(PREFIX_PREC), EXPR_INT(1), 0);
 	} else if (TACCEPT(T_DEC)) {
- 		return EXPR_ASSIGNMENT_OP(OP_SUB, parse_pratt(PREFIX_PREC), EXPR_INT(1));
+ 		return EXPR_ASSIGNMENT_OP(OP_SUB, parse_pratt(PREFIX_PREC), EXPR_INT(1), 0);
  	} else if (TACCEPT(T_STAR)) {
  		return EXPR_ARGS(E_INDIRECTION, parse_pratt(PREFIX_PREC));
 	} else if (TACCEPT(T_ADD)) {
@@ -1131,7 +1091,7 @@ struct expr *parse_pratt(int precedence) {
 			lhs = EXPR_ARGS(ops[tok_type][1], lhs, parse_pratt(new_prec));
 		} else if (ops[tok_type][0] == 2) {
 			TNEXT();
-			lhs = EXPR_ASSIGNMENT_OP(ops[tok_type][1], lhs, parse_pratt(new_prec));
+			lhs = EXPR_ASSIGNMENT_OP(ops[tok_type][1], lhs, parse_pratt(new_prec), 0);
 		} else if (ops[tok_type][0] == 3) {
 			TNEXT();
 			lhs = EXPR_BINARY_OP(ops[tok_type][1], lhs, parse_pratt(new_prec));
@@ -1196,9 +1156,12 @@ struct expr *parse_pratt(int precedence) {
 					}
 				});
 		} else if (TACCEPT(T_INC)) {
-			lhs = EXPR_ARGS(E_POSTFIX_INC, lhs);
+			//lhs = EXPR_ASSIGNMENT_OP(ops[tok_type][1], lhs, parse_pratt(new_prec));
+			//lhs = EXPR_ARGS(E_POSTFIX_INC, lhs);
+			lhs = EXPR_ASSIGNMENT_OP(OP_ADD, lhs, EXPR_INT(1), 1);
 		} else if (TACCEPT(T_DEC)) {
-			lhs = EXPR_ARGS(E_POSTFIX_DEC, lhs);
+			//lhs = EXPR_ARGS(E_POSTFIX_DEC, lhs);
+			lhs = EXPR_ASSIGNMENT_OP(OP_SUB, lhs, EXPR_INT(1), 1);
 		} else {
 			break;
 		}

@@ -15,10 +15,10 @@ struct expr *expr_new(struct expr expr);
 			.args = {__VA_ARGS__}						\
 		})
 
-#define EXPR_ASSIGNMENT_OP(TYPE, LHS, RHS) expr_new((struct expr) {	\
-			.type = E_ASSIGNMENT_OP,								\
-			.binary_op = (TYPE),								\
-			.args = {(LHS), (RHS)}								\
+#define EXPR_ASSIGNMENT_OP(TYPE, LHS, RHS, POSTFIX) expr_new((struct expr) {	\
+			.type = E_ASSIGNMENT_OP,									\
+			.assignment_op = {.op = (TYPE), .postfix = (POSTFIX)},			\
+			.args = {(LHS), (RHS)}										\
 		})
 
 #define EXPR_BINARY_OP(TYPE, LHS, RHS) expr_new((struct expr) {	\
@@ -58,8 +58,6 @@ struct expr {
 		E_CONSTANT,
 		E_GENERIC_SELECTION,
 		E_DOT_OPERATOR,
-		E_POSTFIX_INC,
-		E_POSTFIX_DEC,
 		E_COMPOUND_LITERAL,
 		E_ADDRESS_OF,
 		E_INDIRECTION,
@@ -70,8 +68,7 @@ struct expr {
 		E_POINTER_SUB,
 		E_POINTER_DIFF,
 		E_ASSIGNMENT,
-		E_ASSIGNMENT_POINTER_ADD,
-		E_ASSIGNMENT_POINTER_SUB,
+		E_ASSIGNMENT_POINTER,
 		E_ASSIGNMENT_OP,
 		E_CONDITIONAL,
 		E_COMMA,
@@ -133,7 +130,16 @@ struct expr {
 		} va_copy_;
 
 		struct constant constant;
-		//const char *string_literal;
+
+		struct {
+			int postfix;
+			enum operator_type op;
+			struct type *cast;
+		} assignment_op;
+
+		struct {
+			int postfix, sub;
+		} assignment_pointer;
 
 		enum operator_type binary_op;
 		enum unary_operator_type unary_op;
