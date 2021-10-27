@@ -1,5 +1,4 @@
 // DEFS A B C D
-// Compile with -DA -DB -DC -DE -DF -DG -DH -DI
 
 int main() {
 #if defined(A)
