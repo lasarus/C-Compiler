@@ -911,8 +911,9 @@ void codegen_function(struct function *func) {
 		codegen_block(func->blocks + i, reg_save_info);
 	}
 
-	if (codegen_flags.debug_stack_size)
-		printf("Function %s has stack consumption: %d\n", func->name, max_temp_stack + perm_stack_count);
+	int total_stack_usage = max_temp_stack + perm_stack_count;
+	if (codegen_flags.debug_stack_size && total_stack_usage >= codegen_flags.debug_stack_min)
+		printf("Function %s has stack consumption: %d\n", func->name, total_stack_usage);
 }
 
 void codegen(const char *path) {

@@ -44,8 +44,12 @@ struct arguments parse_arguments(int argc, char **argv) {
 				parser_flags.dmodel = DMODEL_LLP64;
 			} else if (strcmp(argv[i] + 2, "dmodel=LP64") == 0) {
 				parser_flags.dmodel = DMODEL_LP64;
-			} else if (strcmp(argv[i] + 2, "debug-stack-size") == 0) {
+			} else if (strncmp(argv[i] + 2, "debug-stack-size", 16) == 0) {
 				codegen_flags.debug_stack_size = 1;
+				if (argv[i][18] == '=') {
+					codegen_flags.debug_stack_min = atoi(argv[i] + 19);
+					printf("DBG STACK MIN: %d\n", codegen_flags.debug_stack_min);
+				}
 			} else {
 				ERROR("invalid flag %s", argv[i]);
 			}

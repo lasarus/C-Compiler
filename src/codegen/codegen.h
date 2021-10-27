@@ -7,6 +7,7 @@ extern struct codegen_flags {
 		CMODEL_LARGE
 	} cmodel;
 	int debug_stack_size;
+	int debug_stack_min;
 } codegen_flags;
 
 struct variable_info {
