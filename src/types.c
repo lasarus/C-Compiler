@@ -216,11 +216,14 @@ int type_member_idx(struct type *type,
 // Make arrays into pointers, and functions into function pointers.
 struct type *parameter_adjust(struct type *type) {
 	if (type->type == TY_ARRAY ||
-		type->type == TY_INCOMPLETE_ARRAY)
-		return type_pointer(type->children[0]);
-	else if (type->type == TY_FUNCTION)
+		type->type == TY_INCOMPLETE_ARRAY) {
+		struct type *ptr = type_pointer(type->children[0]);
+		if (type->is_const)
+			ptr = type_make_const(ptr);
+		return ptr;
+	} else if (type->type == TY_FUNCTION) {
 		return type_pointer(type);
-	else
+	} else
 		return type;
 }
 

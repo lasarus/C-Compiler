@@ -83,7 +83,7 @@ struct type_ast {
 };
 
 struct type_ast *parse_declarator(int *was_abstract);
-struct type *ast_to_type(const struct type_specifiers *ts, const struct type_qualifiers *tq, struct type_ast *ast, char **name);
+struct type *ast_to_type(const struct type_specifiers *ts, const struct type_qualifiers *tq, struct type_ast *ast, char **name, int allow_tq_in_array);
 
 int parse_struct(struct type_specifiers *ts);
 int parse_enum(struct type_specifiers *ts);
@@ -364,7 +364,7 @@ int parse_struct(struct type_specifiers *ts) {
 					if (was_abstract)
 						ERROR("Can't have abstract in struct declaration");
 
-					type = ast_to_type(&s.ts, &s.tq, ast, &name);
+					type = ast_to_type(&s.ts, &s.tq, ast, &name, 0);
 				} else {
 					needs_bitfield = 1;
 				}
@@ -372,7 +372,7 @@ int parse_struct(struct type_specifiers *ts) {
 				if (TACCEPT(T_COLON)) {
 					found_one = 1; // Bit-fields can't declare anonymous structs.
 
-					type = ast_to_type(&s.ts, &s.tq, NULL, NULL);
+					type = ast_to_type(&s.ts, &s.tq, NULL, NULL, 0);
 					struct expr *bitfield_expr = parse_assignment_expression();
 					struct constant *c = expression_to_constant(
 						expression_cast(bitfield_expr, type_simple(ST_INT)));
@@ -616,7 +616,7 @@ struct type *apply_tq(struct type *type, const struct type_qualifiers *tq) {
 	return type;
 }
 
-struct type *ast_to_type(const struct type_specifiers *ts, const struct type_qualifiers *tq, struct type_ast *ast, char **name) {
+struct type *ast_to_type(const struct type_specifiers *ts, const struct type_qualifiers *tq, struct type_ast *ast, char **name, int allow_tq_in_array) {
 	struct type *type = specifiers_to_type(ts);
 
 	type = apply_tq(type, tq);
@@ -688,6 +688,11 @@ struct type *ast_to_type(const struct type_specifiers *ts, const struct type_qua
 			default:
 				NOTIMP();
 			}
+			if (!allow_tq_in_array && !null_type_qualifier(&ast->array.tq)) {
+				ERROR("Can't have type qualifiers in array outside of function prototype.");
+			} else if (allow_tq_in_array) {
+				type = apply_tq(type, &ast->array.tq);
+			}
 			ast = ast->parent;
 		} break;
 
@@ -733,7 +738,7 @@ struct parameter_list parse_parameter_list(void) {
 		ret.n++;
 		ret.types = realloc(ret.types, ret.n * sizeof(*ret.types));
 		char *name = NULL;
-		ret.types[ret.n - 1] = ast_to_type(&s.ts, &s.tq, ast, &name);
+		ret.types[ret.n - 1] = ast_to_type(&s.ts, &s.tq, ast, &name, 1);
 
 		if (!ret.abstract) {
 			ret.names = realloc(ret.names, ret.n * sizeof(*ret.names));
@@ -1192,7 +1197,7 @@ struct type *parse_type_name(void) {
 	if (!was_abstract)
 		ERROR("Type name must be abstract");
 
-	return ast_to_type(&s.ts, &s.tq, ast, NULL);
+	return ast_to_type(&s.ts, &s.tq, ast, NULL, 0);
 }
 
 int parse_init_declarator(struct specifiers s, int global, int *was_func) {
@@ -1211,7 +1216,7 @@ int parse_init_declarator(struct specifiers s, int global, int *was_func) {
 
 	struct type *type;
 	char *name;
-	type = ast_to_type(&s.ts, &s.tq, ast, &name);
+	type = ast_to_type(&s.ts, &s.tq, ast, &name, 0);
 
 	if (TPEEK(0)->type == T_LBRACE) {
 		int arg_n = 0;

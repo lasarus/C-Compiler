@@ -81,10 +81,6 @@ struct type {
 		struct {
 			int is_variadic;
 		} function;
-		/* struct { */
-		/* 	//int is_const; */
-		/* 	// TODO: other qualifiers */
-		/* } pointer; */
 		struct struct_data *struct_data;
 	};
 
