@@ -1,5 +1,48 @@
 #!/bin/bash
 
+test_source() {
+	OUT="$(basename -s .c $1).s"
+
+	if [ "$4" == "true" ]; then
+		if [ "$2" == "true" ]; then
+			$5 $1 test_asm/$OUT -Imusl -D_POSIX_SOURCE -D$3
+		else
+			$5 $1 test_asm/$OUT -I/usr/include -Iinclude -D$3
+		fi
+
+		gcc test_asm/$OUT -o test -no-pie
+		./test
+	else
+		if [ "$2" == "true" ]; then
+			! $5 $1 test_asm/$OUT -Imusl -D_POSIX_SOURCE -D$3 >/dev/null
+		else
+			! $5 $1 test_asm/$OUT -I/usr/include -Iinclude -D$3 >/dev/null
+		fi
+	fi
+}
+
+run_tests() {
+	for SRC in $SOURCES
+	do
+		echo -en "\r\033[KTESTING $SRC"
+
+		if [ -z "${SRC##*should_fail*}" ]; then
+			found=0
+			for D in $(sed -n -e 's/\/\/ DEFS //p' <$SRC); do
+				found=1
+				test_source $SRC $MUSL $D false $1
+			done
+			[ $found -eq 0 ] && test_source $SRC $MUSL AAA false $1
+		else
+			found=0
+			for D in $(sed -n -e 's/\/\/ DEFS //p' <$SRC); do
+				test_source $SRC $MUSL $D true $1
+			done
+			[ $found -eq 0 ] && test_source $SRC $MUSL AAA true $1
+		fi
+	done
+}
+
 MUSL=true
 
 if [ ! -d "musl" ] 
@@ -16,19 +59,7 @@ SOURCES=$(find tests -name '*.c')
 set -e
 
 echo "TESTING SOURCES IN tests/"
-for SRC in $SOURCES
-do
-	echo -en "\r\033[KTESTING $SRC"
-	OUT="$(basename -s .c $SRC).s"
-	if [ "$MUSL" = "true" ]
-	then
-		./cc $SRC test_asm/$OUT -Imusl -Isrc -D_POSIX_SOURCE
-	else
-		./cc $SRC test_asm/$OUT -I/usr/include -Iinclude -Isrc
-	fi
-	gcc test_asm/$OUT -o test -no-pie
-	./test
-done
+run_tests ./cc
 echo -en "\r\033[KNo errors"
 echo
 
@@ -38,18 +69,6 @@ diff asm/ asm2/
 echo "No errors"
 
 echo "TESTING SECOND GENERATION ON SOURCES IN tests/"
-for SRC in $SOURCES
-do
-	echo -en "\r\033[KTESTING $SRC"
-	OUT="$(basename -s .c $SRC).s"
-	if [ "$MUSL" = "true" ]
-	then
-		./cc_self $SRC test_asm/$OUT -Imusl -Isrc -D_POSIX_SOURCE
-	else
-		./cc_self $SRC test_asm/$OUT -I/usr/include -Iinclude -Isrc
-	fi
-	gcc test_asm/$OUT -o test -no-pie
-	./test
-done
+run_tests ./cc_self
 echo -en "\r\033[KNo errors"
 echo
