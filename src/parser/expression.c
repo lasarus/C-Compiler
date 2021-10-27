@@ -320,16 +320,10 @@ void fix_assignment_operators(struct expr *expr) {
 	}
 	int lhs_ptr = type_is_pointer(expr->args[0]->data_type);
 
-	switch (expr->assignment_op.op) {
-	case OP_ADD:
-	case OP_SUB:
-		if (lhs_ptr) {
-			expr->type = E_ASSIGNMENT_POINTER;
-			expr->assignment_pointer.postfix = expr->assignment_op.postfix;
-			expr->assignment_pointer.sub = expr->assignment_op.op == OP_SUB;
-		}
-	default:
-		break;
+	if (lhs_ptr && (expr->assignment_op.op == OP_ADD || expr->assignment_op.op == OP_SUB)) {
+		expr->type = E_ASSIGNMENT_POINTER;
+		expr->assignment_pointer.postfix = expr->assignment_op.postfix;
+		expr->assignment_pointer.sub = expr->assignment_op.op == OP_SUB;
 	}
 }
 
