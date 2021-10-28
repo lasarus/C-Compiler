@@ -719,9 +719,13 @@ void constant_to_buffer(uint8_t *buffer, struct constant constant) {
 	case ST_ULLONG:
 		*(uint64_t *)buffer = constant.ullong_d;
 		break;
-
 	case ST_FLOAT:
+		*(uint32_t *)buffer = constant.uint_d;
+		break;
 	case ST_DOUBLE:
+		*(uint64_t *)buffer = constant.ulong_d;
+		break;
+
 	case ST_LDOUBLE:
 	case ST_BOOL:
 	case ST_FLOAT_COMPLEX:
