@@ -899,7 +899,7 @@ struct expr *parse_prefix() {
 			type = parse_pratt(PREFIX_PREC)->data_type;
 		}
 		// TODO: Size should perhaps not be an integer.
-		struct constant c = {.type = CONSTANT_TYPE, .data_type = type_simple(ST_INT), .int_d = calculate_size(type) };
+		struct constant c = {.type = CONSTANT_TYPE, .data_type = type_simple(ST_ULONG), .ulong_d = calculate_size(type) };
 
 		return expr_new((struct expr) {
 				.type = E_CONSTANT,
