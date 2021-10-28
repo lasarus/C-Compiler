@@ -29,7 +29,7 @@ int is_space(char c) {
 
 int is_identifier_nondigit(char c) {
 	// TODO: implement universal character names.
-	return is_nondigit(c) /* || is_universal_character_name(c) || other implementation-defined characters */;
+	return is_nondigit(c) || c == '$'; /* || is_universal_character_name(c) || other implementation-defined characters */;
 }
 
 // Initial is first character of token
