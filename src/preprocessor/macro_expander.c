@@ -143,15 +143,29 @@ int get_param(struct define *def, struct token tok) {
 	return token_list_index_of(&def->par, tok);
 }
 
+// TODO: Make this use the tokenizer.
+// Strings are not correctly handled in the early stages of the preprocessor.
 struct token glue(struct token a, struct token b) {
-	if (a.type != PP_IDENT ||
-		b.type != PP_IDENT) {
-		printf("a of type %s %d\n", token_to_str(a.type), a.type);
-		printf("b of type %s %d\n", token_to_str(b.type), b.type);
-		NOTIMP();
+	struct token ret = a;
+	if (a.type == PP_STRING || b.type == PP_STRING) {
+		// This ignores cases like u8"string".
+		ERROR("Can't paste strings.");
+	} else if (a.type == PP_CHARACTER_CONSTANT || b.type == PP_CHARACTER_CONSTANT) {
+		// This ignores L'a'.
+		ERROR("Can't paste character constants.");
+	} else if (b.type == PP_IDENT) {
+		ret.type = PP_IDENT;
+		if (!(a.type == PP_IDENT || a.type == PP_NUMBER))
+			ERROR("Can't paste identifier and number");
+	} else if (b.type == PP_IDENT) {
+		ret.type = PP_IDENT;
+	} else if (b.type == PP_HASH || b.type == PP_HHASH ||
+		b.type == PP_LPAR || b.type == PP_COMMA ||
+		b.type == PP_RPAR || b.type == PP_DIRECTIVE ||
+		b.type == PP_PUNCT) {
+		ret.type = PP_PUNCT;
 	}
 
-	struct token ret = a;
 	ret.str = allocate_printf("%s%s", b.str, a.str);
 	ret.hs = string_set_intersection(a.hs, b.hs);
 
