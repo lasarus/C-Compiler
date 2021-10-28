@@ -927,10 +927,6 @@ struct expr *parse_prefix() {
 						.label.offset = 0
 					}
 				});
-			/* return expr_new((struct expr) { */
-			/* 		.type = E_SYMBOL, */
-			/* 		.symbol = { sym->label.name, sym->label.type } */
-			/* 	}); */
 
 		case IDENT_VARIABLE:
 			TNEXT();
@@ -1001,9 +997,6 @@ struct expr *parse_prefix() {
 		if (!res)
 			ERROR("No type matched the expresison in _Generic");
 
-		//ERROR("Got expression of type %s\n", type_to_string(expr->data_type));
-
-		//if (!default_res)
 		TEXPECT(T_RPAR);
 		return res;
 	} else if (TACCEPT(T_KVA_START)) {
@@ -1166,11 +1159,8 @@ struct expr *parse_pratt(int precedence) {
 					}
 				});
 		} else if (TACCEPT(T_INC)) {
-			//lhs = EXPR_ASSIGNMENT_OP(ops[tok_type][1], lhs, parse_pratt(new_prec));
-			//lhs = EXPR_ARGS(E_POSTFIX_INC, lhs);
 			lhs = EXPR_ASSIGNMENT_OP(OP_ADD, lhs, EXPR_INT(1), 1);
 		} else if (TACCEPT(T_DEC)) {
-			//lhs = EXPR_ARGS(E_POSTFIX_DEC, lhs);
 			lhs = EXPR_ASSIGNMENT_OP(OP_SUB, lhs, EXPR_INT(1), 1);
 		} else {
 			break;

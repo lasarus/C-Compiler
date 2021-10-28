@@ -90,7 +90,6 @@ struct constant operators_constant(enum operator_type op,
 		default: NOTIMP();									\
 		} break;											
 
-	//struct constant res = { -1, NULL, .str_d = "WHAT?" };
 	struct constant res = {
 		.type = CONSTANT_TYPE,
 		.data_type = operators_get_result_type(op, lhs.data_type, rhs.data_type)
