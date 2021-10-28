@@ -801,12 +801,18 @@ struct type_ast *parse_declarator(int *was_abstract) {
 			*was_abstract = 0;
 		TNEXT();
 	} else if (TACCEPT(T_LPAR)) {
-		ast = parse_declarator(was_abstract);
+		if (!(T0->type == T_IDENT && symbols_get_typedef(T0->str)))
+			ast = parse_declarator(was_abstract);
 		if (!ast) {
-			// This is really a function declaration.
-			ERROR("Not implemented");
+			*was_abstract = 1;
+			ast = type_ast_new((struct type_ast) {
+					.type = TAST_TERMINAL,
+					.terminal.name = NULL
+				});
+			ast = parse_function_parameters(ast);
+		} else {
+			TEXPECT(T_RPAR);
 		}
-		TEXPECT(T_RPAR);
 	} else if (TACCEPT(T_STAR)) {
 		// Read type qualifiers.
 
@@ -829,6 +835,7 @@ struct type_ast *parse_declarator(int *was_abstract) {
 		}
 	} else if (T0->type == T_LBRACK) {
 		// Small hack to allow for type-names like int[].
+		*was_abstract = 1;
 		ast = type_ast_new((struct type_ast) {
 				.type = TAST_TERMINAL,
 				.terminal.name = NULL
