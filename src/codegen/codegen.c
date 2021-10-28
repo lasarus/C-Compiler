@@ -191,7 +191,9 @@ void codegen_call(var_id variable, struct type *function_type, struct type **arg
 		emit("leaq -%d(%%rbp), %%rdi", variable_info[result].stack_location);
 	}
 
-	emit("subq $%d, %%rsp", round_up_to_nearest(total_memory_argument_size, 16));
+	int stack_sub = round_up_to_nearest(total_memory_argument_size, 16);
+	if (stack_sub)
+		emit("subq $%d, %%rsp", stack_sub);
 
 	int current_stack_pos = 0;
 	for (int i = 0; i < n_args; i++) {
@@ -851,7 +853,10 @@ void codegen_function(struct function *func) {
 	emit("%s:", func->name);
 	emit("pushq %%rbp");
 	emit("movq %%rsp, %%rbp");
-	emit("subq $%d, %%rsp", round_up_to_nearest(perm_stack_count + max_temp_stack, 16));
+
+	int stack_sub = round_up_to_nearest(perm_stack_count + max_temp_stack, 16);
+	if (stack_sub)
+		emit("subq $%d, %%rsp", stack_sub);
 
 	if (return_type != type_simple(ST_VOID) &&
 		return_classification.pass_in_memory) {
