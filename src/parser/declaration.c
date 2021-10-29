@@ -450,7 +450,7 @@ int parse_struct(struct type_specifiers *ts) {
 		};
 
 		calculate_offsets(data);
-		merge_anonymous(data);
+		type_merge_anonymous_substructures(data);
 
 		struct type params = {
 			.type = TY_STRUCT,
@@ -641,7 +641,7 @@ struct type *ast_to_type(const struct type_specifiers *ts, const struct type_qua
 
 			struct type *parameters[ast->function.n + 1];
 			for (int i = 0; i < ast->function.n; i++)
-				parameters[i + 1] = parameter_adjust(ast->function.types[i]);
+				parameters[i + 1] = type_adjust_parameter(ast->function.types[i]);
 			parameters[0] = type;
 
 			type = type_create(&params, parameters);
@@ -1294,7 +1294,7 @@ int parse_init_declarator(struct specifiers s, int global, int *was_func) {
 			is_static = 1;
 		else {
 			symbol->type = IDENT_VARIABLE;
-			if (has_variable_size(type)) {
+			if (type_has_variable_size(type)) {
 				struct type *n_type = type;
 				symbol->variable.id = allocate_vla(&n_type);
 				symbol->variable.type = n_type;

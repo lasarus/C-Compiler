@@ -132,6 +132,7 @@ struct type *type_array(struct type *type, int length);
 struct type *type_deref(struct type *type);
 struct type *type_struct(struct struct_data *struct_data);
 struct type *type_make_const(struct type *type);
+struct type *type_adjust_parameter(struct type *type);
 
 int type_member_idx(struct type *type,
 					const char *name);
@@ -139,26 +140,18 @@ int type_member_idx(struct type *type,
 void type_select(struct type *type, int index,
 				 int *field_offset, struct type **field_type);
 
-struct type *parameter_adjust(struct type *type);
-
 int type_is_real(struct type *type);
 int type_is_arithmetic(struct type *type);
 int type_is_floating(struct type *type);
 int type_is_integer(struct type *type);
 int type_is_pointer(struct type *type);
-
 int type_is_simple(struct type *type, enum simple_type st);
-
-uint32_t type_hash(struct type *type, struct type **children);
-int compare_types(struct type *a, struct type **a_children,
-				  struct type *b);
+int type_is_aggregate(struct type *type);
 
 const char *type_to_string(struct type *type);
 
-void merge_anonymous(struct struct_data *data);
-int has_variable_size(struct type *type);
-
-int type_is_aggregate(struct type *type);
+void type_merge_anonymous_substructures(struct struct_data *data);
+int type_has_variable_size(struct type *type);
 
 #include <arch/x64.h>
 

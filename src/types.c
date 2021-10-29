@@ -8,8 +8,8 @@
 #include "types.h"
 #include "common.h"
 
-int compare_types(struct type *a, struct type **a_children,
-				  struct type *b) {
+static int compare_types(struct type *a, struct type **a_children,
+						 struct type *b) {
 	if (a->type != b->type)
 		return 0;
 
@@ -66,12 +66,10 @@ int compare_types(struct type *a, struct type **a_children,
 	return 1;
 }
 
-uint32_t type_hash(struct type *type, struct type **children) {
+static uint32_t type_hash(struct type *type, struct type **children) {
 	uint32_t hash = 0;
 
-	hash ^= hash32(type->type);
-
-	hash ^= hash32(type->is_const);
+	hash ^= hash32(type->type) ^ hash32(type->is_const);
 
 	switch (type->type) {
 	case TY_SIMPLE:
@@ -137,40 +135,21 @@ struct type *type_create(struct type *params, struct type **children) {
 }
 
 struct type *type_simple(enum simple_type type) {
-	struct type t = {
-		.type = TY_SIMPLE,
-		.simple = type,
-		.n = 0
-	};
-
-	return type_create(&t, NULL);
+	return type_create(&(struct type) { .type = TY_SIMPLE, .simple = type }, NULL);
 }
 
 struct type *type_pointer(struct type *type) {
-	struct type params = {
-		.type = TY_POINTER,
-		.n = 1
-	};
-	struct type *children = type;
-	return type_create(&params, &children);
+	return type_create(&(struct type) { .type = TY_POINTER, .n = 1 }, &type);
 }
 
 struct type *type_struct(struct struct_data *struct_data) {
-	struct type params = {
-		.type = TY_STRUCT,
-		.struct_data = struct_data
-	};
-	return type_create(&params, NULL);
+	return type_create(&(struct type) { .type = TY_STRUCT,
+			.struct_data = struct_data }, NULL);
 }
 
 struct type *type_array(struct type *type, int length) {
-	struct type params = {
-		.type = TY_ARRAY,
-		.n = 1,
-		.array.length = length
-	};
-	struct type *children = type;
-	return type_create(&params, &children);
+	return type_create(&(struct type) { .type = TY_ARRAY,
+			.n = 1, .array.length = length}, &type);
 }
 
 struct type *type_deref(struct type *type) {
@@ -214,7 +193,7 @@ int type_member_idx(struct type *type,
 }
 
 // Make arrays into pointers, and functions into function pointers.
-struct type *parameter_adjust(struct type *type) {
+struct type *type_adjust_parameter(struct type *type) {
 	if (type->type == TY_ARRAY ||
 		type->type == TY_INCOMPLETE_ARRAY) {
 		struct type *ptr = type_pointer(type->children[0]);
@@ -358,7 +337,7 @@ const char *simple_to_str(enum simple_type st) {
 	}
 }
 
-void merge_anonymous(struct struct_data *data) {
+void type_merge_anonymous_substructures(struct struct_data *data) {
 	// types names offsets need to be modified.
 	for (int i = 0; i < data->n; i++) {
 		if (data->fields[i].name)
@@ -456,7 +435,7 @@ const char *type_to_string(struct type *type) {
 	return buffer;
 }
 
-int has_variable_size(struct type *type) {
+int type_has_variable_size(struct type *type) {
 	switch (type->type) {
 	case TY_SIMPLE:
 	case TY_STRUCT:
@@ -467,7 +446,7 @@ int has_variable_size(struct type *type) {
 		return 0; // At least I hope this is correct.
 
 	case TY_ARRAY:
-		return has_variable_size(type->children[0]);
+		return type_has_variable_size(type->children[0]);
 
 	case TY_INCOMPLETE_ARRAY:
 		return 0;
