@@ -1,9 +1,9 @@
 #include "variables.h"
-#include "expression.h"
-#include "parser.h"
 
 #include <common.h>
 #include <types.h>
+#include <parser/expression.h>
+#include <parser/parser.h>
 
 #include <stdlib.h>
 #include <assert.h>

@@ -1,7 +1,7 @@
 #ifndef TYPES_H
 #define TYPES_H
 
-#include <parser/variables.h>
+#include <ir/variables.h>
 
 #include <stdint.h>
 

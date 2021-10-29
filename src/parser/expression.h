@@ -4,7 +4,8 @@
 #include "preprocessor/preprocessor.h"
 #include "parser.h"
 #include "declaration.h"
-#include "operators.h"
+
+#include <ir/operators.h>
 
 #include <types.h>
 
