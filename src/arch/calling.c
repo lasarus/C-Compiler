@@ -67,7 +67,7 @@ void classify_recursively(enum parameter_class *current,
 	} break;
 
 	case TY_ARRAY: {
-		for (int i = 0; i < type->array.length; i++) {
+		for (size_t i = 0; i < type->array.length; i++) {
 			struct type *memb_type = type->children[0];
 			int offset = calculate_size(memb_type) * i;
 			if (!(offset >= lower && offset < upper))

@@ -4,6 +4,7 @@
 #include <ir/variables.h>
 
 #include <stdint.h>
+#include <stdlib.h>
 
 // This describes the types used for all parts of the compiler.
 // These should be able to describe all types of the C programming
@@ -73,7 +74,7 @@ struct type {
 	union {
 		enum simple_type simple;
 		struct { 
-			int length;
+			size_t length;
 		} array;
 		struct {
 			var_id length;

@@ -660,12 +660,11 @@ struct type *ast_to_type(const struct type_specifiers *ts, const struct type_qua
 			} break;
 			case ARR_EXPRESSION: {
 				struct constant *length;
-				if ((length = expression_to_constant(ast->array.expr))) {
+				if ((length = expression_to_constant(expression_cast(ast->array.expr, type_simple(SIZE_TYPE))))) {
 					assert(length->type == CONSTANT_TYPE);
-					assert(type_is_simple(length->data_type, ST_INT));
 					struct type params = {
 						.type = TY_ARRAY,
-						.array.length = length->int_d,
+						.array.length = length->ullong_d,
 						.n = 1
 					};
 					type = type_create(&params, &type);
@@ -675,7 +674,7 @@ struct type *ast_to_type(const struct type_specifiers *ts, const struct type_qua
 					// This is an exception.
 					// TODO: Safeguard against VLA in global scope.
 					// TODO: Don't cast to integer.
-					var_id length = expression_to_ir(expression_cast(ast->array.expr, type_simple(ST_INT)));
+					var_id length = expression_to_ir(expression_cast(ast->array.expr, type_simple(SIZE_TYPE)));
 
 					struct type params = {
 						.type = TY_VARIABLE_LENGTH_ARRAY,
