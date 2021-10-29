@@ -7,6 +7,7 @@
 
 #include "types.h"
 #include "common.h"
+#include "parser/expression.h"
 
 static int compare_types(struct type *a, struct type **a_children,
 						 struct type *b) {
@@ -385,4 +386,26 @@ int type_is_aggregate(struct type *type) {
 	return type->type == TY_STRUCT ||
 		type->type == TY_ARRAY ||
 		type->type == TY_INCOMPLETE_ARRAY;
+}
+
+struct expr *type_sizeof(struct type *type) {
+	if (type_has_variable_size(type)) {
+		switch (type->type) {
+		case TY_VARIABLE_LENGTH_ARRAY:
+			return EXPR_BINARY_OP(OP_MUL, EXPR_VAR(type->variable_length_array.length, type_simple(ST_INT)),
+								  type_sizeof(type->children[0]));
+		case TY_ARRAY:
+			return EXPR_BINARY_OP(OP_MUL, EXPR_INT(type->array.length),
+								  type_sizeof(type->children[0]));
+		default:
+			ERROR("Type can't have variable size");
+		}
+	} else {
+		struct constant c = {.type = CONSTANT_TYPE, .data_type = type_simple(ST_ULONG), .ulong_d = calculate_size(type) };
+
+		return expr_new((struct expr) {
+				.type = E_CONSTANT,
+				.constant = c
+			});
+	}
 }

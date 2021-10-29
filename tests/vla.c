@@ -9,4 +9,7 @@ int main() {
 	arr2[0] = 20;
 	assert(arr[20] == 100);
 	assert(arr[99] == 99);
+
+	assert(sizeof (char [a]) == a);
+	assert(sizeof (char [a][a * 2]) == a * a * 2);
 }

@@ -151,6 +151,9 @@ int type_is_aggregate(struct type *type);
 void type_merge_anonymous_substructures(struct struct_data *data);
 int type_has_variable_size(struct type *type);
 
+struct expr;
+struct expr *type_sizeof(struct type *type);
+
 #include <arch/x64.h>
 
 #endif

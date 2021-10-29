@@ -8,19 +8,6 @@
 #include <stdlib.h>
 #include <assert.h>
 
-struct expr *construct_size_expression(struct type *type) {
-	switch (type->type) {
-	case TY_VARIABLE_LENGTH_ARRAY:
-		return EXPR_BINARY_OP(OP_MUL, EXPR_VAR(type->variable_length_array.length, type_simple(ST_INT)),
-							  construct_size_expression(type->children[0]));
-	case TY_ARRAY:
-		return EXPR_BINARY_OP(OP_MUL, EXPR_INT(type->array.length),
-							  construct_size_expression(type->children[0]));
-	default:
-		return EXPR_INT(calculate_size(type));
-	}
-}
-
 struct variable_data {
 	int size, stack_bucket;
 } *variables = NULL;
@@ -34,7 +21,7 @@ var_id new_variable(struct type *type, int allocate, int stack_bucket) {
 
 var_id allocate_vla(struct type **type) {
 	struct type *n_type = type_pointer((*type)->children[0]);
-	struct expr *size_expr = construct_size_expression(*type);
+	struct expr *size_expr = type_sizeof(*type);
 	var_id size = expression_to_ir(size_expr);
 	var_id ptr = new_variable(n_type, 1, 0);
 	IR_PUSH_STACK_ALLOC(ptr, size);

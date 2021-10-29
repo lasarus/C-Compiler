@@ -898,13 +898,8 @@ struct expr *parse_prefix() {
 		} else {
 			type = parse_pratt(PREFIX_PREC)->data_type;
 		}
-		// TODO: Size should perhaps not be an integer.
-		struct constant c = {.type = CONSTANT_TYPE, .data_type = type_simple(ST_ULONG), .ulong_d = calculate_size(type) };
 
-		return expr_new((struct expr) {
-				.type = E_CONSTANT,
-				.constant = c
-			});
+		return type_sizeof(type);
 	} else if (TACCEPT(T_KALIGNOF)) {
 		NOTIMP();
 	} else if (T_ISNEXT(T_IDENT)) {
