@@ -238,8 +238,15 @@ const char *dbg_token(struct token *t) {
 	} else if (t->type == T_NUM) {
 		DBG_PRINT("%s", t->str);
 	} else {
-		switch(t->type) {
-#define PRINT(A, B) case A: DBG_PRINT("%s", B); break;
+		DBG_PRINT("%s", dbg_token_type(t->type));
+	}
+
+	return buffer;
+}
+
+const char *dbg_token_type(enum ttype tt) {
+	switch(tt) {
+#define PRINT(A, B) case A: return B;
 #define X(A, B) PRINT(A, B)
 #define SYM(A, B) PRINT(A, B)
 #define KEY(A, B) PRINT(A, B)
@@ -247,10 +254,8 @@ const char *dbg_token(struct token *t) {
 #undef KEY
 #undef X
 #undef SYM
-		default:
-			return "";
-		}
+#undef PRINT
+	default:
+		return "";
 	}
-
-	return buffer;
 }

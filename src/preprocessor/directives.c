@@ -126,7 +126,7 @@ intmax_t evaluate_expression(int prec) {
 	} else if (t.type == PP_CHARACTER_CONSTANT) {
 		expr = character_constant_to_int(t.str);
 	} else {
-		ERROR("Invalid token in preprocessor expression. %d %s, in %s:%d", t.type, token_to_str(t.type), t.pos.path, t.pos.line);
+		ERROR("Invalid token in preprocessor expression. %s, in %s:%d", dbg_token(&t), t.pos.path, t.pos.line);
 	}
 
 	t = NEXT_E();
@@ -172,7 +172,7 @@ intmax_t evaluate_expression(int prec) {
 					ERROR("Modulo by zero");
 				break;
 			default:
-			ERROR("Invalid infix %s", token_to_str(t.type));
+			ERROR("Invalid infix %s", dbg_token(&t));
 			}
 		}
 

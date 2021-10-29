@@ -89,7 +89,7 @@ void T_expect(enum ttype type) {
 		t_next();
 		return;
 	}
-	ERROR("Expected token %s got %s", token_to_str(type), token_to_str(ts.t.type));
+	ERROR("Expected %s got %s", dbg_token_type(type), dbg_token(&ts.t));
 }
 
 struct token *T_peek(int n) {

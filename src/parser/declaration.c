@@ -1217,8 +1217,7 @@ int parse_init_declarator(struct specifiers s, int global, int *was_func) {
 
 	if (was_abstract) {
 		PRINT_POS(TPEEK(0)->pos);
-		printf("%s\n", token_to_str(TPEEK(0)->type));
-		ERROR("Declaration can't be abstract");
+		ERROR("\nDeclaration can't be abstract");
 	}
 
 	struct type *type;

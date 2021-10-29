@@ -34,8 +34,6 @@ struct token {
     struct string_set hs; // Hide set. Only unsed internally.
 };
 
-char *token_to_str(enum ttype type);
-
 struct token token_init(enum ttype type, char *str, struct position pos);
 void token_delete(struct token *from);
 struct token token_move(struct token *from);
@@ -57,7 +55,7 @@ struct token token_dup_from_hs(struct token *from, struct string_set hs);
 		} else {														\
 			struct token *t = TPEEK(0);									\
 			printf("On line %d col %d file %s\n", t->pos.line, t->pos.column, t->pos.path); \
-			printf("Got %s (%d), expected %s (%d)\n", token_to_str(t->type), t->type, token_to_str(TYPE), TYPE); \
+			printf("Got %s, expected %s\n", strdup(dbg_token(t)), dbg_token_type(TYPE)); \
 			if (t->str)													\
 				printf("Token string has value %s\n", t->str);			\
 			ERROR("Expected other token");								\

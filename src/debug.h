@@ -8,5 +8,6 @@
 const char *dbg_type(struct type *type);
 const char *dbg_instruction(struct instruction ins);
 const char *dbg_token(struct token *t);
+const char *dbg_token_type(enum ttype tt);
 
 #endif

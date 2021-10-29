@@ -28,21 +28,6 @@ enum ttype get_ident(char *str) {
 	return T_IDENT;
 }
 
-char *token_to_str(enum ttype type) {
-	switch(type) {
-#define DBG_PRINT(A, B) case A: return B;
-#define X(A, B) DBG_PRINT(A, B)
-#define SYM(A, B) DBG_PRINT(A, B)
-#define KEY(A, B) DBG_PRINT(A, B)
-#include "tokens.h"
-#undef KEY
-#undef X
-#undef SYM
-	default:
-		return "";
-	}
-}
-
 enum ttype get_punct(char **in_str) {
 	char *str = *in_str;
 
@@ -132,5 +117,5 @@ struct token splitter_next_translate(void) {
 		return in;
 	}
 
-	ERROR("Can't process token %s\n", token_to_str(in.type));
+	ERROR("Can't process token %s\n", dbg_token(&in));
 }
