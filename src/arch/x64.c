@@ -421,10 +421,6 @@ struct constant constant_zero(struct type *type) {
 	};
 }
 
-struct constant constant_one(struct type *type) {
-	return constant_increment(constant_zero(type));
-}
-
 // Basically if string is not of the format (0x|0X)[0-9a-fA-F]+[ulUL]*
 int is_float(const char *str) {
 	if (str[0] == '0' && (str[1] == 'x' || str[1] == 'X'))

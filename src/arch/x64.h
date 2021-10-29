@@ -80,15 +80,10 @@ struct constant {
 	};
 };
 
-struct constant constant_add(struct constant a, struct constant b);
-struct constant constant_sub(struct constant a, struct constant b);
 struct constant constant_increment(struct constant a);
 struct constant constant_zero(struct type *type);
-struct constant constant_one(struct type *type);
 struct constant constant_from_string(const char *str);
 struct constant constant_cast(struct constant a, struct type *target);
-struct constant constant_shift_left(struct constant a, struct constant b);
-struct constant constant_or(struct constant a, struct constant b);
 
 void convert_rax(enum simple_type from, enum simple_type to);
 
