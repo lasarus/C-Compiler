@@ -30,10 +30,10 @@ enum ttype get_ident(char *str) {
 
 char *token_to_str(enum ttype type) {
 	switch(type) {
-#define PRINT(A, B) case A: return B;
-#define X(A, B) PRINT(A, B)
-#define SYM(A, B) PRINT(A, B)
-#define KEY(A, B) PRINT(A, B)
+#define DBG_PRINT(A, B) case A: return B;
+#define X(A, B) DBG_PRINT(A, B)
+#define SYM(A, B) DBG_PRINT(A, B)
+#define KEY(A, B) DBG_PRINT(A, B)
 #include "tokens.h"
 #undef KEY
 #undef X

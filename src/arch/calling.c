@@ -128,6 +128,6 @@ void classify(struct type *type, int *n_parts, enum parameter_class *classes) {
 			}
 		}
 	} else {
-		printf("Can't classify type: %s", type_to_string(type));
+		printf("Can't classify type: %s", dbg_type(type));
 	}
 }

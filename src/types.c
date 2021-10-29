@@ -154,7 +154,7 @@ struct type *type_array(struct type *type, int length) {
 
 struct type *type_deref(struct type *type) {
 	if (type->type != TY_POINTER)
-		ERROR("Expected type to be pointer when dereffing %s", type_to_string(type));
+		ERROR("Expected type to be pointer when dereffing %s", dbg_type(type));
 	return type->children[0];
 }
 
@@ -176,7 +176,7 @@ struct enum_data *register_enum(void) {
 int type_member_idx(struct type *type,
 					const char *name) {
 	if (type->type != TY_STRUCT) {
-		ERROR("%s is not a struct", type_to_string(type));
+		ERROR("%s is not a struct", dbg_type(type));
 	}
 
 	struct struct_data *data = type->struct_data;
@@ -189,7 +189,7 @@ int type_member_idx(struct type *type,
 			return i;
 	}
 
-	ERROR("%s has no member with name %s", type_to_string(type), name);
+	ERROR("%s has no member with name %s", dbg_type(type), name);
 }
 
 // Make arrays into pointers, and functions into function pointers.
@@ -312,31 +312,6 @@ void type_select(struct type *type, int index,
 	}
 }
 
-const char *simple_to_str(enum simple_type st) {
-	switch (st) {
-	case ST_VOID: return "ST_VOID";
-	case ST_CHAR: return "ST_CHAR";
-	case ST_SCHAR: return "ST_SCHAR";
-	case ST_UCHAR: return "ST_UCHAR";
-	case ST_SHORT: return "ST_SHORT";
-	case ST_USHORT: return "ST_USHORT";
-	case ST_INT: return "ST_INT";
-	case ST_UINT: return "ST_UINT";
-	case ST_LONG: return "ST_LONG";
-	case ST_ULONG: return "ST_ULONG";
-	case ST_LLONG: return "ST_LLONG";
-	case ST_ULLONG: return "ST_ULLONG";
-	case ST_FLOAT: return "ST_FLOAT";
-	case ST_DOUBLE: return "ST_DOUBLE";
-	case ST_LDOUBLE: return "ST_LDOUBLE";
-	case ST_BOOL: return "ST_BOOL";
-	case ST_FLOAT_COMPLEX: return "ST_FLOAT_COMPLEX";
-	case ST_DOUBLE_COMPLEX: return "ST_DOUBLE_COMPLEX";
-	case ST_LDOUBLE_COMPLEX: return "ST_LDOUBLE_COMPLEX";
-	default: return "???";
-	}
-}
-
 void type_merge_anonymous_substructures(struct struct_data *data) {
 	// types names offsets need to be modified.
 	for (int i = 0; i < data->n; i++) {
@@ -375,64 +350,6 @@ void type_merge_anonymous_substructures(struct struct_data *data) {
 
 		i += n_new_elements - 1;
 	}
-}
-
-const char *type_to_string(struct type *type) {
-	static int char_buffer_size = 100;
-	static char *buffer = NULL;
-
-	if (!buffer) {
-		buffer = malloc(char_buffer_size);
-	}
-
-	int curr_pos = 0;
-	
-#define PRINT(STR, ...) do {											\
-		int print_size = snprintf(buffer + curr_pos, char_buffer_size - 1 - curr_pos, STR, ##__VA_ARGS__); \
-		int req_size = print_size + 1 + curr_pos; \
-		if (req_size > char_buffer_size) {								\
-			char_buffer_size = req_size;								\
-			buffer = realloc(buffer, char_buffer_size);					\
-			snprintf(buffer + curr_pos, char_buffer_size - 1 - curr_pos, STR, ##__VA_ARGS__); \
-		}																\
-		curr_pos += print_size;\
-	} while (0)
-
-	while (type) {
-		switch (type->type) {
-		case TY_SIMPLE:
-			PRINT("SIMPLE %s", simple_to_str(type->simple));
-			type = NULL;
-			break;
-		case TY_ARRAY:
-			PRINT("ARRAY of ");
-			type = type->children[0];
-			break;
-		case TY_VARIABLE_LENGTH_ARRAY:
-			PRINT("VARIABLE LENGTH ARRAY OF ");
-			type = type->children[0];
-			break;
-		case TY_POINTER:
-			PRINT("POINTER to ");
-			type = type->children[0];
-			break;
-		case TY_FUNCTION:
-			PRINT("FUNCTION returning ");
-			type = type->children[0];
-			break;
-		case TY_STRUCT:
-			PRINT("STRUCT (%s)", type->struct_data->name);
-			type = NULL;
-			break;
-		case TY_INCOMPLETE_ARRAY:
-			PRINT("INCOMPLETE ARRAY of ");
-			type = type->children[0];
-			break;
-		default:
-			type = NULL;
-		}
-	}
-	return buffer;
 }
 
 int type_has_variable_size(struct type *type) {

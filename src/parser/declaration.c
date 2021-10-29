@@ -910,14 +910,14 @@ int parse_non_brace_initializer(struct type **type, int offset, struct initializ
 
 		struct expr *expr = parse_assignment_expression();
 		if (!expr) {
-			printf("%s\n%d\n", type_to_string(*type), has_braces);
+			printf("%s\n%d\n", dbg_type(*type), has_braces);
 			PRINT_POS(T0->pos);
-			ERROR("Expected expression, got: %s", token_to_string(T0));
+			ERROR("Expected expression, got: %s", dbg_token(T0));
 		}
 
 		if (expr->data_type->type == TY_STRUCT) {
 			if (!failed_expr) {
-				ERROR("Got invalid rhs for type %s\n", type_to_string(*type));
+				ERROR("Got invalid rhs for type %s\n", dbg_type(*type));
 			}
 			assert(failed_expr);
 			*failed_expr = expr;
@@ -1089,7 +1089,7 @@ int parse_brace_initializer(struct type **current_object, int offset, struct ini
 				if (!expr)
 					ERROR("Expected expression");
 				if (!type_is_aggregate(expr->data_type))
-					ERROR("Expected expression of aggregate data type, but got %s", type_to_string(expr->data_type));
+					ERROR("Expected expression of aggregate data type, but got %s", dbg_type(expr->data_type));
 
 				for (; stack_count > start_count; stack_count--) {
 					if (expr->data_type == type_stack[stack_count - 1]) {
@@ -1362,7 +1362,7 @@ int parse_declaration(int global) {
 			assert(constant->type == CONSTANT_TYPE);
 
 			if (!type_is_simple(constant->data_type, ST_INT)) {
-				ERROR("Invalid _Static_assert type: %s\n", type_to_string(constant->data_type));
+				ERROR("Invalid _Static_assert type: %s\n", dbg_type(constant->data_type));
 			}
 
 			TEXPECT(T_COMMA);

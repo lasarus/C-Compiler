@@ -148,8 +148,6 @@ int type_is_pointer(struct type *type);
 int type_is_simple(struct type *type, enum simple_type st);
 int type_is_aggregate(struct type *type);
 
-const char *type_to_string(struct type *type);
-
 void type_merge_anonymous_substructures(struct struct_data *data);
 int type_has_variable_size(struct type *type);
 

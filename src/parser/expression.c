@@ -124,7 +124,7 @@ struct type *calculate_type(struct expr *expr) {
 			printf("POS: ");
 			PRINT_POS(expr->pos);
 			printf("\n");
-			ERROR("Can't call type %s\n", type_to_string(callee_type));
+			ERROR("Can't call type %s\n", dbg_type(callee_type));
 		}
 	}
 
@@ -225,16 +225,16 @@ void cast_conditional(struct expr *expr) {
 			expr->args[2] = expression_cast(expr->args[2], a);
 		else {
 			ERROR("Invalid combination of data types:\n%s and %s\n",
-				  strdup(type_to_string(a)),
-				  strdup(type_to_string(b)));
+				  strdup(dbg_type(a)),
+				  strdup(dbg_type(b)));
 		}
 	} else if (type_is_arithmetic(a) &&
 			   type_is_arithmetic(b)) {
 		convert_arithmetic(&expr->args[1], &expr->args[2]);
 	} else if (a != b) {
 		ERROR("Invalid combination of data types:\n%s and %s\n",
-			  strdup(type_to_string(a)),
-			  strdup(type_to_string(b)));
+			  strdup(dbg_type(a)),
+			  strdup(dbg_type(b)));
 	}
 }
 
@@ -602,7 +602,7 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		struct type *func_type = callee->data_type;
 
 		if (func_type->type != TY_POINTER) {
-			ERROR("Can't call type %s", type_to_string(func_type));
+			ERROR("Can't call type %s", dbg_type(func_type));
 		}
 
 		IR_PUSH_CALL_VARIABLE(func_var, type_deref(func_type), arg_types, expr->call.n_args, args, res);

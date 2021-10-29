@@ -322,7 +322,7 @@ void codegen_stackcpy(int dest, int source, int len) {
 }
 
 void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_info) {
-	const char *ins_str = instruction_to_str(ins);
+	const char *ins_str = dbg_instruction(ins);
 	emit("#instruction start \"%s\":", ins_str);
 	switch (ins.type) {
 	case IR_CONSTANT: {

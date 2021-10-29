@@ -369,7 +369,7 @@ void calculate_offsets(struct struct_data *data) {
 		} else {
 			new_size = calculate_size(field);
 			if (new_size == -1)
-				ERROR("%s has invalid size", type_to_string(field));
+				ERROR("%s has invalid size", dbg_type(field));
 		}
 
 		if (calculate_alignment(field) > alignment)
@@ -591,7 +591,7 @@ struct constant simple_cast(struct constant from, enum simple_type target) {
 		case ST_ULLONG: from.NAME = from.ullong_d; break;\
 		case ST_FLOAT: from.NAME = from.float_d; break;\
 		case ST_DOUBLE: from.NAME = from.double_d; break;\
-		default: ERROR("Trying to convert from %s to %s", strdup(type_to_string(from.data_type)), strdup(type_to_string(type_simple(target)))); \
+		default: ERROR("Trying to convert from %s to %s", strdup(dbg_type(from.data_type)), strdup(dbg_type(type_simple(target)))); \
 		}\
 
 	switch (target) {
@@ -624,8 +624,8 @@ struct constant constant_cast(struct constant a, struct type *target) {
 			return a;
 		} else {
 			printf("Can't do constant cast of the form %s to %s\n",
-				   strdup(type_to_string(a.data_type)),
-				   strdup(type_to_string(target)));
+				   strdup(dbg_type(a.data_type)),
+				   strdup(dbg_type(target)));
 			NOTIMP();
 		}
 		return a;
@@ -653,8 +653,8 @@ struct constant constant_cast(struct constant a, struct type *target) {
 	}
 
 	printf("Trying to cast from %s to %s\n",
-		   strdup(type_to_string(a.data_type)),
-		   strdup(type_to_string(target)));
+		   strdup(dbg_type(a.data_type)),
+		   strdup(dbg_type(target)));
 
 	NOTIMP();
 }
@@ -746,7 +746,7 @@ const char *constant_to_string(struct constant constant) {
 	if (constant.data_type->type == TY_SIMPLE)
 		st = constant.data_type->simple;
 	else
-		ERROR("Tried to print type %s to number\n", type_to_string(constant.data_type));
+		ERROR("Tried to print type %s to number\n", dbg_type(constant.data_type));
 
 	switch (st) {
 	case ST_BOOL:

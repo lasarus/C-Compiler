@@ -31,8 +31,8 @@ struct type *operators_get_result_type(enum operator_type op,
 			type_is_pointer(lhs_type) != type_is_pointer(rhs_type)) {
 			PRINT_POS(T0->pos);
 			ERROR("Can't perform op %d on %s and %s\n", op,
-				  strdup(type_to_string(lhs_type)),
-				  strdup(type_to_string(rhs_type)));
+				  strdup(dbg_type(lhs_type)),
+				  strdup(dbg_type(rhs_type)));
 		}
 	}
 

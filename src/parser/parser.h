@@ -7,7 +7,7 @@
 #include <types.h>
 
 typedef int block_id;
-block_id new_block();
+block_id new_block(void);
 
 enum operand_type {
 	OT_INT,
@@ -179,10 +179,7 @@ struct instruction {
 	};
 };
 
-const char *instruction_to_str(struct instruction ins);
-
-void parse_into_ir();
-void print_parser_ir();
+void parse_into_ir(void);
 
 struct program {
 	int size, cap;

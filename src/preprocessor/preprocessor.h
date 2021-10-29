@@ -74,6 +74,4 @@ void T_expect(enum ttype type);
 struct token *T_peek(int n);
 void preprocessor_create(const char *path);
 
-const char *token_to_string(struct token *t);
-
 #endif

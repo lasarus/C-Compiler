@@ -33,4 +33,6 @@ void character_to_escape_sequence(char character, char *output);
 
 void init_source_character_set(void);
 
+#include <debug.h>
+
 #endif

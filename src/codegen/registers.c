@@ -78,7 +78,7 @@ void load_address(struct type *type, var_id result) {
 			NOTIMP();
 		}
 	} else {
-		ERROR("Can't load type %s", type_to_string(type));
+		ERROR("Can't load type %s", dbg_type(type));
 	}
 }
 
