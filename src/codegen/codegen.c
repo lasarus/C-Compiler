@@ -930,10 +930,8 @@ void codegen(const char *path) {
 	if (!data.out)
 		ERROR("Could not open file %s", path);
 
-	struct program *program = get_program();
-
-	for (int i = 0; i < program->size; i++)
-		codegen_function(program->functions + i);
+	for (int i = 0; i < ir.size; i++)
+		codegen_function(ir.functions + i);
 
 	rodata_codegen();
 	data_codegen();

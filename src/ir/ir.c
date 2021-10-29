@@ -10,10 +10,10 @@ block_id new_block() {
 	return block_counter++;
 }
 
-struct program program;
+struct ir ir;
 
 struct function *get_current_function(void) {
-	return &program.functions[program.size - 1];
+	return &ir.functions[ir.size - 1];
 }
 
 struct block *get_current_block(void) {
@@ -37,7 +37,7 @@ void ir_block_start(block_id id) {
 }
 
 void ir_new_function(struct type *signature, var_id *arguments, const char *name, int is_global) {
-	ADD_ELEMENT(program.size, program.cap, program.functions) = (struct function) {
+	ADD_ELEMENT(ir.size, ir.cap, ir.functions) = (struct function) {
 		.signature = signature,
 		.named_arguments = arguments,
 		.name = name,
@@ -45,12 +45,8 @@ void ir_new_function(struct type *signature, var_id *arguments, const char *name
 	};
 }
 
-struct program *get_program(void) {
-	return &program;
-}
-
 void allocate_var(var_id var) {
-	struct function *func = &program.functions[program.size - 1];
+	struct function *func = &ir.functions[ir.size - 1];
 	ADD_ELEMENT(func->var_size, func->var_cap, func->vars) = var;
 }
 

@@ -174,10 +174,12 @@ struct instruction {
 	};
 };
 
-struct program {
+struct ir {
 	int size, cap;
 	struct function *functions;
 };
+
+extern struct ir ir;
 
 struct function {
 	int is_global;
@@ -244,8 +246,6 @@ struct block {
 };
 
 void ir_new_function(struct type *signature, var_id *arguments, const char *name, int is_global);
-
-struct program *get_program(void);
 
 void ir_block_start(block_id id);
 
