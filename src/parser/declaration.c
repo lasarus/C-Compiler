@@ -1118,7 +1118,7 @@ int parse_brace_initializer(struct type **current_object, int offset, struct ini
 
 		// Advance one step.
 		while (stack_count > 0) {
-			index_stack[stack_count - 1]++;
+			int idx = ++index_stack[stack_count - 1];
 			struct type *top_type = type_stack[stack_count - 1];
 			int num_members = 0;
 			switch (top_type->type) {
@@ -1130,6 +1130,11 @@ int parse_brace_initializer(struct type **current_object, int offset, struct ini
 				break;
 			case TY_STRUCT:
 				num_members = top_type->struct_data->n;
+				// Advance until end of struct, or reaching a different offset.
+				while (idx < num_members && (top_type->struct_data->fields[idx - 1].offset ==
+											 top_type->struct_data->fields[idx].offset)) {
+					idx = ++index_stack[stack_count - 1];
+				}
 				break;
 			default: ERROR("Invalid top type");
 			}
@@ -1192,7 +1197,6 @@ struct initializer *parse_initializer(struct type **type) {
 		PRINT_POS(T0->pos);
 		ERROR("Should have completed");
 	}
-//parse_initializer_recursive(0, type, 1, init);
 
 	return init;
 }

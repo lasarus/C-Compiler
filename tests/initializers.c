@@ -117,4 +117,20 @@ int main() {
 		[0][0] = "AAA",
 		[1][1] = "BBB",
 	};
+
+
+	{
+		struct T {
+			int a;
+			union {
+				int b, c;
+			};
+			struct T2 {
+				int d, e;
+			} t2;
+		};
+
+		struct T t = {1, 2, {3, 4}};
+		assert(t.t2.d == 3 && t.a == 1 && t.b == 2);
+	}
 }
