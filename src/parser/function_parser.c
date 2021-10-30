@@ -428,7 +428,7 @@ const char *get_current_function_name() {
 	return current_function;
 }
 
-void parse_function(const char *name, struct type *type, int arg_n, char **arg_names, int global) {
+void parse_function(const char *name, struct type *type, int arg_n, var_id *args, int global) {
 	current_function = name;
 	struct symbol_identifier *symbol = symbols_get_identifier(name);
 
@@ -443,40 +443,21 @@ void parse_function(const char *name, struct type *type, int arg_n, char **arg_n
 	symbol->type = IDENT_LABEL;
 	symbol->label.type = type;
 	symbol->label.name = name;
-
-	if (arg_n && !arg_names)
-		ERROR("Should not be null");
-
 	symbols_push_scope();
 
-	var_id *vars = arg_n ? malloc(sizeof(*vars) * arg_n) : NULL;
-	
 	assert(type->type == TY_FUNCTION);
-	for (int i = 0; i < arg_n; i++) {
-		char *arg_name = arg_names[i];
-		struct type *arg_type = type->children[i + 1];
 
-		var_id arg_var = new_variable(arg_type, 0, 0); // Don't allocate yet.
-		struct symbol_identifier *arg_sym = symbols_add_identifier(arg_name);
-
-		arg_sym->type = IDENT_VARIABLE;
-		arg_sym->variable.id = arg_var;
-		arg_sym->variable.type = arg_type;
-		vars[i] = arg_var;
-	}
-
-	ir_new_function(type, vars, name, global);
+	ir_new_function(type, args, name, global);
 	ir_block_start(new_block());
 
 	type_evaluate_vla(type);
 
 	for (int i = 0; i < arg_n; i++) {
-		allocate_var(vars[i]);
+		allocate_var(args[i]);
 	}
 
 	struct jump_blocks jump_blocks = { 0 };
 	parse_compound_statement(jump_blocks);
-	symbols_pop_scope();
 
 	if (strcmp(name, "main") == 0) {
 		struct block *b = get_current_block();
@@ -485,4 +466,26 @@ void parse_function(const char *name, struct type *type, int arg_n, char **arg_n
 	} else if (current_ret_val == type_simple(ST_VOID)) {
 		ir_return_void();
 	}
+	
+	symbols_pop_scope();
+	symbols_pop_scope();
+
+	// Need to add the function to the outer scope again.
+	// This is because the function prototype scope comes before the
+	// function definition, but parameters should (obviously) still be
+	// visible in the function body.
+
+	symbol = symbols_get_identifier(name);
+
+	function_scope.size = 0;
+
+	current_ret_val = type->children[0];
+
+	if (!symbol) {
+		symbol = symbols_add_identifier(name);
+	}
+
+	symbol->type = IDENT_LABEL;
+	symbol->label.type = type;
+	symbol->label.name = name;
 }

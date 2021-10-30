@@ -3,9 +3,18 @@
 #include <string.h>
 
 int global = 10;
-void func(char arr[][global]) {
+void func1(char arr[][global]) {
 	assert(sizeof *arr == global);
 }
+
+void func2(int n, char arr[][n * 2]) {
+	assert(sizeof *arr == n * 2);
+}
+
+// TODO:
+/* void func3(int func3) { */
+/* 	assert(func3 == 10); */
+/* } */
 
 int main() {
 	int a = 10 * 10;
@@ -33,4 +42,8 @@ int main() {
 		ptrs[i] = arr;
 	}
 	assert(ptrs[0] - ptrs[999] < 1100);
+
+	func1(NULL);
+	func2(100, NULL);
+	//func3(10);
 }

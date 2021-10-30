@@ -20,7 +20,7 @@ struct symbol_identifier {
 		IDENT_VARIABLE_LENGTH_ARRAY,
 		IDENT_CONSTANT,
 		IDENT_LABEL,
-		IDENT_INCOMPLETE,
+		IDENT_ARGUMENT,
 	} type;
 
 	union {
@@ -37,6 +37,9 @@ struct symbol_identifier {
 			struct type *type;
 			const char *name;
 		} label;
+		struct {
+			struct type *type;
+		} argument;
 	};
 };
 

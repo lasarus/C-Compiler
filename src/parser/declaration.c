@@ -74,7 +74,8 @@ struct type_ast {
 		struct {
 			int n;
 			struct type **types;
-			char **names;
+			var_id *arguments;
+			//char **names;
 			int vararg;
 		} function;
 	};
@@ -82,7 +83,7 @@ struct type_ast {
 	struct type_ast *parent;
 };
 
-struct type_ast *parse_declarator(int *was_abstract);
+struct type_ast *parse_declarator(int *was_abstract, int *has_symbols);
 struct type *ast_to_type(const struct type_specifiers *ts, const struct type_qualifiers *tq, struct type_ast *ast, char **name, int allow_tq_in_array);
 
 int parse_struct(struct type_specifiers *ts);
@@ -359,7 +360,7 @@ int parse_struct(struct type_specifiers *ts) {
 				int bitfield = -1;
 				int needs_bitfield = 0;
 
-				if ((ast = parse_declarator(&was_abstract))) {
+				if ((ast = parse_declarator(&was_abstract, 0))) {
 					found_one = 1;
 					if (was_abstract)
 						ERROR("Can't have abstract in struct declaration");
@@ -495,7 +496,7 @@ int parse_struct(struct type_specifiers *ts) {
 }
 
 void ast_get_parameters(struct type_ast *ast,
-						int *n, char ***names) {
+						int *n, var_id **arguments) {
 	while (ast->type != TAST_TERMINAL) {
 		switch (ast->type) {
 		case TAST_POINTER:
@@ -509,7 +510,7 @@ void ast_get_parameters(struct type_ast *ast,
 		case TAST_FUNCTION:
 			if (ast->parent->type == TAST_TERMINAL) {
 				*n = ast->function.n;
-				*names = ast->function.names;
+				*arguments = ast->function.arguments;
 				return;
 			} else {
 				ast = ast->parent;
@@ -641,7 +642,7 @@ struct type *ast_to_type(const struct type_specifiers *ts, const struct type_qua
 
 			struct type *parameters[ast->function.n + 1];
 			for (int i = 0; i < ast->function.n; i++)
-				parameters[i + 1] = type_adjust_parameter(ast->function.types[i]);
+				parameters[i + 1] = ast->function.types[i];
 			parameters[0] = type;
 
 			type = type_create(&params, parameters);
@@ -705,17 +706,18 @@ struct parameter_list {
 	int n;
 	int vararg;
 	struct type **types;
-	char **names;
+	var_id *arguments;
 };
 
 struct parameter_list parse_parameter_list(void) {
 	struct parameter_list ret = { 0 };
+	symbols_push_scope();
 
 	struct specifiers s;
 	int first = 1;
 	while (parse_specifiers(&s.ts, &s.scs, &s.tq, &s.fs, &s.as)) {
 		int was_abstract = 10;
-		struct type_ast *ast = parse_declarator(&was_abstract);
+		struct type_ast *ast = parse_declarator(&was_abstract, 0);
 
 		if (first) {
 			ret.abstract = was_abstract;
@@ -730,11 +732,17 @@ struct parameter_list parse_parameter_list(void) {
 		ret.n++;
 		ret.types = realloc(ret.types, ret.n * sizeof(*ret.types));
 		char *name = NULL;
-		ret.types[ret.n - 1] = ast_to_type(&s.ts, &s.tq, ast, &name, 1);
+		struct type *type = ast_to_type(&s.ts, &s.tq, ast, &name, 1);
+		type = type_adjust_parameter(type);
+		ret.types[ret.n - 1] = type;
 
 		if (!ret.abstract) {
-			ret.names = realloc(ret.names, ret.n * sizeof(*ret.names));
-			ret.names[ret.n - 1] = name;
+			ret.arguments = realloc(ret.arguments, ret.n * sizeof(*ret.arguments));
+			struct symbol_identifier *ident = symbols_add_identifier(name);
+			ident->type = IDENT_VARIABLE;
+			ident->variable.type = type;
+			ident->variable.id = new_variable(type, 0, 0);
+			ret.arguments[ret.n - 1] = ident->variable.id;
 		}
 
 		TACCEPT(T_COMMA);
@@ -751,14 +759,14 @@ struct parameter_list parse_parameter_list(void) {
 	return ret;
 }
 
-struct type_ast *parse_function_parameters(struct type_ast *parent) {
+struct type_ast *parse_function_parameters(struct type_ast *parent, int *has_symbols) {
 	if (TACCEPT(T_RPAR)) {
 		return type_ast_new((struct type_ast){
 				.type = TAST_FUNCTION,
 				.function.n = 0,
 				.function.vararg = 1,
 				.function.types = NULL,
-				.function.names = NULL,
+				.function.arguments = NULL,
 				.parent = parent
 			});
 	}
@@ -770,6 +778,11 @@ struct type_ast *parse_function_parameters(struct type_ast *parent) {
 		TNEXT();
 	} else {
 		parameters = parse_parameter_list();
+
+		if (has_symbols)
+			*has_symbols = 1;
+		else
+			symbols_pop_scope();
 	}
 
 	return type_ast_new((struct type_ast){
@@ -777,12 +790,12 @@ struct type_ast *parse_function_parameters(struct type_ast *parent) {
 			.function.n = parameters.n,
 			.function.vararg = parameters.vararg,
 			.function.types = parameters.types,
-			.function.names = parameters.names,
+			.function.arguments = parameters.arguments,
 			.parent = parent
 		});
 }
 
-struct type_ast *parse_declarator(int *was_abstract) {
+struct type_ast *parse_declarator(int *was_abstract, int *has_symbols) {
 	struct type_ast *ast = NULL;
 	if (TPEEK(0)->type == T_IDENT) {
 		ast = type_ast_new((struct type_ast){
@@ -794,14 +807,14 @@ struct type_ast *parse_declarator(int *was_abstract) {
 		TNEXT();
 	} else if (TACCEPT(T_LPAR)) {
 		if (!(T0->type == T_IDENT && symbols_get_typedef(T0->str)))
-			ast = parse_declarator(was_abstract);
+			ast = parse_declarator(was_abstract, has_symbols);
 		if (!ast) {
 			*was_abstract = 1;
 			ast = type_ast_new((struct type_ast) {
 					.type = TAST_TERMINAL,
 					.terminal.name = NULL
 				});
-			ast = parse_function_parameters(ast);
+			ast = parse_function_parameters(ast, has_symbols);
 		} else {
 			TEXPECT(T_RPAR);
 		}
@@ -813,7 +826,7 @@ struct type_ast *parse_declarator(int *was_abstract) {
 
 		ast = type_ast_new((struct type_ast){
 				.type = TAST_POINTER,
-				.parent = parse_declarator(was_abstract),
+				.parent = parse_declarator(was_abstract, has_symbols),
 				.pointer.tq = tq
 			});
 
@@ -875,7 +888,7 @@ struct type_ast *parse_declarator(int *was_abstract) {
 			arr.parent = ast;
 			ast = type_ast_new(arr);
 		} else if (TACCEPT(T_LPAR)) {
-			ast = parse_function_parameters(ast);
+			ast = parse_function_parameters(ast, has_symbols);
 		}
 	}
 
@@ -1192,7 +1205,7 @@ struct type *parse_type_name(void) {
 		return NULL;
 
 	int was_abstract = 1;
-	struct type_ast *ast = parse_declarator(&was_abstract);
+	struct type_ast *ast = parse_declarator(&was_abstract, 0);
 	if (!was_abstract)
 		ERROR("Type name must be abstract");
 
@@ -1203,8 +1216,8 @@ struct type *parse_type_name(void) {
 
 int parse_init_declarator(struct specifiers s, int global, int *was_func) {
 	*was_func = 0;
-	int was_abstract = 1;
-	struct type_ast *ast = parse_declarator(&was_abstract);
+	int was_abstract = 1, has_symbols = 0;
+	struct type_ast *ast = parse_declarator(&was_abstract, &has_symbols);
 
 	if (!ast)
 		return 0;
@@ -1220,16 +1233,22 @@ int parse_init_declarator(struct specifiers s, int global, int *was_func) {
 
 	if (TPEEK(0)->type == T_LBRACE) {
 		int arg_n = 0;
-		char **arg_names = NULL;
-		ast_get_parameters(ast, &arg_n, &arg_names);
+		var_id *args = NULL;
+		ast_get_parameters(ast, &arg_n, &args);
 
-		if (arg_n && !arg_names)
+		if (!has_symbols)
+			symbols_push_scope();
+
+		if (arg_n && !args)
 			ERROR("Should not be null");
 
-		parse_function(name, type, arg_n, arg_names, s.scs.static_n ? 0 : 1);
+		parse_function(name, type, arg_n, args, s.scs.static_n ? 0 : 1);
 		*was_func = 1;
 		return 1;
 	}
+
+	if (has_symbols)
+		symbols_pop_scope();
 
 	if (!global)
 		type_evaluate_vla(type);
