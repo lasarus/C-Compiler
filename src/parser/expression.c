@@ -413,6 +413,21 @@ struct expr *expr_new(struct expr expr) {
 	return ret;
 }
 
+/* 		struct { */
+/* 			var_id pointer, index; */
+/* 			int decrement; */
+/* 			struct type *ptr_type; */
+/* 			enum simple_type index_type; */
+/* 		} pointer_increment; */
+/* #define IR_PUSH_POINTER_INCREMENT(RESULT, POINTER, INDEX, DECREMENT, PTR_TYPE, INDEX_TYPE) IR_PUSH(.type = IR_POINTER_INCREMENT, .result = (RESULT), .pointer_increment = {(POINTER), (INDEX), (DECREMENT), (PTR_TYPE), (INDEX_TYPE)}) */
+void pointer_increment(var_id result, var_id pointer, struct expr *index, int decrement, struct type *type) {
+	var_id size = expression_to_ir(type_sizeof(type_deref(type)));
+	var_id index_var = expression_to_ir(expression_cast(index, type_simple(ST_ULONG)));
+	IR_PUSH_BINARY_OPERATOR(OP_MUL, OT_ULONG, index_var, size, index_var);
+	IR_PUSH_BINARY_OPERATOR(decrement ? OP_SUB : OP_ADD, OT_ULONG, pointer, index_var, result);
+	//IR_PUSH_POINTER_INCREMENT(result, pointer, index_var, decrement, type, index_type);
+}
+
 // Loads pointer into return value.
 int try_expression_to_address(struct expr *expr, var_id *var) {
 	switch (expr->type) {
@@ -636,18 +651,16 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 					 expression_to_address(expr->args[0]), type_pointer(expr->args[0]->data_type));
 		break;
 
-	case E_POINTER_ADD:
-		IR_PUSH_POINTER_INCREMENT(res, expression_to_ir(expr->args[0]),
-								  expression_to_ir(expr->args[1]), 0,
-								  expr->args[0]->data_type,
-								  expr->args[1]->data_type->simple);
-		break;
+	case E_POINTER_ADD: {
+		pointer_increment(res, expression_to_ir(expr->args[0]),
+						  expr->args[1], 0,
+						  expr->args[0]->data_type);
+	} break;
 
 	case E_POINTER_SUB:
-		IR_PUSH_POINTER_INCREMENT(res, expression_to_ir(expr->args[0]),
-								  expression_to_ir(expr->args[1]), 1,
-								  expr->args[0]->data_type,
-								  expr->args[1]->data_type->simple);
+		pointer_increment(res, expression_to_ir(expr->args[0]),
+						  expr->args[1], 1,
+						  expr->args[0]->data_type);
 		break;
 
 	case E_POINTER_DIFF:
@@ -693,7 +706,6 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 
 	case E_ASSIGNMENT_POINTER: {
 		var_id address = expression_to_address(expr->args[0]);
-		var_id rhs = expression_to_ir(expr->args[1]);
 
 		var_id prev_val = address_load(address, expr->args[0]->data_type);
 
@@ -702,7 +714,7 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 
 		assert(type_is_pointer(expr->args[0]->data_type));
 
-		IR_PUSH_POINTER_INCREMENT(prev_val, prev_val, rhs, expr->assignment_pointer.sub, expr->args[0]->data_type, expr->args[1]->data_type->simple);
+		pointer_increment(prev_val, prev_val, expr->args[1], expr->assignment_pointer.sub, expr->args[0]->data_type);
 
 		address_store(address, prev_val);
 		return expr->assignment_pointer.postfix ? res : prev_val;

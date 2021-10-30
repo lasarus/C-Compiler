@@ -29,7 +29,6 @@ struct instruction {
 	enum {
 		IR_BINARY_OPERATOR,
 		IR_UNARY_OPERATOR,
-		IR_POINTER_INCREMENT,
 		IR_POINTER_DIFF,
 		IR_LOAD,
 		IR_STORE,
@@ -72,13 +71,6 @@ struct instruction {
 			var_id operand;
 		} unary_operator;
 #define IR_PUSH_UNARY_OPERATOR(TYPE, OPERAND_TYPE, OPERAND, RESULT) IR_PUSH(.type = IR_UNARY_OPERATOR, .result = (RESULT), .unary_operator = { (TYPE), (OPERAND_TYPE), (OPERAND)})
-		struct {
-			var_id pointer, index;
-			int decrement;
-			struct type *ptr_type;
-			enum simple_type index_type;
-		} pointer_increment;
-#define IR_PUSH_POINTER_INCREMENT(RESULT, POINTER, INDEX, DECREMENT, PTR_TYPE, INDEX_TYPE) IR_PUSH(.type = IR_POINTER_INCREMENT, .result = (RESULT), .pointer_increment = {(POINTER), (INDEX), (DECREMENT), (PTR_TYPE), (INDEX_TYPE)})
 		struct {
 			var_id lhs, rhs;
 			struct type *ptr_type;

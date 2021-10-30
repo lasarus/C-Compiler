@@ -435,26 +435,6 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 					 ins.result);
 		break;
 
-	case IR_POINTER_INCREMENT: {
-		int do_decrement = ins.pointer_increment.decrement;
-		var_id index = ins.pointer_increment.index,
-			pointer = ins.pointer_increment.pointer,
-			result = ins.result;
-		int size = calculate_size(type_deref(ins.pointer_increment.ptr_type));
-
-		scalar_to_reg(index, REG_RDI);
-		emit("%s", cast_operator_outputs[ST_ULONG][ins.pointer_increment.index_type]);
-		emit("imulq $%d, %%rax", size);
-		scalar_to_reg(pointer, REG_RSI);
-
-		if (do_decrement)
-			emit("subq %%rax, %%rsi");
-		else
-			emit("addq %%rax, %%rsi");
-
-		reg_to_scalar(REG_RSI, result);
-	} break;
-
 	case IR_POINTER_DIFF: {
 		scalar_to_reg(ins.pointer_diff.lhs, REG_RAX);
 		scalar_to_reg(ins.pointer_diff.rhs, REG_RDX);

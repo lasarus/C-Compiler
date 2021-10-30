@@ -131,10 +131,6 @@ const char *dbg_instruction(struct instruction ins) {
 		DBG_PRINT("store %d into %d", ins.store.value, ins.store.pointer);
 		break;
 
-	case IR_POINTER_INCREMENT:
-		DBG_PRINT("%d = increment %d by %d", ins.result, ins.pointer_increment.pointer, ins.pointer_increment.index);
-		break;
-
 	case IR_COPY: {
 		DBG_PRINT("%d = %d", ins.result, ins.copy.source);
 	} break;
