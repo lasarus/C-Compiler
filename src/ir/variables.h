@@ -9,7 +9,7 @@ struct type;
 var_id new_variable_sz(int size, int allocate, int stack_bucket);
 var_id new_variable(struct type *type, int allocate, int stack_bucket);
 
-var_id allocate_vla(struct type **type);
+var_id allocate_vla(struct type *type);
 void allocate_var(var_id var);
 int get_n_vars(void);
 

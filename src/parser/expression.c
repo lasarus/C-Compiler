@@ -131,6 +131,9 @@ struct type *calculate_type(struct expr *expr) {
 	case E_VARIABLE:
 		return expr->variable.type;
 
+	case E_VARIABLE_LENGTH_ARRAY:
+		return expr->variable.type;
+
 	case E_INDIRECTION:
 		return type_deref(expr->args[0]->data_type);
 
@@ -420,6 +423,13 @@ int try_expression_to_address(struct expr *expr, var_id *var) {
 	case E_VARIABLE: {
 		var_id address = new_variable(type_pointer(expr->data_type), 1, 1);
 		IR_PUSH_ADDRESS_OF(address, expr->variable.id);
+		*var = address;
+		return 1;
+	}
+
+	case E_VARIABLE_LENGTH_ARRAY: {
+		var_id address = new_variable(type_pointer(expr->data_type), 1, 1);
+		IR_PUSH_COPY(address, expr->variable_length_array.ptr);
 		*var = address;
 		return 1;
 	}
@@ -928,6 +938,13 @@ struct expr *parse_prefix() {
 			return expr_new((struct expr) {
 					.type = E_VARIABLE,
 					.variable = { sym->variable.id, sym->variable.type }
+				});
+
+		case IDENT_VARIABLE_LENGTH_ARRAY:
+			TNEXT();
+			return expr_new((struct expr) {
+					.type = E_VARIABLE_LENGTH_ARRAY,
+					.variable_length_array = { sym->variable.id, sym->variable.type }
 				});
 
 		case IDENT_CONSTANT:

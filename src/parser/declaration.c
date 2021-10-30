@@ -1291,15 +1291,14 @@ int parse_init_declarator(struct specifiers s, int global, int *was_func) {
 		if (s.scs.static_n)
 			is_static = 1;
 		else {
-			symbol->type = IDENT_VARIABLE;
+			symbol->variable.type = type;
 			if (type_has_variable_size(type)) {
-				struct type *n_type = type;
-				symbol->variable.id = allocate_vla(&n_type);
-				symbol->variable.type = n_type;
+				symbol->type = IDENT_VARIABLE_LENGTH_ARRAY;
+				symbol->variable.id = allocate_vla(type);
 				definition = 0;
 			} else {
+				symbol->type = IDENT_VARIABLE;
 				symbol->variable.id = new_variable(type, 1, 0);
-				symbol->variable.type = type;
 			}
 		}
 	}

@@ -19,13 +19,12 @@ var_id new_variable(struct type *type, int allocate, int stack_bucket) {
 	return new_variable_sz(calculate_size(type), allocate, stack_bucket);
 }
 
-var_id allocate_vla(struct type **type) {
-	struct type *n_type = type_pointer((*type)->children[0]);
-	struct expr *size_expr = type_sizeof(*type);
+var_id allocate_vla(struct type *type) {
+	struct type *n_type = type_pointer(type->children[0]);
+	struct expr *size_expr = type_sizeof(type);
 	var_id size = expression_to_ir(size_expr);
 	var_id ptr = new_variable(n_type, 1, 0);
 	IR_PUSH_STACK_ALLOC(ptr, size);
-	*type = n_type;
 	return ptr;
 }
 

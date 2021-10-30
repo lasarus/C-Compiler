@@ -17,6 +17,7 @@ void symbols_init(void);
 struct symbol_identifier {
 	enum {
 		IDENT_VARIABLE,
+		IDENT_VARIABLE_LENGTH_ARRAY,
 		IDENT_CONSTANT,
 		IDENT_LABEL,
 		IDENT_INCOMPLETE,
@@ -28,6 +29,10 @@ struct symbol_identifier {
 			struct type *type;
 			var_id id;
 		} variable;
+		struct {
+			struct type *type;
+			var_id id;
+		} variable_length_array;
 		struct {
 			struct type *type;
 			const char *name;

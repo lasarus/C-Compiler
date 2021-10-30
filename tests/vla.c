@@ -12,4 +12,10 @@ int main() {
 
 	assert(sizeof (char [a]) == a);
 	assert(sizeof (char [a][a * 2]) == a * a * 2);
+
+	int n = 5;
+	assert(sizeof (char[2][n]) == 2 * n);
+
+	char arr3[n][n];
+	assert(sizeof arr3 == n * n);
 }
