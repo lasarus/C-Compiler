@@ -193,8 +193,10 @@ struct function {
 	int uses_va;
 
 	int size, cap;
-	struct block *blocks;
+	block_id *blocks;
 };
+
+struct block *get_block(block_id id);
 
 struct case_labels {
 	int size, cap;

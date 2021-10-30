@@ -813,7 +813,7 @@ void codegen_function(struct function *func) {
 	}
 
 	for (int i = 0; i < func->size; i++) {
-		struct block *block = func->blocks + i;
+		struct block *block = get_block(func->blocks[i]);
 
 		for (int j = 0; j < block->size; j++) {
 			struct instruction *ins = block->instructions + j;
@@ -913,7 +913,7 @@ void codegen_function(struct function *func) {
 	reg_save_info.overflow_position = total_memory_argument_size + 16;
 
 	for (int i = 0; i < func->size; i++) {
-		codegen_block(func->blocks + i, reg_save_info);
+		codegen_block(get_block(func->blocks[i]), reg_save_info);
 	}
 
 	int total_stack_usage = max_temp_stack + perm_stack_count;

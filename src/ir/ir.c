@@ -5,9 +5,21 @@
 
 #include <assert.h>
 
+static size_t block_size, block_cap;
+static struct block *blocks;
+
 block_id new_block() {
-	static int block_counter = 1; // reserve space for null block.
-	return block_counter++;
+	int id = (int)block_size;
+	ADD_ELEMENT(block_size, block_cap, blocks) = (struct block) {
+		.id = id,
+		.exit.type = BLOCK_EXIT_NONE
+	};
+
+	return id;
+}
+
+struct block *get_block(block_id id) {
+	return blocks + id;
 }
 
 struct ir ir;
@@ -18,7 +30,7 @@ struct function *get_current_function(void) {
 
 struct block *get_current_block(void) {
 	struct function *func = get_current_function();
-	return &func->blocks[func->size - 1];
+	return get_block(func->blocks[func->size - 1]);
 }
 
 void push_ir(struct instruction instruction) {
@@ -30,10 +42,7 @@ void push_ir(struct instruction instruction) {
 void ir_block_start(block_id id) {
 	struct function *func = get_current_function();
 
-	ADD_ELEMENT(func->size, func->cap, func->blocks) = (struct block) {
-		.id = id,
-		.exit.type = BLOCK_EXIT_NONE
-	};
+	ADD_ELEMENT(func->size, func->cap, func->blocks) = id;
 }
 
 void ir_new_function(struct type *signature, var_id *arguments, const char *name, int is_global) {
