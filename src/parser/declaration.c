@@ -1132,7 +1132,9 @@ int parse_brace_initializer(struct type **current_object, int offset, struct ini
 				num_members = top_type->struct_data->n;
 				// Advance until end of struct, or reaching a different offset.
 				while (idx < num_members && (top_type->struct_data->fields[idx - 1].offset ==
-											 top_type->struct_data->fields[idx].offset)) {
+											 top_type->struct_data->fields[idx].offset &&
+											 top_type->struct_data->fields[idx - 1].bit_offset ==
+											 top_type->struct_data->fields[idx].bit_offset)) {
 					idx = ++index_stack[stack_count - 1];
 				}
 				break;
