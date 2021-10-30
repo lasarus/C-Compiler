@@ -29,6 +29,14 @@ struct codegen_flags codegen_flags = {
 	.debug_stack_size = 0
 };
 
+struct vla_info {
+	size_t size, cap;
+	struct vla_slot {
+		var_id slot;
+		int dominance;
+	} *slots;
+} vla_info;
+
 void set_section(const char *section) {
 	if (strcmp(section, data.current_section) != 0)
 		emit(".section %s", section);
@@ -605,9 +613,28 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 		break;
 
 	case IR_STACK_ALLOC: {
-		// TODO: Also free the stack allocation at the end of blocks.
-		//EMIT("pushq %%rsp");
-		//EMIT("subq $8, %%rsp");
+		struct vla_slot *slot = NULL;
+		for (size_t i = 0; i < vla_info.size; i++) {
+			if (vla_info.slots[i].dominance == ins.stack_alloc.dominance) {
+				slot = vla_info.slots + i;
+			} else if (vla_info.slots[i].dominance > ins.stack_alloc.dominance) {
+				emit("movq $0, -%d(%%rbp)", variable_info[vla_info.slots[i].slot].stack_location);
+			}
+		}
+		assert(slot);
+
+		static int tmp_label = 0;
+		emit("movq -%d(%%rbp), %%rax", variable_info[slot->slot].stack_location);
+		emit("cmpq $0, %%rax");
+		emit("jne .Lvla%d", tmp_label);
+		emit("movq %%rsp, %%rax");
+		emit("movq %%rax, -%d(%%rbp)", variable_info[slot->slot].stack_location);
+		emit(".Lvla%d:", tmp_label);
+		tmp_label++;
+
+		emit("movq %%rax, %%rsp");
+
+		emit("movq %%rsp, -%d(%%rbp)", variable_info[slot->slot].stack_location);
 		scalar_to_reg(ins.stack_alloc.length, REG_RAX);
 		emit("subq %%rax, %%rsp");
 		reg_to_scalar(REG_RSP, ins.result);
@@ -812,6 +839,8 @@ void codegen_function(struct function *func) {
 		reg_save_info.reg_save_position = perm_stack_count;
 	}
 
+	vla_info.size = 0;
+
 	for (int i = 0; i < func->size; i++) {
 		struct block *block = get_block(func->blocks[i]);
 
@@ -832,21 +861,14 @@ void codegen_function(struct function *func) {
 				variable_info[var].stack_location = temp_stack_count + perm_stack_count;
 			} else if (ins->type == IR_CLEAR_STACK_BUCKET) {
 				temp_stack_count = 0;
+			} else if (ins->type == IR_STACK_ALLOC) {
+				ADD_ELEMENT(vla_info.size, vla_info.cap, vla_info.slots) = (struct vla_slot) {
+					.slot = ins->stack_alloc.slot,
+					.dominance = ins->stack_alloc.dominance
+				};
 			}
 		}
 	}
-	/* for (int i = 0; i < func->var_size; i++) { */
-	/* 	var_id var = func->vars[i]; */
-	/* 	if (!get_variable_stack_bucket(var)) */
-	/* 		continue; */
-
-	/* 	int size = get_variable_size(var); */
-
-	/* 	temp_stack_count += size; */
-
-	/* 	variable_info[var].storage = VAR_STOR_STACK; */
-	/* 	variable_info[var].stack_location = max_temp_stack + perm_stack_count; */
-	/* } */
 
 	if (func->is_global)
 		emit(".global %s", func->name);
@@ -872,6 +894,10 @@ void codegen_function(struct function *func) {
 		emit("movq %%r8, %d(%%rax)", 32);
 		emit("movq %%r9, %d(%%rax)", 40);
 		// TODO: xmm0-15
+	}
+
+	for (size_t i = 0; i < vla_info.size; i++) {
+		emit("movq $0, -%d(%%rbp)", variable_info[vla_info.slots[i].slot].stack_location);
 	}
 
 	for (int i = 0; i < n_args; i++) {

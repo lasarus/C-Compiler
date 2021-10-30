@@ -148,10 +148,10 @@ struct instruction {
 #define IR_PUSH_VA_ARG(ARRAY, RESULT, TYPE) IR_PUSH(.type = IR_VA_ARG, .result = (RESULT), .va_arg_ = {(ARRAY), (TYPE)})
 
 		struct {
-			var_id length;
+			var_id length, slot;
+			int dominance;
 		} stack_alloc;
-#define IR_PUSH_STACK_ALLOC(RESULT, LENGTH) IR_PUSH(.type = IR_STACK_ALLOC, .result = (RESULT), .stack_alloc = {(LENGTH)})
-#define IR_PUSH_POP_STACK_ALLOC() IR_PUSH(.type = IR_POP_STACK_ALLOC)
+#define IR_PUSH_STACK_ALLOC(RESULT, LENGTH, SLOT, DOMINANCE) IR_PUSH(.type = IR_STACK_ALLOC, .result = (RESULT), .stack_alloc = {(LENGTH), (SLOT), (DOMINANCE)})
 
 		struct {
 			var_id field, value;

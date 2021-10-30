@@ -1,4 +1,6 @@
 #include <assert.h>
+#include <stdlib.h>
+#include <string.h>
 
 int main() {
 	int a = 10 * 10;
@@ -18,4 +20,12 @@ int main() {
 
 	char arr3[n][n];
 	assert(sizeof arr3 == n * n);
+
+	char *ptrs[1000];
+	for (int i = 0; i < 1000; i++) {
+		char arr[i + 100];
+		memset(arr, 0, i + 100);
+		ptrs[i] = arr;
+	}
+	assert(ptrs[0] - ptrs[999] < 1100);
 }
