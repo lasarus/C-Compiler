@@ -5,6 +5,7 @@
 
 #include <common.h>
 #include <precedence.h>
+#include <arch/x64.h>
 
 #include <assert.h>
 
@@ -109,7 +110,8 @@ intmax_t evaluate_expression(int prec) {
 		if (strcmp(nt.str, "(") == 0) {
 			name = NEXT_U();
 			struct token rpar = NEXT_U();
-			assert(strcmp(rpar.str, ")") == 0);
+			if (strcmp(rpar.str, ")") != 0)
+				ERROR("Expected )");
 		} else {
 			name = nt;
 		}
@@ -120,9 +122,39 @@ intmax_t evaluate_expression(int prec) {
 	} else if (t.type == T_LPAR) {
 		expr = evaluate_expression(0);
 		struct token rpar = NEXT_E();
-		assert(rpar.type == T_RPAR);
+		if (rpar.type != T_RPAR) {
+			PRINT_POS(rpar.pos);
+			ERROR("Expected )");
+		}
 	} else if (t.type == T_NUM) {
-		expr = atoi(t.str);
+		struct constant c = constant_from_string(t.str);
+		if (c.type != CONSTANT_TYPE)
+			ERROR("Internal compiler error.");
+		if (type_is_floating(c.data_type))
+			ERROR("Floating point arithmetic in the preprocessor is not allowed.");
+		if (!type_is_integer(c.data_type))
+			ERROR("Preprocessor variables must be of integer type.");
+		switch (c.data_type->simple) {
+		case ST_INT:
+			expr = c.int_d;
+			break;
+		case ST_UINT:
+			expr = c.uint_d;
+			break;
+		case ST_LONG:
+			expr = c.long_d;
+			break;
+		case ST_ULONG:
+			expr = c.ulong_d;
+			break;
+		case ST_LLONG:
+			expr = c.llong_d;
+			break;
+		case ST_ULLONG:
+			expr = c.ullong_d;
+			break;
+		default: ERROR("Internal compiler error.");
+		}
 	} else if (t.type == PP_CHARACTER_CONSTANT) {
 		expr = character_constant_to_int(t.str);
 	} else {
@@ -138,7 +170,8 @@ intmax_t evaluate_expression(int prec) {
 			int mid = evaluate_expression(0);
 			struct token colon = NEXT_E();
 			assert(colon.type == T_COLON);
-			expr = expr ? mid : evaluate_expression(new_prec);
+			int rhs = evaluate_expression(new_prec);
+			expr = expr ? mid : rhs;
 		} else {
 			// Standard binary operator.
 			int rhs = evaluate_expression(new_prec);
