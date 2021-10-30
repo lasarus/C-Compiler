@@ -1287,27 +1287,27 @@ int parse_init_declarator(struct specifiers s, int global, int *was_func) {
 	int is_static = 0;
 	int is_global = 0;
 
+	if (type->type == TY_FUNCTION) {
+		symbol->type = IDENT_LABEL;
+		symbol->label.name = name;
+		symbol->label.type = type;
+		return 1;
+	}
+
 	// Create space for symbol if not a function prototype.
 	if (global) {
-		if (type->type == TY_FUNCTION) {
-			symbol->type = IDENT_LABEL;
-			symbol->label.name = name;
-			symbol->label.type = type;
-			return 1;
-		} else {
-			if (prev_type && type != prev_type) {
-				type = prev_type;
-			}
-
-			is_static = 1;
-			symbol->type = IDENT_LABEL;
-			symbol->label.name = name;
-			symbol->label.type = type;
-			if (s.scs.extern_n) {
-				definition = 0;
-			}
-			is_global = s.scs.static_n ? 0 : 1;
+		if (prev_type && type != prev_type) {
+			type = prev_type;
 		}
+
+		is_static = 1;
+		symbol->type = IDENT_LABEL;
+		symbol->label.name = name;
+		symbol->label.type = type;
+		if (s.scs.extern_n) {
+			definition = 0;
+		}
+		is_global = s.scs.static_n ? 0 : 1;
 	} else {
 		if (s.scs.static_n)
 			is_static = 1;
