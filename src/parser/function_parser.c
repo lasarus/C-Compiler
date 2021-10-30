@@ -64,6 +64,8 @@ int parse_labeled_statement(struct jump_blocks jump_blocks) {
 		add_function_scope_label(label, id, 1);
 		ir_goto(id);
 		ir_block_start(id);
+
+		parse_statement(jump_blocks);
 		return 1;
 	} else if (TACCEPT(T_KCASE)) {
 		struct expr *value = parse_expression();
@@ -85,6 +87,7 @@ int parse_labeled_statement(struct jump_blocks jump_blocks) {
 		ADD_ELEMENT(labels->size, labels->cap, labels->labels) =
 			(struct case_label) { block_case, *constant };
 
+		parse_statement(jump_blocks);
 		return 1;
 	} else if (TACCEPT(T_KDEFAULT)) {
 		TEXPECT(T_COLON);
@@ -94,6 +97,8 @@ int parse_labeled_statement(struct jump_blocks jump_blocks) {
 		if (!jump_blocks.case_labels)
 			ERROR("Not currently in a switch statement");
 		jump_blocks.case_labels->default_ = block_default;
+
+		parse_statement(jump_blocks);
 	}
 	return 0;
 }
