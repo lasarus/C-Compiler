@@ -20,5 +20,7 @@ int main() {
 	int *null_ptr = NULL;
 	assert(null_ptr == 0);
 
+	assert(&arr[5] - &arr[3] == 2);
+
 	func(NULL);
 }

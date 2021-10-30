@@ -413,19 +413,11 @@ struct expr *expr_new(struct expr expr) {
 	return ret;
 }
 
-/* 		struct { */
-/* 			var_id pointer, index; */
-/* 			int decrement; */
-/* 			struct type *ptr_type; */
-/* 			enum simple_type index_type; */
-/* 		} pointer_increment; */
-/* #define IR_PUSH_POINTER_INCREMENT(RESULT, POINTER, INDEX, DECREMENT, PTR_TYPE, INDEX_TYPE) IR_PUSH(.type = IR_POINTER_INCREMENT, .result = (RESULT), .pointer_increment = {(POINTER), (INDEX), (DECREMENT), (PTR_TYPE), (INDEX_TYPE)}) */
 void pointer_increment(var_id result, var_id pointer, struct expr *index, int decrement, struct type *type) {
 	var_id size = expression_to_ir(type_sizeof(type_deref(type)));
 	var_id index_var = expression_to_ir(expression_cast(index, type_simple(ST_ULONG)));
 	IR_PUSH_BINARY_OPERATOR(OP_MUL, OT_ULONG, index_var, size, index_var);
 	IR_PUSH_BINARY_OPERATOR(decrement ? OP_SUB : OP_ADD, OT_ULONG, pointer, index_var, result);
-	//IR_PUSH_POINTER_INCREMENT(result, pointer, index_var, decrement, type, index_type);
 }
 
 // Loads pointer into return value.
@@ -663,12 +655,14 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 						  expr->args[0]->data_type);
 		break;
 
-	case E_POINTER_DIFF:
-		// TODO: Make this work on variable length objects.
-		IR_PUSH_POINTER_DIFF(res, expression_to_ir(expr->args[0]),
-							 expression_to_ir(expr->args[1]),
-							 expr->args[0]->data_type);
-		break;
+	case E_POINTER_DIFF: {
+		var_id lhs = expression_to_ir(expr->args[0]),
+			rhs = expression_to_ir(expr->args[1]);
+		var_id size = expression_to_ir(type_sizeof(type_deref(expr->args[0]->data_type)));
+
+		IR_PUSH_BINARY_OPERATOR(OP_SUB, OT_ULONG, lhs, rhs, res);
+		IR_PUSH_BINARY_OPERATOR(OP_DIV, OT_ULONG, res, size, res);
+	} break;
 
 	case E_ASSIGNMENT: {
 		var_id rhs = expression_to_ir(expression_cast(expr->args[1], expr->args[0]->data_type));

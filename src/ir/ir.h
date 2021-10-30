@@ -29,7 +29,6 @@ struct instruction {
 	enum {
 		IR_BINARY_OPERATOR,
 		IR_UNARY_OPERATOR,
-		IR_POINTER_DIFF,
 		IR_LOAD,
 		IR_STORE,
 		IR_ADDRESS_OF,
@@ -71,11 +70,6 @@ struct instruction {
 			var_id operand;
 		} unary_operator;
 #define IR_PUSH_UNARY_OPERATOR(TYPE, OPERAND_TYPE, OPERAND, RESULT) IR_PUSH(.type = IR_UNARY_OPERATOR, .result = (RESULT), .unary_operator = { (TYPE), (OPERAND_TYPE), (OPERAND)})
-		struct {
-			var_id lhs, rhs;
-			struct type *ptr_type;
-		} pointer_diff;
-#define IR_PUSH_POINTER_DIFF(RESULT, LHS, RHS, PTR_TYPE) IR_PUSH(.type = IR_POINTER_DIFF, .result=(RESULT), .pointer_diff = {(LHS), (RHS), (PTR_TYPE)})
 		struct {
 			var_id pointer;
 		} load;

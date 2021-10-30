@@ -435,17 +435,6 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 					 ins.result);
 		break;
 
-	case IR_POINTER_DIFF: {
-		scalar_to_reg(ins.pointer_diff.lhs, REG_RAX);
-		scalar_to_reg(ins.pointer_diff.rhs, REG_RDX);
-		emit("subq %%rdx, %%rax");
-		emit("movq $%d, %%rdi", calculate_size(type_deref(ins.pointer_diff.ptr_type)));
-		emit("cqto");
-		emit("idivq %%rdi");
-
-		reg_to_scalar(REG_RAX, ins.result);
-	} break;
-
 	case IR_LOAD: {
 		scalar_to_reg(ins.load.pointer, REG_RDI);
 		emit("leaq -%d(%%rbp), %%rsi", variable_info[ins.result].stack_location);

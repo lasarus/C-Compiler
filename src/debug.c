@@ -176,12 +176,6 @@ const char *dbg_instruction(struct instruction ins) {
 			  ins.get_symbol_ptr.label);
 		break;
 
-	case IR_POINTER_DIFF:
-		DBG_PRINT("%d = pointer_diff(%d - %d)", ins.result,
-			  ins.pointer_diff.lhs,
-			  ins.pointer_diff.rhs);
-		break;
-
 	case IR_GET_BITS:
 		DBG_PRINT("%d = get bits from %d, [%d - %d], se: %d", ins.result,
 			  ins.get_bits.field,
