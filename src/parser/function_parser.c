@@ -108,8 +108,8 @@ int parse_compound_statement(struct jump_blocks jump_blocks) {
 		return 0;
 
 	symbols_push_scope();
-	while (parse_declaration(0) ||
-		   parse_statement(jump_blocks));
+	while (parse_labeled_statement(jump_blocks) ||
+		   parse_declaration(0) || parse_statement(jump_blocks));
 	symbols_pop_scope();
 
 	TEXPECT(T_RBRACE);
