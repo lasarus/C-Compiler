@@ -12,9 +12,9 @@ void func2(int n, char arr[][n * 2]) {
 }
 
 // TODO:
-/* void func3(int func3) { */
-/* 	assert(func3 == 10); */
-/* } */
+void func3(int func3) {
+	assert(func3 == 10);
+}
 
 int main() {
 	int a = 10 * 10;
@@ -45,5 +45,5 @@ int main() {
 
 	func1(NULL);
 	func2(100, NULL);
-	//func3(10);
+	func3(10);
 }

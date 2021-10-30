@@ -43,6 +43,9 @@ struct symbol_identifier {
 	};
 };
 
+struct symbol_identifier *symbols_add_identifier_global(const char *name);
+struct symbol_identifier *symbols_get_identifier_global(const char *name);
+
 struct symbol_identifier *symbols_add_identifier(const char *name);
 struct symbol_identifier *symbols_get_identifier(const char *name);
 struct symbol_identifier *symbols_get_identifier_in_current_scope(const char *name);

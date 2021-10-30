@@ -69,17 +69,60 @@ void symbols_pop_scope(void) {
 	}
 }
 
-struct table_entry *get_entry(struct entry_id id) {
+struct table_entry *get_entry(struct entry_id id, int global) {
 	uint32_t hash = hash_entry(id) % hash_table.size;
 	int current_idx = hash_table.entries[hash];
 	while (current_idx >= 0) {
 		struct table_entry *entry = table.entries + current_idx;
-		if (compare_entry(entry->id, id))
+		if (compare_entry(entry->id, id) &&
+			!(global && entry->block != 0)) {
 			return entry;
+		}
 		current_idx = entry->link;
 	}
 
 	return NULL;
+}
+
+struct table_entry *add_entry_with_block(struct entry_id id, int block) {
+	// Move entire table one step down for entry->block > block.
+	(void)ADD_ELEMENT(table.size, table.cap, table.entries);
+	int i;
+	for (i = table.size - 2; i >= 0; i--) {
+		struct table_entry *entry = table.entries + i;
+		if (entry->block > block) {
+			uint32_t hash = hash_entry(entry->id) % hash_table.size;
+
+			hash_table.entries[hash]++;
+
+			if (entry->link >= 0 && table.entries[entry->link].block > block) {
+				entry->link++;
+			}
+
+			table.entries[i + 1] = *entry;
+		} else {
+			break;
+		}
+	}
+	i++;
+
+	uint32_t hash = hash_entry(id) % hash_table.size;
+	int *link = &hash_table.entries[hash];
+	while (*link >= 0 && *link > i) {
+		struct table_entry *entry = table.entries + *link;
+		link = &entry->link;
+	}
+
+	table.entries[i] = (struct table_entry) {
+		.id.name = id.name,
+		.id.type = id.type,
+		.block = block,
+		.link = *link,
+	};
+
+	*link = i;
+
+	return table.entries + i;
 }
 
 struct table_entry *add_entry(struct entry_id id) {
@@ -101,7 +144,7 @@ struct table_entry *add_entry(struct entry_id id) {
 
 // table_entry querying.
 struct table_entry *symbols_add(enum entry_type type, const char *name) {
-	struct table_entry *entry = get_entry((struct entry_id) { type, name });
+	struct table_entry *entry = get_entry((struct entry_id) { type, name }, 0);
 
 	if (entry && entry->block == current_block)
 		ERROR("Name already declared, %s", name);
@@ -110,11 +153,11 @@ struct table_entry *symbols_add(enum entry_type type, const char *name) {
 }
 
 struct table_entry *symbols_get(enum entry_type type, const char *name) {
-	return get_entry((struct entry_id) { type, name });
+	return get_entry((struct entry_id) { type, name }, 0);
 }
 
 struct table_entry *symbols_get_in_current_scope(enum entry_type type, const char *name) {
-	struct table_entry *entry = get_entry((struct entry_id) { type, name });
+	struct table_entry *entry = get_entry((struct entry_id) { type, name }, 0);
 
 	return (entry && entry->block == current_block) ? entry : NULL;
 }
@@ -131,6 +174,20 @@ struct symbol_identifier *symbols_get_identifier(const char *name) {
 
 struct symbol_identifier *symbols_get_identifier_in_current_scope(const char *name) {
 	struct table_entry *entry = symbols_get_in_current_scope(ENTRY_IDENTIFIER, name);
+	return entry ? &entry->identifier_data : NULL;
+}
+
+struct symbol_identifier *symbols_add_identifier_global(const char *name) {
+	struct table_entry *entry = get_entry((struct entry_id) { ENTRY_IDENTIFIER, name }, 1);
+
+	if (entry && entry->block == current_block)
+		ERROR("Name already declared, %s", name);
+
+	return &add_entry_with_block((struct entry_id) { ENTRY_IDENTIFIER, name }, 0)->identifier_data;
+}
+
+struct symbol_identifier *symbols_get_identifier_global(const char *name) {
+	struct table_entry *entry = get_entry((struct entry_id) { ENTRY_IDENTIFIER, name }, 1);
 	return entry ? &entry->identifier_data : NULL;
 }
 
@@ -152,7 +209,7 @@ struct symbol_struct *symbols_get_struct_in_current_scope(const char *name) {
 // Typedef help functions.
 struct symbol_typedef *symbols_add_typedef(const char *name) {
 	struct entry_id id = {ENTRY_TYPEDEF, name};
-	struct table_entry *entry = get_entry(id);
+	struct table_entry *entry = get_entry(id, 0);
 
 	if (entry && entry->block == current_block)
 		return &entry->typedef_data;

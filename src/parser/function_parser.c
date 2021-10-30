@@ -430,20 +430,19 @@ const char *get_current_function_name() {
 
 void parse_function(const char *name, struct type *type, int arg_n, var_id *args, int global) {
 	current_function = name;
-	struct symbol_identifier *symbol = symbols_get_identifier(name);
+	struct symbol_identifier *symbol = symbols_get_identifier_global(name);
 
 	function_scope.size = 0;
 
 	current_ret_val = type->children[0];
 
 	if (!symbol) {
-		symbol = symbols_add_identifier(name);
+		symbol = symbols_add_identifier_global(name);
 	}
 
 	symbol->type = IDENT_LABEL;
 	symbol->label.type = type;
 	symbol->label.name = name;
-	symbols_push_scope();
 
 	assert(type->type == TY_FUNCTION);
 
@@ -468,24 +467,4 @@ void parse_function(const char *name, struct type *type, int arg_n, var_id *args
 	}
 	
 	symbols_pop_scope();
-	symbols_pop_scope();
-
-	// Need to add the function to the outer scope again.
-	// This is because the function prototype scope comes before the
-	// function definition, but parameters should (obviously) still be
-	// visible in the function body.
-
-	symbol = symbols_get_identifier(name);
-
-	function_scope.size = 0;
-
-	current_ret_val = type->children[0];
-
-	if (!symbol) {
-		symbol = symbols_add_identifier(name);
-	}
-
-	symbol->type = IDENT_LABEL;
-	symbol->label.type = type;
-	symbol->label.name = name;
 }
