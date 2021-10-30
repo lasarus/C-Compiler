@@ -660,7 +660,8 @@ struct type *ast_to_type(const struct type_specifiers *ts, const struct type_qua
 			} break;
 			case ARR_EXPRESSION: {
 				struct constant *length;
-				if ((length = expression_to_constant(expression_cast(ast->array.expr, type_simple(SIZE_TYPE))))) {
+				struct expr *length_expr = expression_cast(ast->array.expr, type_simple(SIZE_TYPE));
+				if ((length = expression_to_constant(length_expr))) {
 					assert(length->type == CONSTANT_TYPE);
 					struct type params = {
 						.type = TY_ARRAY,
@@ -669,16 +670,9 @@ struct type *ast_to_type(const struct type_specifiers *ts, const struct type_qua
 					};
 					type = type_create(&params, &type);
 				} else {
-					// VLA. This is a bit tricky.
-					// Normally, IR isn't generated during type parsing.
-					// This is an exception.
-					// TODO: Safeguard against VLA in global scope.
-					// TODO: Don't cast to integer.
-					var_id length = expression_to_ir(expression_cast(ast->array.expr, type_simple(SIZE_TYPE)));
-
 					struct type params = {
 						.type = TY_VARIABLE_LENGTH_ARRAY,
-						.variable_length_array.length = length,
+						.variable_length_array.length_expr = length_expr,
 						.n = 1
 					};
 					type = type_create(&params, &type);
@@ -728,11 +722,10 @@ struct parameter_list parse_parameter_list(void) {
 			first = 0;
 		} else if (was_abstract != ret.abstract) {
 			if (was_abstract == 10) {
-				ERROR("SOmething went wrong");
+				ERROR("Something went wrong");
 			}
 			ERROR("Abstractness can't be mixed in parameter list");
 		}
-
 
 		ret.n++;
 		ret.types = realloc(ret.types, ret.n * sizeof(*ret.types));
@@ -1203,7 +1196,9 @@ struct type *parse_type_name(void) {
 	if (!was_abstract)
 		ERROR("Type name must be abstract");
 
-	return ast_to_type(&s.ts, &s.tq, ast, NULL, 0);
+	struct type *type = ast_to_type(&s.ts, &s.tq, ast, NULL, 0);
+	type_evaluate_vla(type);
+	return type;
 }
 
 int parse_init_declarator(struct specifiers s, int global, int *was_func) {
@@ -1235,6 +1230,9 @@ int parse_init_declarator(struct specifiers s, int global, int *was_func) {
 		*was_func = 1;
 		return 1;
 	}
+
+	if (!global)
+		type_evaluate_vla(type);
 
 	if (s.scs.typedef_n) {
 		symbols_add_typedef(name)->data_type = type;

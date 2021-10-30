@@ -49,8 +49,8 @@ static int compare_types(struct type *a, struct type **a_children,
 		break;
 
 	case TY_VARIABLE_LENGTH_ARRAY:
-		if (a->variable_length_array.length !=
-			b->variable_length_array.length)
+		if (a->variable_length_array.length_expr !=
+			b->variable_length_array.length_expr)
 			return 0;
 		break;
 
@@ -90,7 +90,7 @@ static uint32_t type_hash(struct type *type, struct type **children) {
 	case TY_INCOMPLETE_ARRAY:
 		break;
 	case TY_VARIABLE_LENGTH_ARRAY:
-		hash ^= hash32(type->variable_length_array.length);
+		hash ^= hash32((size_t)type->variable_length_array.length_expr);
 		break;
 	default:
 		ERROR("Not implemented %d", (int)type->type);
@@ -392,7 +392,8 @@ struct expr *type_sizeof(struct type *type) {
 	if (type_has_variable_size(type)) {
 		switch (type->type) {
 		case TY_VARIABLE_LENGTH_ARRAY:
-			return EXPR_BINARY_OP(OP_MUL, EXPR_VAR(type->variable_length_array.length, type_simple(ST_INT)),
+			assert(type->variable_length_array.is_evaluated);
+			return EXPR_BINARY_OP(OP_MUL, EXPR_VAR(type->variable_length_array.length_var, type_simple(ST_INT)),
 								  type_sizeof(type->children[0]));
 		case TY_ARRAY:
 			return EXPR_BINARY_OP(OP_MUL, EXPR_INT(type->array.length),
@@ -407,5 +408,17 @@ struct expr *type_sizeof(struct type *type) {
 				.type = E_CONSTANT,
 				.constant = c
 			});
+	}
+}
+
+void type_evaluate_vla(struct type *type) {
+	for (int i = 0; i < type->n; i++)
+		type_evaluate_vla(type->children[i]);
+
+	if (type->type == TY_VARIABLE_LENGTH_ARRAY) {
+		if (!type->variable_length_array.is_evaluated) {
+			type->variable_length_array.length_var = expression_to_ir(type->variable_length_array.length_expr);
+		}
+		type->variable_length_array.is_evaluated = 1;
 	}
 }

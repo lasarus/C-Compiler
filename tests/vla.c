@@ -2,6 +2,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+int global = 10;
+void func(char arr[][global]) {
+	assert(sizeof *arr == global);
+}
+
 int main() {
 	int a = 10 * 10;
 	int arr[a];

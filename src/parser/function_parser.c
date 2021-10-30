@@ -468,6 +468,8 @@ void parse_function(const char *name, struct type *type, int arg_n, char **arg_n
 	ir_new_function(type, vars, name, global);
 	ir_block_start(new_block());
 
+	type_evaluate_vla(type);
+
 	for (int i = 0; i < arg_n; i++) {
 		allocate_var(vars[i]);
 	}

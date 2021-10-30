@@ -77,7 +77,9 @@ struct type {
 			size_t length;
 		} array;
 		struct {
-			var_id length;
+			int is_evaluated;
+			var_id length_var;
+			struct expr *length_expr;
 		} variable_length_array;
 		struct {
 			int is_variadic;
@@ -134,6 +136,8 @@ struct type *type_deref(struct type *type);
 struct type *type_struct(struct struct_data *struct_data);
 struct type *type_make_const(struct type *type);
 struct type *type_adjust_parameter(struct type *type);
+
+void type_evaluate_vla(struct type *type);
 
 int type_member_idx(struct type *type,
 					const char *name);
