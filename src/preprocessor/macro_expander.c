@@ -204,10 +204,8 @@ void stringify_add(struct token *t, int start) {
 	ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = '\0';
 }
 
-void expander_subs(struct define *def, struct string_set *hs,
-				   struct position new_pos) {
-	string_set_insert(hs, strdup(def->name));
-
+int expander_subs(struct define *def, struct string_set *hs,
+				  struct position new_pos) {
 	// Parse function macro.
 	int n_args = def->par.size;
 	if (n_args > 16)
@@ -218,8 +216,9 @@ void expander_subs(struct define *def, struct string_set *hs,
 	if(def->func) {
 		struct token lpar = expander_take();
 		if (lpar.type != PP_LPAR) {
-			PRINT_POS(lpar.pos);
-			ERROR("Expected ( in macro expension of %s", def->name);
+			// Not a macro after all. Abort.
+			expander_push(lpar);
+			return 0;
 		}
 		ASSERT_TYPE(lpar, PP_LPAR);
 
@@ -245,6 +244,8 @@ void expander_subs(struct define *def, struct string_set *hs,
 			}
 		}
 	}
+
+	string_set_insert(hs, strdup(def->name));
 
 	int concat_with_prev = 0;
 	for(int i = def->def.size - 1; i >= 0; i--) {
@@ -345,6 +346,8 @@ void expander_subs(struct define *def, struct string_set *hs,
 	for(int i = 0; i < n_args; i++) {
 		token_list_free(&arguments[i]);
 	}
+
+	return 1;
 }
 
 int builtin_macros(struct token *t) {
@@ -395,8 +398,11 @@ struct token expander_next(void) {
 	if (builtin_macros(&t)) {
 		return t;
 	} else if ((def = define_map_get(t.str))) {
-		expander_subs(def, &t.hs, t.pos);
-		return expander_next();
+		if (!expander_subs(def, &t.hs, t.pos)) {
+			return t;
+		} else {
+			return expander_next();
+		}
 	}
 
 	return t;
