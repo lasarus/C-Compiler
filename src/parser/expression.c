@@ -1251,8 +1251,8 @@ int evaluate_constant_expression(struct expr *expr,
 			return 0;
 		if (!evaluate_constant_expression(expr->args[1], &rhs))
 			return 0;
-		if (lhs.type == CONSTANT_LABEL ||
-			rhs.type == CONSTANT_LABEL) {
+		if (lhs.type != CONSTANT_TYPE ||
+			rhs.type != CONSTANT_TYPE) {
 			return 0;
 		}
 		*constant = operators_constant(expr->binary_op, lhs, rhs);
