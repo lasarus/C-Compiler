@@ -249,8 +249,8 @@ void directiver_flush_if(void) {
 			nest_level++;
 		} else if (strcmp(name, "elif") == 0) {
 			if (nest_level == 1) {
-				PUSH(t);
 				PUSH(dir);
+				PUSH(t);
 				return;
 			}
 		} else if (strcmp(name, "else") == 0) {
@@ -325,6 +325,7 @@ struct token directiver_next(void) {
 				ERROR("Expected s char sequence as second argument to #line");
 			}
 		} else {
+			PRINT_POS(directive.pos);
 			ERROR("#%s not implemented", name);
 		}
 		return directiver_next();
