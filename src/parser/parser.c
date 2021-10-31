@@ -22,6 +22,8 @@ void parse_into_ir() {
 		ERROR("Extra semicolon outside function.");
 	}
 	TEXPECT(T_EOI);
+
+	generate_tentative_definitions();
 }
 
 enum operand_type ot_from_st(enum simple_type st) {

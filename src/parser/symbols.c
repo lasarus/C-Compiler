@@ -191,6 +191,16 @@ struct symbol_identifier *symbols_get_identifier_global(const char *name) {
 	return entry ? &entry->identifier_data : NULL;
 }
 
+struct type *symbols_get_identifier_type(struct symbol_identifier *symbol) {
+	switch (symbol->type) {
+	case IDENT_LABEL: return symbol->label.type;
+	case IDENT_CONSTANT: return symbol->constant.data_type;
+	case IDENT_VARIABLE: return symbol->variable.type;
+	case IDENT_VARIABLE_LENGTH_ARRAY: return symbol->variable_length_array.type;
+	default: NOTIMP();
+	}
+}
+
 // Struct help functions.
 struct symbol_struct *symbols_add_struct(const char *name) {
 	return &symbols_add(ENTRY_STRUCT, name)->struct_data;

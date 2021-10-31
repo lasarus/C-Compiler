@@ -92,6 +92,8 @@ struct specifiers {
 
 // See section A.2.2 in the standard.
 struct type *parse_type_name(void);
-int parse_declaration(int global);
+int parse_declaration(int external);
+
+void generate_tentative_definitions(void);
 
 #endif

@@ -422,3 +422,44 @@ void type_evaluate_vla(struct type *type) {
 		type->variable_length_array.is_evaluated = 1;
 	}
 }
+
+int type_contains_unevaluated_vla(struct type *type) {
+	for (int i = 0; i < type->n; i++)
+		if (type_contains_unevaluated_vla(type->children[i]))
+			return 1;
+
+	return type->type == TY_VARIABLE_LENGTH_ARRAY && type->variable_length_array.is_evaluated;
+}
+
+// See 6.2.7.
+// Returns NULL if not compatible.
+struct type *type_make_composite(struct type *a, struct type *b) {
+	if (a == b)
+		return a;
+
+	if (a->type == TY_ARRAY && b->type == TY_INCOMPLETE_ARRAY) {
+		return a;
+	} else if (b->type == TY_ARRAY && a->type == TY_INCOMPLETE_ARRAY) {
+		return b;
+	}
+
+	if (a->type != b->type)
+		return NULL;
+
+	switch (a->type) {
+	case TY_FUNCTION:
+		if (a->function.is_variadic && a->n == 1) {
+			return b;
+		} else if (b->function.is_variadic && b->n == 1) {
+			return a;
+		}
+		break;
+
+	case TY_ARRAY:
+		break;
+
+	default:;
+	}
+
+	return NULL;
+}

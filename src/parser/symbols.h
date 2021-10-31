@@ -20,7 +20,6 @@ struct symbol_identifier {
 		IDENT_VARIABLE_LENGTH_ARRAY,
 		IDENT_CONSTANT,
 		IDENT_LABEL,
-		IDENT_ARGUMENT,
 	} type;
 
 	union {
@@ -37,11 +36,14 @@ struct symbol_identifier {
 			struct type *type;
 			const char *name;
 		} label;
-		struct {
-			struct type *type;
-		} argument;
 	};
+
+	int is_global;
+	int is_tentative;
+	int has_definition;
 };
+
+struct type *symbols_get_identifier_type(struct symbol_identifier *symbol);
 
 struct symbol_identifier *symbols_add_identifier_global(const char *name);
 struct symbol_identifier *symbols_get_identifier_global(const char *name);

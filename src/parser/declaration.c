@@ -1220,7 +1220,12 @@ struct type *parse_type_name(void) {
 	return type;
 }
 
-int parse_init_declarator(struct specifiers s, int global, int *was_func) {
+struct {
+	size_t size, cap;
+	const char **names;
+} potentially_tentative;
+
+int parse_init_declarator(struct specifiers s, int external, int *was_func) {
 	*was_func = 0;
 	int was_abstract = 1, has_symbols = 0;
 	struct type_ast *ast = parse_declarator(&was_abstract, &has_symbols);
@@ -1245,6 +1250,9 @@ int parse_init_declarator(struct specifiers s, int global, int *was_func) {
 		if (!has_symbols)
 			symbols_push_scope();
 
+		if (!external)
+			ERROR("Function definition are not allowed inside functions.");
+
 		if (arg_n && !args)
 			ERROR("Should not be null");
 
@@ -1253,91 +1261,105 @@ int parse_init_declarator(struct specifiers s, int global, int *was_func) {
 		return 1;
 	}
 
+	// Pop function prototype scope if it is not needed for function definition.
 	if (has_symbols)
 		symbols_pop_scope();
 
-	if (!global)
+	// Evaluate all unevaluated VLAs.
+	if (external) {
+		if (type_contains_unevaluated_vla(type))
+			ERROR("Global declaration can't contain VLA.");
+	} else {
 		type_evaluate_vla(type);
+	}
 
 	if (s.scs.typedef_n) {
 		symbols_add_typedef(name)->data_type = type;
 		return 1;
 	}
 
-	// TODO: This system is not robust at all.
-	// For example, defining variable twice in the same local
-	// scope is allowed, even though it shouldn't.
-
+	// Check for agreement with previous declarations.
 	struct symbol_identifier *symbol = symbols_get_identifier_in_current_scope(name);
+	int prev_definition = 0;
 
-	struct type *prev_type = NULL;
 	if (symbol) {
-		if (symbol->type == IDENT_LABEL)
-			prev_type = symbol->label.type;
-		else if (symbol->type == IDENT_CONSTANT)
-			prev_type = symbol->constant.data_type;
-		else if (symbol->type == IDENT_VARIABLE)
-			prev_type = symbol->variable.type;
-		else
-			NOTIMP();
-	}
+		prev_definition = symbol->has_definition;
+		struct type *prev_type = symbols_get_identifier_type(symbol);
+		struct type *composite_type = type_make_composite(type, prev_type);
 
-	if (!symbol)
+		if (!composite_type)
+			ERROR("Conflicting types: %s and %s\n", strdup(dbg_type(prev_type)),
+				  strdup(dbg_type(type)));
+
+		type = composite_type;
+	} else {
 		symbol = symbols_add_identifier(name);
+	}
+	
+	int has_init = TACCEPT(T_A);
 
-	int definition = 1;
-	int is_static = 0;
-	int is_global = 0;
-
+	// Handle function definitions first, since they differ a bit from the others.
 	if (type->type == TY_FUNCTION) {
+		if (has_init)
+			ERROR("Function definition can't have initializer.");
+		if (!external && s.scs.static_n)
+			ERROR("Function declarations outside file-scope can't be static.");
+
 		symbol->type = IDENT_LABEL;
 		symbol->label.name = name;
 		symbol->label.type = type;
+
 		return 1;
 	}
 
-	// Create space for symbol if not a function prototype.
-	if (global) {
-		if (prev_type && type != prev_type) {
-			type = prev_type;
-		}
+	int definition_is_static = 0;
+	int has_definition = 0;
+	int is_global = 0;
+	int is_tentative = 0;
 
-		is_static = 1;
-		symbol->type = IDENT_LABEL;
-		symbol->label.name = name;
-		symbol->label.type = type;
+	if (s.scs.extern_n && has_init)
+		ERROR("Extern declaration can't have initializer.");
+
+	if (external) {
+		definition_is_static = 1;
+
+		if (!s.scs.static_n)
+			is_global = 1;
+
 		if (s.scs.extern_n) {
-			definition = 0;
+			has_definition = 0;
+		} else if (has_init) {
+			has_definition = 1;
+		} else {
+			is_tentative = 1;
 		}
-		is_global = s.scs.static_n ? 0 : 1;
 	} else {
 		if (s.scs.static_n)
-			is_static = 1;
-		else {
-			symbol->variable.type = type;
-			if (type_has_variable_size(type)) {
-				symbol->type = IDENT_VARIABLE_LENGTH_ARRAY;
-				symbol->variable.id = allocate_vla(type);
-				definition = 0;
-			} else {
-				symbol->type = IDENT_VARIABLE;
-				symbol->variable.id = new_variable(type, 1, 0);
-			}
+			definition_is_static = 1;
+		if (s.scs.extern_n) {
+			is_global = 1;
+			NOTIMP();
+		} else {
+			has_definition = 1;
 		}
 	}
 
+	if (!prev_definition) {
+		symbol->is_tentative = is_tentative;
+		symbol->is_global = is_global;
+		symbol->has_definition = has_definition;
+	} else {
+		if (!is_tentative && has_definition)
+			symbol->is_tentative = 0;
+	}
+	if (is_tentative && !prev_definition)
+		ADD_ELEMENT(potentially_tentative.size, potentially_tentative.cap, potentially_tentative.names) = strdup(name);
 
-	if (definition) {
-		// Is variable that potentially has a initializer.
-		struct type *prev_type = type;
-		struct initializer *init = NULL;
-		if (TACCEPT(T_A))
-			init = parse_initializer(&type);
-
-		if (is_static) {
+	if (has_definition) {
+		if (definition_is_static) {
 			symbol->type = IDENT_LABEL;
 
-			if (!global) {
+			if (!external) {
 				static int local_var = 0;
 				name = allocate_printf(".LVAR%d%s", local_var++, name);
 			}
@@ -1345,26 +1367,42 @@ int parse_init_declarator(struct specifiers s, int global, int *was_func) {
 			symbol->label.name = name;
 			symbol->label.type = type;
 
-			if (!s.scs.extern_n) {
-				// init can be NULL
-				data_register_static_var(name, type, init, is_global);
+			struct initializer *init = NULL;
+			if (has_init) {
+				init = parse_initializer(&type);
+				symbol->label.type = type;
 			}
+			data_register_static_var(name, type, init, is_global);
 		} else {
-			// TODO: This doesn't feel very robust.
-			if (prev_type != type) {
-				change_variable_size(symbol->variable.id, calculate_size(type));
-				symbol->variable.type = type;
-			}
+			if (type_has_variable_size(type)) {
+				symbol->type = IDENT_VARIABLE_LENGTH_ARRAY;
+				symbol->variable_length_array.id = allocate_vla(type);
+				symbol->variable_length_array.type = type;
 
-			if (init)
-				ir_init_var(init, symbol->variable.id);
+				if (has_init)
+					ERROR("Variable length array can't have initializer");
+			} else {
+				symbol->type = IDENT_VARIABLE;
+				symbol->variable.id = new_variable(type, 1, 0);
+				symbol->variable.type = type;
+				if (has_init) {
+					struct initializer *init = parse_initializer(&type);
+					symbol->variable.type = type;
+					change_variable_size(symbol->variable.id, calculate_size(type));
+					ir_init_var(init, symbol->variable.id);
+				}
+			}
 		}
+	} else {
+		symbol->type = IDENT_LABEL;
+		symbol->label.name = name;
+		symbol->label.type = type;
 	}
 
 	return 1;
 }
 
-int parse_declaration(int global) {
+int parse_declaration(int external) {
 	struct specifiers s;
 	if (!parse_specifiers(&s.ts,
 						  &s.scs,
@@ -1404,7 +1442,7 @@ int parse_declaration(int global) {
 	}
 
 	int was_func = 0;
-	while (!was_func && parse_init_declarator(s, global, &was_func)) {
+	while (!was_func && parse_init_declarator(s, external, &was_func)) {
 		TACCEPT(T_COMMA);
 	}
 
@@ -1414,3 +1452,16 @@ int parse_declaration(int global) {
 	return 1;
 }
 
+void generate_tentative_definitions(void) {
+	for (size_t i = 0; i < potentially_tentative.size; i++) {
+		const char *name = potentially_tentative.names[i];
+
+		struct symbol_identifier *symbol = symbols_get_identifier_global(name);
+
+		if (symbol && symbol->is_tentative) {
+			struct type *type = symbols_get_identifier_type(symbol);
+			data_register_static_var(name, type, NULL, symbol->is_global);
+			symbol->is_tentative = 0;
+		}
+	}
+}
