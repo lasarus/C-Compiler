@@ -256,7 +256,14 @@ void fix_binary_operator(struct expr *expr) {
 	if (expr->type != E_BINARY_OP)
 		return;
 
-	convert_arithmetic(&expr->args[0], &expr->args[1]);
+	if (expr->binary_op == OP_LSHIFT ||
+		expr->binary_op == OP_RSHIFT) {
+		// Cast the right to be the same as left.
+		// See 6.5.7.
+		expr->args[1] = expression_cast(expr->args[1], expr->args[0]->data_type);
+	} else {
+		convert_arithmetic(&expr->args[0], &expr->args[1]);
+	}
 
 	int lhs_ptr = type_is_pointer(expr->args[0]->data_type),
 		rhs_ptr = type_is_pointer(expr->args[1]->data_type);
