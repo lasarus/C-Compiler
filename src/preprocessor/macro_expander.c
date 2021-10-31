@@ -4,6 +4,9 @@
 #include <common.h>
 
 #include <time.h>
+#include <assert.h>
+
+void expand_buffer(int input, int return_output, struct token *t);
 
 struct token tokenizer_next();
 #define NEXT() tokenizer_next();
@@ -86,56 +89,6 @@ void define_add_par(struct define *d, struct token t) {
 	token_list_add(&d->par, t);
 }
 
-struct expander {
-	struct token_list stack;
-} expander;
-
-struct token expander_take(void) {
-	struct token t;
-
-	if (expander.stack.size > 0) {
-		t = token_move(token_list_top(&expander.stack));
-		token_list_pop(&expander.stack);
-	} else {
-		t = NEXT();
-	}
-	return t;
-}
-
-void expander_push(struct token t) {
-	token_list_add(&expander.stack, t);
-}
-
-void expander_push_front(struct token t) {
-	token_list_push_front(&expander.stack, t);
-}
-
-// Returns true if done.
-int expander_parse_argument(struct token_list *tl, int ignore_comma) {
-	int depth = 1;
-	*tl = (struct token_list) {0};
-	struct token t;
-	do {
-		t = expander_take();
-		if(t.type == PP_LPAR) {
-			depth++;
-		} else if(t.type == PP_RPAR) {
-			depth--;
-			if(depth == 0)
-				continue;
-		} else if(!ignore_comma && t.type == PP_COMMA) {
-			if(depth == 1)
-				continue;
-		}
-
-		token_list_add(tl, t);
-	} while(
-		!(!ignore_comma && (depth == 1 && t.type == PP_COMMA)) &&
-		!(depth == 0 && t.type == PP_RPAR));
-
-	return t.type == PP_RPAR;
-}
-
 int get_param(struct define *def, struct token tok) {
 	if (!def->func || tok.type != PP_IDENT)
 		return -1;
@@ -155,8 +108,10 @@ struct token glue(struct token a, struct token b) {
 		ERROR("Can't paste character constants.");
 	} else if (b.type == PP_IDENT) {
 		ret.type = PP_IDENT;
-		if (!(a.type == PP_IDENT || a.type == PP_NUMBER))
-			ERROR("Can't paste identifier and number");
+		if (!(a.type == PP_IDENT || a.type == PP_NUMBER)) {
+			PRINT_POS(a.pos);
+			ERROR("Can't paste %s and %s", a.str, b.str);
+		}
 	} else if (b.type == PP_IDENT) {
 		ret.type = PP_IDENT;
 	} else if (b.type == PP_HASH || b.type == PP_HHASH ||
@@ -204,152 +159,6 @@ void stringify_add(struct token *t, int start) {
 	ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = '\0';
 }
 
-int expander_subs(struct define *def, struct string_set *hs,
-				  struct position new_pos) {
-	// Parse function macro.
-	int n_args = def->par.size;
-	if (n_args > 16)
-		ERROR("Unsupported number of elements");
-	struct token_list arguments[16] = {0};
-	struct token_list vararg = {0};
-	int vararg_included = 0;
-	if(def->func) {
-		struct token lpar = expander_take();
-		if (lpar.type != PP_LPAR) {
-			// Not a macro after all. Abort.
-			expander_push(lpar);
-			return 0;
-		}
-		ASSERT_TYPE(lpar, PP_LPAR);
-
-		int finished = 0;
-		for (int i = 0; i < n_args; i++) {
-			if (expander_parse_argument(&arguments[i], 0)) {
-				finished = 1;
-				if (i != n_args - 1)
-					ERROR("Wrong number of arguments to macro");
-			}
-		}
-
-		if (n_args == 0 && !def->vararg) {
-			struct token rpar = expander_take();
-			ASSERT_TYPE(rpar, PP_RPAR);
-			finished = 1;
-		}
-
-		if (def->vararg && !finished) {
-			vararg_included = 1;
-			if (!expander_parse_argument(&vararg, 1)) {
-				ERROR("__VA_ARGS__ Not end of input");
-			}
-		}
-	}
-
-	string_set_insert(hs, strdup(def->name));
-
-	int concat_with_prev = 0;
-	for(int i = def->def.size - 1; i >= 0; i--) {
-		struct token t = def->def.list[i];
-
-		int concat = 0;
-		int stringify = 0;
-
-		if (i != 0) {
-			concat = (def->def.list[i - 1].type == PP_HHASH);
-			stringify = (def->def.list[i - 1].type == PP_HASH);
-		}
-
-		if (t.type == PP_HHASH)
-			ERROR("Concat token at edge of macro expansion.");
-
-		int idx;
-
-		int is_va_args = strcmp(t.str, "__VA_ARGS__") == 0;
-
-		if (!is_va_args)
-			idx = get_param(def, t);
-
-		if (is_va_args) {
-			if (concat && i - 2 >= 0 &&
-				def->def.list[i - 2].type == PP_COMMA &&
-				!vararg_included) {
-				i--; // There is an additional i-- at the end of the loop.
-			} else if (vararg_included) {
-				struct token_list tl = vararg;
-
-				int start_it = tl.size - 1;
-
-				if (concat_with_prev && tl.size) {
-					struct token *end = token_list_top(&expander.stack);
-					*end = glue(*end, tl.list[start_it--]);
-				}
-
-				for(int i = start_it; i >= 0; i--) {
-					struct token t = tl.list[i];
-					//t.pos = new_pos;
-					expander_push(t);
-				}
-			} else {
-				PRINT_POS(T0->pos);
-				ERROR("Not implemented, %s (%d)", def->name, def->func);
-				NOTIMP();
-			}
-		} else if (idx >= 0 && stringify) {
-			struct token_list tl = arguments[idx];
-			stringify_start();
-
-			for(int i = 0; i < tl.size; i++)
-				stringify_add(tl.list + i, i == 0);
-
-			struct token t = token_init(PP_STRING, strdup(stringify_buffer), (struct position) { 0 });
-			expander_push(t);
-		} else if(idx >= 0) {
-			struct token_list tl = arguments[idx];
-
-			int start_it = tl.size - 1;
-
-			if (concat_with_prev && tl.size) {
-				struct token *end = &expander.stack.list[
-					expander.stack.size - 1
-					];
-				*end = glue(*end, tl.list[start_it--]);
-			}
-
-			for(int i = start_it; i >= 0; i--) {
-				struct token t = tl.list[i];
-				//t.pos = new_pos;
-				expander_push(t);
-			}
-
-			if (tl.size)
-				concat_with_prev = concat;
-		} else {
-			if (concat_with_prev) {
-				struct token *end = token_list_top(&expander.stack);
-				*end = glue(*end, t);
-			} else if (stringify) {
-				ERROR("# Should be followed by macro parameter");
-			} else {
-				t.hs = string_set_union(*hs, t.hs);
-				t.pos = new_pos;
-				expander_push(t);
-
-				if (concat)
-					concat_with_prev = 1;
-			}
-		}
-
-		if (concat || stringify)
-			i--;
-	}
-
-	for(int i = 0; i < n_args; i++) {
-		token_list_free(&arguments[i]);
-	}
-
-	return 1;
-}
-
 int builtin_macros(struct token *t) {
 	// These are only single tokens.
 	if (strcmp(t->str, "__LINE__") == 0) {
@@ -385,30 +194,263 @@ int builtin_macros(struct token *t) {
 	return 1;
 }
 
-struct token expander_next(void) {
-	struct token t = expander_take();
+static struct {
+	size_t size, cap;
+	struct token *tokens;
+} input_buffer;
 
-	if (t.type != PP_IDENT)
-		return t;
+static struct {
+	size_t size, cap;
+	struct token *tokens;
+} output_buffer;
 
-	if (string_set_contains(t.hs, t.str))
-		return t;
+void input_buffer_push(struct token *t) {
+	ADD_ELEMENT(input_buffer.size, input_buffer.cap, input_buffer.tokens) = *t;
+}
 
-	struct define *def = NULL;
-	if (builtin_macros(&t)) {
-		return t;
-	} else if ((def = define_map_get(t.str))) {
-		if (!expander_subs(def, &t.hs, t.pos)) {
-			return t;
-		} else {
-			return expander_next();
+struct token input_buffer_take(int input) {
+	if (input_buffer.size)
+		return input_buffer.tokens[--input_buffer.size];
+
+	if (input) {
+		return NEXT();
+	} else {
+		ERROR("Reached end of input buffer.");
+	}
+}
+
+struct token *input_buffer_top(int input) {
+	if (input_buffer.size)
+		return &input_buffer.tokens[input_buffer.size - 1];
+
+	if (input) {
+		struct token t = NEXT();
+		input_buffer_push(&t);
+		return input_buffer_top(input);
+	} else {
+		ERROR("Reached end of input buffer.");
+	}
+}
+
+// Returns true if done.
+int input_buffer_parse_argument(struct token_list *tl, int ignore_comma, int input) {
+	int depth = 1;
+	*tl = (struct token_list) {0};
+	struct token t;
+	do {
+		t = input_buffer_take(input);
+		if(t.type == PP_LPAR) {
+			depth++;
+		} else if(t.type == PP_RPAR) {
+			depth--;
+			if(depth == 0)
+				continue;
+		} else if(!ignore_comma && t.type == PP_COMMA) {
+			if(depth == 1)
+				continue;
+		}
+
+		token_list_add(tl, t);
+	} while(
+		!(!ignore_comma && (depth == 1 && t.type == PP_COMMA)) &&
+		!(depth == 0 && t.type == PP_RPAR));
+
+	return t.type == PP_RPAR;
+}
+
+void expand_argument(struct token_list tl, int *concat_with_prev, int concat, int stringify, int input) {
+	int start_it = tl.size - 1;
+
+	if (*concat_with_prev && tl.size) {
+		struct token *end = input_buffer_top(input);
+		*end = glue(*end, tl.list[start_it--]);
+	}
+
+	int run_expand_again = 0;
+	if (!(concat || stringify)) {
+		run_expand_again = 1;
+		struct token t = token_init(T_EOI, "", (struct position) { 0 });
+		input_buffer_push(&t);
+	}
+
+	for(int i = start_it; i >= 0; i--) {
+		struct token t = tl.list[i];
+		input_buffer_push(&t);
+	}
+
+	if (run_expand_again) {
+		size_t output_pos = output_buffer.size;
+		expand_buffer(input, 0, NULL);
+
+		for (int i = output_buffer.size - 1; i >= (int)output_pos; i--) {
+			input_buffer_push(&output_buffer.tokens[i]);
+		}
+		output_buffer.size = output_pos;
+		// Expand argument again.
+	}
+}
+
+void subs_buffer(struct define *def, struct string_set *hs, struct position new_pos, int input) {
+	int n_args = def->par.size;
+	if (n_args > 16)
+		ERROR("Unsupported number of elements");
+	struct token_list arguments[16] = {0};
+	struct token_list vararg = {0};
+	int vararg_included = 0;
+	if(def->func) {
+		struct token lpar = input_buffer_take(input);
+		ASSERT_TYPE(lpar, PP_LPAR);
+
+		int finished = 0;
+		for (int i = 0; i < n_args; i++) {
+			if (input_buffer_parse_argument(&arguments[i], 0, input)) {
+				finished = 1;
+				if (i != n_args - 1)
+					ERROR("Wrong number of arguments to macro");
+			}
+		}
+
+		if (n_args == 0 && !def->vararg) {
+			struct token rpar = input_buffer_take(input);
+			ASSERT_TYPE(rpar, PP_RPAR);
+			finished = 1;
+		}
+
+		if (def->vararg && !finished) {
+			vararg_included = 1;
+			if (!input_buffer_parse_argument(&vararg, 1, input)) {
+				ERROR("__VA_ARGS__ Not end of input");
+			}
 		}
 	}
+	(void)vararg_included;
+
+	string_set_insert(hs, strdup(def->name));
+
+	int concat_with_prev = 0;
+	for(int i = def->def.size - 1; i >= 0; i--) {
+		struct token t = def->def.list[i];
+
+		int concat = 0;
+		int stringify = 0;
+
+		if (i != 0) {
+			concat = (def->def.list[i - 1].type == PP_HHASH);
+			stringify = (def->def.list[i - 1].type == PP_HASH);
+		}
+
+		if (t.type == PP_HHASH)
+			ERROR("Concat token at edge of macro expansion.");
+
+		int idx;
+
+		int is_va_args = strcmp(t.str, "__VA_ARGS__") == 0;
+
+		if (!is_va_args)
+			idx = get_param(def, t);
+
+		if (is_va_args) {
+			if (concat && i - 2 >= 0 &&
+				def->def.list[i - 2].type == PP_COMMA &&
+				!vararg_included) {
+				i--; // There is an additional i-- at the end of the loop.
+			} else if (vararg_included) {
+				expand_argument(vararg, &concat_with_prev, concat, stringify, input);
+			} else {
+				PRINT_POS(T0->pos);
+				ERROR("Not implemented, %s (%d)", def->name, def->func);
+				NOTIMP();
+			}
+		} else if (idx >= 0 && stringify) {
+			struct token_list tl = arguments[idx];
+			stringify_start();
+
+			for(int i = 0; i < tl.size; i++)
+				stringify_add(tl.list + i, i == 0);
+
+			struct token t = token_init(PP_STRING, strdup(stringify_buffer), (struct position) { 0 });
+			input_buffer_push(&t);
+		} else if(idx >= 0) {
+			expand_argument(arguments[idx], &concat_with_prev, concat, stringify, input);
+
+			if (arguments[idx].size)
+				concat_with_prev = concat;
+		} else {
+			if (concat_with_prev) {
+				struct token *end = input_buffer_top(input);
+				*end = glue(*end, t);
+			} else if (stringify) {
+				ERROR("# Should be followed by macro parameter");
+			} else {
+				t.hs = string_set_union(*hs, t.hs);
+				t.pos = new_pos;
+				input_buffer_push(&t);
+
+				if (concat)
+					concat_with_prev = 1;
+			}
+		}
+
+		if (concat || stringify)
+			i--;
+	}
+
+	for(int i = 0; i < n_args; i++) {
+		token_list_free(&arguments[i]);
+	}
+}
+
+// Expands until empty token.
+void expand_buffer(int input, int return_output, struct token *t) { 
+	while (input || input_buffer.size) {
+		struct token top = input_buffer_take(input);
+		if (top.type == T_EOI)
+			break;
+
+		struct define *def = NULL;
+		if (top.type != PP_IDENT || string_set_contains(top.hs, top.str) ||
+			builtin_macros(&top) || !(def = define_map_get(top.str))) {
+			if (return_output) {
+				*t = top;
+				return;
+			} else {
+				ADD_ELEMENT(output_buffer.size, output_buffer.cap, output_buffer.tokens) = top;
+				continue;
+			}
+		}
+
+		assert(def);
+
+		if ((def->func && (input || input_buffer.size) && input_buffer_top(input)->type == PP_LPAR) ||
+			!def->func) {
+			subs_buffer(def, &top.hs, top.pos, input);
+		} else {
+			if (return_output) {
+				*t = top;
+				return;
+			} else {
+				ADD_ELEMENT(output_buffer.size, output_buffer.cap, output_buffer.tokens) = top;
+				continue;
+			}
+		}
+	}
+
+	if (return_output)
+		*t = token_init(T_EOI, NULL, (struct position) { 0 });
+}
+
+struct token expander_next(void) {
+	struct token t;
+	expand_buffer(1, 1, &t);
 
 	return t;
 }
 
 struct token expander_next_unexpanded(void) {
-	struct token t = expander_take();
+	struct token t = input_buffer_take(1);
 	return t;
+}
+
+void expander_push_front(struct token t) {
+	input_buffer_push(&t);
 }
