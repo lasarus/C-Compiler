@@ -92,16 +92,16 @@ void directiver_undef(void) {
 	define_map_remove(name.str);
 }
 
-intmax_t evaluate_expression(int prec) {
+intmax_t evaluate_expression(int prec, int evaluate) {
 	intmax_t expr = 0;
 	struct token t = NEXT_E();
 
 	if (t.type == T_ADD) {
-		expr = evaluate_expression(PREFIX_PREC);
+		expr = evaluate_expression(PREFIX_PREC, evaluate);
 	} else if (t.type == T_SUB) {
-		expr = -evaluate_expression(PREFIX_PREC);
+		expr = -evaluate_expression(PREFIX_PREC, evaluate);
 	} else if (t.type == T_NOT) {
-		expr = !evaluate_expression(PREFIX_PREC);
+		expr = !evaluate_expression(PREFIX_PREC, evaluate);
 	} else if (t.type == PP_IDENT &&
 			   strcmp(t.str, "defined") == 0) {
 		struct token name;
@@ -120,7 +120,7 @@ intmax_t evaluate_expression(int prec) {
 	} else if (t.type == PP_IDENT) {
 		expr = 0;
 	} else if (t.type == T_LPAR) {
-		expr = evaluate_expression(0);
+		expr = evaluate_expression(0, evaluate);
 		struct token rpar = NEXT_E();
 		if (rpar.type != T_RPAR) {
 			PRINT_POS(rpar.pos);
@@ -167,45 +167,51 @@ intmax_t evaluate_expression(int prec) {
 		int new_prec = precedence_get(t.type, 0);
 
 		if (t.type == T_QUEST) {
-			int mid = evaluate_expression(0);
+			int mid = evaluate_expression(0, expr ? evaluate : 0);
 			struct token colon = NEXT_E();
 			assert(colon.type == T_COLON);
-			int rhs = evaluate_expression(new_prec);
+			int rhs = evaluate_expression(new_prec, expr ? 0 : evaluate);
 			expr = expr ? mid : rhs;
+		} else if (t.type == T_AND) {
+			int rhs = evaluate_expression(new_prec, expr ? evaluate : 0);
+			expr = expr && rhs;
+		} else if (t.type == T_OR) {
+			int rhs = evaluate_expression(new_prec, expr ? 0 : evaluate);
+			expr = expr || rhs;
 		} else {
 			// Standard binary operator.
-			int rhs = evaluate_expression(new_prec);
-			switch (t.type) {
-			case T_AND: expr = expr && rhs; break;
-			case T_OR: expr = expr || rhs; break;
-			case T_BOR: expr = expr | rhs; break;
-			case T_XOR: expr = expr ^ rhs; break;
-			case T_AMP: expr = expr & rhs; break;
-			case T_EQ: expr = expr == rhs; break;
-			case T_NEQ: expr = expr != rhs; break;
-			case T_LEQ: expr = expr <= rhs; break;
-			case T_GEQ: expr = expr >= rhs; break;
-			case T_L: expr = expr < rhs; break;
-			case T_G: expr = expr > rhs; break;
-			case T_LSHIFT: expr = expr << rhs; break;
-			case T_RSHIFT: expr = expr >> rhs; break;
-			case T_ADD: expr = expr + rhs; break;
-			case T_SUB: expr = expr - rhs; break;
-			case T_STAR: expr = expr * rhs; break;
-			case T_DIV:
-				if (rhs)
-					expr = expr / rhs;
-				else
-					ERROR("Division by zero");
-				break;
-			case T_MOD:
-				if (rhs)
-					expr = expr % rhs;
-				else
-					ERROR("Modulo by zero");
-				break;
-			default:
-			ERROR("Invalid infix %s", dbg_token(&t));
+			int rhs = evaluate_expression(new_prec, evaluate);
+			if (evaluate) {
+				switch (t.type) {
+				case T_BOR: expr = expr | rhs; break;
+				case T_XOR: expr = expr ^ rhs; break;
+				case T_AMP: expr = expr & rhs; break;
+				case T_EQ: expr = expr == rhs; break;
+				case T_NEQ: expr = expr != rhs; break;
+				case T_LEQ: expr = expr <= rhs; break;
+				case T_GEQ: expr = expr >= rhs; break;
+				case T_L: expr = expr < rhs; break;
+				case T_G: expr = expr > rhs; break;
+				case T_LSHIFT: expr = expr << rhs; break;
+				case T_RSHIFT: expr = expr >> rhs; break;
+				case T_ADD: expr = expr + rhs; break;
+				case T_SUB: expr = expr - rhs; break;
+				case T_STAR: expr = expr * rhs; break;
+				case T_DIV:
+					if (rhs)
+						expr = expr / rhs;
+					else
+						ERROR("Division by zero");
+					break;
+				case T_MOD:
+					if (rhs)
+						expr = expr % rhs;
+					else
+						ERROR("Modulo by zero");
+					break;
+				default:
+					ERROR("Invalid infix %s", dbg_token(&t));
+				}
 			}
 		}
 
@@ -224,7 +230,7 @@ int directiver_evaluate_conditional(struct token dir) {
 		return !(define_map_get(NEXT_U().str) != NULL);
 	} else if (strcmp(dir.str, "if") == 0 ||
 			   strcmp(dir.str, "elif") == 0) {
-		intmax_t eval = evaluate_expression(0);
+		intmax_t eval = evaluate_expression(0, 1);
 		return eval;
 	}
 
