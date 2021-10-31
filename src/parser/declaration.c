@@ -745,7 +745,9 @@ struct parameter_list parse_parameter_list(void) {
 			ret.arguments[ret.n - 1] = ident->variable.id;
 		}
 
-		TACCEPT(T_COMMA);
+		if (T0->type == T_RPAR)
+			break;
+		TEXPECT(T_COMMA);
 	}
 
 	if (TACCEPT(T_ELLIPSIS)) {
