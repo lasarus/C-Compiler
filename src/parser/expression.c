@@ -211,6 +211,12 @@ static const int does_integer_conversion[E_NUM_TYPES] = {
 	[E_CONDITIONAL] = 1,
 };
 
+int is_null_pointer_constant(struct expr *expr) {
+	struct constant *c = expression_to_constant(expr);
+
+	return c && c->type == CONSTANT_TYPE && constant_is_zero(c);
+}
+
 void cast_conditional(struct expr *expr) {
 	if (expr->type != E_CONDITIONAL)
 		return;
@@ -231,6 +237,10 @@ void cast_conditional(struct expr *expr) {
 				  strdup(dbg_type(a)),
 				  strdup(dbg_type(b)));
 		}
+	} else if (type_is_pointer(a) && is_null_pointer_constant(expr->args[2])) {
+		expr->args[2] = expression_cast(expr->args[2], a);
+	} else if (type_is_pointer(b) && is_null_pointer_constant(expr->args[1])) {
+		expr->args[1] = expression_cast(expr->args[1], b);
 	} else if (type_is_arithmetic(a) &&
 			   type_is_arithmetic(b)) {
 		convert_arithmetic(&expr->args[1], &expr->args[2]);
