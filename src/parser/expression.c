@@ -1003,14 +1003,20 @@ struct expr *parse_prefix() {
 		struct expr *expr = parse_assignment_expression();
 		if (!expr)
 			ERROR("Expected expression.");
+
 		decay_array(&expr);
+		// Remove all constness. This is a part of lvalue conversions.
+		// TODO: Make removing constness a bit more robust.
+		struct type *match_type = type_make_const(expr->data_type, 0);
 
 		struct expr *res = NULL;
+		int res_is_default = 0;
 
 		while (TACCEPT(T_COMMA)) {
 			int default_ = 0;
 			struct type *type = NULL;
 			if (TACCEPT(T_KDEFAULT)) {
+				res_is_default = 1;
 				default_ = 1;
 			} else {
 				type = parse_type_name();
@@ -1021,9 +1027,10 @@ struct expr *parse_prefix() {
 				if (!res)
 					res = rhs;
 			} else {
-				if (type == expr->data_type) {
-					if (res)
-						ERROR("More than one compatible type in _Generic association list");
+				if (type == match_type) {
+					if (res && !res_is_default)
+						ERROR("More than one compatible type in _Generic association list, %s",
+							  strdup(dbg_type(type)));
 					res = rhs;
 				}
 			}

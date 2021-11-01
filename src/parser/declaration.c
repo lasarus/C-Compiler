@@ -613,7 +613,7 @@ int null_type_qualifier(struct type_qualifiers *tq) {
 
 struct type *apply_tq(struct type *type, const struct type_qualifiers *tq) {
 	if (tq->const_n == 1)
-		type = type_make_const(type);
+		type = type_make_const(type, 1);
 	return type;
 }
 

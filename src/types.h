@@ -134,7 +134,7 @@ struct type *type_pointer(struct type *type);
 struct type *type_array(struct type *type, int length);
 struct type *type_deref(struct type *type);
 struct type *type_struct(struct struct_data *struct_data);
-struct type *type_make_const(struct type *type);
+struct type *type_make_const(struct type *type, int is_const);
 struct type *type_adjust_parameter(struct type *type);
 
 void type_evaluate_vla(struct type *type);

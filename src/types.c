@@ -159,9 +159,9 @@ struct type *type_deref(struct type *type) {
 	return type->children[0];
 }
 
-struct type *type_make_const(struct type *type) {
+struct type *type_make_const(struct type *type, int is_const) {
 	struct type params = *type;
-	params.is_const = 1;
+	params.is_const = is_const;
 	return type_create(&params, type->children);
 }
 
@@ -199,7 +199,7 @@ struct type *type_adjust_parameter(struct type *type) {
 		type->type == TY_INCOMPLETE_ARRAY) {
 		struct type *ptr = type_pointer(type->children[0]);
 		if (type->is_const)
-			ptr = type_make_const(ptr);
+			ptr = type_make_const(ptr, 1);
 		return ptr;
 	} else if (type->type == TY_FUNCTION) {
 		return type_pointer(type);
