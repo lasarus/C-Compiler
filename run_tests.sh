@@ -5,18 +5,18 @@ test_source() {
 
 	if [ "$4" == "true" ]; then
 		if [ "$2" == "true" ]; then
-			$5 $1 test_asm/$OUT -Imusl -D_POSIX_SOURCE -D$3
+			$5 $1 $TEST_DIR/$OUT -Imusl -D_POSIX_SOURCE -D$3
 		else
-			$5 $1 test_asm/$OUT -I/usr/include -Iinclude -D$3
+			$5 $1 $TEST_DIR/$OUT -I/usr/include -Iinclude -D$3
 		fi
 
-		gcc test_asm/$OUT -o test -no-pie
+		musl-gcc $TEST_DIR/$OUT -o test -no-pie -lm
 		./test
 	else
 		if [ "$2" == "true" ]; then
-			! $5 $1 test_asm/$OUT -Imusl -D_POSIX_SOURCE -D$3 >/dev/null
+			! $5 $1 $TEST_DIR/$OUT -Imusl -D_POSIX_SOURCE -D$3 >/dev/null
 		else
-			! $5 $1 test_asm/$OUT -I/usr/include -Iinclude -D$3 >/dev/null
+			! $5 $1 $TEST_DIR/$OUT -I/usr/include -Iinclude -D$3 >/dev/null
 		fi
 	fi
 }
@@ -43,6 +43,7 @@ run_tests() {
 	done
 }
 
+TEST_DIR=test_asm
 MUSL=true
 
 if [ ! -d "musl" ] 
@@ -52,7 +53,7 @@ then
 	#STDC_FLAGS=-I/usr/include -Iinclude -Isrc
 fi
 
-mkdir -p test_asm
+mkdir -p $TEST_DIR
 
 SOURCES=$(find tests -name '*.c')
 
@@ -69,6 +70,10 @@ diff asm/ asm2/
 echo "No errors"
 
 echo "TESTING SECOND GENERATION ON SOURCES IN tests/"
+TEST_DIR=test_asm2
+mkdir -p $TEST_DIR
 run_tests ./cc_self
 echo -en "\r\033[KNo errors"
 echo
+
+diff test_asm test_asm2 -x 'std_macros.s' # Ignore difference in __TIME__.
