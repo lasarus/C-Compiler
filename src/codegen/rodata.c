@@ -101,55 +101,71 @@ void data_register_static_var(const char *label, struct type *type, struct initi
 	};
 }
 
+void codegen_initializer_recursive(struct initializer *init,
+								   uint8_t *buffer, label_id *labels,
+								   int64_t *label_offsets, int *is_label,
+								   size_t size) {
+	for (int i = 0; i < init->size; i++) {
+		struct init_pair *pair = init->pairs + i;
+		size_t offset = pair->offset;
+
+		if (offset >= size)
+			ERROR("Internal compiler error");
+
+		struct constant *c = expression_to_constant(pair->expr);
+		if (c) {
+			switch (c->type) {
+			case CONSTANT_TYPE:
+				constant_to_buffer(buffer + offset, *c);
+				break;
+
+			case CONSTANT_LABEL_POINTER:
+				is_label[offset] = 1;
+				labels[offset] = c->label.label;
+				label_offsets[offset] = c->label.offset;
+				break;
+
+			case CONSTANT_LABEL:
+				NOTIMP();
+				break;
+
+			default:
+				NOTIMP();
+			}
+		} else if (pair->expr->type == E_COMPOUND_LITERAL) {
+			codegen_initializer_recursive(pair->expr->compound_literal.init,
+										  buffer + offset,
+										  labels + offset,
+										  label_offsets + offset,
+										  is_label + offset,
+										  size - offset);
+		} else {
+			ERROR("Invalid constant expression in static initializer.");
+		}
+	}
+}
+
 void codegen_initializer(struct type *type,
 						 struct initializer *init) {
 	// TODO: Make this more portable.
-	int size = calculate_size(type);
+	size_t size = calculate_size(type);
 
 	uint8_t *buffer = malloc(sizeof *buffer * size);
 	label_id *labels = malloc(sizeof *labels * size);
 	int64_t *label_offsets = malloc(sizeof *label_offsets * size);
 	int *is_label = malloc(sizeof *is_label * size);
 
-	for (int i = 0; i < size; i++) {
+	for (unsigned i = 0; i < size; i++) {
 		buffer[i] = 0;
 		is_label[i] = 0;
 		labels[i] = 0;
 		label_offsets[i] = 0;
 	}
 
-	for (int i = 0; i < init->size; i++) {
-		struct init_pair *pair = init->pairs + i;
-		int offset = pair->offset;
 
-		if (offset >= size)
-			ERROR("Internal compiler error");
+	codegen_initializer_recursive(init, buffer, labels, label_offsets, is_label, size);
 
-		struct constant *c = expression_to_constant(pair->expr);
-		if (!c)
-			ERROR("Static initialization can't contain non constant expressions! %d", pair->expr->type);
-
-		switch (c->type) {
-		case CONSTANT_TYPE:
-			constant_to_buffer(buffer + offset, *c);
-			break;
-
-		case CONSTANT_LABEL_POINTER:
-			is_label[offset] = 1;
-			labels[offset] = c->label.label;
-			label_offsets[offset] = c->label.offset;
-			break;
-
-		case CONSTANT_LABEL:
-			NOTIMP();
-			break;
-
-		default:
-			NOTIMP();
-		}
-	}
-
-	for (int i = 0; i < size; i++) {
+	for (unsigned i = 0; i < size; i++) {
 		if (is_label[i]) {
 			if (label_offsets[i] == 0)
 				emit(".quad %s", rodata_get_label_string(labels[i]));
@@ -163,9 +179,6 @@ void codegen_initializer(struct type *type,
 				if (is_label[i + how_long])
 					break;
 			}
-			//TODO: This shouldn't need an integer cast.
-			// But right now I can't be bothered to implement
-			// implicit integer casts for variadic functions.
 			if (how_long == 8) {
 				emit(".quad %" PRIu64, *(uint64_t *)(buffer + i));
 				i += how_long - 1;
