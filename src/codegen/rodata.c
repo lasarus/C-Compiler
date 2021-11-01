@@ -122,6 +122,9 @@ void codegen_initializer(struct type *type,
 		struct init_pair *pair = init->pairs + i;
 		int offset = pair->offset;
 
+		if (offset >= size)
+			ERROR("Internal compiler error");
+
 		struct constant *c = expression_to_constant(pair->expr);
 		if (!c)
 			ERROR("Static initialization can't contain non constant expressions! %d", pair->expr->type);

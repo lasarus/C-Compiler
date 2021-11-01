@@ -1114,9 +1114,7 @@ int parse_brace_initializer(struct type **current_object, int offset, struct ini
 			}
 		}
 
-		if (stack_count == 1) {
-			max_index = MAX(max_index, index_stack[0]);
-		}
+		max_index = MAX(max_index, index_stack[0]);
 
 		// Advance one step.
 		while (stack_count > 0) {
