@@ -237,6 +237,9 @@ void codegen_call(var_id variable, struct type *function_type, struct type **arg
 	emit("movl $%d, %%eax", current_sse_reg);
 	emit("callq *%%rbx");
 
+	if (stack_sub)
+		emit("addq $%d, %%rsp", stack_sub);
+
 	if (!return_classification.pass_in_memory && return_type != type_simple(ST_VOID)) {
 		int var_size = get_variable_size(result);
 		for (int i = 0; i < return_classification.n_parts; i++) {
