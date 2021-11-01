@@ -138,6 +138,13 @@ struct constant operators_constant_unary(enum unary_operator_type op,
 	default: NOTIMP();													\
 	} break;															\
 
+#define UOPF(TYPE, FIELD) case TYPE: res.type = CONSTANT_TYPE; res.data_type = type_simple(TYPE); \
+	switch (op) {														\
+	case UOP_PLUS: res.FIELD = +rhs.FIELD; break;						\
+	case UOP_NEG: res.FIELD = -rhs.FIELD; break;						\
+	default: NOTIMP();													\
+	} break;															\
+
 	switch (type->simple) {
 		UOP(ST_INT, int_d);
 		UOP(ST_UINT, uint_d);
@@ -145,6 +152,8 @@ struct constant operators_constant_unary(enum unary_operator_type op,
 		UOP(ST_ULONG, ulong_d);
 		UOP(ST_LLONG, llong_d);
 		UOP(ST_ULLONG, ullong_d);
+		UOPF(ST_FLOAT, float_d);
+		UOPF(ST_DOUBLE, double_d);
 	default:
 		NOTIMP();
 	}
