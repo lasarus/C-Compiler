@@ -255,6 +255,8 @@ int input_buffer_parse_argument(struct token_list *tl, int ignore_comma, int inp
 		!(!ignore_comma && (depth == 1 && t.type == PP_COMMA)) &&
 		!(depth == 0 && t.type == PP_RPAR));
 
+	if (t.type == PP_RPAR)
+		input_buffer_push(&t);
 	return t.type == PP_RPAR;
 }
 
@@ -310,11 +312,6 @@ void subs_buffer(struct define *def, struct string_set *hs, struct position new_
 			}
 		}
 
-		if (n_args == 0 && !def->vararg) {
-			struct token rpar = input_buffer_take(input);
-			ASSERT_TYPE(rpar, PP_RPAR);
-			finished = 1;
-		}
 
 		if (def->vararg && !finished) {
 			vararg_included = 1;
@@ -322,6 +319,12 @@ void subs_buffer(struct define *def, struct string_set *hs, struct position new_
 				ERROR("__VA_ARGS__ Not end of input");
 			}
 		}
+		
+		struct token rpar = input_buffer_take(input);
+		ASSERT_TYPE(rpar, PP_RPAR);
+		finished = 1;
+
+		*hs = string_set_intersection(*hs, rpar.hs);
 	}
 	(void)vararg_included;
 
