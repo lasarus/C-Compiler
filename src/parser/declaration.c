@@ -679,6 +679,14 @@ struct type *ast_to_type(const struct type_specifiers *ts, const struct type_qua
 					type = type_create(&params, &type);
 				}
 			} break;
+			case ARR_STAR: {
+				struct type params = {
+					.type = TY_VARIABLE_LENGTH_ARRAY,
+					.variable_length_array.length_expr = NULL,
+					.n = 1
+				};
+				type = type_create(&params, &type);
+			} break;
 			default:
 				NOTIMP();
 			}
@@ -876,6 +884,9 @@ struct type_ast *parse_declarator(int *was_abstract, int *has_symbols) {
 				arr.array.type = ARR_EMPTY;
 				if (need_expression)
 					ERROR("Missing expression after static");
+			} else if (TACCEPT(T_STAR)) {
+				arr.array.type = ARR_STAR;
+				TEXPECT(T_RBRACK);
 			} else {
 				struct expr *expression = parse_expression();
 				if (!expression)

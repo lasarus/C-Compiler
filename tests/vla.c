@@ -11,7 +11,9 @@ void func2(int n, char arr[][n * 2]) {
 	assert(sizeof *arr == n * 2);
 }
 
-// TODO:
+void test(int n, int x[n]);
+void test(int n, int x[*]);
+
 void func3(int func3) {
 	assert(func3 == 10);
 }
