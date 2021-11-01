@@ -781,7 +781,7 @@ struct type_ast *parse_function_parameters(struct type_ast *parent, int *has_sym
 	} else {
 		parameters = parse_parameter_list();
 
-		if (has_symbols)
+		if (has_symbols && !*has_symbols)
 			*has_symbols = 1;
 		else
 			symbols_pop_scope();
