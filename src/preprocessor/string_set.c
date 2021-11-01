@@ -72,6 +72,11 @@ void string_set_free(struct string_set a) {
 }
 
 void string_set_insert(struct string_set *a, char *str) {
+	if (!a->size) {
+		string_set_append(a, str);
+		return;
+	}
+
 	int s = 0, cmp = 0;
 	for (; s < a->size; s++) {
 		if ((cmp = strcmp(a->strings[s], str)) <= 0)

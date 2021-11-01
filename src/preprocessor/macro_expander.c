@@ -327,6 +327,7 @@ void subs_buffer(struct define *def, struct string_set *hs, struct position new_
 
 	string_set_insert(hs, strdup(def->name));
 
+	size_t input_start = input_buffer.size;
 	int concat_with_prev = 0;
 	for(int i = def->def.size - 1; i >= 0; i--) {
 		struct token t = def->def.list[i];
@@ -383,7 +384,6 @@ void subs_buffer(struct define *def, struct string_set *hs, struct position new_
 			} else if (stringify) {
 				ERROR("# Should be followed by macro parameter");
 			} else {
-				t.hs = string_set_union(*hs, t.hs);
 				t.pos = new_pos;
 				input_buffer_push(&t);
 
@@ -398,6 +398,11 @@ void subs_buffer(struct define *def, struct string_set *hs, struct position new_
 
 	for(int i = 0; i < n_args; i++) {
 		token_list_free(&arguments[i]);
+	}
+
+	for(unsigned i = input_start; i < input_buffer.size; i++) {
+		struct token *tok = input_buffer.tokens + i;
+		tok->hs = string_set_union(*hs, tok->hs);
 	}
 }
 
