@@ -379,6 +379,7 @@ void subs_buffer(struct define *def, struct string_set *hs, struct position new_
 			if (concat_with_prev) {
 				struct token *end = input_buffer_top(input);
 				*end = glue(*end, t);
+				concat_with_prev = 0;
 			} else if (stringify) {
 				ERROR("# Should be followed by macro parameter");
 			} else {
