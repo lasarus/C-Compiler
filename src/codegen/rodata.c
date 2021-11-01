@@ -145,6 +145,77 @@ void codegen_initializer_recursive(struct initializer *init,
 	}
 }
 
+void codegen_initializer(struct type *type, struct initializer *init);
+
+void codegen_compound_literals(struct expr **expr, int lvalue) {
+	switch ((*expr)->type) {
+	case E_GENERIC_SELECTION:
+	case E_DOT_OPERATOR: NOTIMP();
+	case E_COMPOUND_LITERAL:
+		if (lvalue) {
+			static int counter = 0;
+			char name[256];
+			sprintf(name, ".compundliteral%d", counter++);
+			emit("%s:", name);
+			codegen_initializer((*expr)->compound_literal.type,
+								(*expr)->compound_literal.init);
+
+			label_id label = register_label_name(strdup(name));
+
+			*expr = expr_new((struct expr) {
+					.type = E_CONSTANT,
+					.constant = {
+						.type = CONSTANT_LABEL,
+						.label = { label, 0 }
+					}
+				});
+		}
+		break;
+	case E_ARRAY_PTR_DECAY:
+	case E_ADDRESS_OF:
+		codegen_compound_literals(&(*expr)->args[0], 1);
+		break;
+	case E_INDIRECTION:
+		break;
+	case E_UNARY_OP:
+	case E_ALIGNOF:
+	case E_CAST:
+	case E_POINTER_ADD:
+	case E_POINTER_SUB:
+	case E_POINTER_DIFF:
+	case E_ASSIGNMENT:
+	case E_ASSIGNMENT_POINTER:
+	case E_ASSIGNMENT_OP:
+	case E_CONDITIONAL:
+	case E_COMMA:
+	case E_BUILTIN_VA_START:
+	case E_BUILTIN_VA_END:
+	case E_BUILTIN_VA_ARG:
+	case E_BUILTIN_VA_COPY:
+
+	default: return;
+	}
+
+	if ((*expr)->type != E_CONSTANT) {
+		struct constant c;
+		if (evaluate_constant_expression(*expr, &c)) {
+			*expr = expr_new((struct expr) {
+					.type = E_CONSTANT,
+					.constant = c
+				});
+		}
+	}
+}
+
+void codegen_pre_initializer(struct initializer *init) {
+	// Iterate through all child expressions and find uninitialized compound literals.
+	for (int i = 0; i < init->size; i++) {
+		struct init_pair *pair = init->pairs + i;
+
+		codegen_compound_literals(&pair->expr, 0);
+	}
+}
+
 void codegen_initializer(struct type *type,
 						 struct initializer *init) {
 	// TODO: Make this more portable.
@@ -161,7 +232,6 @@ void codegen_initializer(struct type *type,
 		labels[i] = 0;
 		label_offsets[i] = 0;
 	}
-
 
 	codegen_initializer_recursive(init, buffer, labels, label_offsets, is_label, size);
 
@@ -199,6 +269,8 @@ void codegen_static_var(struct static_var *static_var) {
 	if (static_var->global)
 		emit(".global %s", static_var->label);
 	if (static_var->init) {
+		codegen_pre_initializer(static_var->init);
+
 		emit("%s:", static_var->label);
 
 		codegen_initializer(static_var->type,
