@@ -1184,6 +1184,7 @@ struct expr *parse_pratt(int precedence) {
 		} else if (TACCEPT(T_ARROW)) {
 			const char *identifier = T0->str;
 			TNEXT();
+			decay_array(&lhs);
 			struct type *lhs_type = type_deref(lhs->data_type);
 			int idx = type_member_idx(lhs_type, identifier);
 
