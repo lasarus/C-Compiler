@@ -58,33 +58,6 @@ static void input_internal_next(struct input *input) {
 	};
 }
 
-static int flush_comment(struct input *input) {
-	int did_something = 0;
-	if (input->ic[0] == '/' &&
-		input->ic[1] == '*') {
-		did_something = 1;
-		while (!(input->ic[0] == '*' &&
-				 input->ic[1] == '/')) {
-			input_internal_next(input);
-
-			if (input->ic[0] == '\0')
-				ERROR("Comment reached end of file");
-		}
-		input_internal_next(input);
-		input_internal_next(input);
-	} else if (input->ic[0] == '/' &&
-			   input->ic[1] == '/') {
-		did_something = 1;
-		while (!(input->ic[0] == '\n')) {
-			input_internal_next(input);
-
-			if (input->ic[0] == '\0')
-				ERROR("Comment reached end of file");
-		}
-	}
-	return did_something;
-}
-
 static int flush_backslash(struct input *input) {
 	if (input->ic[0] == '\\' &&
 		input->ic[1] == '\n') {
@@ -105,11 +78,7 @@ void input_next(struct input *input) {
 
 	int removed_comment = 0;
 
-	do {
-		while (flush_comment(input)) {
-			removed_comment = 1;
-		}
-	} while (flush_backslash(input));
+	while (flush_backslash(input));
 
 	char nc;
 	struct position npos;

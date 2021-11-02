@@ -61,20 +61,37 @@ static void tokenizer_pop_input(void) {
 	tok.top = &tok.stack[tok.input_n - 1];
 }
 
-int flush_whitespace(int *whitespace,
-					 int *first_of_line) {
-	int any_change = 0;
-	while (is_space(tok.top->c[0])) {
+void flush_whitespace(int *whitespace, int *first_of_line) {
+	for (;;) {
+		if (is_space(tok.top->c[0])) {
+			if(tok.top->c[0] == '\n')
+				*first_of_line = 1;
+
+			input_next(tok.top);
+		} else if (tok.top->c[0] == '/' &&
+				   tok.top->c[1] == '*') {
+			while (!(tok.top->c[0] == '*' &&
+					 tok.top->c[1] == '/')) {
+				input_next(tok.top);
+
+				if (tok.top->c[0] == '\0')
+					ERROR("Comment reached end of file");
+			}
+			input_next(tok.top);
+			input_next(tok.top);
+		} else if (tok.top->c[0] == '/' &&
+				   tok.top->c[1] == '/') {
+			while (!(tok.top->c[0] == '\n')) {
+				input_next(tok.top);
+
+				if (tok.top->c[0] == '\0')
+					ERROR("Comment reached end of file");
+			}
+		} else {
+			break;
+		}
 		*whitespace = 1;
-
-		if(tok.top->c[0] == '\n')
-			*first_of_line = 1;
-
-		input_next(tok.top);
-		any_change = 1;
 	}
-
-	return any_change;
 }
 
 char *buffer = NULL;
@@ -270,7 +287,6 @@ int parse_string(struct token *next) {
 
 	input_next(tok.top);
 
-	//while(tok.top->c[0] != '"') {
 	int character;
 	while (parse_cs_char(&character, 1))
 		buffer_write((char)character);
