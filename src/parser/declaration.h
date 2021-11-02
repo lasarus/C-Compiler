@@ -10,6 +10,7 @@ struct initializer {
 	int size, cap;
 	struct init_pair {
 		int offset;
+		int bit_offset, bit_size;
 		struct expr *expr;
 	} *pairs;
 };

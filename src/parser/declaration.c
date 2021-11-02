@@ -919,7 +919,8 @@ void add_init_pair(struct initializer *init, struct init_pair pair) {
 	ADD_ELEMENT(init->size, init->cap, init->pairs) = pair;
 }
 
-int parse_non_brace_initializer(struct type **type, int offset, struct initializer *init,
+int parse_non_brace_initializer(struct type **type, int offset, int bit_offset,
+								int bitfield, struct initializer *init,
 	struct expr **failed_expr) {
 	if (failed_expr)
 		*failed_expr = NULL;
@@ -943,7 +944,7 @@ int parse_non_brace_initializer(struct type **type, int offset, struct initializ
 		} else {
 			struct expr *casted_expr = expression_cast(expr, *type);
 			if (!expression_is_zero(casted_expr)) {
-				add_init_pair(init, (struct init_pair){offset,
+				add_init_pair(init, (struct init_pair){offset, bit_offset, bitfield,
 						expression_cast(expr, *type)});
 			}
 		}
@@ -977,7 +978,7 @@ int parse_non_brace_initializer(struct type **type, int offset, struct initializ
 			*type = type_create(&complete_array_params, (*type)->children);
 		}
 
-		add_init_pair(init, (struct init_pair){offset, EXPR_STR(str)});
+		add_init_pair(init, (struct init_pair){offset, bit_offset, bitfield, EXPR_STR(str)});
 		return 1;
 	}
 
@@ -1066,12 +1067,20 @@ int parse_brace_initializer(struct type **current_object, int offset, struct ini
 			ERROR("Should not be here");
 		}
 		struct type *selected_type = NULL;
-		int selected_offset = 0;
+		int selected_offset = 0, selected_bit_offset = 0, selected_bitfield = -1;
 		type_select(type_stack[stack_count - 1], index_stack[stack_count - 1], &selected_offset, &selected_type);
+		if (type_stack[stack_count - 1]->type == TY_STRUCT) {
+			int index = index_stack[stack_count - 1];
+			struct struct_data *data = type_stack[stack_count - 1]->struct_data;
+			selected_bit_offset = data->fields[index].bit_offset;
+			selected_bitfield = data->fields[index].bitfield;
+		}
 		selected_offset += offset_stack[stack_count - 1];
 
 		if (type_is_char_array(selected_type) && parse_non_brace_initializer(&selected_type,
 																			 selected_offset,
+																			 selected_bit_offset,
+																			 selected_bitfield,
 																			 init, NULL)) {
 		} else if (!(type_is_aggregate(selected_type) &&
 			  parse_brace_initializer(&selected_type, selected_offset, init))) {
@@ -1082,7 +1091,7 @@ int parse_brace_initializer(struct type **current_object, int offset, struct ini
 			struct type *current = selected_type;
 			while (type_is_aggregate(current)) {
 				struct expr *failed_expr = NULL;
-				if (parse_non_brace_initializer(&current, selected_offset,
+				if (parse_non_brace_initializer(&current, selected_offset, selected_bit_offset, selected_bitfield,
 												init, &failed_expr)) {
 					found = 1;
 					break;
@@ -1098,7 +1107,8 @@ int parse_brace_initializer(struct type **current_object, int offset, struct ini
 			}
 
 			struct expr *failed_expr = NULL;
-			if (!found && parse_non_brace_initializer(&current, selected_offset,
+			if (!found && parse_non_brace_initializer(&current, selected_offset, selected_bit_offset,
+													  selected_bitfield,
 													  init, &failed_expr)) {
 				found = 1;
 			}
@@ -1113,7 +1123,8 @@ int parse_brace_initializer(struct type **current_object, int offset, struct ini
 
 				for (; stack_count > start_count; stack_count--) {
 					if (expr->data_type == type_stack[stack_count - 1]) {
-						add_init_pair(init, (struct init_pair) { selected_offset,
+						add_init_pair(init, (struct init_pair) { selected_offset, selected_bit_offset,
+								selected_bitfield,
 								expr});
 						break;
 					}
@@ -1197,11 +1208,11 @@ int parse_brace_initializer(struct type **current_object, int offset, struct ini
 struct initializer *parse_initializer(struct type **type) {
 	struct initializer *init = initializer_init();
 
-	if (!parse_non_brace_initializer(type, 0, init, NULL)) {
+	if (!parse_non_brace_initializer(type, 0, 0, -1, init, NULL)) {
 		struct expr *expr = parse_assignment_expression();
 
 		if (expr) {
-			add_init_pair(init, (struct init_pair) { 0,
+			add_init_pair(init, (struct init_pair) { 0, 0, -1,
 					expression_cast(expr, *type)});
 		} else {
 			parse_brace_initializer(type, 0, init);

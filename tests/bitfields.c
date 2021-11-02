@@ -37,4 +37,19 @@ int main() {
 	s.shared_1 = 3;
 	assert(s.shared_2 == s.shared_3);
 	assert(s.shared_2 == 3);
+
+	{
+		struct {
+			unsigned x : 1, y : 1;
+		} t = {.y = 1};
+
+		assert(t.y == 1);
+	}
+	{
+		static struct {
+			unsigned x : 1, y : 1;
+		} t = {.y = 1};
+
+		assert(t.y == 1);
+	}
 }

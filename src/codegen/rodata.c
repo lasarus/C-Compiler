@@ -116,7 +116,7 @@ void codegen_initializer_recursive(struct initializer *init,
 		if (c) {
 			switch (c->type) {
 			case CONSTANT_TYPE:
-				constant_to_buffer(buffer + offset, *c);
+				constant_to_buffer(buffer + offset, *c, pair->bit_offset, pair->bit_size);
 				break;
 
 			case CONSTANT_LABEL_POINTER:

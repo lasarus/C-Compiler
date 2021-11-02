@@ -659,15 +659,17 @@ struct constant constant_cast(struct constant a, struct type *target) {
 	NOTIMP();
 }
 
-void constant_to_buffer(uint8_t *buffer, struct constant constant) {
+void constant_to_buffer(uint8_t *buffer, struct constant constant, int bit_offset, int bit_size) {
 	assert(constant.type == CONSTANT_TYPE);
 
 	if (type_is_pointer(constant.data_type)) {
+		assert(bit_offset == 0 && bit_size == -1);
 		*buffer = constant.long_d;
 		return;
 	}
 
 	if (constant.data_type->type == TY_ARRAY) {
+		assert(bit_offset == 0 && bit_size == -1);
 		if (constant.data_type->children[0] != type_simple(ST_CHAR))
 			NOTIMP();
 
@@ -679,7 +681,41 @@ void constant_to_buffer(uint8_t *buffer, struct constant constant) {
 		buffer[i] = 0;
 		return;
 	}
+
 	assert(constant.data_type->type == TY_SIMPLE);
+
+	if (bit_size != -1) {
+		// TODO: Make this more portable.
+		assert(type_is_integer(constant.data_type));
+		uint64_t prev = 0;
+		int req_size = bit_size + bit_offset;
+		if (req_size <= 8) {
+			prev = *(uint8_t *)buffer;
+		} else if (req_size <= 16) {
+			prev = *(uint16_t *)buffer;
+		} else if (req_size <= 32) {
+			prev = *(uint32_t *)buffer;
+		} else {
+			prev = *(uint64_t *)buffer;
+		}
+		uint64_t mask = gen_mask(64 - bit_size - bit_offset, bit_offset);
+		uint64_t tmp_buffer = 0;
+		constant_to_buffer((uint8_t *)&tmp_buffer, constant, 0, -1);
+
+		tmp_buffer <<= bit_offset;
+		prev &= mask;
+		uint64_t out = (prev & mask) | (tmp_buffer & ~mask);
+		if (req_size <= 8) {
+			*(uint8_t *)buffer = out;
+		} else if (req_size <= 16) {
+			*(uint16_t *)buffer = out;
+		} else if (req_size <= 32) {
+			*(uint32_t *)buffer = out;
+		} else {
+			*(uint64_t *)buffer = out;
+		}
+		return;
+	}
 
 	switch (constant.data_type->simple) {
 	case ST_CHAR:
