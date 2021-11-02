@@ -1056,6 +1056,8 @@ int parse_brace_initializer(struct type **current_object, int offset, struct ini
 			break;
 		}
 
+		must_have_designator_list = 0;
+
 		if (has_designator_list)
 			TEXPECT(T_A);
 
