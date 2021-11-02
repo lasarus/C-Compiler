@@ -418,7 +418,7 @@ void type_evaluate_vla(struct type *type) {
 
 	if (type->type == TY_VARIABLE_LENGTH_ARRAY) {
 		if (!type->variable_length_array.is_evaluated) {
-			type->variable_length_array.length_var = expression_to_ir(type->variable_length_array.length_expr);
+			type->variable_length_array.length_var = expression_to_ir_clear_temp(type->variable_length_array.length_expr);
 		}
 		type->variable_length_array.is_evaluated = 1;
 	}

@@ -48,4 +48,6 @@ int main() {
 	func1(NULL);
 	func2(100, NULL);
 	func3(10);
+
+	assert(sizeof arr == 4 * 10 * 10);
 }
