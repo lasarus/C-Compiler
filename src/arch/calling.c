@@ -82,6 +82,11 @@ void classify_recursively(enum parameter_class *current,
 		}
 	} break;
 
+	case TY_INCOMPLETE_ARRAY: {
+		// This is for cases like struct { int arr[]; }.
+		// Should just be assumed to have zero size, and ignored.
+	} break;
+
 	default:
 		ERROR("Not imp %d\n", type->type);
 		NOTIMP();
