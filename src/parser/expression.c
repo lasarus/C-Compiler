@@ -1263,9 +1263,9 @@ int evaluate_constant_expression(struct expr *expr,
 			int size = calculate_size(type_deref(lhs.data_type));
 
 			if (expr->type == E_POINTER_ADD) {
-				constant->label.offset = rhs.int_d * size;
+				constant->label.offset += rhs.int_d * size;
 			} else if (expr->type == E_POINTER_SUB) {
-				constant->label.offset = -rhs.int_d * size;
+				constant->label.offset -= rhs.int_d * size;
 			}
 
 			return 1;

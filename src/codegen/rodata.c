@@ -140,7 +140,8 @@ void codegen_initializer_recursive(struct initializer *init,
 										  is_label + offset,
 										  size - offset);
 		} else {
-			ERROR("Invalid constant expression in static initializer.");
+			ERROR("Invalid constant expression in static initializer of type %s.",
+				  dbg_type(pair->expr->data_type));
 		}
 	}
 }
@@ -166,6 +167,7 @@ void codegen_compound_literals(struct expr **expr, int lvalue) {
 					.type = E_CONSTANT,
 					.constant = {
 						.type = CONSTANT_LABEL,
+						.data_type = (*expr)->compound_literal.type,
 						.label = { label, 0 }
 					}
 				});
@@ -176,12 +178,16 @@ void codegen_compound_literals(struct expr **expr, int lvalue) {
 		codegen_compound_literals(&(*expr)->args[0], 1);
 		break;
 	case E_INDIRECTION:
+		codegen_compound_literals(&(*expr)->args[0], 0);
 		break;
 	case E_UNARY_OP:
 	case E_ALIGNOF:
 	case E_CAST:
 	case E_POINTER_ADD:
 	case E_POINTER_SUB:
+		codegen_compound_literals(&(*expr)->args[0], lvalue);
+		codegen_compound_literals(&(*expr)->args[1], lvalue);
+		break;
 	case E_POINTER_DIFF:
 	case E_ASSIGNMENT:
 	case E_ASSIGNMENT_POINTER:
