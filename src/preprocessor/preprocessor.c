@@ -18,6 +18,8 @@
 
 struct token_stream {
     struct token t, nt, nnt;
+	int has_pushed;
+	struct token pushed;
 } ts;
 
 // Token functions.
@@ -64,7 +66,22 @@ void token_free(struct token *from) {
 void t_next() {
 	ts.t = ts.nt;
 	ts.nt = ts.nnt;
-	ts.nnt = string_concat_next();
+	if (ts.has_pushed) {
+		ts.nnt = ts.pushed;
+		ts.has_pushed = 0;
+	} else {
+		ts.nnt = string_concat_next();
+	}
+}
+
+void t_push(struct token t) {
+	if (ts.has_pushed)
+		ERROR("Internal compiler error.");
+	ts.has_pushed = 1;
+	ts.pushed = ts.nnt;
+	ts.nnt = ts.nt;
+	ts.nt = ts.t;
+	ts.t = t;
 }
 
 void preprocessor_create(const char *path) {

@@ -67,6 +67,7 @@ struct token token_dup_from_hs(struct token *from, struct string_set hs);
 #define T_ISNEXT(TYPE) (T0->type == (TYPE))
 
 void t_next(void);
+void t_push(struct token t);
 int T_accept(enum ttype type);
 void T_expect(enum ttype type);
 struct token *T_peek(int n);

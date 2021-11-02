@@ -923,11 +923,15 @@ struct expr *parse_prefix() {
  		return EXPR_ARGS(E_ADDRESS_OF, parse_pratt(PREFIX_PREC));
 	} else if (TACCEPT(T_KSIZEOF)) {
 		struct type *type = NULL;
+		struct token t = *T0;
 		if (TACCEPT(T_LPAR)) {
 			type = parse_type_name();
-			if (!type)
-				type = parse_expression()->data_type;
-			TEXPECT(T_RPAR);
+			if (type) {
+				TEXPECT(T_RPAR);
+			} else {
+				t_push(t);
+				type = parse_pratt(PREFIX_PREC)->data_type;
+			} 
 		} else {
 			type = parse_pratt(PREFIX_PREC)->data_type;
 		}
