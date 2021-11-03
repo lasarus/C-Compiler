@@ -15,6 +15,7 @@ struct position {
 
 struct input {
 	struct file file;
+	struct input *next;
 
 	struct position pos[N_BUFF];
 	char c[N_BUFF];
