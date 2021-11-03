@@ -5,7 +5,6 @@
 #include <common.h>
 
 #include <string.h>
-#include <stdlib.h>
 #include <limits.h>
 
 static struct tokenizer {
@@ -18,25 +17,23 @@ static struct tokenizer {
 #define C2 (tok.top->c[2])
 #define CNEXT() input_next(tok.top)
 
-size_t disallowed_size, disallowed_cap;
-char **disallowed = NULL;
+// Used for #pragma once.
+static struct string_set disallowed_headers;
 
 enum {
 	C_DIGIT = 0x1,
 	C_OCTAL_DIGIT = 0x2,
 	C_HEXADECIMAL_DIGIT = 0x4,
-	C_SIGN = 0x8,
 	C_SPACE = 0x10,
 	C_IDENTIFIER_NONDIGIT = 0x20,
 };
 
 // Sorry for this hardcoded table.
 // These are the constants above, and ored together to build a lookup table.
-// E.g.: char_props['c'] = CHAR_HEXADECIMAL_DIGIT | CHAR_IDENTIFIER_NONDIGIT
-unsigned char char_props[UCHAR_MAX] = {
+// E.g.: char_props['c'] = C_HEXADECIMAL_DIGIT | C_IDENTIFIER_NONDIGIT
+static const unsigned char char_props[UCHAR_MAX] = {
 	['\t'] = 0x10, 0x10, 0x10, 0x10, 
 	[' '] = 0x10, ['$'] = 0x20, 
-	['+'] = 0x8, ['-'] = 0x8, 
 	['_'] = 0x20, 
 	['0'] = 0x7, 0x7, 0x7, 0x7, 0x7, 0x7, 0x7, 0x7, 0x5, 0x5, 
 	['A'] = 0x24, 0x24, 0x24, 0x24, 0x24, 0x24, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 
@@ -65,16 +62,14 @@ void tokenizer_push_input_absolute(const char *path) {
 void tokenizer_push_input(const char *rel_path) {
 	struct file file = search_include(&tok.top->file, rel_path);
 
-	for (unsigned i = 0; i < disallowed_size; i++) {
-		if (strcmp(disallowed[i], file.full) == 0)
-			return; // Do not open file. (Related to #pragma once.)
-	}
+	if (string_set_contains(disallowed_headers, file.full))
+		return;
 
 	push_input(file);
 }
 
 void tokenizer_disable_current_path(void) {
-	ADD_ELEMENT(disallowed_size, disallowed_cap, disallowed) = strdup(tok.top->file.full);
+	string_set_insert(&disallowed_headers, strdup(tok.top->file.full));
 }
 
 static void tokenizer_pop_input(void) {
@@ -84,7 +79,7 @@ static void tokenizer_pop_input(void) {
 	free(prev);
 }
 
-void flush_whitespace(int *whitespace, int *first_of_line) {
+static void flush_whitespace(int *whitespace, int *first_of_line) {
 	for (;;) {
 		if (HAS_PROP(C0, C_SPACE)) {
 			if(C0 == '\n')
@@ -117,19 +112,19 @@ void flush_whitespace(int *whitespace, int *first_of_line) {
 char *buffer = NULL;
 size_t buffer_size = 0, buffer_cap = 0;
 
-void buffer_start(void) {
+static void buffer_start(void) {
 	buffer_size = 0;
 }
 
-void buffer_write(char c) {
+static void buffer_write(char c) {
 	ADD_ELEMENT(buffer_size, buffer_cap, buffer) = c;
 }
 
-char *buffer_get(void) {
+static char *buffer_get(void) {
 	return strdup(buffer);
 }
 
-int parse_identifier(struct token *next) {
+static int parse_identifier(struct token *next) {
 	if (!HAS_PROP(C0, C_IDENTIFIER_NONDIGIT))
 		return 0;
 
@@ -147,7 +142,7 @@ int parse_identifier(struct token *next) {
 	return 1;
 }
 
-int parse_pp_number(struct token *next) {
+static int parse_pp_number(struct token *next) {
 	if (!(HAS_PROP(C0, C_DIGIT) ||
 		  (C0 == '.' && HAS_PROP(C1, C_DIGIT))))
 		return 0;
@@ -160,7 +155,7 @@ int parse_pp_number(struct token *next) {
 			CNEXT();
 		} else if ((C0 == 'e' || C0 == 'E' ||
 					C0 == 'p' || C0 == 'P') &&
-				   HAS_PROP(C1, C_SIGN)) {
+				   (C1 == '+' || C1 == '-')) {
 			buffer_write(C0);
 			CNEXT();
 			buffer_write(C0);
@@ -177,7 +172,7 @@ int parse_pp_number(struct token *next) {
 	return 1;
 }
 
-int parse_escape_sequence(int *character) {
+static int parse_escape_sequence(int *character) {
 	if (C0 != '\\')
 		return 0;
 
@@ -236,7 +231,7 @@ int parse_escape_sequence(int *character) {
 	return 1;
 }
 
-int parse_cs_char(int *character, char end_char) {
+static int parse_cs_char(int *character, char end_char) {
 	char c = C0;
 	if (parse_escape_sequence(character)) {
 		return 1;
@@ -249,7 +244,7 @@ int parse_cs_char(int *character, char end_char) {
 	}
 }
 
-char *parse_string_like(void) {
+static char *parse_string_like(void) {
 	char end_char = C0 == '<' ? '>' : C0;
 	CNEXT();
 
@@ -269,7 +264,7 @@ char *parse_string_like(void) {
 	return buffer_get();
 }
 
-int parse_string(struct token *next) {
+static int parse_string(struct token *next) {
 	if (C0 == 'u' &&
 		C1 == '8' &&
 		C2 == '"') {
@@ -293,7 +288,7 @@ int parse_string(struct token *next) {
 	return 1;
 }
 
-int parse_pp_header_name(struct token *next) {
+static int parse_pp_header_name(struct token *next) {
 	if (C0 != '"' && C0 != '<')
 		return 0;
 
@@ -303,7 +298,7 @@ int parse_pp_header_name(struct token *next) {
 	return 1;
 }
 
-int parse_character_constant(struct token *next) {
+static int parse_character_constant(struct token *next) {
 	if (C0 != '\'')
 		return 0;
 
@@ -313,7 +308,7 @@ int parse_character_constant(struct token *next) {
 	return 1;
 }
 
-int parse_punctuator(struct token *next) {
+static int parse_punctuator(struct token *next) {
 	int count = 0;
 #define SYM(A, B) else if (												\
 		(sizeof(B) <= 1 || B[0] == C0) &&					\
@@ -411,4 +406,3 @@ void set_filename(char *name) {
 		tok.top->ipos[i].path = name;
 	tok.top->file.full = name;
 }
-

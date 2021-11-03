@@ -10,7 +10,6 @@ struct string_set {
 	char **strings;
 };
 
-
 struct string_set string_set_intersection(struct string_set a, struct string_set b);
 struct string_set string_set_union(struct string_set a, struct string_set b);
 struct string_set string_set_dup(struct string_set a);
