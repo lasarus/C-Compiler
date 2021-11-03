@@ -1,5 +1,5 @@
 #include "string_concat.h"
-#include "directives.h"
+#include "splitter.h"
 
 #include <common.h>
 
@@ -12,10 +12,10 @@ struct token string_concat_next(void) {
 		return prev;
 	}
 
-	struct token t = directiver_next();
+	struct token t = splitter_next();
 
 	while (t.type == T_STRING) {
-		struct token nt = directiver_next();
+		struct token nt = splitter_next();
 		if (nt.type != T_STRING) {
 			has_prev = 1;
 			prev = nt;

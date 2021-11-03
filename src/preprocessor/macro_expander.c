@@ -1,5 +1,6 @@
 #include "macro_expander.h"
 #include "token_list.h"
+#include "directives.h"
 
 #include <common.h>
 
@@ -8,8 +9,7 @@
 
 void expand_buffer(int input, int return_output, struct token *t);
 
-struct token tokenizer_next();
-#define NEXT() tokenizer_next();
+#define NEXT() directiver_next();
 
 #define MAP_SIZE 1024
 struct define_map {
@@ -462,4 +462,23 @@ struct token expander_next_unexpanded(void) {
 
 void expander_push_front(struct token t) {
 	input_buffer_push(&t);
+}
+
+void expand_token_list(struct token_list *ts) {
+	input_buffer_push(&(struct token) { .type = T_EOI, .str = "" });
+
+	for(int i = ts->size - 1; i >= 0; i--) {
+		struct token t = ts->list[i];
+		input_buffer_push(&t);
+	}
+
+	size_t output_pos = output_buffer.size;
+	expand_buffer(0, 0, NULL);
+
+	ts->size = 0;
+	for (unsigned i = output_pos; i < output_buffer.size; i++) {
+		token_list_add(ts, output_buffer.tokens[i]);
+	}
+
+	output_buffer.size = output_pos;
 }

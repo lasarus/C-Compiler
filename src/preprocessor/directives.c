@@ -1,7 +1,6 @@
 #include "directives.h"
 #include "macro_expander.h"
 #include "tokenizer.h"
-#include "splitter.h"
 
 #include <common.h>
 #include <precedence.h>
@@ -9,22 +8,34 @@
 
 #include <assert.h>
 
-#define NEXT_U() splitter_next_unexpanded()
-#define NEXT_E() splitter_next()
-#define NEXT_T() splitter_next_translate()
-#define PUSH(T) expander_push_front(T)
+static int pushed_idx = 0;
+static struct token pushed[2];
+
+void push(struct token t) {
+	if (pushed_idx > 1)
+		ERROR("Internal compiler error");
+	pushed[pushed_idx++] = t;
+}
+
+struct token next() {
+	struct token t = pushed_idx ? pushed[--pushed_idx] : tokenizer_next();
+	return t;
+}
+
+#define NEXT() next()
+#define PUSH(T) push(T)
 
 void directiver_define(void) {
 
-	struct token name = NEXT_U();
+	struct token name = NEXT();
 
 	struct define def = define_init(name.str);
 
-	struct token t = NEXT_U();
+	struct token t = NEXT();
 	if(t.type == PP_LPAR && !t.whitespace) {
 		int idx = 0;
 		do {
-			t = NEXT_U();
+			t = NEXT();
 			if(idx == 0 && t.type == PP_RPAR) {
 				def.func = 1;
 				break;
@@ -32,7 +43,7 @@ void directiver_define(void) {
 
 			if (t.type == PP_PUNCT &&
 				strcmp(t.str, "...") == 0) {
-				t = NEXT_U();
+				t = NEXT();
 				EXPECT(&t, PP_RPAR);
 				def.vararg = 1;
 				def.func = 1;
@@ -41,19 +52,19 @@ void directiver_define(void) {
 			EXPECT(&t, PP_IDENT);
 			define_add_par(&def, t);
 
-			t = NEXT_U();
+			t = NEXT();
 			if (t.type != PP_RPAR)
 				EXPECT(&t, PP_COMMA);
 
 			idx++;
 		} while(t.type == PP_COMMA);
 
-		t = NEXT_U();
+		t = NEXT();
 	}
 
 	while(!t.first_of_line) {
 		define_add_def(&def, t);
-		t = NEXT_U();
+		t = NEXT();
 	}
 
 	PUSH(t);
@@ -62,15 +73,74 @@ void directiver_define(void) {
 }
 
 void directiver_undef(void) {
-	struct token name = NEXT_U();
+	struct token name = NEXT();
 
 	EXPECT(&name, PP_IDENT);
 	define_map_remove(name.str);
 }
 
+static enum ttype get_punct(char **in_str) {
+	char *str = *in_str;
+
+	enum ttype type;
+
+#define SYM(A, B) else if(B[0] == *str && (sizeof(B) <= 2 || B[1] == *(str + 1)) && (sizeof(B) <= 3 || B[2] == *(str + 2))) { type = A; str += sizeof(B) - 1; }
+#define KEY(A, B)
+#define X(A, B)
+
+	if(0) {
+	}
+#include "tokens.h"
+	else {
+		ERROR("Unrecognized punctuation: %s %d", str, *str);
+	}
+
+#undef SYM
+#undef KEY
+#undef X
+
+
+	*in_str = str;
+	return type;
+}
+
+static struct token_list buffer;
+static int buffer_pos;
+
+struct token buffer_next() {
+	if (buffer_pos >= buffer.size)
+		return (struct token) { .type = T_EOI, .str = "" };
+	struct token *t = buffer.list + buffer_pos;
+	if (t->type == PP_PUNCT) {
+		enum ttype next_type = get_punct(&t->str);
+
+		if (*t->str == '\0')
+			buffer_pos++;
+
+		return (struct token) { .type = next_type, .str = "" };
+	} else if (t->type == PP_IDENT) {
+		buffer_pos++;
+		return (struct token) { .type = T_NUM, .str = "0" };
+	} else if (t->type == PP_NUMBER) {
+		buffer_pos++;
+		return (struct token) { .type = T_NUM, .str = t->str };
+	} else if (t->type == PP_LPAR) {
+		buffer_pos++;
+		return (struct token) { .type = T_LPAR };
+	} else if (t->type == PP_RPAR) {
+		buffer_pos++;
+		return (struct token) { .type = T_RPAR };
+	} else if (t->type == PP_COMMA) {
+		buffer_pos++;
+		return (struct token) { .type = T_COMMA };
+	} else {
+		return buffer.list[buffer_pos++];
+	}
+}
+
 intmax_t evaluate_expression(int prec, int evaluate) {
 	intmax_t expr = 0;
-	struct token t = NEXT_E();
+	struct token t = buffer_next();
 
 	if (t.type == T_ADD) {
 		expr = evaluate_expression(PREFIX_PREC, evaluate);
@@ -78,29 +148,12 @@ intmax_t evaluate_expression(int prec, int evaluate) {
 		expr = -evaluate_expression(PREFIX_PREC, evaluate);
 	} else if (t.type == T_NOT) {
 		expr = !evaluate_expression(PREFIX_PREC, evaluate);
-	} else if (t.type == PP_IDENT &&
-			   strcmp(t.str, "defined") == 0) {
-		struct token name;
-		struct token nt = NEXT_U();
-
-		if (strcmp(nt.str, "(") == 0) {
-			name = NEXT_U();
-			struct token rpar = NEXT_U();
-			if (strcmp(rpar.str, ")") != 0)
-				ERROR("Expected )");
-		} else {
-			name = nt;
-		}
-
-		expr = (define_map_get(name.str) != NULL);
-	} else if (t.type == PP_IDENT) {
-		expr = 0;
 	} else if (t.type == T_LPAR) {
 		expr = evaluate_expression(0, evaluate);
-		struct token rpar = NEXT_E();
+		struct token rpar = buffer_next();
 		if (rpar.type != T_RPAR) {
 			PRINT_POS(rpar.pos);
-			ERROR("Expected )");
+			ERROR("Expected ), got %s", dbg_token_type(rpar.type));
 		}
 	} else if (t.type == T_NUM) {
 		struct constant c = constant_from_string(t.str);
@@ -137,14 +190,14 @@ intmax_t evaluate_expression(int prec, int evaluate) {
 		ERROR("Invalid token in preprocessor expression. %s, in %s:%d", dbg_token(&t), t.pos.path, t.pos.line);
 	}
 
-	t = NEXT_E();
+	t = buffer_next();
 
 	while (prec < precedence_get(t.type, 1)) {
 		int new_prec = precedence_get(t.type, 0);
 
 		if (t.type == T_QUEST) {
 			int mid = evaluate_expression(0, expr ? evaluate : 0);
-			struct token colon = NEXT_E();
+			struct token colon = buffer_next();
 			assert(colon.type == T_COLON);
 			int rhs = evaluate_expression(new_prec, expr ? 0 : evaluate);
 			expr = expr ? mid : rhs;
@@ -191,23 +244,61 @@ intmax_t evaluate_expression(int prec, int evaluate) {
 			}
 		}
 
-		t = NEXT_E();
+		t = buffer_next();
 	}
 
-	PUSH(t);
+	if (buffer_pos == 0)
+		ERROR("Internal compiler error.");
+	buffer.list[--buffer_pos] = t;
+	// Push t.
 
 	return expr;
 }
 
+intmax_t evaluate_until_newline() {
+	buffer.size = 0;
+	struct token t = NEXT();
+	while (!t.first_of_line) {
+		if (strcmp(t.str, "defined") == 0) {
+			t = NEXT();
+			int has_lpar = t.type == PP_LPAR;
+			if (has_lpar)
+				t = NEXT();
+
+			int is_defined = define_map_get(t.str) != NULL;
+			token_list_add(&buffer, (struct token) {.type = PP_NUMBER, .str = is_defined ? "1" : "0"});
+
+			t = NEXT();
+
+			if (has_lpar) {
+				EXPECT(&t, PP_RPAR);
+				t = NEXT();
+			}
+		} else {
+			token_list_add(&buffer, t);
+
+			t = NEXT();
+		}
+	}
+	PUSH(t);
+
+	expand_token_list(&buffer);
+	token_list_add(&buffer, (struct token) { .type = T_EOI, .str = "" });
+
+	buffer_pos = 0;
+	intmax_t result = evaluate_expression(0, 1);
+
+	return result;
+}
+
 int directiver_evaluate_conditional(struct token dir) {
 	if (strcmp(dir.str, "ifdef") == 0) {
-		return (define_map_get(NEXT_U().str) != NULL);
+		return (define_map_get(NEXT().str) != NULL);
 	} else if (strcmp(dir.str, "ifndef") == 0) {
-		return !(define_map_get(NEXT_U().str) != NULL);
+		return !(define_map_get(NEXT().str) != NULL);
 	} else if (strcmp(dir.str, "if") == 0 ||
 			   strcmp(dir.str, "elif") == 0) {
-		intmax_t eval = evaluate_expression(0, 1);
-		return eval;
+		return evaluate_until_newline();
 	}
 
 	ERROR("Invalid conditional directive");
@@ -218,12 +309,12 @@ void directiver_flush_if(void) {
 	while (nest_level > 0) {
 		struct token t;
 		do {
-			t = NEXT_U();
+			t = NEXT();
 			if (t.type == T_EOI)
 				ERROR("Reading past end of file");
 		} while (t.type != PP_DIRECTIVE);
 
-		struct token dir = NEXT_U();
+		struct token dir = NEXT();
 		char *name = dir.str;
 		if (strcmp(name, "if") == 0 ||
 			strcmp(name, "ifdef") == 0 ||
@@ -246,7 +337,7 @@ void directiver_flush_if(void) {
 }
 
 void directiver_handle_pragma(void) {
-	struct token command = NEXT_U();
+	struct token command = NEXT();
 
 	if (strcmp(command.str, "once") == 0) {
 		tokenizer_disable_current_path();
@@ -256,9 +347,9 @@ void directiver_handle_pragma(void) {
 }
 
 struct token directiver_next(void) {
-	struct token t = NEXT_T();
+	struct token t = NEXT();
 	if (t.type == PP_DIRECTIVE) {
-		struct token directive = NEXT_U();
+		struct token directive = NEXT();
 
 		char *name = directive.str;
 		assert(directive.type == PP_IDENT);
@@ -266,11 +357,11 @@ struct token directiver_next(void) {
 		if (strcmp(name, "define") == 0) {
 			directiver_define();
 		} else if (strcmp(name, "undef") == 0) {
-			define_map_remove(NEXT_U().str);
+			define_map_remove(NEXT().str);
 		} else if (strcmp(name, "error") == 0) {
 			ERROR("#error directive was invoked on %s:%d", directive.pos.path, directive.pos.line);
 		} else if (strcmp(name, "include") == 0) {
-			struct token path_tok = NEXT_U();
+			struct token path_tok = NEXT();
 			char *path = path_tok.str;
 			tokenizer_push_input(path);
 		} else if (strcmp(name, "ifndef") == 0 ||
@@ -288,13 +379,13 @@ struct token directiver_next(void) {
 			directiver_handle_pragma();
 		} else if (strcmp(name, "line") == 0) {
 			// 6.10.4
-			struct token digit_seq = NEXT_E();
-			if (digit_seq.first_of_line || digit_seq.type != T_NUM)
+			struct token digit_seq = NEXT();
+			if (digit_seq.first_of_line || digit_seq.type != PP_NUMBER)
 				ERROR("Expected digit sequence after #line");
 			set_line(atoi(digit_seq.str));
 
 			// TODO: Make this also use NEXT_E(), currently a bit buggy.
-			struct token s_char_seq = NEXT_U();
+			struct token s_char_seq = NEXT();
 
 			if (s_char_seq.first_of_line) {
 				PUSH(s_char_seq);

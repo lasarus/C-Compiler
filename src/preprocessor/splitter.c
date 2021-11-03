@@ -4,7 +4,6 @@
 
 #include <common.h>
 
-#define NEXT_U() expander_next_unexpanded()
 #define NEXT() expander_next()
 
 static char *str_move(char **from) {
@@ -64,6 +63,8 @@ struct token splitter_next(void) {
 
 	if(in.type == PP_STRING) {
 		return token_init(T_STRING, str_move(&in.str), in.pos);
+	} else if(in.type == PP_CHARACTER_CONSTANT) {
+		return token_init(T_CHARACTER_CONSTANT, str_move(&in.str), in.pos);
 	} else if(in.type == PP_NUMBER) {
 		return token_init(T_NUM, str_move(&in.str), in.pos);
 	} else if(in.type == PP_PUNCT ||
@@ -80,42 +81,10 @@ struct token splitter_next(void) {
 		}
 
 		return splitter_next();
+	} else if (in.type == PP_IDENT) {
+		enum ttype type = get_ident(in.str);
+		return token_init(type, str_move(&in.str), in.pos);
 	} else {
 		return in;
 	}
-}
-
-struct token splitter_next_unexpanded(void) {
-	if (splitter.stack.size) {
-		struct token t = *token_list_top(&splitter.stack);
-		token_list_pop(&splitter.stack);
-		return t;
-	} else {
-		return NEXT_U();
-	}
-}
-
-struct token splitter_next_translate(void) {
-	struct token in = splitter_next();
-
-	if(in.type == PP_IDENT) {
-		struct token t = token_init(get_ident(in.str), NULL, in.pos);
-		if(t.type == T_IDENT)
-			t.str = str_move(&in.str);
-		return t;
-	} else if(in.type == PP_STRING) {
-		return token_init(T_STRING, str_move(&in.str), in.pos);
-	} else if(in.type == PP_CHARACTER_CONSTANT) {
-		return token_init(T_CHARACTER_CONSTANT, str_move(&in.str), in.pos);
-	} else if(in.type == PP_NUMBER) {
-		return token_init(T_NUM, str_move(&in.str), in.pos);
-	} else if(in.type == T_EOI) {
-		return token_init(T_EOI, NULL, in.pos);
-	} else if (in.type == PP_DIRECTIVE) {
-		return in;
-	} else {
-		return in;
-	}
-
-	ERROR("Can't process token %s\n", dbg_token(&in));
 }
