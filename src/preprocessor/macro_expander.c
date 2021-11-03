@@ -301,7 +301,7 @@ void subs_buffer(struct define *def, struct string_set *hs, struct position new_
 	int vararg_included = 0;
 	if(def->func) {
 		struct token lpar = input_buffer_take(input);
-		ASSERT_TYPE(lpar, PP_LPAR);
+		EXPECT(&lpar, PP_LPAR);
 
 		int finished = 0;
 		for (int i = 0; i < n_args; i++) {
@@ -321,7 +321,7 @@ void subs_buffer(struct define *def, struct string_set *hs, struct position new_
 		}
 		
 		struct token rpar = input_buffer_take(input);
-		ASSERT_TYPE(rpar, PP_RPAR);
+		EXPECT(&rpar, PP_RPAR);
 		finished = 1;
 
 		*hs = string_set_intersection(*hs, rpar.hs);

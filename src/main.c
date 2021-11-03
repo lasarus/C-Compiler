@@ -104,7 +104,7 @@ int main(int argc, char **argv) {
 	add_implementation_defs();
 	builtins_init();
 
-	preprocessor_create(arguments.input);
+	preprocessor_init(arguments.input);
 	parse_into_ir();
 	codegen(arguments.output);
 

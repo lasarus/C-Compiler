@@ -30,11 +30,7 @@ void unescape(char *str) {
 	*escaped = '\0';
 }
 
-struct token tmp(void);
-void p(struct token t);
-
 #define NEXT_U() splitter_next_unexpanded()
-
 #define NEXT_E() splitter_next()
 #define NEXT_T() splitter_next_translate()
 #define PUSH(T) expander_push_front(T)
@@ -58,16 +54,17 @@ void directiver_define(void) {
 			if (t.type == PP_PUNCT &&
 				strcmp(t.str, "...") == 0) {
 				t = NEXT_U();
-				ASSERT_TYPE(t, PP_RPAR);
+				EXPECT(&t, PP_RPAR);
 				def.vararg = 1;
 				def.func = 1;
 				break;
 			}
-			ASSERT_TYPE(t, PP_IDENT);
+			EXPECT(&t, PP_IDENT);
 			define_add_par(&def, t);
 
 			t = NEXT_U();
-			ASSERT_TYPE2(t, PP_COMMA, PP_RPAR);
+			if (t.type != PP_RPAR)
+				EXPECT(&t, PP_COMMA);
 
 			idx++;
 		} while(t.type == PP_COMMA);
@@ -88,7 +85,7 @@ void directiver_define(void) {
 void directiver_undef(void) {
 	struct token name = NEXT_U();
 
-	ASSERT_TYPE(name, PP_IDENT);
+	EXPECT(&name, PP_IDENT);
 	define_map_remove(name.str);
 }
 
