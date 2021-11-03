@@ -1,5 +1,4 @@
 #include "tokenizer.h"
-#include "syntax.h"
 #include "search_path.h"
 #include "input.h"
 
@@ -7,6 +6,7 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <limits.h>
 
 static struct tokenizer {
 	struct input *top;
@@ -20,6 +20,32 @@ static struct tokenizer {
 
 size_t disallowed_size, disallowed_cap;
 char **disallowed = NULL;
+
+enum {
+	C_DIGIT = 0x1,
+	C_OCTAL_DIGIT = 0x2,
+	C_HEXADECIMAL_DIGIT = 0x4,
+	C_SIGN = 0x8,
+	C_SPACE = 0x10,
+	C_IDENTIFIER_NONDIGIT = 0x20,
+};
+
+// Sorry for this hardcoded table.
+// These are the constants above, and ored together to build a lookup table.
+// E.g.: char_props['c'] = CHAR_HEXADECIMAL_DIGIT | CHAR_IDENTIFIER_NONDIGIT
+unsigned char char_props[UCHAR_MAX] = {
+	['\t'] = 0x10, 0x10, 0x10, 0x10, 
+	[' '] = 0x10, ['$'] = 0x20, 
+	['+'] = 0x8, ['-'] = 0x8, 
+	['_'] = 0x20, 
+	['0'] = 0x7, 0x7, 0x7, 0x7, 0x7, 0x7, 0x7, 0x7, 0x5, 0x5, 
+	['A'] = 0x24, 0x24, 0x24, 0x24, 0x24, 0x24, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 
+	0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 
+	['a'] = 0x24, 0x24, 0x24, 0x24, 0x24, 0x24, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 
+	0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20
+};
+
+#define HAS_PROP(C, PROP) (char_props[(unsigned char)(C)] & (PROP))
 
 static void push_input(struct file file) {
 	struct input *n_top = malloc(sizeof *n_top);
@@ -60,7 +86,7 @@ static void tokenizer_pop_input(void) {
 
 void flush_whitespace(int *whitespace, int *first_of_line) {
 	for (;;) {
-		if (is_space(C0)) {
+		if (HAS_PROP(C0, C_SPACE)) {
 			if(C0 == '\n')
 				*first_of_line = 1;
 
@@ -103,26 +129,51 @@ char *buffer_get(void) {
 	return strdup(buffer);
 }
 
-int parse_pp_token(enum ttype type, struct token *t,
-				   int (*is_token)(char c, char nc, int initial)) {
-	if (!is_token(C0, C1, 1))
+int parse_identifier(struct token *next) {
+	if (!HAS_PROP(C0, C_IDENTIFIER_NONDIGIT))
 		return 0;
 
 	buffer_start();
 
-	int advance = 0, initial = 1;
-	while((advance = is_token(C0, C1, initial)) > 0) {
-		initial = 0;
-		for (int i = 0; i < advance; i++) {
+	while(HAS_PROP(C0, C_IDENTIFIER_NONDIGIT | C_DIGIT)) {
+		buffer_write(C0);
+		CNEXT();
+	}
+
+	buffer_write('\0');
+
+	next->type = PP_IDENT;
+	next->str = buffer_get();
+	return 1;
+}
+
+int parse_pp_number(struct token *next) {
+	if (!(HAS_PROP(C0, C_DIGIT) ||
+		  (C0 == '.' && HAS_PROP(C1, C_DIGIT))))
+		return 0;
+
+	buffer_start();
+
+	for (;;) {
+		if (HAS_PROP(C0, C_DIGIT | C_IDENTIFIER_NONDIGIT) || C0 == '.') {
 			buffer_write(C0);
 			CNEXT();
+		} else if ((C0 == 'e' || C0 == 'E' ||
+					C0 == 'p' || C0 == 'P') &&
+				   HAS_PROP(C1, C_SIGN)) {
+			buffer_write(C0);
+			CNEXT();
+			buffer_write(C0);
+			CNEXT();
+		} else {
+			break;
 		}
 	}
 
 	buffer_write('\0');
 
-	t->type = type;
-	t->str = buffer_get();
+	next->type = PP_NUMBER;
+	next->str = buffer_get();
 	return 1;
 }
 
@@ -132,9 +183,9 @@ int parse_escape_sequence(int *character) {
 
 	CNEXT();
 
-	if (is_octal_digit(C0)) {
+	if (HAS_PROP(C0, C_OCTAL_DIGIT)) {
 		int result = 0;
-		for (int i = 0; i < 3 && is_octal_digit(C0); i++) {
+		for (int i = 0; i < 3 && HAS_PROP(C0, C_OCTAL_DIGIT); i++) {
 			result *= 8;
 			result += C0 - '0';
 			CNEXT();
@@ -147,10 +198,10 @@ int parse_escape_sequence(int *character) {
 		CNEXT();
 		int result = 0;
 
-		for (; is_hexadecimal_digit(C0); CNEXT()) {
+		for (; HAS_PROP(C0, C_HEXADECIMAL_DIGIT); CNEXT()) {
 			result *= 16;
 			char digit = C0;
-			if (is_digit(digit)) {
+			if (HAS_PROP(digit, C_DIGIT)) {
 				result += digit - '0';
 			} else if (digit >= 'a' && digit <= 'f') {
 				result += digit - 'a' + 10;
@@ -315,12 +366,10 @@ struct token tokenizer_next(void) {
 	} else if(IFSTR(",", PP_COMMA)) {
 	} else if (tok.header && parse_pp_header_name(&next)) {
 	} else if(parse_string(&next)) {
-	} else if(parse_pp_token(PP_IDENT, &next,
-							 is_identifier)) {
+	} else if(parse_identifier(&next)) {
 	} else if(parse_punctuator(&next)) {
 	} else if(parse_character_constant(&next)) {
-	} else if(parse_pp_token(PP_NUMBER, &next,
-							 is_pp_number)) {
+	} else if(parse_pp_number(&next)) {
 	} else if(C0 == '\0') {
 		if (tok.top->next) {
 			// Retry on popped source.
