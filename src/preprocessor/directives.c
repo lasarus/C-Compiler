@@ -64,7 +64,7 @@ void directiver_define(void) {
 				break;
 			}
 			ASSERT_TYPE(t, PP_IDENT);
-			define_add_par(&def, token_move(&t));
+			define_add_par(&def, t);
 
 			t = NEXT_U();
 			ASSERT_TYPE2(t, PP_COMMA, PP_RPAR);
@@ -76,7 +76,7 @@ void directiver_define(void) {
 	}
 
 	while(!t.first_of_line) {
-		define_add_def(&def, token_move(&t));
+		define_add_def(&def, t);
 		t = NEXT_U();
 	}
 

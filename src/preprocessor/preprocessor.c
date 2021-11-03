@@ -28,27 +28,10 @@ struct token token_init(enum ttype type, char *str, struct position pos) {
 	return (struct token) { .type = type, .str = str, .pos = pos };
 }
 
-struct token token_move(struct token *from) {
-	struct token to = *from;
-	*from = token_init(T_NONE, NULL, (struct position) {
-			.path = "invalid",
-			.line = 0,
-			.column = 0
-		});
-	return to;
-}
-
 struct token token_dup(struct token *from) {
 	struct token t = *from;
 	t.str = strdup(from->str);
 	t.hs = string_set_dup(from->hs);
-	return t;
-}
-
-struct token token_dup_from_hs(struct token *from, struct string_set hs) {
-	struct token t = *from;
-	t.str = strdup(from->str);
-	t.hs = hs;
 	return t;
 }
 

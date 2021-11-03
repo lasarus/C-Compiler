@@ -35,9 +35,7 @@ struct token {
 };
 
 struct token token_init(enum ttype type, char *str, struct position pos);
-struct token token_move(struct token *from);
 struct token token_dup(struct token *from);
-struct token token_dup_from_hs(struct token *from, struct string_set hs);
 
 #define ASSERT_TYPE2(TOKEN, TYPE1, TYPE2) do { if(TOKEN.type != TYPE1 && TOKEN.type != TYPE2) { ERROR("Unexpected token %i %s\n", TOKEN.type, TOKEN.str); } } while(0)
 #define ASSERT_TYPE(TOKEN, TYPE) ASSERT_TYPE2(TOKEN, TYPE, T_NONE)
