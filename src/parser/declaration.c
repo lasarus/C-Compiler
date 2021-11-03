@@ -142,7 +142,7 @@ int parse_specifier(struct type_specifiers *ts,
 		}
 
 		if (TACCEPT(T_KENUM)) {
-			PRINT_POS(TPEEK(0)->pos);
+			PRINT_POS(T0->pos);
 			ERROR("Not implemented");
 		}
 
@@ -150,9 +150,9 @@ int parse_specifier(struct type_specifiers *ts,
 			ERROR("Not implemented");
 		}
 
-		if (TPEEK(0)->type == T_IDENT && !*got_ts) {
+		if (T0->type == T_IDENT && !*got_ts) {
 			*got_ts = 1;
-			char *name = TPEEK(0)->str;
+			char *name = T0->str;
 
 			struct symbol_typedef *sym = symbols_get_typedef(name);
 
@@ -186,7 +186,7 @@ int parse_specifier(struct type_specifiers *ts,
 		ACCEPT_INCREMENT(T_KNORETURN, fs->noreturn_n);
 	}
 	if (as) {
-		switch (TPEEK(0)->type) {
+		switch (T0->type) {
 		case T_KALIGNAS:
 			ERROR("_Alignas not implemented");
 		default: break;
@@ -208,7 +208,7 @@ int parse_specifiers(struct type_specifiers *ts,
 	if (as) *as = (struct alignment_specifiers){ 0 };
 
 	if (ts)
-		ts->pos = TPEEK(0)->pos;
+		ts->pos = T0->pos;
 	int matched = 0;
 	int got_ts = 0;
 	while (parse_specifier(ts, scs, tq, fs, as, &got_ts)) {
@@ -218,10 +218,10 @@ int parse_specifiers(struct type_specifiers *ts,
 }
 
 int parse_enumerator(struct constant *prev, int first) {
-	if (TPEEK(0)->type != T_IDENT)
+	if (T0->type != T_IDENT)
 		return 0;
 
-	char *name = TPEEK(0)->str;
+	char *name = T0->str;
 	TNEXT();
 
 	struct constant val;
@@ -263,8 +263,8 @@ int parse_enum(struct type_specifiers *ts) {
 
 	char *name = NULL;
 
-	if (TPEEK(0)->type == T_IDENT) {
-		name = TPEEK(0)->str;
+	if (T0->type == T_IDENT) {
+		name = T0->str;
 		TNEXT();
 	} else {
 		static int anonymous_counter = 0;
@@ -336,8 +336,8 @@ int parse_struct(struct type_specifiers *ts) {
 
 	accept_attribute(&is_packed);
 
-	if (TPEEK(0)->type == T_IDENT) {
-		name = TPEEK(0)->str;
+	if (T0->type == T_IDENT) {
+		name = T0->str;
 		TNEXT();
 	} else {
 		static int anonymous_counter = 0;
@@ -434,7 +434,7 @@ int parse_struct(struct type_specifiers *ts) {
 		} else {
 			data = def->struct_data;
 			if (data->is_complete) {
-				PRINT_POS(TPEEK(0)->pos);
+				PRINT_POS(T0->pos);
 				ERROR("Redeclaring struct/union %s", name);
 			}
 		}
@@ -477,7 +477,7 @@ int parse_struct(struct type_specifiers *ts) {
 		}
 
 		if (!is_union && def->type != STRUCT_STRUCT) {
-			PRINT_POS(TPEEK(0)->pos);
+			PRINT_POS(T0->pos);
 			ERROR("%s Previously not a struct", name);
 		} else if (is_union && def->type != STRUCT_UNION) {
 			ERROR("Previously not a union");
@@ -782,8 +782,8 @@ struct type_ast *parse_function_parameters(struct type_ast *parent, int *has_sym
 	}
 
 	struct parameter_list parameters = { 0 };
-	if (TPEEK(0)->type == T_KVOID &&
-		TPEEK(1)->type == T_RPAR) {
+	if (T0->type == T_KVOID &&
+		T1->type == T_RPAR) {
 		TNEXT();
 		TNEXT();
 	} else {
@@ -807,10 +807,10 @@ struct type_ast *parse_function_parameters(struct type_ast *parent, int *has_sym
 
 struct type_ast *parse_declarator(int *was_abstract, int *has_symbols) {
 	struct type_ast *ast = NULL;
-	if (TPEEK(0)->type == T_IDENT) {
+	if (T0->type == T_IDENT) {
 		ast = type_ast_new((struct type_ast){
 				.type = TAST_TERMINAL,
-				.terminal.name = strdup(TPEEK(0)->str)
+				.terminal.name = strdup(T0->str)
 			});
 		if (was_abstract)
 			*was_abstract = 0;
@@ -860,8 +860,8 @@ struct type_ast *parse_declarator(int *was_abstract, int *has_symbols) {
 		return NULL;
 	}
 
-	while (TPEEK(0)->type == T_LPAR ||
-		   TPEEK(0)->type == T_LBRACK) {
+	while (T0->type == T_LPAR ||
+		   T0->type == T_LBRACK) {
 		if (TACCEPT(T_LBRACK)) {
 			struct type_ast arr;
 			arr.type = TAST_ARRAY;
@@ -955,9 +955,9 @@ int parse_non_brace_initializer(struct type **type, int offset, int bit_offset,
 	} else if (((*type)->type == TY_ARRAY || (*type)->type == TY_INCOMPLETE_ARRAY) &&
 			   type_is_simple((*type)->children[0], ST_CHAR)) {
 		char *str;
-		if (T0->type == T_LBRACE && TPEEK(1)->type == T_STRING &&
-			TPEEK(2)->type == T_RBRACE) {
-			str = TPEEK(1)->str;
+		if (T0->type == T_LBRACE && T1->type == T_STRING &&
+			T2->type == T_RBRACE) {
+			str = T1->str;
 			TNEXT();
 			TNEXT();
 			TNEXT();
@@ -1258,7 +1258,7 @@ int parse_init_declarator(struct specifiers s, int external, int *was_func) {
 		return 0;
 
 	if (was_abstract) {
-		PRINT_POS(TPEEK(0)->pos);
+		PRINT_POS(T0->pos);
 		ERROR("\nDeclaration can't be abstract");
 	}
 
@@ -1266,7 +1266,7 @@ int parse_init_declarator(struct specifiers s, int external, int *was_func) {
 	char *name;
 	type = ast_to_type(&s.ts, &s.tq, ast, &name, 0);
 
-	if (TPEEK(0)->type == T_LBRACE) {
+	if (T0->type == T_LBRACE) {
 		int arg_n = 0;
 		var_id *args = NULL;
 		ast_get_parameters(ast, &arg_n, &args);

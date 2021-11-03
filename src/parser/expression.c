@@ -939,7 +939,7 @@ struct expr *parse_prefix() {
 		return type_sizeof(type);
 	} else if (TACCEPT(T_KALIGNOF)) {
 		NOTIMP();
-	} else if (T_ISNEXT(T_IDENT)) {
+	} else if (T0->type == T_IDENT) {
 		struct symbol_identifier *sym = symbols_get_identifier(T0->str);
 
 		if (!sym) {
@@ -985,18 +985,18 @@ struct expr *parse_prefix() {
 			printf("%s\n", T0->str);
 			NOTIMP();
 		}
-	} else if (T_ISNEXT(T_STRING)) {
+	} else if (T0->type == T_STRING) {
 		const char *str = T0->str;
 		TNEXT();
 		return EXPR_STR(str);
-	} else if (T_ISNEXT(T_NUM)) {
+	} else if (T0->type == T_NUM) {
 		struct constant c = constant_from_string(T0->str);
 		TNEXT();
 		return expr_new((struct expr) {
 				.type = E_CONSTANT,
 				.constant = c
 			});
-	} else if (T_ISNEXT(T_CHARACTER_CONSTANT)) {
+	} else if (T0->type == T_CHARACTER_CONSTANT) {
 		const char *str = T0->str;
 		TNEXT();
 		return EXPR_INT(character_constant_to_int(str));

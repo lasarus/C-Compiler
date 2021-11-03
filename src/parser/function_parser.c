@@ -43,8 +43,8 @@ int parse_iteration_statement(struct jump_blocks jump_blocks);
 int parse_jump_statement(struct jump_blocks jump_blocks);
 
 int parse_labeled_statement(struct jump_blocks jump_blocks) {
-	if (TPEEK(0)->type == T_IDENT &&
-		TPEEK(1)->type == T_COLON) {
+	if (T0->type == T_IDENT &&
+		T1->type == T_COLON) {
 		const char *label = T0->str;
 		TNEXT();
 		TNEXT();

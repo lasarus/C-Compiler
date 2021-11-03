@@ -90,14 +90,6 @@ int T_accept(enum ttype type) {
 	return 0;
 }
 
-void T_expect(enum ttype type) {
-	if (ts.t.type == type) {
-		t_next();
-		return;
-	}
-	ERROR("Expected %s got %s", dbg_token_type(type), dbg_token(&ts.t));
-}
-
 struct token *T_peek(int n) {
 	if (n == 0)
 		return &ts.t;

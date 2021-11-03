@@ -49,10 +49,10 @@ struct token token_dup_from_hs(struct token *from, struct string_set hs);
 	} while (0)
 #define TACCEPT(T) T_accept(T)
 #define TEXPECT(TYPE) do {												\
-		if (TPEEK(0)->type == TYPE) {									\
+		if (T0->type == TYPE) {									\
 			TNEXT();													\
 		} else {														\
-			struct token *t = TPEEK(0);									\
+			struct token *t = T0;									\
 			printf("On line %d col %d file %s\n", t->pos.line, t->pos.column, t->pos.path); \
 			printf("Got %s, expected %s\n", strdup(dbg_token(t)), dbg_token_type(TYPE)); \
 			if (t->str)													\
@@ -60,15 +60,14 @@ struct token token_dup_from_hs(struct token *from, struct string_set hs);
 			ERROR("Expected other token");								\
 		}																\
 	} while (0)
-#define TPEEK(N) T_peek(N)
 
-#define T0 (TPEEK(0))
-#define T_ISNEXT(TYPE) (T0->type == (TYPE))
+#define T0 (T_peek(0))
+#define T1 (T_peek(1))
+#define T2 (T_peek(2))
 
 void t_next(void);
 void t_push(struct token t);
 int T_accept(enum ttype type);
-void T_expect(enum ttype type);
 struct token *T_peek(int n);
 void preprocessor_create(const char *path);
 
