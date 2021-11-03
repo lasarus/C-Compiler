@@ -7,15 +7,12 @@
 #include <string.h>
 #include <limits.h>
 
-static struct tokenizer {
-	struct input *top;
-	int header;
-} tok;
+static struct input *input;
 
-#define C0 (tok.top->c[0])
-#define C1 (tok.top->c[1])
-#define C2 (tok.top->c[2])
-#define CNEXT() input_next(tok.top)
+#define C0 (input->c[0])
+#define C1 (input->c[1])
+#define C2 (input->c[2])
+#define CNEXT() input_next(input)
 
 // Used for #pragma once.
 static struct string_set disallowed_headers;
@@ -47,8 +44,8 @@ static const unsigned char char_props[UCHAR_MAX] = {
 static void push_input(struct file file) {
 	struct input *n_top = malloc(sizeof *n_top);
 	*n_top = input_create(file);
-	n_top->next = tok.top;
-	tok.top = n_top;
+	n_top->next = input;
+	input = n_top;
 }
 
 void tokenizer_push_input_absolute(const char *path) {
@@ -60,7 +57,7 @@ void tokenizer_push_input_absolute(const char *path) {
 }
 
 void tokenizer_push_input(const char *rel_path) {
-	struct file file = search_include(&tok.top->file, rel_path);
+	struct file file = search_include(&input->file, rel_path);
 
 	if (string_set_contains(disallowed_headers, file.full))
 		return;
@@ -69,12 +66,12 @@ void tokenizer_push_input(const char *rel_path) {
 }
 
 void tokenizer_disable_current_path(void) {
-	string_set_insert(&disallowed_headers, strdup(tok.top->file.full));
+	string_set_insert(&disallowed_headers, strdup(input->file.full));
 }
 
 static void tokenizer_pop_input(void) {
-	struct input *prev = tok.top;
-	tok.top = prev->next;
+	struct input *prev = input;
+	input = prev->next;
 	input_free(prev);
 	free(prev);
 }
@@ -339,11 +336,16 @@ static int parse_punctuator(struct token *next) {
 	return 1;
 }
 
+static int is_header, is_directive;
+
 struct token tokenizer_next(void) {
 	struct token next = token_init(T_NONE, NULL, (struct position){0});
 
 	flush_whitespace(&next.whitespace,
 					 &next.first_of_line);
+
+	if (next.first_of_line)
+		is_header = 0;
 
 	int advance = 0;
 #define IFSTR(S, TOK)	(C0 == S[0] &&						\
@@ -351,22 +353,27 @@ struct token tokenizer_next(void) {
 		(next.type = TOK, next.str = strdup(S),							\
 		 advance = sizeof(S) - 1, 1)									\
 
-	next.pos = tok.top->pos[0];
+	next.pos = input->pos[0];
 
 	if(IFSTR("##", PP_HHASH)) {
 	} else if(next.first_of_line && IFSTR("#", PP_DIRECTIVE)) {
+		is_directive = 1;
 	} else if(IFSTR("#", PP_HASH)) {
 	} else if(IFSTR("(", PP_LPAR)) {
 	} else if(IFSTR(")", PP_RPAR)) {
 	} else if(IFSTR(",", PP_COMMA)) {
-	} else if (tok.header && parse_pp_header_name(&next)) {
+	} else if (is_header && parse_pp_header_name(&next)) {
 	} else if(parse_string(&next)) {
 	} else if(parse_identifier(&next)) {
+		if (is_directive) {
+			is_header = strcmp(next.str, "include") == 0;
+			is_directive = 0;
+		}
 	} else if(parse_punctuator(&next)) {
 	} else if(parse_character_constant(&next)) {
 	} else if(parse_pp_number(&next)) {
 	} else if(C0 == '\0') {
-		if (tok.top->next) {
+		if (input->next) {
 			// Retry on popped source.
 			tokenizer_pop_input();
 			return tokenizer_next();
@@ -386,23 +393,19 @@ struct token tokenizer_next(void) {
 	return next;
 }
 
-void set_header(int i) {
-	tok.header = i;
-}
-
 void set_line(int line) {
-	int diff = line - tok.top->pos[0].line;
+	int diff = line - input->pos[0].line;
 	for (int i = 0; i < N_BUFF; i++)
-		tok.top->pos[i].line += diff;
+		input->pos[i].line += diff;
 	for (int i = 0; i < INT_BUFF; i++)
-		tok.top->ipos[i].line += diff;
-	tok.top->iline = tok.top->ipos[INT_BUFF - 1].line;
+		input->ipos[i].line += diff;
+	input->iline = input->ipos[INT_BUFF - 1].line;
 }
 
 void set_filename(char *name) {
 	for (int i = 0; i < N_BUFF; i++)
-		tok.top->pos[i].path = name;
+		input->pos[i].path = name;
 	for (int i = 0; i < INT_BUFF; i++)
-		tok.top->ipos[i].path = name;
-	tok.top->file.full = name;
+		input->ipos[i].path = name;
+	input->file.full = name;
 }

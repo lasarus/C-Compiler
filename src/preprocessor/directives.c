@@ -270,9 +270,7 @@ struct token directiver_next(void) {
 		} else if (strcmp(name, "error") == 0) {
 			ERROR("#error directive was invoked on %s:%d", directive.pos.path, directive.pos.line);
 		} else if (strcmp(name, "include") == 0) {
-			set_header(1);
 			struct token path_tok = NEXT_U();
-			set_header(0);
 			char *path = path_tok.str;
 			tokenizer_push_input(path);
 		} else if (strcmp(name, "ifndef") == 0 ||
