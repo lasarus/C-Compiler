@@ -35,7 +35,6 @@ struct token {
 };
 
 struct token token_init(enum ttype type, char *str, struct position pos);
-void token_delete(struct token *from);
 struct token token_move(struct token *from);
 struct token token_dup(struct token *from);
 struct token token_dup_from_hs(struct token *from, struct string_set hs);

@@ -28,11 +28,6 @@ struct token token_init(enum ttype type, char *str, struct position pos) {
 	return (struct token) { .type = type, .str = str, .pos = pos };
 }
 
-void token_delete(struct token *from) {
-	from->str = 0;
-	from->type = T_NONE;
-}
-
 struct token token_move(struct token *from) {
 	struct token to = *from;
 	*from = token_init(T_NONE, NULL, (struct position) {
@@ -55,12 +50,6 @@ struct token token_dup_from_hs(struct token *from, struct string_set hs) {
 	t.str = strdup(from->str);
 	t.hs = hs;
 	return t;
-}
-
-void token_free(struct token *from) {
-	free(from->str);
-	string_set_free(from->hs);
-	token_delete(from);
 }
 
 void t_next() {
