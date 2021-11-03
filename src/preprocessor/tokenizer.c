@@ -65,10 +65,8 @@ void flush_whitespace(int *whitespace, int *first_of_line) {
 				*first_of_line = 1;
 
 			CNEXT();
-		} else if (C0 == '/' &&
-				   C1 == '*') {
-			while (!(C0 == '*' &&
-					 C1 == '/')) {
+		} else if (C0 == '/' && C1 == '*') {
+			while (!(C0 == '*' && C1 == '/')) {
 				CNEXT();
 
 				if (C0 == '\0')
@@ -76,8 +74,7 @@ void flush_whitespace(int *whitespace, int *first_of_line) {
 			}
 			CNEXT();
 			CNEXT();
-		} else if (C0 == '/' &&
-				   C1 == '/') {
+		} else if (C0 == '/' && C1 == '/') {
 			while (!(C0 == '\n')) {
 				CNEXT();
 
@@ -126,35 +123,6 @@ int parse_pp_token(enum ttype type, struct token *t,
 
 	t->type = type;
 	t->str = buffer_get();
-	return 1;
-}
-
-int parse_pp_header_name(struct token *t) {
-	int hchar;
-	if (C0 == '"')
-		hchar = 0;
-	else if (C0 == '<')
-		hchar = 1;
-	else
-		return 0;
-
-	buffer_start();
-
-	int initial = 1;
-	while (initial || (hchar && is_hchar(C0)) ||
-		   (!hchar && is_qchar(C0))) {
-		initial = 0;
-		buffer_write(C0);
-		CNEXT();
-	}
-
-	buffer_write(C0);
-	buffer_write('\0');
-	t->type = PP_HEADER_NAME;
-	t->str = buffer_get();
-
-	CNEXT();
-
 	return 1;
 }
 
@@ -217,17 +185,37 @@ int parse_escape_sequence(int *character) {
 	return 1;
 }
 
-int parse_cs_char(int *character, int is_schar) {
+int parse_cs_char(int *character, char end_char) {
 	char c = C0;
 	if (parse_escape_sequence(character)) {
 		return 1;
-	} else if (c == '\n' || c == (is_schar ? '\"' : '\'')) {
+	} else if (c == '\n' || c == end_char) {
 		return 0;
 	} else {
 		CNEXT();
 		*character = c;
 		return 1;
 	}
+}
+
+char *parse_string_like(void) {
+	char end_char = C0 == '<' ? '>' : C0;
+	CNEXT();
+
+	buffer_start();
+
+	int character;
+	while (parse_cs_char(&character, end_char))
+		buffer_write((char)character);
+
+	if (C0 != end_char)
+		ERROR("Expected %c", end_char);
+
+	buffer_write('\0');
+
+	CNEXT();
+
+	return buffer_get();
 }
 
 int parse_string(struct token *next) {
@@ -247,23 +235,19 @@ int parse_string(struct token *next) {
 	} else if (C0 != '"') {
 		return 0;
 	}
-	buffer_start();
-
-	CNEXT();
-
-	int character;
-	while (parse_cs_char(&character, 1))
-		buffer_write((char)character);
-
-	if (C0 != '"')
-		ERROR("Expected \"");
-
-	buffer_write('\0');
-
-	CNEXT();
 
 	next->type = PP_STRING;
-	next->str = buffer_get();
+	next->str = parse_string_like();
+
+	return 1;
+}
+
+int parse_pp_header_name(struct token *next) {
+	if (C0 != '"' && C0 != '<')
+		return 0;
+
+	next->type = PP_HEADER_NAME;
+	next->str = parse_string_like();
 
 	return 1;
 }
@@ -272,23 +256,8 @@ int parse_character_constant(struct token *next) {
 	if (C0 != '\'')
 		return 0;
 
-	CNEXT();
-
-	buffer_start();
-
-	int character;
-	while (parse_cs_char(&character, 0))
-		buffer_write((char)character);
-
-	if (C0 != '\'')
-		ERROR("Expected \'");
-
-	buffer_write('\0');
-
-	CNEXT();
-
 	next->type = PP_CHARACTER_CONSTANT;
-	next->str = buffer_get();
+	next->str = parse_string_like();
 
 	return 1;
 }

@@ -11,7 +11,5 @@ int is_identifier_nondigit(char c);
 int is_identifier(char c, char nc, int initial);
 int is_pp_number(char c, char nc, int initial);
 int is_punctuator(char c, char nc, int initial);
-int is_hchar(char c);
-int is_qchar(char c);
 
 #endif

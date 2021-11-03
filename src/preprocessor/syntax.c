@@ -81,11 +81,3 @@ int is_punctuator(char c, char nc, int initial) {
 	}
 	return 0;
 }
-
-int is_hchar(char c) {
-	return c != '>' && c != '\n';
-}
-
-int is_qchar(char c) {
-	return c != '"' && c != '\n';
-}

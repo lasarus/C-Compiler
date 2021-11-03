@@ -9,27 +9,6 @@
 
 #include <assert.h>
 
-void unescape(char *str) {
-	char *escaped = str;
-	int header = *str == '<';
-
-	str++;
-
-	for(;*str; str++) {
-		if (header && *str == '>')
-			break;
-		else if (*str == '"')
-			break;
-		else if (*str == '\\') {
-			str++;
-			*(escaped++) = *str;
-		} else {
-			*(escaped++) = *str;
-		}
-	}
-	*escaped = '\0';
-}
-
 #define NEXT_U() splitter_next_unexpanded()
 #define NEXT_E() splitter_next()
 #define NEXT_T() splitter_next_translate()
@@ -295,7 +274,6 @@ struct token directiver_next(void) {
 			struct token path_tok = NEXT_U();
 			set_header(0);
 			char *path = path_tok.str;
-			unescape(path);
 			tokenizer_push_input(path);
 		} else if (strcmp(name, "ifndef") == 0 ||
 				   strcmp(name, "ifdef") == 0 ||
