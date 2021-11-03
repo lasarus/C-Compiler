@@ -22,8 +22,6 @@ struct define *define_map_get(char *str);
 void define_map_remove(char *name);
 
 struct token expander_next(void);
-struct token expander_next_unexpanded(void);
-void expander_push_front(struct token t);
 
 void expand_token_list(struct token_list *ts);
 

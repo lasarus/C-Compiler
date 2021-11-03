@@ -455,15 +455,6 @@ struct token expander_next(void) {
 	return t;
 }
 
-struct token expander_next_unexpanded(void) {
-	struct token t = input_buffer_take(1);
-	return t;
-}
-
-void expander_push_front(struct token t) {
-	input_buffer_push(&t);
-}
-
 void expand_token_list(struct token_list *ts) {
 	input_buffer_push(&(struct token) { .type = T_EOI, .str = "" });
 

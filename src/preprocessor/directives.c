@@ -379,20 +379,56 @@ struct token directiver_next(void) {
 			directiver_handle_pragma();
 		} else if (strcmp(name, "line") == 0) {
 			// 6.10.4
-			struct token digit_seq = NEXT();
+			struct token digit_seq = NEXT(), s_char_seq, to_be_pushed;
+
+			if (digit_seq.first_of_line)
+				ERROR("Expected digit sequence after #line");
+
+			int has_s_char_seq = 0;
+			if (digit_seq.type != PP_NUMBER) {
+				buffer.size = 0;
+				to_be_pushed = digit_seq;
+				while (!to_be_pushed.first_of_line) {
+					token_list_add(&buffer, to_be_pushed);
+					to_be_pushed = NEXT();
+				}
+
+				expand_token_list(&buffer);
+
+				if (buffer.size == 0) {
+					PRINT_POS(digit_seq.pos);
+					ERROR("Invalid #line macro expansion");
+				} else if (buffer.size >= 1) {
+					digit_seq = buffer.list[0];
+				} else if (buffer.size >= 2) {
+					s_char_seq = buffer.list[1];
+					has_s_char_seq = 1;
+				}
+			} else {
+				s_char_seq = NEXT();
+				if (s_char_seq.first_of_line) {
+					to_be_pushed = s_char_seq;
+				} else {
+					to_be_pushed = NEXT();
+					has_s_char_seq = 1;
+				}
+			}
+
 			if (digit_seq.first_of_line || digit_seq.type != PP_NUMBER)
 				ERROR("Expected digit sequence after #line");
-			set_line(atoi(digit_seq.str));
 
-			// TODO: Make this also use NEXT_E(), currently a bit buggy.
-			struct token s_char_seq = NEXT();
+			int new_line = atoi(digit_seq.str);
+			to_be_pushed.pos.line = new_line + to_be_pushed.pos.line - directive.pos.line - 1;
+			set_line(to_be_pushed.pos.line);
 
-			if (s_char_seq.first_of_line) {
-				PUSH(s_char_seq);
-			} else if (s_char_seq.type == PP_STRING) {
-				set_filename(s_char_seq.str);
-			} else {
-				ERROR("Expected s char sequence as second argument to #line");
+			PUSH(to_be_pushed);
+
+			if (has_s_char_seq) {
+				if (s_char_seq.type == PP_STRING) {
+					set_filename(s_char_seq.str);
+				} else {
+					ERROR("Expected s char sequence as second argument to #line");
+				}
 			}
 		} else {
 			PRINT_POS(directive.pos);

@@ -15,8 +15,17 @@ int main() {
 					  MACRO) == 21);
 	#line 2
 
-	assert(__LINE__ == 3);
+	printf("%d\n", __LINE__);
+	assert(__LINE__ == 4);
 
 	#line 4 "notline.c"
 	assert(strcmp(__FILE__, "notline.c") == 0);
+	
+#undef MACRO
+#define MACRO 13
+  
+#line MACRO
+#if __LINE__ != 13
+#error
+#endif
 }
