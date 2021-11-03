@@ -347,11 +347,10 @@ struct token tokenizer_next(void) {
 	if (next.first_of_line)
 		is_header = 0;
 
-	int advance = 0;
 #define IFSTR(S, TOK)	(C0 == S[0] &&						\
 						 (sizeof(S) == 2 || C1 == S[1])) &&	\
-		(next.type = TOK, next.str = strdup(S),							\
-		 advance = sizeof(S) - 1, 1)									\
+		(next.type = TOK, next.str = strdup(S),				\
+		 CNEXT(), (sizeof(S) == 3) && (CNEXT(), 1), 1)		\
 
 	next.pos = input->pos[0];
 
@@ -386,9 +385,6 @@ struct token tokenizer_next(void) {
 		ERROR("Unrecognized preprocessing token! Starting with '%c', %d\n", C0, C0);
 	}
 #undef IFSTR
-
-	for(; advance > 0; advance--)
-		CNEXT();
 
 	return next;
 }
