@@ -5,34 +5,31 @@
 
 #include <common.h>
 
-#include <libgen.h>
 #include <string.h>
 #include <stdlib.h>
 
-#define MAX_INCLUDE_DEPTH 16
-
-struct tokenizer {
-	int input_n;
+static struct tokenizer {
+	size_t stack_size, stack_cap;
 	struct input *stack, *top;
 
 	int header;
 } tok;
 // Tokenizer, abbreviated tok.
 
-unsigned disallowed_size, disallowed_cap;
+size_t disallowed_size, disallowed_cap;
 char **disallowed = NULL;
+
+void set_top() {
+	tok.top = tok.stack + tok.stack_size - 1;
+}
 
 void tokenizer_push_input_absolute(const char *path) {
 	struct file file;
 	if (!try_open_file(path, &file))
 		ERROR("No such file as %s exists", path);
 
-	if (!tok.stack)
-		tok.stack = malloc(sizeof *tok.stack * MAX_INCLUDE_DEPTH);
-
-	tok.input_n++;
-	tok.stack[tok.input_n - 1] = input_create(file);
-	tok.top = &tok.stack[tok.input_n - 1];
+	ADD_ELEMENT(tok.stack_size, tok.stack_cap, tok.stack) = input_create(file);
+	set_top();
 }
 
 void tokenizer_push_input(const char *rel_path) {
@@ -43,12 +40,8 @@ void tokenizer_push_input(const char *rel_path) {
 			return; // Do not open file. (Related to #pragma once.)
 	}
 
-	if (!tok.stack)
-		tok.stack = malloc(sizeof *tok.stack * MAX_INCLUDE_DEPTH);
-
-	tok.input_n++;
-	tok.stack[tok.input_n - 1] = input_create(file);
-	tok.top = &tok.stack[tok.input_n - 1];
+	ADD_ELEMENT(tok.stack_size, tok.stack_cap, tok.stack) = input_create(file);
+	set_top();
 }
 
 void tokenizer_disable_current_path(void) {
@@ -57,8 +50,8 @@ void tokenizer_disable_current_path(void) {
 
 static void tokenizer_pop_input(void) {
 	input_free(tok.top);
-	tok.input_n--;
-	tok.top = &tok.stack[tok.input_n - 1];
+	tok.stack_size--;
+	set_top();
 }
 
 void flush_whitespace(int *whitespace, int *first_of_line) {
@@ -159,39 +152,6 @@ int parse_pp_header_name(struct token *t) {
 	input_next(tok.top);
 
 	return 1;
-}
-
-int get_simple_escape_sequence(char nc) {
-	switch (nc) {
-	case '\'':
-		return '\'';
-	case '\"':
-		return '\"';
-	case '?':
-		return '\?';
-	case '\\':
-		return '\\';
-	case 'a':
-		return '\a';
-	case 'b':
-		return '\b';
-	case 'f':
-		return '\f';
-	case 'n':
-		return '\n';
-	case 'r':
-		return '\r';
-	case 't':
-		return '\t';
-	case 'v':
-		return '\v';
-
-	case '0': // This is an octal-escape-sequence, and should be handled seperately.
-		return '\0';
-
-	default:
-		ERROR("Invalid escape sequence \\%c", nc);
-	}
 }
 
 int parse_escape_sequence(int *character) {
@@ -389,7 +349,7 @@ struct token tokenizer_next(void) {
 	} else if(parse_pp_token(PP_NUMBER, &next,
 							 is_pp_number)) {
 	} else if(tok.top->c[0] == '\0') {
-		if(tok.input_n > 1) {
+		if(tok.stack_size > 1) {
 			// Retry on popped source.
 			tokenizer_pop_input();
 			return tokenizer_next();
