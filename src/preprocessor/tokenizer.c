@@ -1,5 +1,4 @@
 #include "tokenizer.h"
-//#include "search_path.h"
 #include "input.h"
 
 #include <common.h>

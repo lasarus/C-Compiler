@@ -4,73 +4,52 @@
 
 #include <errno.h>
 
-static void input_internal_next(struct input *input);
-
 void read_contents(struct input *input, FILE *fp) {
-	int c;
-	while ((c = fgetc(fp)) != EOF) {
-		ADD_ELEMENT(input->contents_size, input->contents_cap, input->contents) = c;
-	}
-	ADD_ELEMENT(input->contents_size, input->contents_cap, input->contents) = '\0';
+	// TODO: pipes are probably good to support.
+	fseek(fp, 0, SEEK_END);
+	input->contents_cap = input->contents_size = ftell(fp);
+	fseek(fp, 0, SEEK_SET);
+
+	input->contents = malloc(input->contents_size + 1);
+	fread(input->contents, 1, input->contents_size, fp);
 }
 
 struct input input_create(const char *filename, FILE *fp) {
 	struct input input = {
 		.filename = filename,
-		.pos = {{0}},
-		.iline = 1,
-		.icol = 1,
-		.c = {'\n', '\n', '\n'}
+		.iline = 1, .icol = 1,
 	};
 
 	read_contents(&input, fp);
 
 	// Buffer should be initialized at the start.
-	for (int i = 0; i < INT_BUFF; i++)
-		input_internal_next(&input);
-
 	for (int i = 0; i < N_BUFF - 1; i++)
 		input_next(&input);
+	input.c[0] = '\n'; // Needs to start with newline.
 
 	return input;
 }
 
-static void input_internal_next(struct input *input) {
-	for (int i = 0; i < INT_BUFF - 1; i++) {
-		input->ic[i] = input->ic[i + 1];
-		input->ipos[i] = input->ipos[i + 1];
-	}
-
-	char c = '\0';
-	if (input->contents[input->c_ptr]) {
-		c = input->contents[input->c_ptr++];
-	}
-
-	if (c == '\n') {
+static char next_char(struct input *input) {
+	while (input->c_ptr < input->contents_size - 1 &&
+		input->contents[input->c_ptr] == '\\' &&
+		input->contents[input->c_ptr + 1] == '\n') {
+		input->c_ptr += 2;
 		input->iline++;
-		input->icol = 1;
-	} else {
-		input->icol++;
+		input->icol = 0;
 	}
 
-	input->ic[INT_BUFF - 1] = c;
-	input->ipos[INT_BUFF - 1] = (struct position) {
-		.path = input->filename,
-		.line = input->iline,
-		input->icol
-	};
-}
+	if (input->c_ptr >= input->contents_size)
+		return '\0';
 
-static int flush_backslash(struct input *input) {
-	if (input->ic[0] == '\\' &&
-		input->ic[1] == '\n') {
-
-		input_internal_next(input);
-		input_internal_next(input);
-
-		return 1;
+	if (input->contents[input->c_ptr] == '\n') {
+		input->iline++;
+		input->icol = 0;
 	}
-	return 0;
+
+	input->icol++;
+
+	return input->contents[input->c_ptr++];
 }
 
 void input_next(struct input *input) {
@@ -79,24 +58,10 @@ void input_next(struct input *input) {
 		input->pos[i] = input->pos[i + 1];
 	}
 
-	int removed_comment = 0;
-
-	while (flush_backslash(input));
-
-	char nc;
-	struct position npos;
-
-	npos = input->ipos[0];
-
-	if (removed_comment) {
-		nc = ' ';
-	} else {
-		nc = input->ic[0];
-		input_internal_next(input);
-	}
-
-	input->c[N_BUFF - 1] = nc;
-	input->pos[N_BUFF - 1] = npos;
+	input->c[N_BUFF - 1] = next_char(input);
+	input->pos[N_BUFF - 1] = (struct position) {
+		input->filename, input->iline, input->icol
+	};
 }
 
 static size_t paths_size = 0, paths_cap;

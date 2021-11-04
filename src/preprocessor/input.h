@@ -1,11 +1,9 @@
 #ifndef INPUT_H
 #define INPUT_H
 
-//#include "search_path.h"
 #include <stdlib.h>
 
 #define N_BUFF 3
-#define INT_BUFF 2
 
 struct position {
 	const char *path;
@@ -19,14 +17,10 @@ struct input {
 
 	size_t c_ptr, contents_size, contents_cap;
 	char *contents;
-	//struct file file;
 	struct input *next;
 
 	struct position pos[N_BUFF];
 	char c[N_BUFF];
-
-	struct position ipos[INT_BUFF];
-	char ic[INT_BUFF];
 
 	int iline, icol;
 };
