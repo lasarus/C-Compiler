@@ -81,11 +81,11 @@ struct arguments parse_arguments(int argc, char **argv) {
 void add_implementation_defs(void) {
 	struct define def = define_init("NULL");
 	struct token tokens[] = {
-		token_init(PP_LPAR, "(", (struct position){0}),
-		token_init(PP_IDENT, "void", (struct position){0}),
-		token_init(PP_PUNCT, "*", (struct position){0}),
-		token_init(PP_RPAR, ")", (struct position){0}),
-		token_init(PP_NUMBER, "0", (struct position){0})
+		token_init(T_LPAR, "(", (struct position){0}),
+		token_init(T_IDENT, "void", (struct position){0}),
+		token_init(T_STAR, "*", (struct position){0}),
+		token_init(T_RPAR, ")", (struct position){0}),
+		token_init(T_NUM, "0", (struct position){0})
 	};
 
 	for (unsigned int i = 0;

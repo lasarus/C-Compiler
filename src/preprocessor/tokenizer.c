@@ -134,7 +134,7 @@ static int parse_identifier(struct token *next) {
 
 	buffer_write('\0');
 
-	next->type = PP_IDENT;
+	next->type = T_IDENT;
 	next->str = buffer_get();
 	return 1;
 }
@@ -164,7 +164,7 @@ static int parse_pp_number(struct token *next) {
 
 	buffer_write('\0');
 
-	next->type = PP_NUMBER;
+	next->type = T_NUM;
 	next->str = buffer_get();
 	return 1;
 }
@@ -279,7 +279,7 @@ static int parse_string(struct token *next) {
 		return 0;
 	}
 
-	next->type = PP_STRING;
+	next->type = T_STRING;
 	next->str = parse_string_like();
 
 	return 1;
@@ -299,7 +299,7 @@ static int parse_character_constant(struct token *next) {
 	if (C0 != '\'')
 		return 0;
 
-	next->type = PP_CHARACTER_CONSTANT;
+	next->type = T_CHARACTER_CONSTANT;
 	next->str = parse_string_like();
 
 	return 1;
@@ -307,11 +307,12 @@ static int parse_character_constant(struct token *next) {
 
 static int parse_punctuator(struct token *next) {
 	int count = 0;
-#define SYM(A, B) else if (												\
-		(sizeof(B) <= 1 || B[0] == C0) &&					\
-		(sizeof(B) <= 2 || B[1] == C1) &&					\
-		(sizeof(B) <= 3 || B[2] == C2)) {					\
-		count = sizeof(B) - 1;											\
+#define SYM(A, B) else if (						\
+		(sizeof(B) <= 1 || B[0] == C0) &&		\
+		(sizeof(B) <= 2 || B[1] == C1) &&		\
+		(sizeof(B) <= 3 || B[2] == C2)) {		\
+		count = sizeof(B) - 1;					\
+		next->type = A;							\
 	}
 #define KEY(A, B)
 #define X(A, B)
@@ -330,7 +331,6 @@ static int parse_punctuator(struct token *next) {
 
 	buffer_write('\0');
 
-	next->type = PP_PUNCT;
 	next->str = buffer_get();
 
 	return 1;
@@ -358,9 +358,6 @@ struct token tokenizer_next(void) {
 	} else if(next.first_of_line && IFSTR("#", PP_DIRECTIVE)) {
 		is_directive = 1;
 	} else if(IFSTR("#", PP_HASH)) {
-	} else if(IFSTR("(", PP_LPAR)) {
-	} else if(IFSTR(")", PP_RPAR)) {
-	} else if(IFSTR(",", PP_COMMA)) {
 	} else if (is_header && parse_pp_header_name(&next)) {
 	} else if(parse_string(&next)) {
 	} else if(parse_identifier(&next)) {

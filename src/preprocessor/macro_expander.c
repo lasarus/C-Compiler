@@ -90,36 +90,52 @@ void define_add_par(struct define *d, struct token t) {
 }
 
 int get_param(struct define *def, struct token tok) {
-	if (!def->func || tok.type != PP_IDENT)
+	if (!def->func || tok.type != T_IDENT)
 		return -1;
 
 	return token_list_index_of(&def->par, tok);
 }
 
-// TODO: Make this use the tokenizer.
-// Strings are not correctly handled in the early stages of the preprocessor.
+// Hopefully sufficiant table for
+// combining two token types to
+// get another. The strings are simply
+// concatenated in all these cases.
+enum ttype paste_table[][3] = {
+	{T_IDENT, T_IDENT, T_IDENT},
+	{T_IDENT, T_NUM, T_IDENT},
+	{T_IDENT, T_IDENT, T_IDENT},
+	{T_LSHIFT, T_A, T_LSHIFTA},
+	{T_RSHIFT, T_A, T_RSHIFTA},
+	{T_ADD, T_ADD, T_INC},
+	{T_ADD, T_A, T_ADDA},
+	{T_SUB, T_SUB, T_DEC},
+	{T_SUB, T_G, T_ARROW},
+	{T_SUB, T_A, T_SUBA},
+	{T_DIV, T_A, T_DIVA},
+	{T_MOD, T_A, T_MODA},
+	{T_G, T_GEQ, T_RSHIFTA},
+	{T_G, T_G, T_RSHIFT},
+	{T_G, T_A, T_GEQ},
+	{T_L, T_LEQ, T_LSHIFTA},
+	{T_L, T_L, T_LSHIFT},
+	{T_L, T_A, T_LEQ},
+	{T_NOT, T_A, T_NEQ},
+	{T_BOR, T_BOR, T_OR},
+	{T_BOR, T_A, T_BORA},
+	{T_XOR, T_A, T_XORA},
+	{T_A, T_A, T_EQ},
+	{T_STAR, T_A, T_MULA},
+	{T_AMP, T_A, T_BANDA},
+	{T_AMP, T_AMP, T_AND},
+};
+
 struct token glue(struct token a, struct token b) {
-	struct token ret = a;
-	if (a.type == PP_STRING || b.type == PP_STRING) {
-		// This ignores cases like u8"string".
-		ERROR("Can't paste strings.");
-	} else if (a.type == PP_CHARACTER_CONSTANT || b.type == PP_CHARACTER_CONSTANT) {
-		// This ignores L'a'.
-		ERROR("Can't paste character constants.");
-	} else if (b.type == PP_IDENT) {
-		ret.type = PP_IDENT;
-		if (!(a.type == PP_IDENT || a.type == PP_NUMBER)) {
-			PRINT_POS(a.pos);
-			ERROR("Can't paste %s and %s", a.str, b.str);
-		}
-	} else if (b.type == PP_IDENT) {
-		ret.type = PP_IDENT;
-	} else if (b.type == PP_HASH || b.type == PP_HHASH ||
-		b.type == PP_LPAR || b.type == PP_COMMA ||
-		b.type == PP_RPAR || b.type == PP_DIRECTIVE ||
-		b.type == PP_PUNCT) {
-		ret.type = PP_PUNCT;
-	}
+	struct token ret = { 0 };
+	for (unsigned i = 0; i < sizeof paste_table / sizeof *paste_table; i++)
+		if (paste_table[i][1] == a.type && paste_table[i][0] == b.type)
+			ret.type = paste_table[i][2];
+	if (!ret.type)
+		ERROR("Invalid paste of %s and %s", b.str, a.str);
 
 	ret.str = allocate_printf("%s%s", b.str, a.str);
 	ret.hs = string_set_intersection(a.hs, b.hs);
@@ -141,7 +157,7 @@ void stringify_add(struct token *t, int start) {
 	if (!start && t->whitespace)
 		ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = ' ';
 	switch (t->type) {
-	case PP_STRING:
+	case T_STRING:
 		ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = '"';
 		for (int i = 0; t->str[i]; i++) {
 			char escape_seq[5];
@@ -162,9 +178,9 @@ void stringify_add(struct token *t, int start) {
 int builtin_macros(struct token *t) {
 	// These are only single tokens.
 	if (strcmp(t->str, "__LINE__") == 0) {
-		*t = token_init(PP_NUMBER, allocate_printf("%d", t->pos.line), t->pos);
+		*t = token_init(T_NUM, allocate_printf("%d", t->pos.line), t->pos);
 	} else if (strcmp(t->str, "__FILE__") == 0) {
-		*t = token_init(PP_STRING, allocate_printf("%s", t->pos.path), t->pos);
+		*t = token_init(T_STRING, allocate_printf("%s", t->pos.path), t->pos);
 	} else if (strcmp(t->str, "__DATE__") == 0) {
 		static const char months[][4] = {
 			"Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -173,22 +189,22 @@ int builtin_macros(struct token *t) {
 
 		time_t ti = time(NULL);
 		struct tm tm = *localtime(&ti);
-		*t = token_init(PP_STRING, allocate_printf("%s %2d %04d", months[tm.tm_mon], tm.tm_mday, 1900 + tm.tm_year), t->pos);
+		*t = token_init(T_STRING, allocate_printf("%s %2d %04d", months[tm.tm_mon], tm.tm_mday, 1900 + tm.tm_year), t->pos);
 	} else if (strcmp(t->str, "__TIME__") == 0) {
 		time_t ti = time(NULL);
 		struct tm tm = *localtime(&ti);
-		*t = token_init(PP_STRING, allocate_printf("%02d:%02d:%02d", tm.tm_hour, tm.tm_min, tm.tm_sec), t->pos);
+		*t = token_init(T_STRING, allocate_printf("%02d:%02d:%02d", tm.tm_hour, tm.tm_min, tm.tm_sec), t->pos);
 	} else if (strcmp(t->str, "__STDC__") == 0) {
-		*t = token_init(PP_NUMBER, "1", t->pos);
+		*t = token_init(T_NUM, "1", t->pos);
 	} else if (strcmp(t->str, "__STDC_HOSTED__") == 0) {
-		*t = token_init(PP_NUMBER, "0", t->pos);
+		*t = token_init(T_NUM, "0", t->pos);
 	} else if (strcmp(t->str, "__STDC_VERSION__") == 0) {
 		char *version_string = "201710L";
-		*t = token_init(PP_NUMBER, version_string, t->pos);
+		*t = token_init(T_NUM, version_string, t->pos);
 	} else if (strcmp(t->str, "__STDC_TIME__") == 0) {
 		NOTIMP(); // Is this actually a macro that is required by anyone?
 	} else if (strcmp(t->str, "__WORDSIZE") == 0) {
-		*t = token_init(PP_NUMBER, "64", t->pos);
+		*t = token_init(T_NUM, "64", t->pos);
 	} else
 		return 0;
 	return 1;
@@ -239,25 +255,25 @@ int input_buffer_parse_argument(struct token_list *tl, int ignore_comma, int inp
 	struct token t;
 	do {
 		t = input_buffer_take(input);
-		if(t.type == PP_LPAR) {
+		if(t.type == T_LPAR) {
 			depth++;
-		} else if(t.type == PP_RPAR) {
+		} else if(t.type == T_RPAR) {
 			depth--;
 			if(depth == 0)
 				continue;
-		} else if(!ignore_comma && t.type == PP_COMMA) {
+		} else if(!ignore_comma && t.type == T_COMMA) {
 			if(depth == 1)
 				continue;
 		}
 
 		token_list_add(tl, t);
 	} while(
-		!(!ignore_comma && (depth == 1 && t.type == PP_COMMA)) &&
-		!(depth == 0 && t.type == PP_RPAR));
+		!(!ignore_comma && (depth == 1 && t.type == T_COMMA)) &&
+		!(depth == 0 && t.type == T_RPAR));
 
-	if (t.type == PP_RPAR)
+	if (t.type == T_RPAR)
 		input_buffer_push(&t);
-	return t.type == PP_RPAR;
+	return t.type == T_RPAR;
 }
 
 void expand_argument(struct token_list tl, int *concat_with_prev, int concat, int stringify, int input) {
@@ -301,7 +317,7 @@ void subs_buffer(struct define *def, struct string_set *hs, struct position new_
 	int vararg_included = 0;
 	if(def->func) {
 		struct token lpar = input_buffer_take(input);
-		EXPECT(&lpar, PP_LPAR);
+		EXPECT(&lpar, T_LPAR);
 
 		int finished = 0;
 		for (int i = 0; i < n_args; i++) {
@@ -321,7 +337,7 @@ void subs_buffer(struct define *def, struct string_set *hs, struct position new_
 		}
 		
 		struct token rpar = input_buffer_take(input);
-		EXPECT(&rpar, PP_RPAR);
+		EXPECT(&rpar, T_RPAR);
 		finished = 1;
 
 		*hs = string_set_intersection(*hs, rpar.hs);
@@ -355,7 +371,7 @@ void subs_buffer(struct define *def, struct string_set *hs, struct position new_
 
 		if (is_va_args) {
 			if (concat && i - 2 >= 0 &&
-				def->def.list[i - 2].type == PP_COMMA &&
+				def->def.list[i - 2].type == T_COMMA &&
 				!vararg_included) {
 				i--; // There is an additional i-- at the end of the loop.
 			} else if (vararg_included) {
@@ -372,7 +388,7 @@ void subs_buffer(struct define *def, struct string_set *hs, struct position new_
 			for(int i = 0; i < tl.size; i++)
 				stringify_add(tl.list + i, i == 0);
 
-			struct token t = token_init(PP_STRING, strdup(stringify_buffer), (struct position) { 0 });
+			struct token t = token_init(T_STRING, strdup(stringify_buffer), (struct position) { 0 });
 			input_buffer_push(&t);
 		} else if(idx >= 0) {
 			expand_argument(arguments[idx], &concat_with_prev, concat, stringify, input);
@@ -417,7 +433,7 @@ void expand_buffer(int input, int return_output, struct token *t) {
 			break;
 
 		struct define *def = NULL;
-		if (top.type != PP_IDENT || string_set_contains(top.hs, top.str) ||
+		if (top.type != T_IDENT || string_set_contains(top.hs, top.str) ||
 			builtin_macros(&top) || !(def = define_map_get(top.str))) {
 			if (return_output) {
 				*t = top;
@@ -430,7 +446,7 @@ void expand_buffer(int input, int return_output, struct token *t) {
 
 		assert(def);
 
-		if ((def->func && (input || input_buffer.size) && input_buffer_top(input)->type == PP_LPAR) ||
+		if ((def->func && (input || input_buffer.size) && input_buffer_top(input)->type == T_LPAR) ||
 			!def->func) {
 			subs_buffer(def, &top.hs, top.pos, input);
 		} else {

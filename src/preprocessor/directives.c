@@ -32,38 +32,36 @@ struct token next() {
 #define PUSH(T) push(T)
 
 void directiver_define(void) {
-
 	struct token name = NEXT();
 
 	struct define def = define_init(name.str);
 
 	struct token t = NEXT();
-	if(t.type == PP_LPAR && !t.whitespace) {
+	if(t.type == T_LPAR && !t.whitespace) {
 		int idx = 0;
 		do {
 			t = NEXT();
-			if(idx == 0 && t.type == PP_RPAR) {
+			if(idx == 0 && t.type == T_RPAR) {
 				def.func = 1;
 				break;
 			}
 
-			if (t.type == PP_PUNCT &&
-				strcmp(t.str, "...") == 0) {
+			if (t.type == T_ELLIPSIS) {
 				t = NEXT();
-				EXPECT(&t, PP_RPAR);
+				EXPECT(&t, T_RPAR);
 				def.vararg = 1;
 				def.func = 1;
 				break;
 			}
-			EXPECT(&t, PP_IDENT);
+			EXPECT(&t, T_IDENT);
 			define_add_par(&def, t);
 
 			t = NEXT();
-			if (t.type != PP_RPAR)
-				EXPECT(&t, PP_COMMA);
+			if (t.type != T_RPAR)
+				EXPECT(&t, T_COMMA);
 
 			idx++;
-		} while(t.type == PP_COMMA);
+		} while(t.type == T_COMMA);
 
 		t = NEXT();
 	}
@@ -81,33 +79,8 @@ void directiver_define(void) {
 void directiver_undef(void) {
 	struct token name = NEXT();
 
-	EXPECT(&name, PP_IDENT);
+	EXPECT(&name, T_IDENT);
 	define_map_remove(name.str);
-}
-
-static enum ttype get_punct(char **in_str) {
-	char *str = *in_str;
-
-	enum ttype type;
-
-#define SYM(A, B) else if(B[0] == *str && (sizeof(B) <= 2 || B[1] == *(str + 1)) && (sizeof(B) <= 3 || B[2] == *(str + 2))) { type = A; str += sizeof(B) - 1; }
-#define KEY(A, B)
-#define X(A, B)
-
-	if(0) {
-	}
-#include "tokens.h"
-	else {
-		ERROR("Unrecognized punctuation: %s %d", str, *str);
-	}
-
-#undef SYM
-#undef KEY
-#undef X
-
-
-	*in_str = str;
-	return type;
 }
 
 static struct token_list buffer;
@@ -117,28 +90,9 @@ struct token buffer_next() {
 	if (buffer_pos >= buffer.size)
 		return (struct token) { .type = T_EOI, .str = "" };
 	struct token *t = buffer.list + buffer_pos;
-	if (t->type == PP_PUNCT) {
-		enum ttype next_type = get_punct(&t->str);
-
-		if (*t->str == '\0')
-			buffer_pos++;
-
-		return (struct token) { .type = next_type, .str = "" };
-	} else if (t->type == PP_IDENT) {
+	if (t->type == T_IDENT) {
 		buffer_pos++;
 		return (struct token) { .type = T_NUM, .str = "0" };
-	} else if (t->type == PP_NUMBER) {
-		buffer_pos++;
-		return (struct token) { .type = T_NUM, .str = t->str };
-	} else if (t->type == PP_LPAR) {
-		buffer_pos++;
-		return (struct token) { .type = T_LPAR };
-	} else if (t->type == PP_RPAR) {
-		buffer_pos++;
-		return (struct token) { .type = T_RPAR };
-	} else if (t->type == PP_COMMA) {
-		buffer_pos++;
-		return (struct token) { .type = T_COMMA };
 	} else {
 		return buffer.list[buffer_pos++];
 	}
@@ -190,7 +144,7 @@ intmax_t evaluate_expression(int prec, int evaluate) {
 			break;
 		default: ERROR("Internal compiler error.");
 		}
-	} else if (t.type == PP_CHARACTER_CONSTANT) {
+	} else if (t.type == T_CHARACTER_CONSTANT) {
 		expr = character_constant_to_int(t.str);
 	} else {
 		ERROR("Invalid token in preprocessor expression. %s, in %s:%d", dbg_token(&t), t.pos.path, t.pos.line);
@@ -256,7 +210,6 @@ intmax_t evaluate_expression(int prec, int evaluate) {
 	if (buffer_pos == 0)
 		ERROR("Internal compiler error.");
 	buffer.list[--buffer_pos] = t;
-	// Push t.
 
 	return expr;
 }
@@ -267,17 +220,17 @@ intmax_t evaluate_until_newline() {
 	while (!t.first_of_line) {
 		if (strcmp(t.str, "defined") == 0) {
 			t = NEXT();
-			int has_lpar = t.type == PP_LPAR;
+			int has_lpar = t.type == T_LPAR;
 			if (has_lpar)
 				t = NEXT();
 
 			int is_defined = define_map_get(t.str) != NULL;
-			token_list_add(&buffer, (struct token) {.type = PP_NUMBER, .str = is_defined ? "1" : "0"});
+			token_list_add(&buffer, (struct token) {.type = T_NUM, .str = is_defined ? "1" : "0"});
 
 			t = NEXT();
 
 			if (has_lpar) {
-				EXPECT(&t, PP_RPAR);
+				EXPECT(&t, T_RPAR);
 				t = NEXT();
 			}
 		} else {
@@ -363,7 +316,7 @@ struct token directiver_next(void) {
 		}
 
 		char *name = directive.str;
-		assert(directive.type == PP_IDENT);
+		assert(directive.type == T_IDENT);
 
 		if (strcmp(name, "define") == 0) {
 			directiver_define();
@@ -400,7 +353,7 @@ struct token directiver_next(void) {
 				ERROR("Expected digit sequence after #line");
 
 			int has_s_char_seq = 0;
-			if (digit_seq.type != PP_NUMBER) {
+			if (digit_seq.type != T_NUM) {
 				buffer.size = 0;
 				struct token t = digit_seq;
 				while (!t.first_of_line) {
@@ -430,13 +383,13 @@ struct token directiver_next(void) {
 				}
 			}
 
-			if (digit_seq.first_of_line || digit_seq.type != PP_NUMBER)
+			if (digit_seq.first_of_line || digit_seq.type != T_NUM)
 				ERROR("Expected digit sequence after #line");
 
 			line_diff += atoi(digit_seq.str) - directive.pos.line - 1;
 
 			if (has_s_char_seq) {
-				if (s_char_seq.type != PP_STRING)
+				if (s_char_seq.type != T_STRING)
 					ERROR("Expected s char sequence as second argument to #line");
 				new_filename = s_char_seq.str;
 			}

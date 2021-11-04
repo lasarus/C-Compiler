@@ -3,17 +3,9 @@
 X(T_NONE, "Invalid token")
     
 // Preprocessing tokens.
-X(PP_STRING, "String")
-X(PP_CHARACTER_CONSTANT, "Character constant")
 X(PP_HEADER_NAME, "Header name")
-X(PP_IDENT, "Preprocessor Identifier")
-X(PP_NUMBER, "Numerical value")
-X(PP_PUNCT, "Punctiaion")
 X(PP_HASH, "#")
 X(PP_HHASH, "##")
-X(PP_LPAR, "(")
-X(PP_COMMA, ",")
-X(PP_RPAR, ")")
 X(PP_DIRECTIVE, "#")
 
 // Conditional tokens.
