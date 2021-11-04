@@ -14,7 +14,11 @@ struct position {
 #define PRINT_POS(POS) do { printf("%s:%d:%d", POS.path, POS.line, POS.column); } while(0)
 
 struct input {
-	struct file file;
+	const char *filename, *dir;
+
+	size_t c_ptr, contents_size, contents_cap;
+	char *contents;
+	//struct file file;
 	struct input *next;
 
 	struct position pos[N_BUFF];

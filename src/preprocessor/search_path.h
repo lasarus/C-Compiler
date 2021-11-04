@@ -8,8 +8,7 @@ struct file {
 	FILE *fp;
 };
 
-struct file search_include(struct file *current_file,
-						   const char *path);
+struct file search_include(const char *dir, const char *path);
 int try_open_file(const char *path, struct file *file);
 
 void file_free(struct file *file);

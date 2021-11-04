@@ -57,7 +57,7 @@ void tokenizer_push_input_absolute(const char *path) {
 }
 
 void tokenizer_push_input(const char *rel_path) {
-	struct file file = search_include(&input->file, rel_path);
+	struct file file = search_include(input->dir, rel_path);
 
 	if (string_set_contains(disallowed_headers, file.full))
 		return;
@@ -66,7 +66,7 @@ void tokenizer_push_input(const char *rel_path) {
 }
 
 void tokenizer_disable_current_path(void) {
-	string_set_insert(&disallowed_headers, strdup(input->file.full));
+	string_set_insert(&disallowed_headers, strdup(input->filename));
 }
 
 static void tokenizer_pop_input(void) {

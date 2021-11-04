@@ -4,14 +4,26 @@
 
 static void input_internal_next(struct input *input);
 
+void read_contents(struct input *input, FILE *fp) {
+	int c;
+	while ((c = fgetc(fp)) != EOF) {
+		ADD_ELEMENT(input->contents_size, input->contents_cap, input->contents) = c;
+	}
+	ADD_ELEMENT(input->contents_size, input->contents_cap, input->contents) = '\0';
+}
+
 struct input input_create(struct file file) {
 	struct input input = {
-		.file = file,
+		.filename = strdup(file.full),
+		.dir = strdup(file.dir),
 		.pos = {{0}},
 		.iline = 1,
 		.icol = 1,
 		.c = {'\n', '\n', '\n'}
 	};
+
+	read_contents(&input, file.fp);
+	file_free(&file);
 
 	// Buffer should be initialized at the start.
 	for (int i = 0; i < INT_BUFF; i++)
@@ -24,7 +36,7 @@ struct input input_create(struct file file) {
 }
 
 void input_free(struct input *input) {
-	file_free(&input->file);
+	free(input->contents);
 }
 
 static void input_internal_next(struct input *input) {
@@ -34,13 +46,8 @@ static void input_internal_next(struct input *input) {
 	}
 
 	char c = '\0';
-	if (!feof(input->file.fp)) {
-		int fc = fgetc(input->file.fp);
-
-		if (fc == EOF)
-			c = 0;
-		else
-			c = fc;
+	if (input->contents[input->c_ptr]) {
+		c = input->contents[input->c_ptr++];
 	}
 
 	if (c == '\n') {
@@ -52,7 +59,7 @@ static void input_internal_next(struct input *input) {
 
 	input->ic[INT_BUFF - 1] = c;
 	input->ipos[INT_BUFF - 1] = (struct position) {
-		.path = input->file.full,
+		.path = input->filename,
 		.line = input->iline,
 		input->icol
 	};

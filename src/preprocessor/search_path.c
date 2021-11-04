@@ -67,12 +67,10 @@ int check_against_path(const char *dir, const char *name,
 	return try_open_file(whole_path, file);
 }
 
-struct file search_include(struct file *current_file,
-						   const char *path) {
+struct file search_include(const char *dir, const char *path) {
 	struct file out;
-	if (current_file) {
-		if (check_against_path(current_file->dir,
-							   path, &out))
+	if (dir) {
+		if (check_against_path(dir, path, &out))
 			return out;
 	}
 
@@ -82,7 +80,7 @@ struct file search_include(struct file *current_file,
 			return out;
 	}
 
-	ERROR("Could not find %s in search path", path);
+	ERROR("Could not find %s in search path, starting at %s", path, dir);
 }
 
 void add_include_path(const char *path) {
