@@ -1,5 +1,5 @@
 #include "tokenizer.h"
-#include "search_path.h"
+//#include "search_path.h"
 #include "input.h"
 
 #include <common.h>
@@ -14,8 +14,6 @@ static struct input *input;
 #define C2 (input->c[2])
 #define CNEXT() input_next(input)
 
-// Used for #pragma once.
-static struct string_set disallowed_headers;
 
 enum {
 	C_DIGIT = 0x1,
@@ -41,39 +39,12 @@ static const unsigned char char_props[UCHAR_MAX] = {
 
 #define HAS_PROP(C, PROP) (char_props[(unsigned char)(C)] & (PROP))
 
-static void push_input(struct file file) {
-	struct input *n_top = malloc(sizeof *n_top);
-	*n_top = input_create(file);
-	n_top->next = input;
-	input = n_top;
-}
-
-void tokenizer_push_input_absolute(const char *path) {
-	struct file file;
-	if (!try_open_file(path, &file))
-		ERROR("No such file as %s exists", path);
-
-	push_input(file);
-}
-
-void tokenizer_push_input(const char *rel_path) {
-	struct file file = search_include(input->dir, rel_path);
-
-	if (string_set_contains(disallowed_headers, file.full))
-		return;
-
-	push_input(file);
+void tokenizer_push_input(const char *path) {
+	input_open(&input, path, 0); // <- TODO: System.
 }
 
 void tokenizer_disable_current_path(void) {
-	string_set_insert(&disallowed_headers, strdup(input->filename));
-}
-
-static void tokenizer_pop_input(void) {
-	struct input *prev = input;
-	input = prev->next;
-	input_free(prev);
-	free(prev);
+	input_disable_path(input);
 }
 
 static void flush_whitespace(int *whitespace, int *first_of_line) {
@@ -371,7 +342,7 @@ struct token tokenizer_next(void) {
 	} else if(C0 == '\0') {
 		if (input->next) {
 			// Retry on popped source.
-			tokenizer_pop_input();
+			input_close(&input);
 			return tokenizer_next();
 		}
 

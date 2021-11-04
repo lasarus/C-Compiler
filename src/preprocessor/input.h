@@ -1,7 +1,8 @@
 #ifndef INPUT_H
 #define INPUT_H
 
-#include "search_path.h"
+//#include "search_path.h"
+#include <stdlib.h>
 
 #define N_BUFF 3
 #define INT_BUFF 2
@@ -14,7 +15,7 @@ struct position {
 #define PRINT_POS(POS) do { printf("%s:%d:%d", POS.path, POS.line, POS.column); } while(0)
 
 struct input {
-	const char *filename, *dir;
+	const char *filename;
 
 	size_t c_ptr, contents_size, contents_cap;
 	char *contents;
@@ -30,9 +31,11 @@ struct input {
 	int iline, icol;
 };
 
-struct input input_create(struct file file);
-void input_free(struct input *input);
-
 void input_next(struct input *input);
+
+void input_add_include_path(const char *path);
+void input_open(struct input **input, const char *path, int system);
+void input_close(struct input **input);
+void input_disable_path(struct input *input);
 
 #endif

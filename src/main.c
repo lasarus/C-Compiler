@@ -2,7 +2,6 @@
 #include "parser/parser.h"
 #include "codegen/codegen.h"
 #include "common.h"
-#include "preprocessor/search_path.h"
 #include "preprocessor/macro_expander.h"
 #include "arch/builtins.h"
 #include "parser/symbols.h"
@@ -27,7 +26,8 @@ struct arguments parse_arguments(int argc, char **argv) {
 	for (int i = 1; i < argc; i++) {
 		if (argv[i][0] == '-' &&
 			argv[i][1] == 'I') {
-			add_include_path(argv[i] + 2);
+
+			input_add_include_path(argv[i] + 2);
 		} else if (argv[i][0] == '-' &&
 			argv[i][1] == 'D') {
 			struct define def = define_init(argv[i] + 2);

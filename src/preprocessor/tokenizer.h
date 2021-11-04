@@ -5,8 +5,7 @@
 
 #include <stdio.h>
 
-void tokenizer_push_input(const char *rel_path);
-void tokenizer_push_input_absolute(const char *path);
+void tokenizer_push_input(const char *path);
 
 void tokenizer_disable_current_path(void);
 
