@@ -102,7 +102,7 @@ void add_implementation_defs(void) {
 	define_string("__STDC__", "1");
 	define_string("__STDC_HOSTED__", "0");
 	define_string("__STDC_VERSION__", "201710L");
-	define_string("__WORDSIZE", "64");
+	define_string("__x86_64__", "1");
 }
 
 int main(int argc, char **argv) {

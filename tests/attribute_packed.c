@@ -6,6 +6,8 @@ struct T_aligned {
 	long c;
 };
 
+#undef __attribute__
+
 struct T_packed {
 	char a;
 	int b;
