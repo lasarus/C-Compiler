@@ -345,7 +345,7 @@ struct token tokenizer_next(void) {
 					 &next.first_of_line);
 
 	if (next.first_of_line)
-		is_header = 0;
+		is_header = is_directive = 0;
 
 #define IFSTR(S, TOK)	(C0 == S[0] &&						\
 						 (sizeof(S) == 2 || C1 == S[1])) &&	\

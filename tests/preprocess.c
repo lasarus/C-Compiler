@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <string.h>
 
 // This is UB, but should be supported anyways.
 #define A 1
@@ -21,6 +22,11 @@ int main() {
 	a = 10;
 	#undef a
 	assert(a == 10);
+
+	const char *include = NULL;
+#
+	include = "Hello";
+assert(strcmp(include, "Hello") == 0);
 }
 
 #if defined(BBBB)

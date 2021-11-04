@@ -23,7 +23,8 @@ static int line_diff = 0;
 struct token next() {
 	struct token t = pushed_idx ? pushed[--pushed_idx] : tokenizer_next();
 	t.pos.line += line_diff;
-	t.pos.path = new_filename;
+	if (new_filename)
+		t.pos.path = new_filename;
 	return t;
 }
 
@@ -355,6 +356,11 @@ struct token directiver_next(void) {
 	struct token t = NEXT();
 	if (t.type == PP_DIRECTIVE) {
 		struct token directive = NEXT();
+
+		if (directive.first_of_line) {
+			PUSH(directive);
+			return directiver_next();
+		}
 
 		char *name = directive.str;
 		assert(directive.type == PP_IDENT);
