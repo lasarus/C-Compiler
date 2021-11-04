@@ -5,7 +5,7 @@ test_source() {
 
 	if [ "$4" == "true" ]; then
 		if [ "$2" == "true" ]; then
-			$5 $1 $TEST_DIR/$OUT -Imusl -D_POSIX_SOURCE -D$3
+			$5 $1 $TEST_DIR/$OUT -Imusl -D$3
 		else
 			$5 $1 $TEST_DIR/$OUT -I/usr/include -Iinclude -D$3
 		fi
@@ -14,7 +14,7 @@ test_source() {
 		./test
 	else
 		if [ "$2" == "true" ]; then
-			! $5 $1 $TEST_DIR/$OUT -Imusl -D_POSIX_SOURCE -D$3 >/dev/null
+			! $5 $1 $TEST_DIR/$OUT -Imusl -D$3 >/dev/null
 		else
 			! $5 $1 $TEST_DIR/$OUT -I/usr/include -Iinclude -D$3 >/dev/null
 		fi

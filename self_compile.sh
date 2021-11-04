@@ -24,7 +24,7 @@ do
 	OUT="$(basename -s .c $SRC).s"
 	if [ "$MUSL" = "true" ]
 	then
-		./cc $SRC asm/$OUT -Isrc -Imusl -D_POSIX_SOURCE
+		./cc $SRC asm/$OUT -Isrc -Imusl
 	else
 		./cc $SRC asm/$OUT -Isrc -I/usr/include/ -Iinclude/
 	fi
@@ -50,7 +50,7 @@ do
 		OUT="$(basename -s .c $SRC).s"
 		if [ "$MUSL" = "true" ]
 		then
-			./cc_self $SRC asm2/$OUT -Isrc -Imusl -D_POSIX_SOURCE
+			./cc_self $SRC asm2/$OUT -Isrc -Imusl
 		else
 			./cc_self $SRC asm2/$OUT -Isrc -I/usr/include/ -Iinclude/
 		fi
