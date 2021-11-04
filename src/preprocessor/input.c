@@ -5,13 +5,11 @@
 #include <errno.h>
 
 void read_contents(struct input *input, FILE *fp) {
-	// TODO: pipes are probably good to support.
-	fseek(fp, 0, SEEK_END);
-	input->contents_cap = input->contents_size = ftell(fp);
-	fseek(fp, 0, SEEK_SET);
-
-	input->contents = malloc(input->contents_size + 1);
-	fread(input->contents, 1, input->contents_size, fp);
+	int c;
+	while ((c = fgetc(fp)) != EOF) {
+		ADD_ELEMENT(input->contents_size, input->contents_cap, input->contents) = c;
+	}
+	ADD_ELEMENT(input->contents_size, input->contents_cap, input->contents) = '\0';
 }
 
 struct input input_create(const char *filename, FILE *fp) {
