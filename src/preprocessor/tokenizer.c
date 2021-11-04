@@ -388,20 +388,3 @@ struct token tokenizer_next(void) {
 
 	return next;
 }
-
-void set_line(int line) {
-	int diff = line - input->pos[0].line;
-	for (int i = 0; i < N_BUFF; i++)
-		input->pos[i].line += diff;
-	for (int i = 0; i < INT_BUFF; i++)
-		input->ipos[i].line += diff;
-	input->iline = input->ipos[INT_BUFF - 1].line;
-}
-
-void set_filename(char *name) {
-	for (int i = 0; i < N_BUFF; i++)
-		input->pos[i].path = name;
-	for (int i = 0; i < INT_BUFF; i++)
-		input->ipos[i].path = name;
-	input->file.full = name;
-}

@@ -15,7 +15,7 @@ int main() {
 					  MACRO) == 21);
 	#line 2
 
-	printf("%d\n", __LINE__);
+
 	assert(__LINE__ == 4);
 
 	#line 4 "notline.c"

@@ -17,8 +17,13 @@ void push(struct token t) {
 	pushed[pushed_idx++] = t;
 }
 
+static const char *new_filename = NULL;
+static int line_diff = 0;
+
 struct token next() {
 	struct token t = pushed_idx ? pushed[--pushed_idx] : tokenizer_next();
+	t.pos.line += line_diff;
+	t.pos.path = new_filename;
 	return t;
 }
 
@@ -361,6 +366,10 @@ struct token directiver_next(void) {
 		} else if (strcmp(name, "error") == 0) {
 			ERROR("#error directive was invoked on %s:%d", directive.pos.path, directive.pos.line);
 		} else if (strcmp(name, "include") == 0) {
+			// There is an issue with just resetting after include. But
+			// I'm interpreting the standard liberally to allow for this.
+			new_filename = NULL;
+			line_diff = 0;
 			struct token path_tok = NEXT();
 			char *path = path_tok.str;
 			tokenizer_push_input(path);
@@ -379,7 +388,7 @@ struct token directiver_next(void) {
 			directiver_handle_pragma();
 		} else if (strcmp(name, "line") == 0) {
 			// 6.10.4
-			struct token digit_seq = NEXT(), s_char_seq, to_be_pushed;
+			struct token digit_seq = NEXT(), s_char_seq;
 
 			if (digit_seq.first_of_line)
 				ERROR("Expected digit sequence after #line");
@@ -387,11 +396,13 @@ struct token directiver_next(void) {
 			int has_s_char_seq = 0;
 			if (digit_seq.type != PP_NUMBER) {
 				buffer.size = 0;
-				to_be_pushed = digit_seq;
-				while (!to_be_pushed.first_of_line) {
-					token_list_add(&buffer, to_be_pushed);
-					to_be_pushed = NEXT();
+				struct token t = digit_seq;
+				while (!t.first_of_line) {
+					token_list_add(&buffer, t);
+					t = NEXT();
 				}
+
+				PUSH(t);
 
 				expand_token_list(&buffer);
 
@@ -407,9 +418,8 @@ struct token directiver_next(void) {
 			} else {
 				s_char_seq = NEXT();
 				if (s_char_seq.first_of_line) {
-					to_be_pushed = s_char_seq;
+					PUSH(s_char_seq);
 				} else {
-					to_be_pushed = NEXT();
 					has_s_char_seq = 1;
 				}
 			}
@@ -417,18 +427,12 @@ struct token directiver_next(void) {
 			if (digit_seq.first_of_line || digit_seq.type != PP_NUMBER)
 				ERROR("Expected digit sequence after #line");
 
-			int new_line = atoi(digit_seq.str);
-			to_be_pushed.pos.line = new_line + to_be_pushed.pos.line - directive.pos.line - 1;
-			set_line(to_be_pushed.pos.line);
-
-			PUSH(to_be_pushed);
+			line_diff += atoi(digit_seq.str) - directive.pos.line - 1;
 
 			if (has_s_char_seq) {
-				if (s_char_seq.type == PP_STRING) {
-					set_filename(s_char_seq.str);
-				} else {
+				if (s_char_seq.type != PP_STRING)
 					ERROR("Expected s char sequence as second argument to #line");
-				}
+				new_filename = s_char_seq.str;
 			}
 		} else {
 			PRINT_POS(directive.pos);
