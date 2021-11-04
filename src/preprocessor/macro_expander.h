@@ -13,6 +13,7 @@ struct define {
 	struct token_list def, par;
 };
 
+void define_string(char *name, char *value);
 struct define define_init(char *name);
 void define_add_def(struct define *d, struct token t);
 void define_add_par(struct define *d, struct token t);

@@ -1,10 +1,10 @@
 #include "macro_expander.h"
 #include "token_list.h"
 #include "directives.h"
+#include "tokenizer.h"
 
 #include <common.h>
 
-#include <time.h>
 #include <assert.h>
 
 void expand_buffer(int input, int return_output, struct token *t);
@@ -96,6 +96,13 @@ int get_param(struct define *def, struct token tok) {
 	return token_list_index_of(&def->par, tok);
 }
 
+void define_string(char *name, char *value) {
+	struct define def = define_init(name);
+	struct input input = input_open_string(value);
+	def.def = tokenizer_whole(&input);
+	define_map_add(def);
+}
+
 // Hopefully sufficiant table for
 // combining two token types to
 // get another. The strings are simply
@@ -181,30 +188,6 @@ int builtin_macros(struct token *t) {
 		*t = token_init(T_NUM, allocate_printf("%d", t->pos.line), t->pos);
 	} else if (strcmp(t->str, "__FILE__") == 0) {
 		*t = token_init(T_STRING, allocate_printf("%s", t->pos.path), t->pos);
-	} else if (strcmp(t->str, "__DATE__") == 0) {
-		static const char months[][4] = {
-			"Jan", "Feb", "Mar", "Apr", "May", "Jun",
-			"Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
-		};
-
-		time_t ti = time(NULL);
-		struct tm tm = *localtime(&ti);
-		*t = token_init(T_STRING, allocate_printf("%s %2d %04d", months[tm.tm_mon], tm.tm_mday, 1900 + tm.tm_year), t->pos);
-	} else if (strcmp(t->str, "__TIME__") == 0) {
-		time_t ti = time(NULL);
-		struct tm tm = *localtime(&ti);
-		*t = token_init(T_STRING, allocate_printf("%02d:%02d:%02d", tm.tm_hour, tm.tm_min, tm.tm_sec), t->pos);
-	} else if (strcmp(t->str, "__STDC__") == 0) {
-		*t = token_init(T_NUM, "1", t->pos);
-	} else if (strcmp(t->str, "__STDC_HOSTED__") == 0) {
-		*t = token_init(T_NUM, "0", t->pos);
-	} else if (strcmp(t->str, "__STDC_VERSION__") == 0) {
-		char *version_string = "201710L";
-		*t = token_init(T_NUM, version_string, t->pos);
-	} else if (strcmp(t->str, "__STDC_TIME__") == 0) {
-		NOTIMP(); // Is this actually a macro that is required by anyone?
-	} else if (strcmp(t->str, "__WORDSIZE") == 0) {
-		*t = token_init(T_NUM, "64", t->pos);
 	} else
 		return 0;
 	return 1;

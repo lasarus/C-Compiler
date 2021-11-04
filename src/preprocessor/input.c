@@ -28,6 +28,24 @@ struct input input_create(const char *filename, FILE *fp) {
 	return input;
 }
 
+struct input input_open_string(char *str) {
+	size_t len = strlen(str);
+	struct input input = {
+		.filename = "<string>",
+		.iline = 1, .icol = 1,
+		.contents_cap = len,
+		.contents_size = len,
+		.contents = str
+	};
+
+	// Buffer should be initialized at the start.
+	for (int i = 0; i < N_BUFF - 1; i++)
+		input_next(&input);
+	input.c[0] = '\n'; // Needs to start with newline.
+
+	return input;
+}
+
 static char next_char(struct input *input) {
 	while (input->c_ptr < input->contents_size - 1 &&
 		input->contents[input->c_ptr] == '\\' &&

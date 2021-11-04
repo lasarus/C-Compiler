@@ -13,7 +13,6 @@ static struct input *input;
 #define C2 (input->c[2])
 #define CNEXT() input_next(input)
 
-
 enum {
 	C_DIGIT = 0x1,
 	C_OCTAL_DIGIT = 0x2,
@@ -354,4 +353,21 @@ struct token tokenizer_next(void) {
 #undef IFSTR
 
 	return next;
+}
+
+struct token_list tokenizer_whole(struct input *new_input) {
+	struct input *prev_input = input;
+	input = new_input;
+
+	struct token_list tl = { 0 };
+
+	struct token t = tokenizer_next();
+	while (t.type != T_EOI) {
+		token_list_add(&tl, t);
+		t = tokenizer_next();
+	}
+
+	input = prev_input;
+
+	return tl;
 }

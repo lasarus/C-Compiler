@@ -32,4 +32,6 @@ void input_open(struct input **input, const char *path, int system);
 void input_close(struct input **input);
 void input_disable_path(struct input *input);
 
+struct input input_open_string(char *str);
+
 #endif

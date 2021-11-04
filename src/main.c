@@ -6,6 +6,7 @@
 #include "arch/builtins.h"
 #include "parser/symbols.h"
 
+#include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -29,9 +30,16 @@ struct arguments parse_arguments(int argc, char **argv) {
 
 			input_add_include_path(argv[i] + 2);
 		} else if (argv[i][0] == '-' &&
-			argv[i][1] == 'D') {
-			struct define def = define_init(argv[i] + 2);
-			define_map_add(def);
+				   argv[i][1] == 'D') {
+			char *name = argv[i] + 2, *value = NULL;
+			for (unsigned j = 2; argv[i][j]; j++) {
+				if (argv[i][j] == '=') {
+					argv[i][j] = '\0';
+					value = argv[i] + j + 1;
+					break;
+				}
+			}
+			define_string(name, value ? value : "1");
 		} else if (argv[i][0] == '-' &&
 			argv[i][1] == 'f') {
 			if (strcmp(argv[i] + 2, "cmodel=small") == 0) {
@@ -79,20 +87,22 @@ struct arguments parse_arguments(int argc, char **argv) {
 }
 
 void add_implementation_defs(void) {
-	struct define def = define_init("NULL");
-	struct token tokens[] = {
-		token_init(T_LPAR, "(", (struct position){0}),
-		token_init(T_IDENT, "void", (struct position){0}),
-		token_init(T_STAR, "*", (struct position){0}),
-		token_init(T_RPAR, ")", (struct position){0}),
-		token_init(T_NUM, "0", (struct position){0})
+	define_string("NULL", "(void*)0");
+	static const char months[][4] = {
+		"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+		"Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
 	};
 
-	for (unsigned int i = 0;
-		 i < sizeof(tokens) / sizeof(*tokens); i++) {
-		define_add_def(&def, tokens[i]);
-	}
-	define_map_add(def);
+	time_t ti = time(NULL);
+	struct tm tm = *localtime(&ti);
+	define_string("__DATE__",
+				  allocate_printf("\"%s %2d %04d\"", months[tm.tm_mon], tm.tm_mday, 1900 + tm.tm_year));
+
+	define_string("__TIME__", allocate_printf("\"%02d:%02d:%02d\"", tm.tm_hour, tm.tm_min, tm.tm_sec));
+	define_string("__STDC__", "1");
+	define_string("__STDC_HOSTED__", "0");
+	define_string("__STDC_VERSION__", "201710L");
+	define_string("__WORDSIZE", "64");
 }
 
 int main(int argc, char **argv) {
