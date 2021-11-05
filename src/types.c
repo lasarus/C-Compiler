@@ -405,7 +405,7 @@ struct expr *type_sizeof(struct type *type) {
 		switch (type->type) {
 		case TY_VARIABLE_LENGTH_ARRAY:
 			assert(type->variable_length_array.is_evaluated);
-			return EXPR_BINARY_OP(OP_MUL, EXPR_VAR(type->variable_length_array.length_var, type_simple(ST_INT)),
+			return EXPR_BINARY_OP(OP_MUL, EXPR_VAR(type->variable_length_array.length_var, type_simple(ST_INT), 0),
 								  type_sizeof(type->children[0]));
 		case TY_ARRAY:
 			return EXPR_BINARY_OP(OP_MUL, EXPR_INT(type->array.length),

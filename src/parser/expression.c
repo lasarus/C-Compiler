@@ -446,6 +446,8 @@ int try_expression_to_address(struct expr *expr, var_id *var) {
 
 	case E_VARIABLE: {
 		var_id address = new_variable(type_pointer(expr->data_type), 1, 1);
+		if (expr->variable.is_register)
+			ERROR("Taking address of register is not allowed.");
 		IR_PUSH_ADDRESS_OF(address, expr->variable.id);
 		*var = address;
 		return 1;
@@ -962,10 +964,7 @@ struct expr *parse_prefix() {
 
 		case IDENT_VARIABLE:
 			TNEXT();
-			return expr_new((struct expr) {
-					.type = E_VARIABLE,
-					.variable = { sym->variable.id, sym->variable.type }
-				});
+			return EXPR_VAR(sym->variable.id, sym->variable.type, sym->is_register);
 
 		case IDENT_VARIABLE_LENGTH_ARRAY:
 			TNEXT();

@@ -1342,6 +1342,9 @@ int parse_init_declarator(struct specifiers s, int external, int *was_func) {
 	if (s.scs.extern_n && has_init)
 		ERROR("Extern declaration can't have initializer.");
 
+	if (s.scs.register_n)
+		symbol->is_register = 1;
+
 	if (external) {
 		definition_is_static = 1;
 

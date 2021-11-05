@@ -38,8 +38,7 @@ struct symbol_identifier {
 		} label;
 	};
 
-	int is_global;
-	int is_tentative;
+	int is_global, is_tentative, is_register;
 	int has_definition;
 };
 
