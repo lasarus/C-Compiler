@@ -109,33 +109,40 @@ static FILE *try_open_file(const char *path) {
 	return fp;
 }
 
+#define BUFFER_SIZE 256
+
+FILE *try_open_local_path(struct input *input, const char *path, char *path_buffer) {
+	int last_slash = last_slash_pos(input->filename);
+	if (last_slash && path[0] != '/')
+		assert(snprintf(path_buffer, BUFFER_SIZE, "%.*s/%s", last_slash, input->filename, path) < BUFFER_SIZE);
+	else
+		assert(snprintf(path_buffer, BUFFER_SIZE, "%s", path) < BUFFER_SIZE);
+	return try_open_file(path_buffer);
+}
+
 void input_open(struct input **input, const char *path, int system) {
 	FILE *fp = NULL;
 
-	#define BUFFER_SIZE 256
 	char path_buffer[BUFFER_SIZE]; // TODO: Remove arbitrary limit.
 
 	if (*input) {
-		if (!system) {
-			int last_slash = last_slash_pos((*input)->filename);
-			if (last_slash)
-				assert(snprintf(path_buffer, BUFFER_SIZE, "%.*s/%s", last_slash, (*input)->filename, path) < BUFFER_SIZE);
-			else
-				assert(snprintf(path_buffer, BUFFER_SIZE, "%s", path) < BUFFER_SIZE);
-			fp = try_open_file(path_buffer);
-		}
+		if (!system)
+			fp = try_open_local_path(*input, path, path_buffer);
 
 		for (unsigned i = 0; !fp && i < paths_size; i++) {
 			assert(snprintf(path_buffer, BUFFER_SIZE, "%s/%s", paths[i], path) < BUFFER_SIZE);
 			fp = try_open_file(path_buffer);
 		}
+
+		if (!fp && system)
+			fp = try_open_local_path(*input, path, path_buffer);
 	} else {
 		assert(snprintf(path_buffer, BUFFER_SIZE, "%s", path) < BUFFER_SIZE);
 		fp = try_open_file(path_buffer);
 	}
 
 	if (!fp) {
-		ERROR("\"%s\" not found in search path", path);
+		ERROR("\"%s\" not found in search path, with origin %s", path, *input ? (*input)->filename : (const char *)".");
 	}
 
 	if (string_set_contains(disabled_headers, path_buffer)) {
