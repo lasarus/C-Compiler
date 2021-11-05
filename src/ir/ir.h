@@ -37,13 +37,10 @@ struct instruction {
 		IR_CALL_VARIABLE,
 		IR_COPY,
 		IR_CAST,
-		IR_ARRAY_PTR_DECAY,
 		IR_SET_ZERO,
 		IR_VA_START,
-		IR_VA_END,
 		IR_VA_ARG, //IR_VA_COPY,
 		IR_STACK_ALLOC,
-		IR_POP_STACK_ALLOC,
 		IR_GET_SYMBOL_PTR,
 		IR_TRUNCATE,
 		IR_SET_BITS,
@@ -85,10 +82,6 @@ struct instruction {
 			var_id variable;
 		} address_of;
 #define IR_PUSH_ADDRESS_OF(RESULT, VARIABLE) IR_PUSH(.type = IR_ADDRESS_OF, .result=(RESULT), .address_of = {(VARIABLE)})
-		struct {
-			var_id array;
-		} array_ptr_decay;
-#define IR_PUSH_ARRAY_PTR_DECAY(RESULT, ARRAY) IR_PUSH(.type = IR_ARRAY_PTR_DECAY, .result=(RESULT), .address_of = {(ARRAY)})
 #define IR_PUSH_SET_ZERO(RESULT) IR_PUSH(.type = IR_SET_ZERO, .result = (RESULT))
 		struct {
 			struct constant constant;

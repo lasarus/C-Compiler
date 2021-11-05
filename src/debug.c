@@ -161,10 +161,6 @@ const char *dbg_instruction(struct instruction ins) {
 			  ins.stack_alloc.length);
 		break;
 
-	case IR_POP_STACK_ALLOC:
-		DBG_PRINT("pop stack allocation");
-		break;
-
 	case IR_GET_SYMBOL_PTR:
 		DBG_PRINT("%d = get symbol %s", ins.result,
 			  ins.get_symbol_ptr.label);
