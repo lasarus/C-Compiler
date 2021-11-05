@@ -307,12 +307,12 @@ void directiver_handle_pragma(void) {
 
 struct token directiver_next(void) {
 	struct token t = NEXT();
-	if (t.type == PP_DIRECTIVE) {
+	while (t.type == PP_DIRECTIVE) {
 		struct token directive = NEXT();
 
 		if (directive.first_of_line) {
-			PUSH(directive);
-			return directiver_next();
+			t = directive;
+			continue;
 		}
 
 		char *name = directive.str;
@@ -397,8 +397,8 @@ struct token directiver_next(void) {
 			PRINT_POS(directive.pos);
 			ERROR("#%s not implemented", name);
 		}
-		return directiver_next();
-	} else {
-		return t;
+
+		t = NEXT();
 	}
+	return t;
 }
