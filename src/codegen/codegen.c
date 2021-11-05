@@ -608,26 +608,6 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 		emit("andq $-16, %%rsp"); // Round down to nearest 16 by clearing last 4 bits.
 	} break;
 
-	case IR_GET_SYMBOL_PTR: {
-		if (codegen_flags.cmodel == CMODEL_SMALL) {
-			if (ins.get_symbol_ptr.offset == 0) {
-				emit("movq $%s, %%rax", ins.get_symbol_ptr.label);
-			} else {
-				emit("movq $%s+%lld, %%rax", ins.get_symbol_ptr.label,
-					ins.get_symbol_ptr.offset);
-			}
-		} else if (codegen_flags.cmodel == CMODEL_LARGE) {
-			if (ins.get_symbol_ptr.offset == 0) {
-				emit("movabsq $%s, %%rax", ins.get_symbol_ptr.label);
-			} else {
-				emit("movabsq $%s+%lld, %%rax", ins.get_symbol_ptr.label,
-					ins.get_symbol_ptr.offset);
-			}
-		}
-
-		reg_to_scalar(REG_RAX, ins.result);
-	} break;
-
 	case IR_TRUNCATE:
 		if (get_variable_size(ins.truncate.rhs) !=
 			get_variable_size(ins.result))

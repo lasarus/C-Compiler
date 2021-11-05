@@ -41,7 +41,6 @@ struct instruction {
 		IR_VA_START,
 		IR_VA_ARG, //IR_VA_COPY,
 		IR_STACK_ALLOC,
-		IR_GET_SYMBOL_PTR,
 		IR_TRUNCATE,
 		IR_SET_BITS,
 		IR_GET_BITS,

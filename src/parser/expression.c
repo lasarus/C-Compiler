@@ -484,13 +484,12 @@ int try_expression_to_address(struct expr *expr, var_id *var) {
 	}
 
 	case E_CONSTANT: {
-		struct constant *c = &expr->constant;
-		assert(c->type == CONSTANT_LABEL);
+		struct constant c_addr = expr->constant;
+		assert(c_addr.type == CONSTANT_LABEL);
+		c_addr.type = CONSTANT_LABEL_POINTER;
 
-		var_id ptr_result = new_variable(type_pointer(expr->data_type), 1, 1);
-		IR_PUSH_GET_SYMBOL_PTR(rodata_get_label_string(c->label.label), c->label.offset, ptr_result);
-
-		*var = ptr_result;
+		*var = new_variable(type_pointer(expr->data_type), 1, 1);
+		IR_PUSH_CONSTANT(c_addr, *var);
 		return 1;
 	}
 

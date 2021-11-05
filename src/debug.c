@@ -161,11 +161,6 @@ const char *dbg_instruction(struct instruction ins) {
 			  ins.stack_alloc.length);
 		break;
 
-	case IR_GET_SYMBOL_PTR:
-		DBG_PRINT("%d = get symbol %s", ins.result,
-			  ins.get_symbol_ptr.label);
-		break;
-
 	case IR_GET_BITS:
 		DBG_PRINT("%d = get bits from %d, [%d - %d], se: %d", ins.result,
 			  ins.get_bits.field,
