@@ -60,4 +60,12 @@ int main() {
 		};
 		_Static_assert(sizeof (struct T) == 8, "");
 	}
+	{
+		static struct T {
+			int a : 2;
+			int :1;
+			int b : 2;
+		} a = {1, 1};
+		assert(a.a == 1 && a.b == 1);
+	}
 }
