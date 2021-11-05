@@ -682,18 +682,18 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 	} break;
 
 	case E_ASSIGNMENT: {
-		var_id rhs = expression_to_ir(expression_cast(expr->args[1], expr->args[0]->data_type));
-		bitfield_store(expression_to_bitfield_address(expr->args[0]), rhs);
-		return rhs;
-	}
+		res = expression_to_ir_result(expression_cast(expr->args[1], expr->args[0]->data_type), res);
+		bitfield_store(expression_to_bitfield_address(expr->args[0]), res);
+	} break;
 
 	case E_ASSIGNMENT_OP: {
 		struct expr *a_expr = expr->args[0];
 
+		var_id b = expression_to_ir(expr->args[1]);
+
 		struct bitfield_address address = expression_to_bitfield_address(a_expr);
 
 		var_id a = bitfield_load(address, a_expr->data_type);
-		var_id b = expression_to_ir(expr->args[1]);
 
 		if (expr->assignment_op.postfix)
 			IR_PUSH_COPY(res, a);
@@ -820,7 +820,7 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 
 	case E_COMMA:
 		expression_to_ir(expr->args[0]);
-		expression_to_ir_result(expr->args[1], res);
+		res = expression_to_ir_result(expr->args[1], res);
 		break;
 
 	default:
