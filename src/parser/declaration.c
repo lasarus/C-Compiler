@@ -1361,8 +1361,8 @@ int parse_init_declarator(struct specifiers s, int external, int *was_func) {
 		if (s.scs.static_n)
 			definition_is_static = 1;
 		if (s.scs.extern_n) {
-			is_global = 1;
-			NOTIMP();
+			has_definition = 0;
+			is_global = 0;
 		} else {
 			has_definition = 1;
 		}
