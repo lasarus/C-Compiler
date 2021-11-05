@@ -731,10 +731,8 @@ struct parameter_list parse_parameter_list(void) {
 			ret.abstract = was_abstract;
 			first = 0;
 		} else if (was_abstract != ret.abstract) {
-			if (was_abstract == 10) {
+			if (was_abstract == 10)
 				ERROR("Something went wrong");
-			}
-			ERROR("Abstractness can't be mixed in parameter list");
 		}
 
 		ret.n++;
@@ -744,7 +742,7 @@ struct parameter_list parse_parameter_list(void) {
 		type = type_adjust_parameter(type);
 		ret.types[ret.n - 1] = type;
 
-		if (!ret.abstract) {
+		if (!was_abstract) {
 			ret.arguments = realloc(ret.arguments, ret.n * sizeof(*ret.arguments));
 			struct symbol_identifier *ident = symbols_add_identifier(name);
 			ident->type = IDENT_VARIABLE;
