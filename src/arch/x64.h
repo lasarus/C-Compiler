@@ -71,8 +71,6 @@ struct constant {
 		float float_d;
 		double double_d;
 
-		char *str_d;
-
 		struct {
 			label_id label;
 			int64_t offset;

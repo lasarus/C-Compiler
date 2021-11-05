@@ -677,20 +677,6 @@ void constant_to_buffer(uint8_t *buffer, struct constant constant, int bit_offse
 		return;
 	}
 
-	if (constant.data_type->type == TY_ARRAY) {
-		assert(bit_offset == 0 && bit_size == -1);
-		if (constant.data_type->children[0] != type_simple(ST_CHAR))
-			NOTIMP();
-
-		const char *str = constant.str_d;
-		int i = 0;
-		for (; str[i]; i++) {
-			buffer[i] = str[i];
-		}
-		buffer[i] = 0;
-		return;
-	}
-
 	assert(constant.data_type->type == TY_SIMPLE);
 
 	if (bit_size != -1) {

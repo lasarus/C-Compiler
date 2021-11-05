@@ -123,17 +123,34 @@ void ir_init_var(struct initializer *init, var_id result) {
 	var_id offset_var = new_variable(type_pointer(type_simple(ST_VOID)), 1, 1);
 
 	for (int i = 0; i < init->size; i++) {
-		ir_get_offset(member_address, base_address, offset_var, init->pairs[i].offset);
-		if (init->pairs[i].bit_offset) {
-			var_id value = expression_to_ir(init->pairs[i].expr);
-			var_id prev = new_variable_sz(get_variable_size(value), 1, 1);
-			IR_PUSH_LOAD(prev, member_address);
+		struct init_pair *pair = init->pairs + i;
+		switch (pair->type) {
+		case IP_EXPRESSION: {
+			ir_get_offset(member_address, base_address, offset_var, pair->offset);
+			if (init->pairs[i].bit_offset) {
+				var_id value = expression_to_ir(pair->u.expr);
+				var_id prev = new_variable_sz(get_variable_size(value), 1, 1);
+				IR_PUSH_LOAD(prev, member_address);
 
-			IR_PUSH_SET_BITS(prev, prev, value, init->pairs[i].bit_offset, init->pairs[i].bit_size);
+				IR_PUSH_SET_BITS(prev, prev, value, init->pairs[i].bit_offset, init->pairs[i].bit_size);
 
-			IR_PUSH_STORE(prev, member_address);
-		} else {
-			IR_PUSH_STORE(expression_to_ir(init->pairs[i].expr), member_address);
+				IR_PUSH_STORE(prev, member_address);
+			} else {
+				IR_PUSH_STORE(expression_to_ir(pair->u.expr), member_address);
+			}
+		} break;
+
+		case IP_STRING: {
+			var_id char_val = new_variable_sz(1, 1, 1);
+			unsigned len = strlen(pair->u.str);
+			for (unsigned i = 0; i < len + 1 /* Include null-terminator. */; i++) { 
+				ir_get_offset(member_address, base_address, offset_var, pair->offset + i);
+				IR_PUSH_CONSTANT(((struct constant) { .type = CONSTANT_TYPE,
+							.data_type = type_simple(ST_CHAR),
+							.char_d = pair->u.str[i]}), char_val);
+				IR_PUSH_STORE(char_val, member_address);
+			}
+		} break;
 		}
 	}
 }

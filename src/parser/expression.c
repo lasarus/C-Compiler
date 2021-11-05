@@ -1300,17 +1300,11 @@ int evaluate_constant_expression(struct expr *expr,
 
 		struct constant c = expr->args[0]->constant;
 
-		if (c.type == CONSTANT_LABEL) {
-			*constant = c;
-			constant->type = CONSTANT_LABEL_POINTER;
-			constant->data_type = type_pointer(expr->args[0]->data_type->children[0]);
-		} else {
-			*constant = c;
-			constant->data_type = type_pointer(expr->args[0]->data_type->children[0]);
-			constant->type = CONSTANT_LABEL_POINTER;
-			constant->label.label = rodata_register(c.str_d);
-			constant->label.offset = 0;
-		}
+		assert(c.type == CONSTANT_LABEL);
+
+		*constant = c;
+		constant->type = CONSTANT_LABEL_POINTER;
+		constant->data_type = type_pointer(expr->args[0]->data_type->children[0]);
 	} break;
 
 	case E_CONDITIONAL: {

@@ -37,9 +37,9 @@ struct expr *expr_new(struct expr expr);
 #define EXPR_STR(STR) expr_new((struct expr) {							\
 			.type = E_CONSTANT,											\
 			.constant = {												\
-				.type = CONSTANT_TYPE,									\
+				.type = CONSTANT_LABEL,									\
 				.data_type = type_array(type_simple(ST_CHAR), strlen(STR) + 1),	\
-				.str_d = (strdup(STR))									\
+				.label = {rodata_register(strdup(STR))}					\
 			}})
 
 #define EXPR_INT(I) expr_new((struct expr) {							\

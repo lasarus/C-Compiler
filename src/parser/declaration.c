@@ -913,8 +913,22 @@ static struct initializer *initializer_init(void) {
 	return init;
 }
 
-void add_init_pair(struct initializer *init, struct init_pair pair) {
-	ADD_ELEMENT(init->size, init->cap, init->pairs) = pair;
+void add_expr_init_pair(struct initializer *init, int offset, int bit_offset, int bit_size, struct expr *expr) {
+	ADD_ELEMENT(init->size, init->cap, init->pairs) = (struct init_pair) {
+		.type = IP_EXPRESSION,
+		.offset = offset,
+		.bit_offset = bit_offset,
+		.bit_size = bit_size,
+		.u.expr = expr
+	};
+}
+
+void add_string_init_pair(struct initializer *init, int offset, const char *str) {
+	ADD_ELEMENT(init->size, init->cap, init->pairs) = (struct init_pair) {
+		.type = IP_STRING,
+		.offset = offset,
+		.u.str = str
+	};
 }
 
 int parse_non_brace_initializer(struct type **type, int offset, int bit_offset,
@@ -942,8 +956,7 @@ int parse_non_brace_initializer(struct type **type, int offset, int bit_offset,
 		} else {
 			struct expr *casted_expr = expression_cast(expr, *type);
 			if (!expression_is_zero(casted_expr)) {
-				add_init_pair(init, (struct init_pair){offset, bit_offset, bitfield,
-						expression_cast(expr, *type)});
+				add_expr_init_pair(init, offset, bit_offset, bitfield, expression_cast(expr, *type));
 			}
 		}
 
@@ -976,7 +989,7 @@ int parse_non_brace_initializer(struct type **type, int offset, int bit_offset,
 			*type = type_create(&complete_array_params, (*type)->children);
 		}
 
-		add_init_pair(init, (struct init_pair){offset, bit_offset, bitfield, EXPR_STR(str)});
+		add_string_init_pair(init, offset, str);
 		return 1;
 	}
 
@@ -1121,9 +1134,7 @@ int parse_brace_initializer(struct type **current_object, int offset, struct ini
 
 				for (; stack_count > start_count; stack_count--) {
 					if (expr->data_type == type_stack[stack_count - 1]) {
-						add_init_pair(init, (struct init_pair) { selected_offset, selected_bit_offset,
-								selected_bitfield,
-								expr});
+						add_expr_init_pair(init, selected_offset, selected_bit_offset, selected_bitfield, expr);
 						break;
 					}
 				}
@@ -1210,8 +1221,7 @@ struct initializer *parse_initializer(struct type **type) {
 		struct expr *expr = parse_assignment_expression();
 
 		if (expr) {
-			add_init_pair(init, (struct init_pair) { 0, 0, -1,
-					expression_cast(expr, *type)});
+			add_expr_init_pair(init, 0, 0, -1, expression_cast(expr, *type));
 		} else {
 			parse_brace_initializer(type, 0, init);
 		}

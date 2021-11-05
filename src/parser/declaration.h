@@ -9,9 +9,15 @@
 struct initializer {
 	int size, cap;
 	struct init_pair {
-		int offset;
-		int bit_offset, bit_size;
-		struct expr *expr;
+		enum {
+			IP_EXPRESSION,
+			IP_STRING
+		} type;
+		int offset, bit_offset, bit_size;
+		union {
+			struct expr *expr;
+			const char *str;
+		} u;
 	} *pairs;
 };
 

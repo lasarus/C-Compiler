@@ -112,36 +112,45 @@ void codegen_initializer_recursive(struct initializer *init,
 		if (offset >= size)
 			ERROR("Internal compiler error");
 
-		struct constant *c = expression_to_constant(pair->expr);
-		if (c) {
-			switch (c->type) {
-			case CONSTANT_TYPE:
-				constant_to_buffer(buffer + offset, *c, pair->bit_offset, pair->bit_size);
-				break;
+		switch (pair->type) {
+		case IP_EXPRESSION: {
+			struct expr *expr = pair->u.expr;
+			struct constant *c = expression_to_constant(expr);
+			if (c) {
+				switch (c->type) {
+				case CONSTANT_TYPE:
+					constant_to_buffer(buffer + offset, *c, pair->bit_offset, pair->bit_size);
+					break;
 
-			case CONSTANT_LABEL_POINTER:
-				is_label[offset] = 1;
-				labels[offset] = c->label.label;
-				label_offsets[offset] = c->label.offset;
-				break;
+				case CONSTANT_LABEL_POINTER:
+					is_label[offset] = 1;
+					labels[offset] = c->label.label;
+					label_offsets[offset] = c->label.offset;
+					break;
 
-			case CONSTANT_LABEL:
-				NOTIMP();
-				break;
+				case CONSTANT_LABEL:
+					NOTIMP();
+					break;
 
-			default:
-				NOTIMP();
+				default:
+					NOTIMP();
+				}
+			} else if (expr->type == E_COMPOUND_LITERAL) {
+				codegen_initializer_recursive(expr->compound_literal.init,
+											  buffer + offset,
+											  labels + offset,
+											  label_offsets + offset,
+											  is_label + offset,
+											  size - offset);
+			} else {
+				ERROR("Invalid constant expression in static initializer of type %s.",
+					  dbg_type(expr->data_type));
 			}
-		} else if (pair->expr->type == E_COMPOUND_LITERAL) {
-			codegen_initializer_recursive(pair->expr->compound_literal.init,
-										  buffer + offset,
-										  labels + offset,
-										  label_offsets + offset,
-										  is_label + offset,
-										  size - offset);
-		} else {
-			ERROR("Invalid constant expression in static initializer of type %s.",
-				  dbg_type(pair->expr->data_type));
+		} break;
+		case IP_STRING:
+			for (unsigned i = 0; i == 0 || pair->u.str[i - 1]; i++)
+				buffer[offset + i] = pair->u.str[i];
+			break;
 		}
 	}
 }
@@ -218,7 +227,8 @@ void codegen_pre_initializer(struct initializer *init) {
 	for (int i = 0; i < init->size; i++) {
 		struct init_pair *pair = init->pairs + i;
 
-		codegen_compound_literals(&pair->expr, 0);
+		if (pair->type == IP_EXPRESSION)
+			codegen_compound_literals(&pair->u.expr, 0);
 	}
 }
 
