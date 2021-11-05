@@ -608,15 +608,6 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 		emit("andq $-16, %%rsp"); // Round down to nearest 16 by clearing last 4 bits.
 	} break;
 
-	case IR_TRUNCATE:
-		if (get_variable_size(ins.truncate.rhs) !=
-			get_variable_size(ins.result))
-			NOTIMP();
-
-		scalar_to_reg(ins.truncate.rhs, REG_RAX);
-		reg_to_scalar(REG_RAX, ins.result);
-		break;
-
 	case IR_SET_BITS: {
 		scalar_to_reg(ins.set_bits.field, REG_RAX);
 		scalar_to_reg(ins.set_bits.value, REG_RBX);

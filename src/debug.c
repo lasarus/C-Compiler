@@ -131,9 +131,9 @@ const char *dbg_instruction(struct instruction ins) {
 		DBG_PRINT("store %d into %d", ins.store.value, ins.store.pointer);
 		break;
 
-	case IR_COPY: {
+	case IR_COPY:
 		DBG_PRINT("%d = %d", ins.result, ins.copy.source);
-	} break;
+		break;
 
 	case IR_CAST:
 		DBG_PRINT("%d (%s)", ins.result, dbg_type(ins.cast.result_type));
@@ -175,11 +175,6 @@ const char *dbg_instruction(struct instruction ins) {
 			  ins.set_bits.value,
 			  ins.set_bits.offset,
 			  ins.set_bits.length);
-		break;
-
-	case IR_TRUNCATE:
-		DBG_PRINT("%d = truncate %d, se: %d", ins.result,
-			  ins.truncate.rhs, ins.truncate.sign_extend);
 		break;
 
 	case IR_CLEAR_STACK_BUCKET:

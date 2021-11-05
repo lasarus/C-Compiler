@@ -41,7 +41,6 @@ struct instruction {
 		IR_VA_START,
 		IR_VA_ARG, //IR_VA_COPY,
 		IR_STACK_ALLOC,
-		IR_TRUNCATE,
 		IR_SET_BITS,
 		IR_GET_BITS,
 		IR_ADD_TEMPORARY,
@@ -104,11 +103,6 @@ struct instruction {
 			struct type *result_type, *rhs_type;
 		} cast;
 #define IR_PUSH_CAST(RESULT, RESULT_TYPE, RHS, RHS_TYPE) IR_PUSH(.type = IR_CAST, .result = (RESULT), .cast = {(RHS), (RESULT_TYPE), (RHS_TYPE)})
-		struct {
-			var_id rhs;
-			int sign_extend;
-		} truncate;
-#define IR_PUSH_TRUNCATE(RESULT, RHS, SIGN_EXTEND) IR_PUSH(.type = IR_TRUNCATE, .result = (RESULT), .truncate = {(RHS), (SIGN_EXTEND)})
 
 #define IR_PUSH_VA_START(RESULT) IR_PUSH(.type = IR_VA_START, .result = (RESULT))
 
