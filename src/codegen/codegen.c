@@ -608,20 +608,6 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 		emit("andq $-16, %%rsp"); // Round down to nearest 16 by clearing last 4 bits.
 	} break;
 
-	case IR_SET_BITS: {
-		scalar_to_reg(ins.set_bits.field, REG_RAX);
-		scalar_to_reg(ins.set_bits.value, REG_RBX);
-		uint64_t mask = gen_mask(64 - ins.set_bits.offset - ins.set_bits.length,
-								 ins.set_bits.offset);
-		emit("movabsq $%lld, %%rdx", mask);
-		emit("andq %%rdx, %%rax");
-		emit("shl $%d, %%rbx", ins.set_bits.offset);
-		emit("notq %%rdx");
-		emit("andq %%rdx, %%rbx");
-		emit("orq %%rbx, %%rax");
-		reg_to_scalar(REG_RAX, ins.result);
-	} break;
-
 	case IR_GET_BITS:
 		scalar_to_reg(ins.get_bits.field, REG_RAX);
 		emit("shl $%d, %%rax", 64 - ins.get_bits.offset - ins.get_bits.length);

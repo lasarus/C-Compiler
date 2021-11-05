@@ -115,6 +115,28 @@ void ir_get_offset(var_id member_address, var_id base_address, var_id offset_var
 	IR_PUSH_BINARY_OPERATOR(OP_ADD, OT_ULLONG, base_address, offset_var, member_address);
 }
 
+void ir_set_bits(var_id result, var_id field, var_id value, int offset, int length) {
+	// TODO: Unaligned loads? Out of bounds? Different sizes of value?
+	uint64_t mask = gen_mask(64 - offset - length, offset);
+	var_id mask_var = new_variable_sz(8, 1, 1);
+	var_id shift_var = new_variable_sz(8, 1, 1);
+	IR_PUSH_CONSTANT(((struct constant) { .type = CONSTANT_TYPE,
+				.data_type = type_simple(ST_UCHAR), .ullong_d = offset }),
+				shift_var);
+	IR_PUSH_CONSTANT(((struct constant) { .type = CONSTANT_TYPE,
+				.data_type = type_simple(ST_ULLONG), .ullong_d = mask }),
+				mask_var);
+	IR_PUSH_BINARY_OPERATOR(OP_BAND, OT_ULLONG, mask_var, field, result);
+	IR_PUSH_UNARY_OPERATOR(UOP_BNOT, OT_ULLONG, mask_var, mask_var);
+	IR_PUSH_BINARY_OPERATOR(OP_LSHIFT, OT_ULLONG, value, shift_var, value);
+	IR_PUSH_BINARY_OPERATOR(OP_BAND, OT_ULLONG, mask_var, value, mask_var);
+	IR_PUSH_BINARY_OPERATOR(OP_BOR, OT_ULLONG, mask_var, result, result);
+}
+
+void ir_get_bits(var_id result, var_id field, int offset, int length, int sign_extend) {
+	IR_PUSH_GET_BITS(result, field, offset, length, sign_extend);
+}
+
 void ir_init_var(struct initializer *init, var_id result) {
 	IR_PUSH_SET_ZERO(result);
 	var_id base_address = new_variable(type_pointer(type_simple(ST_VOID)), 1, 1);
@@ -132,7 +154,7 @@ void ir_init_var(struct initializer *init, var_id result) {
 				var_id prev = new_variable_sz(get_variable_size(value), 1, 1);
 				IR_PUSH_LOAD(prev, member_address);
 
-				IR_PUSH_SET_BITS(prev, prev, value, init->pairs[i].bit_offset, init->pairs[i].bit_size);
+				ir_set_bits(prev, prev, value, init->pairs[i].bit_offset, init->pairs[i].bit_size);
 
 				IR_PUSH_STORE(prev, member_address);
 			} else {

@@ -569,7 +569,7 @@ var_id bitfield_load(struct bitfield_address address, struct type *type) {
 		return ret;
 	} else {
 		IR_PUSH_LOAD(ret, address.address);
-		IR_PUSH_GET_BITS(ret, ret, address.offset, address.bitfield, address.sign_extend);
+		ir_get_bits(ret, ret, address.offset, address.bitfield, address.sign_extend);
 		return ret;
 	}
 }
@@ -581,7 +581,7 @@ void bitfield_store(struct bitfield_address address, var_id value) {
 		var_id prev = new_variable_sz(get_variable_size(value), 1, 1);
 		IR_PUSH_LOAD(prev, address.address);
 
-		IR_PUSH_SET_BITS(prev, prev, value, address.offset, address.bitfield);
+		ir_set_bits(prev, prev, value, address.offset, address.bitfield);
 
 		IR_PUSH_STORE(prev, address.address);
 	}
@@ -760,7 +760,7 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 
 		if (field_bitfield != -1) {
 			int sign_extend = is_signed(data->fields[expr->member.member_idx].type->simple);
-			IR_PUSH_GET_BITS(res, res, data->fields[expr->member.member_idx].bit_offset, field_bitfield, sign_extend);
+			ir_get_bits(res, res, data->fields[expr->member.member_idx].bit_offset, field_bitfield, sign_extend);
 		}
 	} break;
 

@@ -86,11 +86,6 @@ struct instruction {
 		} constant;
 #define IR_PUSH_CONSTANT(CONSTANT, RESULT) IR_PUSH(.type = IR_CONSTANT, .result=(RESULT), .constant = {(CONSTANT)})
 		struct {
-			const char *label;
-			int64_t offset;
-		} get_symbol_ptr;
-#define IR_PUSH_GET_SYMBOL_PTR(STR, OFFSET, RESULT) IR_PUSH(.type = IR_GET_SYMBOL_PTR, .result=(RESULT), .get_symbol_ptr = {(STR), (OFFSET)})
-		struct {
 			var_id function;
 			struct type *function_type;
 			struct type **argument_types;
@@ -117,12 +112,6 @@ struct instruction {
 			int dominance;
 		} stack_alloc;
 #define IR_PUSH_STACK_ALLOC(RESULT, LENGTH, SLOT, DOMINANCE) IR_PUSH(.type = IR_STACK_ALLOC, .result = (RESULT), .stack_alloc = {(LENGTH), (SLOT), (DOMINANCE)})
-
-		struct {
-			var_id field, value;
-			int offset, length;
-		} set_bits;
-#define IR_PUSH_SET_BITS(RESULT, FIELD, VALUE, OFFSET, LENGTH) IR_PUSH(.type = IR_SET_BITS, .result = (RESULT), .set_bits = {(FIELD), (VALUE), (OFFSET), (LENGTH)})
 
 		struct {
 			var_id field;
@@ -224,6 +213,8 @@ void ir_return_void(void);
 
 void ir_init_var(struct initializer *init, var_id result);
 void ir_get_offset(var_id member_address, var_id base_address, var_id offset_var, int offset);
+void ir_set_bits(var_id result, var_id field, var_id value, int offset, int length);
+void ir_get_bits(var_id result, var_id field, int offset, int length, int sign_extend);
 
 struct function *get_current_function(void);
 struct block *get_current_block(void);

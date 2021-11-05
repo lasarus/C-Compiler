@@ -169,14 +169,6 @@ const char *dbg_instruction(struct instruction ins) {
 			  ins.get_bits.sign_extend);
 		break;
 
-	case IR_SET_BITS:
-		DBG_PRINT("%d = set bits to %d, value: %d, [%d - %d]", ins.result,
-			  ins.set_bits.field,
-			  ins.set_bits.value,
-			  ins.set_bits.offset,
-			  ins.set_bits.length);
-		break;
-
 	case IR_CLEAR_STACK_BUCKET:
 		DBG_PRINT("clear stack bucket %d", ins.clear_stack_bucket.stack_bucket);
 		break;
