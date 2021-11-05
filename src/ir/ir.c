@@ -104,15 +104,26 @@ void ir_return_void(void) {
 	block->exit.return_.value = 0;
 }
 
+void ir_get_offset(var_id member_address, var_id base_address, var_id offset_var, int offset) {
+	if (!offset_var)
+		offset_var = new_variable(type_pointer(type_simple(ST_VOID)), 1, 1);
+	IR_PUSH_CONSTANT(((struct constant) {
+				.type = CONSTANT_TYPE,
+				.data_type = type_simple(ST_ULLONG),
+				.ullong_d = offset
+			}), offset_var);
+	IR_PUSH_BINARY_OPERATOR(OP_ADD, OT_ULLONG, base_address, offset_var, member_address);
+}
 
 void ir_init_var(struct initializer *init, var_id result) {
 	IR_PUSH_SET_ZERO(result);
 	var_id base_address = new_variable(type_pointer(type_simple(ST_VOID)), 1, 1);
 	IR_PUSH_ADDRESS_OF(base_address, result);
 	var_id member_address = new_variable(type_pointer(type_simple(ST_VOID)), 1, 1);
+	var_id offset_var = new_variable(type_pointer(type_simple(ST_VOID)), 1, 1);
 
 	for (int i = 0; i < init->size; i++) {
-		IR_PUSH_GET_OFFSET(member_address, base_address, init->pairs[i].offset);
+		ir_get_offset(member_address, base_address, offset_var, init->pairs[i].offset);
 		if (init->pairs[i].bit_offset) {
 			var_id value = expression_to_ir(init->pairs[i].expr);
 			var_id prev = new_variable_sz(get_variable_size(value), 1, 1);

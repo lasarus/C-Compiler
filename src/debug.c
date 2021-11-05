@@ -144,12 +144,6 @@ const char *dbg_instruction(struct instruction ins) {
 		DBG_PRINT("%d = address of %d", ins.result, ins.address_of.variable);
 		break;
 
-	case IR_GET_MEMBER:
-		DBG_PRINT("%d = get offset %d of %d", ins.result,
-			   ins.get_member.offset,
-			   ins.get_member.pointer);
-		break;
-
 	case IR_VA_ARG:
 		DBG_PRINT("%d = v_arg", ins.result);
 		break;

@@ -37,7 +37,6 @@ struct instruction {
 		IR_CALL_VARIABLE,
 		IR_COPY,
 		IR_CAST,
-		IR_GET_MEMBER,
 		IR_ARRAY_PTR_DECAY,
 		IR_SET_ZERO,
 		IR_VA_START,
@@ -90,12 +89,6 @@ struct instruction {
 			var_id array;
 		} array_ptr_decay;
 #define IR_PUSH_ARRAY_PTR_DECAY(RESULT, ARRAY) IR_PUSH(.type = IR_ARRAY_PTR_DECAY, .result=(RESULT), .address_of = {(ARRAY)})
-		struct {
-			var_id pointer;
-			int offset;
-		} get_member;
-#define IR_PUSH_GET_OFFSET(RESULT, POINTER, OFFSET) IR_PUSH(.type = IR_GET_MEMBER, .result = (RESULT), .get_member = {(POINTER), (OFFSET)})
-
 #define IR_PUSH_SET_ZERO(RESULT) IR_PUSH(.type = IR_SET_ZERO, .result = (RESULT))
 		struct {
 			struct constant constant;
@@ -244,6 +237,7 @@ void ir_return(var_id value, struct type *type);
 void ir_return_void(void);
 
 void ir_init_var(struct initializer *init, var_id result);
+void ir_get_offset(var_id member_address, var_id base_address, var_id offset_var, int offset);
 
 struct function *get_current_function(void);
 struct block *get_current_block(void);

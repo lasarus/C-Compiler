@@ -477,7 +477,7 @@ int try_expression_to_address(struct expr *expr, var_id *var) {
 			return 0;
 
 		var_id member_address = new_variable(type_pointer(expr->data_type), 1, 1);
-		IR_PUSH_GET_OFFSET(member_address, address, field_offset);
+		ir_get_offset(member_address, address, 0, field_offset);
 
 		*var = member_address;
 		return 1;
@@ -536,7 +536,7 @@ struct bitfield_address expression_to_bitfield_address(struct expr *expr) {
 			out.address = expression_to_address(expr->member.lhs);
 			int offset = data->fields[idx].offset;
 
-			IR_PUSH_GET_OFFSET(out.address, out.address, offset);
+			ir_get_offset(out.address, out.address, 0, offset);
 
 			out.bitfield = data->fields[idx].bitfield;
 			out.offset = data->fields[idx].bit_offset;
@@ -756,7 +756,7 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 
 		var_id member_address = new_variable(type_pointer(expr->data_type), 1, 1);
 
-		IR_PUSH_GET_OFFSET(member_address, address, field_offset);
+		ir_get_offset(member_address, address, 0, field_offset);
 		IR_PUSH_LOAD(res, member_address);
 
 		if (field_bitfield != -1) {

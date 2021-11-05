@@ -482,12 +482,6 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 		reg_to_scalar(REG_RAX, ins.result);
 		break;
 
-	case IR_GET_MEMBER: {
-		scalar_to_reg(ins.get_member.pointer, REG_RAX);
-		emit("addq $%d, %%rax", ins.get_member.offset);
-		reg_to_scalar(REG_RAX, ins.result);
-	} break;
-
 	case IR_VA_START: {
 		int gp_offset_offset = builtin_va_list->fields[0].offset;
 		int fp_offset_offset = builtin_va_list->fields[1].offset;
