@@ -345,7 +345,7 @@ void calculate_offsets(struct struct_data *data) {
 		data->fields[i].bit_offset = 0;
 
 		if (data->fields[i].bitfield != -1) {
-			if (last_bit_offset != 0)
+			if (last_bit_offset != 0 && data->fields[i - 1].bitfield != 0)
 				data->fields[i].offset = data->fields[i - 1].offset;
 
 			int fits = 0;

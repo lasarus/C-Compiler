@@ -15,6 +15,8 @@ struct S {
 	};
 };
 
+
+
 int main() {
 	struct S s;
 	s.val = 0;
@@ -51,5 +53,11 @@ int main() {
 		} t = {.y = 1};
 
 		assert(t.y == 1);
+	}
+	{
+		struct T {
+			int a : 1, : 0, b : 1;
+		};
+		_Static_assert(sizeof (struct T) == 8, "");
 	}
 }
