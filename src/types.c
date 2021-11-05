@@ -314,6 +314,15 @@ void type_select(struct type *type, int index,
 	}
 }
 
+static void type_remove_unnamed(struct struct_data *data) {
+	int k = 0;
+	for (int i = 0; i < data->n; i++) {
+		if (data->fields[i].name)
+			data->fields[k++] = data->fields[i];
+	}
+	data->n = k;
+}
+
 void type_merge_anonymous_substructures(struct struct_data *data) {
 	// types names offsets need to be modified.
 	for (int i = 0; i < data->n; i++) {
@@ -352,6 +361,8 @@ void type_merge_anonymous_substructures(struct struct_data *data) {
 
 		i += n_new_elements - 1;
 	}
+
+	type_remove_unnamed(data);
 }
 
 int type_has_variable_size(struct type *type) {
