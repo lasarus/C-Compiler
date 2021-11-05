@@ -330,8 +330,9 @@ struct token directiver_next(void) {
 			new_filename = NULL;
 			line_diff = 0;
 			struct token path_tok = NEXT();
+			int system = path_tok.type == PP_HEADER_NAME_H;
 			char *path = path_tok.str;
-			tokenizer_push_input(path);
+			tokenizer_push_input(path, system);
 		} else if (strcmp(name, "ifndef") == 0 ||
 				   strcmp(name, "ifdef") == 0 ||
 				   strcmp(name, "if") == 0 ||

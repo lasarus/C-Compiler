@@ -37,8 +37,8 @@ static const unsigned char char_props[UCHAR_MAX] = {
 
 #define HAS_PROP(C, PROP) (char_props[(unsigned char)(C)] & (PROP))
 
-void tokenizer_push_input(const char *path) {
-	input_open(&input, path, 0); // <- TODO: System.
+void tokenizer_push_input(const char *path, int system) {
+	input_open(&input, path, system); // <- TODO: System.
 }
 
 void tokenizer_disable_current_path(void) {
@@ -258,7 +258,7 @@ static int parse_pp_header_name(struct token *next) {
 	if (C0 != '"' && C0 != '<')
 		return 0;
 
-	next->type = PP_HEADER_NAME;
+	next->type = C0 == '<' ? PP_HEADER_NAME_H : PP_HEADER_NAME_Q;
 	next->str = parse_string_like();
 
 	return 1;

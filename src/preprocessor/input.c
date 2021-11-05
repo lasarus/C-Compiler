@@ -3,6 +3,7 @@
 #include <common.h>
 
 #include <errno.h>
+#include <assert.h>
 
 void read_contents(struct input *input, FILE *fp) {
 	int c;
@@ -93,7 +94,7 @@ void input_add_include_path(const char *path) {
 static int last_slash_pos(const char *str) {
 	int slash_pos = 0;
 	for (int i = 0; str[i]; i++) {
-		if (str[i] == '/')
+		if (str[i] == '/' && slash_pos != i)
 			slash_pos = i + 1;
 	}
 	return slash_pos;
@@ -111,26 +112,27 @@ static FILE *try_open_file(const char *path) {
 void input_open(struct input **input, const char *path, int system) {
 	FILE *fp = NULL;
 
-	char path_buffer[256]; // TODO: Remove arbitrary limit.
+	#define BUFFER_SIZE 256
+	char path_buffer[BUFFER_SIZE]; // TODO: Remove arbitrary limit.
 
-	(void)system; // <- TODO.
 	if (*input) {
-		int last_slash = last_slash_pos((*input)->filename);
-		if (last_slash)
-			sprintf(path_buffer, "%.*s/%s", last_slash, (*input)->filename, path);
-		else
-			sprintf(path_buffer, "%s", path);
-		fp = try_open_file(path_buffer);
+		if (!system) {
+			int last_slash = last_slash_pos((*input)->filename);
+			if (last_slash)
+				assert(snprintf(path_buffer, BUFFER_SIZE, "%.*s/%s", last_slash, (*input)->filename, path) < BUFFER_SIZE);
+			else
+				assert(snprintf(path_buffer, BUFFER_SIZE, "%s", path) < BUFFER_SIZE);
+			fp = try_open_file(path_buffer);
+		}
 
 		for (unsigned i = 0; !fp && i < paths_size; i++) {
-			sprintf(path_buffer, "%s/%s", paths[i], path);
+			assert(snprintf(path_buffer, BUFFER_SIZE, "%s/%s", paths[i], path) < BUFFER_SIZE);
 			fp = try_open_file(path_buffer);
 		}
 	} else {
-		sprintf(path_buffer, "%s", path);
+		assert(snprintf(path_buffer, BUFFER_SIZE, "%s", path) < BUFFER_SIZE);
 		fp = try_open_file(path_buffer);
 	}
-
 
 	if (!fp) {
 		ERROR("\"%s\" not found in search path", path);

@@ -3,7 +3,8 @@
 X(T_NONE, "Invalid token")
     
 // Preprocessing tokens.
-X(PP_HEADER_NAME, "Header name")
+X(PP_HEADER_NAME_H, "Header name")
+X(PP_HEADER_NAME_Q, "Header name")
 X(PP_HASH, "#")
 X(PP_HHASH, "##")
 X(PP_DIRECTIVE, "#")

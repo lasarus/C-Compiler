@@ -29,7 +29,7 @@ void t_push(struct token t) {
 }
 
 void preprocessor_init(const char *path) {
-	tokenizer_push_input(path);
+	tokenizer_push_input(path, 0);
 
 	for (unsigned i = 0; i < sizeof ts.buffer / sizeof *ts.buffer; i++)
 		t_next();
