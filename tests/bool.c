@@ -1,6 +1,18 @@
 #include <assert.h>
 #include <stdbool.h>
 
+struct {
+	_Bool b;
+} S = { 1 };
+
+struct C {
+	_Bool a : 1;
+	unsigned b : 20;
+	_Bool c : 1;
+};
+
+_Static_assert(sizeof(struct C) == 4, "");
+
 bool ret_true(void) {
 	return true;
 }
