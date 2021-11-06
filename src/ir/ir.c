@@ -112,7 +112,7 @@ void ir_get_offset(var_id member_address, var_id base_address, var_id offset_var
 				.data_type = type_simple(ST_ULLONG),
 				.ullong_d = offset
 			}), offset_var);
-	IR_PUSH_BINARY_OPERATOR(OP_ADD, OT_ULLONG, base_address, offset_var, member_address);
+	IR_PUSH_BINARY_OPERATOR(IBO_ADD, base_address, offset_var, member_address);
 }
 
 void ir_set_bits(var_id result, var_id field, var_id value, int offset, int length) {
@@ -126,11 +126,11 @@ void ir_set_bits(var_id result, var_id field, var_id value, int offset, int leng
 	IR_PUSH_CONSTANT(((struct constant) { .type = CONSTANT_TYPE,
 				.data_type = type_simple(ST_ULLONG), .ullong_d = mask }),
 				mask_var);
-	IR_PUSH_BINARY_OPERATOR(OP_BAND, OT_ULLONG, mask_var, field, result);
+	IR_PUSH_BINARY_OPERATOR(IBO_BAND, mask_var, field, result);
 	IR_PUSH_UNARY_OPERATOR(UOP_BNOT, OT_ULLONG, mask_var, mask_var);
-	IR_PUSH_BINARY_OPERATOR(OP_LSHIFT, OT_ULLONG, value, shift_var, value);
-	IR_PUSH_BINARY_OPERATOR(OP_BAND, OT_ULLONG, mask_var, value, mask_var);
-	IR_PUSH_BINARY_OPERATOR(OP_BOR, OT_ULLONG, mask_var, result, result);
+	IR_PUSH_BINARY_OPERATOR(IBO_LSHIFT, value, shift_var, value);
+	IR_PUSH_BINARY_OPERATOR(IBO_BAND, mask_var, value, mask_var);
+	IR_PUSH_BINARY_OPERATOR(IBO_BOR, mask_var, result, result);
 }
 
 void ir_get_bits(var_id result, var_id field, int offset, int length, int sign_extend) {

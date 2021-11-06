@@ -433,8 +433,8 @@ struct expr *expr_new(struct expr expr) {
 void pointer_increment(var_id result, var_id pointer, struct expr *index, int decrement, struct type *type) {
 	var_id size = expression_to_ir(type_sizeof(type_deref(type)));
 	var_id index_var = expression_to_ir(expression_cast(index, type_simple(ST_ULONG)));
-	IR_PUSH_BINARY_OPERATOR(OP_MUL, OT_ULONG, index_var, size, index_var);
-	IR_PUSH_BINARY_OPERATOR(decrement ? OP_SUB : OP_ADD, OT_ULONG, pointer, index_var, result);
+	IR_PUSH_BINARY_OPERATOR(IBO_MUL, index_var, size, index_var);
+	IR_PUSH_BINARY_OPERATOR(decrement ? IBO_SUB : IBO_ADD, pointer, index_var, result);
 }
 
 // Loads pointer into return value.
@@ -592,19 +592,11 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		res = new_variable(expr->data_type, 1, 1);
 
 	switch(expr->type) {
-	case E_BINARY_OP: {
-		enum operand_type ot;
-		if (type_is_pointer(expr->args[0]->data_type) && type_is_pointer(expr->args[1]->data_type)) {
-			ot = OT_PTR;
-		} else {
-			assert(expr->args[0]->data_type->type == TY_SIMPLE &&
-				   expr->args[1]->data_type->type == TY_SIMPLE);
-			ot = ot_from_st(expr->args[0]->data_type->simple);
-		}
-		IR_PUSH_BINARY_OPERATOR(expr->binary_op, ot,
+	case E_BINARY_OP:
+		IR_PUSH_BINARY_OPERATOR(ibo_from_type_and_op(expr->args[0]->data_type, expr->binary_op),
 								expression_to_ir(expr->args[0]),
 								expression_to_ir(expr->args[1]), res);
-		} break;
+		break;
 
 	case E_UNARY_OP:
 		IR_PUSH_UNARY_OPERATOR(expr->unary_op, ot_from_type(expr->args[0]->data_type), expression_to_ir(expr->args[0]), res);
@@ -678,8 +670,8 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 			rhs = expression_to_ir(expr->args[1]);
 		var_id size = expression_to_ir(type_sizeof(type_deref(expr->args[0]->data_type)));
 
-		IR_PUSH_BINARY_OPERATOR(OP_SUB, OT_ULONG, lhs, rhs, res);
-		IR_PUSH_BINARY_OPERATOR(OP_DIV, OT_ULONG, res, size, res);
+		IR_PUSH_BINARY_OPERATOR(IBO_SUB, lhs, rhs, res);
+		IR_PUSH_BINARY_OPERATOR(IBO_DIV, res, size, res);
 	} break;
 
 	case E_ASSIGNMENT: {
@@ -702,13 +694,13 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		if (expr->assignment_op.cast) {
 			var_id ac = new_variable(expr->assignment_op.cast, 1, 1);
 			IR_PUSH_CAST(ac, expr->assignment_op.cast, a, a_expr->data_type);
-			IR_PUSH_BINARY_OPERATOR(expr->assignment_op.op,
-									ot_from_type(expr->args[1]->data_type),
+
+			IR_PUSH_BINARY_OPERATOR(ibo_from_type_and_op(expr->args[1]->data_type, expr->assignment_op.op),
 									ac, b, ac);
+
 			IR_PUSH_CAST(a, a_expr->data_type, ac, expr->assignment_op.cast);
 		} else {
-			IR_PUSH_BINARY_OPERATOR(expr->assignment_op.op,
-									ot_from_type(expr->args[1]->data_type),
+			IR_PUSH_BINARY_OPERATOR(ibo_from_type_and_op(expr->args[1]->data_type, expr->assignment_op.op),
 									a, b, a);
 		}
 

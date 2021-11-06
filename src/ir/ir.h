@@ -21,6 +21,30 @@ enum operand_type {
 	OT_TYPE_COUNT
 };
 
+enum ir_binary_operator {
+	IBO_ADD, IBO_SUB,
+	IBO_MUL, IBO_IMUL,
+	IBO_DIV, IBO_IDIV,
+	IBO_MOD, IBO_IMOD,
+	IBO_LSHIFT, IBO_RSHIFT, IBO_IRSHIFT,
+	IBO_BXOR, IBO_BOR, IBO_BAND,
+	IBO_LESS, IBO_ILESS,
+	IBO_GREATER, IBO_IGREATER,
+	IBO_LESS_EQ, IBO_ILESS_EQ,
+	IBO_GREATER_EQ, IBO_IGREATER_EQ,
+	IBO_EQUAL, IBO_NOT_EQUAL,
+
+	IBO_FLT_ADD, IBO_FLT_SUB,
+	IBO_FLT_MUL, IBO_FLT_DIV,
+	IBO_FLT_LESS, IBO_FLT_GREATER,
+	IBO_FLT_LESS_EQ,
+	IBO_FLT_GREATER_EQ,
+	IBO_FLT_EQUAL,
+	IBO_FLT_NOT_EQUAL,
+
+	IBO_COUNT
+};
+
 struct instruction;
 void push_ir(struct instruction instruction);
 #define IR_PUSH(...) do { push_ir((struct instruction) { __VA_ARGS__ }); } while(0)
@@ -53,11 +77,10 @@ struct instruction {
 
 	union {
 		struct {
-			enum operator_type type;
-			enum operand_type operand_type;
+			enum ir_binary_operator type;
 			var_id lhs, rhs;
 		} binary_operator;
-#define IR_PUSH_BINARY_OPERATOR(TYPE, OPERAND_TYPE, LHS, RHS, RESULT) IR_PUSH(.type = IR_BINARY_OPERATOR, .result = (RESULT), .binary_operator = {(TYPE), (OPERAND_TYPE), (LHS), (RHS)})
+#define IR_PUSH_BINARY_OPERATOR(TYPE, LHS, RHS, RESULT) IR_PUSH(.type = IR_BINARY_OPERATOR, .result = (RESULT), .binary_operator = {(TYPE), (LHS), (RHS)})
 		struct {
 			enum unary_operator_type type;
 			enum operand_type operand_type;

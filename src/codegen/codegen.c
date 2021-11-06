@@ -64,14 +64,18 @@ void emit_char(char c) {
 	fputc(c, data.out);
 }
 
-void codegen_binary_operator(int operator_type, enum operand_type ot, var_id out,
-							 var_id lhs, var_id rhs) {
+void codegen_binary_operator(enum ir_binary_operator ibo,
+							 var_id lhs, var_id rhs, var_id res) {
 	scalar_to_reg(lhs, REG_RDI);
 	scalar_to_reg(rhs, REG_RSI);
 
-	emit("%s", binary_operator_outputs[ot][operator_type]);
+	int size = get_variable_size(lhs);
 
-	reg_to_scalar(REG_RAX, out);
+	assert(size == 4 || size == 8);
+
+	emit("%s", binary_operator_outputs[size == 4 ? 0 : 1][ibo]);
+
+	reg_to_scalar(REG_RAX, res);
 }
 
 void codegen_unary_operator(int operator_type, enum operand_type ot, var_id out,
@@ -416,10 +420,9 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 
 	case IR_BINARY_OPERATOR:
 		codegen_binary_operator(ins.binary_operator.type,
-								ins.binary_operator.operand_type,
-								ins.result,
 								ins.binary_operator.lhs,
-								ins.binary_operator.rhs);
+								ins.binary_operator.rhs,
+								ins.result);
 		break;
 
 	case IR_UNARY_OPERATOR:

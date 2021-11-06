@@ -103,9 +103,10 @@ const char *dbg_instruction(struct instruction ins) {
 		break;
 
 	case IR_BINARY_OPERATOR:
-		DBG_PRINT("%d = binary_op(%d, %d)", ins.result,
-			   ins.binary_operator.lhs,
-			   ins.binary_operator.rhs);
+		DBG_PRINT("%d = binary_op(%d, %d) of type %d", ins.result,
+				  ins.binary_operator.lhs,
+				  ins.binary_operator.rhs,
+				  ins.binary_operator.type);
 		break;
 
 	case IR_UNARY_OPERATOR:
