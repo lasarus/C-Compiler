@@ -165,11 +165,11 @@ void ir_init_var(struct initializer *init, var_id result) {
 		case IP_STRING: {
 			var_id char_val = new_variable_sz(1, 1, 1);
 			unsigned len = strlen(pair->u.str);
-			for (unsigned i = 0; i < len + 1 /* Include null-terminator. */; i++) { 
-				ir_get_offset(member_address, base_address, offset_var, pair->offset + i);
+			for (unsigned j = 0; j < len + 1 /* Include null-terminator. */; j++) { 
+				ir_get_offset(member_address, base_address, offset_var, pair->offset + j);
 				IR_PUSH_CONSTANT(((struct constant) { .type = CONSTANT_TYPE,
 							.data_type = type_simple(ST_CHAR),
-							.char_d = pair->u.str[i]}), char_val);
+							.char_d = pair->u.str[j]}), char_val);
 				IR_PUSH_STORE(char_val, member_address);
 			}
 		} break;

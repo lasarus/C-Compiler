@@ -280,59 +280,68 @@ struct reg_save_info {
 
 // Address in rdi.
 void codegen_memzero(int len) {
-	int pos = 0;
-	for (;pos < (len & ~7); pos += 8) {
-		emit("movq $0, %d(%%rdi)", pos);
-	}
-	for (;pos < (len & ~3); pos += 4) {
-		emit("movl $0, %d(%%rdi)", pos);
-	}
-	for (;pos < (len & ~1); pos += 2) {
-		emit("movw $0, %d(%%rdi)", pos);
-	}
-	for (;pos < len; pos += 1) {
-		emit("movb $0, %d(%%rdi)", pos);
+	for (int i = 0; i < len;) {
+		if (i + 8 <= len) {
+			emit("movq $0, %d(%%rdi)", i);
+			i += 8;
+		} else if (i + 4 <= len) {
+			emit("movl $0, %d(%%rdi)", i);
+			i += 4;
+		} else if (i + 2 <= len) {
+			emit("movw $0, %d(%%rdi)", i);
+			i += 2;
+		} else if (i + 1 <= len) {
+			emit("movb $0, %d(%%rdi)", i);
+			i += 1;
+		} else
+			break;
 	}
 }
 
 // From rdi to rsi address
 void codegen_memcpy(int len) {
-	int pos = 0;
-	for (;pos < (len & ~7); pos += 8) {
-		emit("movq %d(%%rdi), %%rax", pos);
-		emit("movq %%rax, %d(%%rsi)", pos);
-	}
-	for (;pos < (len & ~3); pos += 4) {
-		emit("movl %d(%%rdi), %%eax", pos);
-		emit("movl %%eax, %d(%%rsi)", pos);
-	}
-	for (;pos < (len & ~1); pos += 2) {
-		emit("movw %d(%%rdi), %%ax", pos);
-		emit("movw %%ax, %d(%%rsi)", pos);
-	}
-	for (;pos < len; pos += 1) {
-		emit("movb %d(%%rdi), %%al", pos);
-		emit("movb %%al, %d(%%rsi)", pos);
+	for (int i = 0; i < len;) {
+		if (i + 8 <= len) {
+			emit("movq %d(%%rdi), %%rax", i);
+			emit("movq %%rax, %d(%%rsi)", i);
+			i += 8;
+		} else if (i + 4 <= len) {
+			emit("movl %d(%%rdi), %%eax", i);
+			emit("movl %%eax, %d(%%rsi)", i);
+			i += 4;
+		} else if (i + 2 <= len) {
+			emit("movw %d(%%rdi), %%ax", i);
+			emit("movw %%ax, %d(%%rsi)", i);
+			i += 2;
+		} else if (i + 1 <= len) {
+			emit("movb %d(%%rdi), %%al", i);
+			emit("movb %%al, %d(%%rsi)", i);
+			i += 1;
+		} else
+			break;
 	}
 }
 
 void codegen_stackcpy(int dest, int source, int len) {
-	int pos = 0;
-	for (;pos < (len & ~7); pos += 8) {
-		emit("movq %d(%%rbp), %%rax", source + pos);
-		emit("movq %%rax, %d(%%rbp)", dest + pos);
-	}
-	for (;pos < (len & ~3); pos += 4) {
-		emit("movl %d(%%rbp), %%eax", source + pos);
-		emit("movl %%eax, %d(%%rbp)", dest + pos);
-	}
-	for (;pos < (len & ~1); pos += 2) {
-		emit("movw %d(%%rbp), %%ax", source + pos);
-		emit("movw %%ax, %d(%%rbp)", dest + pos);
-	}
-	for (;pos < len; pos += 1) {
-		emit("movb %d(%%rbp), %%al", source + pos);
-		emit("movb %%al, %d(%%rbp)", dest + pos);
+	for (int i = 0; i < len;) {
+		if (i + 8 <= len) {
+			emit("movq %d(%%rbp), %%rax", source + i);
+			emit("movq %%rax, %d(%%rbp)", dest + i);
+			i += 8;
+		} else if (i + 4 <= len) {
+			emit("movl %d(%%rbp), %%eax", source + i);
+			emit("movl %%eax, %d(%%rbp)", dest + i);
+			i += 4;
+		} else if (i + 2 <= len) {
+			emit("movw %d(%%rbp), %%ax", source + i);
+			emit("movw %%ax, %d(%%rbp)", dest + i);
+			i += 2;
+		} else if (i + 1 <= len) {
+			emit("movb %d(%%rbp), %%al", source + i);
+			emit("movb %%al, %d(%%rbp)", dest + i);
+			i += 1;
+		} else
+			break;
 	}
 }
 

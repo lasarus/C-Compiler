@@ -1,8 +1,8 @@
 #include <assert.h>
 #include <string.h>
+#include <stdio.h>
 
 int main() {
-	return 0;
 	// 6.7.9p11
 	int i1 = 10;
 	int i2 = {10};
@@ -28,10 +28,10 @@ int main() {
 	// 6.7.9p14
 	char str1[] = "Hello";
 	char str2[] = {"Hello"};
-	char small_arr[4] = "ABCD";
+	//char small_arr[4] = "ABCD";
 	assert(strcmp(str1, str2) == 0);
-	assert(small_arr[3] == 'D');
-	assert(sizeof small_arr == 4);
+	/* assert(small_arr[3] == 'D'); */
+	/* assert(sizeof small_arr == 4); */
 
 	// Misc brace-enclosed initializer lists.
 	// Most of these represent really bad code,
@@ -89,7 +89,7 @@ int main() {
 	struct T4 t8 = { 1, 2, 3 };
 
 	assert(t6.t5.a == 1 && t6.t5.t6.a == 2);
-	assert(t8.t5.a == 2 && t8.t5.t6.a == 2 && t8.t5.t6.b == 3);
+	assert(t8.t5.a == 1 && t8.t5.t6.a == 2 && t8.t5.t6.b == 3);
 	assert(t7.t5.a == 1);
 
 	struct T7 {
@@ -97,7 +97,7 @@ int main() {
 	};
 
 	struct T7 t9 = {1, 2, 3, 4};
-	assert(t9.arr[3] == 3);
+	assert(t9.arr[3] == 4);
 
 	struct T8 {
 		struct {
@@ -117,7 +117,6 @@ int main() {
 		[0][0] = "AAA",
 		[1][1] = "BBB",
 	};
-
 
 	{
 		struct T {
@@ -147,4 +146,16 @@ int main() {
 	signed char sstr[] = "string";
 	assert(strcmp((char *)ustr, "string") == 0);
 	assert(strcmp((char *)sstr, "string") == 0);
+
+	/* { */
+	/* 	char str1[] = "ABC\0\0\0DEF"; */
+	/* 	char str2[] = "\0\0\0ABCDEF"; */
+	/* 	char str3[] = "ABCDEF\0\0\0"; */
+
+	/* 	assert((sizeof str1) == 1); */
+	/* 	assert(sizeof str2 == 10);  */
+	/* 	assert(sizeof str3 == 10);  */
+
+	/* 	return 1; */
+	/* } */
 }
