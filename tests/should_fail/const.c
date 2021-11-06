@@ -1,4 +1,8 @@
-// DEFS A B C D
+// DEFS A B C D E
+
+#ifdef E
+const unsigned int a = 0, b = (int)(a * 8);
+#endif
 
 int main() {
 #if defined(A)

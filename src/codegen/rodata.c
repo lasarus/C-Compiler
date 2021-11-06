@@ -190,13 +190,18 @@ void codegen_compound_literals(struct expr **expr, int lvalue) {
 		codegen_compound_literals(&(*expr)->args[0], 0);
 		break;
 	case E_UNARY_OP:
-	case E_ALIGNOF:
+		codegen_compound_literals(&(*expr)->args[0], lvalue);
+		break;
 	case E_CAST:
+		codegen_compound_literals(&(*expr)->cast.arg, lvalue);
+		break;
+	case E_ALIGNOF:
 	case E_POINTER_ADD:
 	case E_POINTER_SUB:
 		codegen_compound_literals(&(*expr)->args[0], lvalue);
 		codegen_compound_literals(&(*expr)->args[1], lvalue);
 		break;
+
 	case E_POINTER_DIFF:
 	case E_ASSIGNMENT:
 	case E_ASSIGNMENT_POINTER:
@@ -207,6 +212,7 @@ void codegen_compound_literals(struct expr **expr, int lvalue) {
 	case E_BUILTIN_VA_END:
 	case E_BUILTIN_VA_ARG:
 	case E_BUILTIN_VA_COPY:
+		break;
 
 	default: return;
 	}
