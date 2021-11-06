@@ -142,4 +142,9 @@ int main() {
 		} t = {.z = 3, .x = 2, 5};
 		assert(t.z == 3 && t.x == 2 && t.y == 5);
 	}
+
+	unsigned char ustr[] = "string";
+	signed char sstr[] = "string";
+	assert(strcmp((char *)ustr, "string") == 0);
+	assert(strcmp((char *)sstr, "string") == 0);
 }

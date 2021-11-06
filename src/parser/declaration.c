@@ -964,7 +964,9 @@ int parse_non_brace_initializer(struct type **type, int offset, int bit_offset,
 			TEXPECT(T_RBRACE);
 		return 1;
 	} else if (((*type)->type == TY_ARRAY || (*type)->type == TY_INCOMPLETE_ARRAY) &&
-			   type_is_simple((*type)->children[0], ST_CHAR)) {
+			   (type_is_simple((*type)->children[0], ST_CHAR) ||
+				type_is_simple((*type)->children[0], ST_UCHAR) ||
+				type_is_simple((*type)->children[0], ST_SCHAR))) {
 		char *str;
 		if (T0->type == T_LBRACE && T1->type == T_STRING &&
 			T2->type == T_RBRACE) {
