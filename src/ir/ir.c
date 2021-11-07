@@ -120,17 +120,27 @@ void ir_set_bits(var_id result, var_id field, var_id value, int offset, int leng
 	uint64_t mask = gen_mask(64 - offset - length, offset);
 	var_id mask_var = new_variable_sz(8, 1, 1);
 	var_id shift_var = new_variable_sz(8, 1, 1);
+
+	var_id value_large = new_variable_sz(8, 1, 1);
+	var_id field_large = new_variable_sz(8, 1, 1);
+	var_id result_large = new_variable_sz(8, 1, 1);
+
+	IR_PUSH_COPY(value_large, value);
+	IR_PUSH_COPY(field_large, field);
+
 	IR_PUSH_CONSTANT(((struct constant) { .type = CONSTANT_TYPE,
 				.data_type = type_simple(ST_UCHAR), .ullong_d = offset }),
 				shift_var);
 	IR_PUSH_CONSTANT(((struct constant) { .type = CONSTANT_TYPE,
 				.data_type = type_simple(ST_ULLONG), .ullong_d = mask }),
 				mask_var);
-	IR_PUSH_BINARY_OPERATOR(IBO_BAND, mask_var, field, result);
+	IR_PUSH_BINARY_OPERATOR(IBO_BAND, mask_var, field_large, result_large);
 	IR_PUSH_UNARY_OPERATOR(UOP_BNOT, OT_ULLONG, mask_var, mask_var);
-	IR_PUSH_BINARY_OPERATOR(IBO_LSHIFT, value, shift_var, value);
-	IR_PUSH_BINARY_OPERATOR(IBO_BAND, mask_var, value, mask_var);
-	IR_PUSH_BINARY_OPERATOR(IBO_BOR, mask_var, result, result);
+	IR_PUSH_BINARY_OPERATOR(IBO_LSHIFT, value_large, shift_var, value_large);
+	IR_PUSH_BINARY_OPERATOR(IBO_BAND, mask_var, value_large, mask_var);
+	IR_PUSH_BINARY_OPERATOR(IBO_BOR, mask_var, result_large, result_large);
+
+	IR_PUSH_COPY(result, result_large);
 }
 
 void ir_get_bits(var_id result, var_id field, int offset, int length, int sign_extend) {

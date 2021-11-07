@@ -71,6 +71,10 @@ void codegen_binary_operator(enum ir_binary_operator ibo,
 
 	int size = get_variable_size(lhs);
 
+	if (size != 4 && size != 8) {
+		printf("Invalid size %d = %d op %d with %d\n", get_variable_size(res), size, get_variable_size(rhs), ibo);
+	}
+
 	assert(size == 4 || size == 8);
 
 	emit("%s", binary_operator_outputs[size == 4 ? 0 : 1][ibo]);

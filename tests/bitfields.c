@@ -68,4 +68,13 @@ int main() {
 		} a = {1, 1};
 		assert(a.a == 1 && a.b == 1);
 	}
+	{
+		static struct T {
+			char c : 2, c2 : 4;
+		} t;
+		t.c = 1;
+		t.c2 = 5;
+		assert(t.c == 1);
+		assert(t.c2 == 5);
+	}
 }

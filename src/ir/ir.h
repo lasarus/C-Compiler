@@ -69,6 +69,7 @@ struct instruction {
 		IR_GET_BITS,
 		IR_ADD_TEMPORARY,
 		IR_CLEAR_STACK_BUCKET,
+		IR_RESIZE,
 
 		IR_TYPE_COUNT
 	} type;
