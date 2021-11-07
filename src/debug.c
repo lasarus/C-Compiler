@@ -136,9 +136,17 @@ const char *dbg_instruction(struct instruction ins) {
 		DBG_PRINT("%d = %d", ins.result, ins.copy.source);
 		break;
 
-	case IR_CAST:
-		DBG_PRINT("%d (%s)", ins.result, dbg_type(ins.cast.result_type));
-		DBG_PRINT(" = cast %d (%s)", ins.cast.rhs, dbg_type(ins.cast.rhs_type));
+	case IR_INT_CAST:
+		DBG_PRINT("%d = int_cast %d (%s)", ins.result, ins.int_cast.rhs, ins.int_cast.sign_extend ? "signed" : "not signed");
+		break;
+
+	case IR_FLOAT_CAST:
+		DBG_PRINT("%d = float_cast %d", ins.result, ins.float_cast.rhs);
+		break;
+
+	case IR_INT_FLOAT_CAST:
+		DBG_PRINT("%d = float_cast %d, from float: %d, sign: %d", ins.result, ins.int_float_cast.rhs,
+				  ins.int_float_cast.from_float, ins.int_float_cast.sign);
 		break;
 
 	case IR_ADDRESS_OF:

@@ -60,7 +60,10 @@ struct instruction {
 		IR_SWITCH_SELECTION,
 		IR_CALL_VARIABLE,
 		IR_COPY,
-		IR_CAST,
+		IR_INT_CAST,
+		IR_FLOAT_CAST,
+		IR_INT_FLOAT_CAST,
+		IR_FROM_FLOAT,
 		IR_SET_ZERO,
 		IR_VA_START,
 		IR_VA_ARG, //IR_VA_COPY,
@@ -115,11 +118,23 @@ struct instruction {
 			var_id *args;
 		} call_variable;
 #define IR_PUSH_CALL_VARIABLE(VARIABLE, FUNCTION_TYPE, ARGUMENT_TYPES, N_ARGS, ARGS, RESULT) IR_PUSH(.type = IR_CALL_VARIABLE, .result = (RESULT), .call_variable = {(VARIABLE), (FUNCTION_TYPE), (ARGUMENT_TYPES), (N_ARGS), (ARGS)})
+
 		struct {
 			var_id rhs;
-			struct type *result_type, *rhs_type;
-		} cast;
-#define IR_PUSH_CAST(RESULT, RESULT_TYPE, RHS, RHS_TYPE) IR_PUSH(.type = IR_CAST, .result = (RESULT), .cast = {(RHS), (RESULT_TYPE), (RHS_TYPE)})
+			int sign_extend;
+		} int_cast;
+#define IR_PUSH_INT_CAST(RESULT, RHS, SIGN_EXTEND) IR_PUSH(.type = IR_INT_CAST, .result = (RESULT), .int_cast = {(RHS), (SIGN_EXTEND)})
+
+		struct {
+			var_id rhs;
+		} float_cast;
+#define IR_PUSH_FLOAT_CAST(RESULT, RHS) IR_PUSH(.type = IR_FLOAT_CAST, .result = (RESULT), .float_cast = {(RHS)})
+
+		struct {
+			var_id rhs;
+			int from_float, sign;
+		} int_float_cast;
+#define IR_PUSH_INT_FLOAT_CAST(RESULT, RHS, FROM_FLOAT, SIGN) IR_PUSH(.type = IR_INT_FLOAT_CAST, .result = (RESULT), .int_float_cast = {(RHS), (FROM_FLOAT), (SIGN)})
 
 #define IR_PUSH_VA_START(RESULT) IR_PUSH(.type = IR_VA_START, .result = (RESULT))
 

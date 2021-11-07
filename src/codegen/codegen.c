@@ -2,7 +2,6 @@
 #include "registers.h"
 #include "binary_operators.h"
 #include "unary_operators.h"
-#include "cast_operators.h"
 
 #include <common.h>
 #include <arch/builtins.h>
@@ -87,15 +86,6 @@ void codegen_unary_operator(int operator_type, enum operand_type ot, var_id out,
 	scalar_to_reg(rhs, REG_RDI);
 
 	emit("%s", unary_operator_outputs[ot][operator_type]);
-
-	reg_to_scalar(REG_RAX, out);
-}
-
-void codegen_simple_cast(var_id in, var_id out,
-						 enum simple_type st_in, enum simple_type st_out) {
-	scalar_to_reg(in, REG_RDI);
-
-	emit("%s", cast_operator_outputs[st_in][st_out]);
 
 	reg_to_scalar(REG_RAX, out);
 }
@@ -474,23 +464,79 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 						 get_variable_size(ins.copy.source));
 		break;
 
-	case IR_CAST: {
-		var_id source = ins.cast.rhs,
-			dest = ins.result;
-		struct type *dest_type = ins.cast.result_type;
-		struct type *source_type = ins.cast.rhs_type;
-
-		if (dest_type == type_simple(ST_VOID)) {
-			// No op.
-		} else if (dest_type->type == TY_SIMPLE &&
-				   source_type->type == TY_SIMPLE) {
-			codegen_simple_cast(source, dest,
-								source_type->simple, dest_type->simple);
-		} else {
-			// All other casts are just copies.
-			scalar_to_reg(source, REG_RAX);
-			reg_to_scalar(REG_RAX, dest);
+	case IR_INT_CAST: {
+		scalar_to_reg(ins.int_cast.rhs, REG_RAX);
+		int size_rhs = get_variable_size(ins.int_cast.rhs),
+			size_result = get_variable_size(ins.result);
+		if (size_result > size_rhs && ins.int_cast.sign_extend) {
+			if (size_rhs == 1) {
+				emit("movsbq %%al, %%rax");
+			} else if (size_rhs == 2) {
+				emit("movswq %%ax, %%rax");
+			} else if (size_rhs == 4) {
+				emit("movslq %%eax, %%rax");
+			}
 		}
+		reg_to_scalar(REG_RAX, ins.result);
+	} break;
+
+	case IR_FLOAT_CAST: {
+		scalar_to_reg(ins.float_cast.rhs, REG_RAX);
+		int size_rhs = get_variable_size(ins.float_cast.rhs),
+			size_result = get_variable_size(ins.result);
+
+		if (size_rhs == 4 && size_result == 8) {
+			emit("movd %%eax, %%xmm0");
+			emit("cvtss2sd %%xmm0, %%xmm0");
+			emit("movq %%xmm0, %rax");
+		} else if (size_rhs == 8 && size_result == 4) {
+			emit("movq %%rax, %%xmm0");
+			emit("cvtsd2ss %%xmm0, %%xmm0");
+			emit("movd %%xmm0, %%eax");
+		} else {
+			assert(size_rhs == size_result);
+		}
+
+		reg_to_scalar(REG_RAX, ins.result);
+	} break;
+
+	case IR_INT_FLOAT_CAST: {
+		scalar_to_reg(ins.int_float_cast.rhs, REG_RAX);
+		int size_rhs = get_variable_size(ins.int_float_cast.rhs),
+			size_result = get_variable_size(ins.result);
+		int sign = ins.int_float_cast.sign;
+		if (ins.int_float_cast.from_float) {
+			// This is not the exact same as gcc and clang in the
+			// case of unsigned long. But within the C standard?
+			if (size_rhs == 4) {
+				emit("movd %%eax, %%xmm0");
+				emit("cvttss2si %%xmm0, %%rax");
+			} else if (size_rhs == 8) {
+				emit("movd %%rax, %%xmm0");
+				emit("cvttsd2si %%xmm0, %%rax");
+			}
+		} else {
+			if (sign && size_rhs == 1) {
+				emit("movsbl %%al, %%eax");
+			} else if (!sign && size_rhs == 1) {
+				emit("movzbl %%al, %%eax");
+			} else if (sign && size_rhs == 2) {
+				emit("movswl %%ax, %%eax");
+			} else if (!sign && size_rhs == 2) {
+				emit("movzwl %%ax, %%eax");
+			}
+
+			if (size_result == 4) {
+				emit("cvtsi2ss %%rax, %%xmm0");
+				emit("movd %%xmm0, %%eax");
+			} else if (size_result == 8) {
+				emit("cvtsi2sd %%rax, %%xmm0");
+				emit("movq %%xmm0, %%rax");
+			} else {
+				NOTIMP();
+			}
+		}
+		reg_to_scalar(REG_RAX, ins.result);
 	} break;
 
 	case IR_ADDRESS_OF:

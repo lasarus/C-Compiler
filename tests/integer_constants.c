@@ -7,4 +7,10 @@ int main() {
 
 	int c = 0b101;
 	assert(c == 5);
+
+	int x = 0;
+	assert (~x == 0xffffffffffffffff);
+		
+	return 0;
+
 }

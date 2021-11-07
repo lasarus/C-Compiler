@@ -18,5 +18,17 @@ int main() {
 	long double ld = 4.5; // Only 64-bit, as allowed by the standard.
 	assert(ld >= 4.4 && ld <= 4.6);
 
+	int integer = 88;
+	float f = integer;
+
+	assert(f >= 87 && f <= 89);
+
+	integer = f / 2;
+	assert(integer >= 43 && integer <= 45);
+
+	d = 999999999;
+	unsigned long ul = d;
+	assert(ul >= 999999998 && ul <= 1000000000);
+
 	return 0;
 }

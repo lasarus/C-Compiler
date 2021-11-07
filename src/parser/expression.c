@@ -587,6 +587,27 @@ void bitfield_store(struct bitfield_address address, var_id value) {
 	}
 }
 
+var_id ir_cast(var_id res, struct type *result_type, var_id rhs, struct type *rhs_type) {
+	if (type_is_simple(result_type, ST_VOID)) {
+	} else if ((type_is_integer(result_type) || type_is_pointer(result_type)) &&
+			   (type_is_integer(rhs_type) || type_is_pointer(rhs_type))) {
+		int sign_extend = type_is_integer(rhs_type) && is_signed(rhs_type->simple);
+		if (get_variable_size(res) == get_variable_size(rhs))
+			return rhs;
+		IR_PUSH_INT_CAST(res, rhs, sign_extend);
+	} else if(type_is_floating(result_type) && type_is_floating(rhs_type)) {
+		IR_PUSH_FLOAT_CAST(res, rhs);
+	} else if(type_is_floating(result_type) && type_is_integer(rhs_type)) {
+		IR_PUSH_INT_FLOAT_CAST(res, rhs, 0, is_signed(rhs_type->simple));
+	} else if(type_is_integer(result_type) && type_is_floating(rhs_type)) {
+		IR_PUSH_INT_FLOAT_CAST(res, rhs, 1, is_signed(result_type->simple));
+	} else {
+		return rhs;
+	}
+	return res;
+}
+
+
 var_id expression_to_ir_result(struct expr *expr, var_id res) {
 	if (!res)
 		res = new_variable(expr->data_type, 1, 1);
@@ -633,8 +654,7 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		}
 
 		IR_PUSH_CALL_VARIABLE(func_var, type_deref(func_type), arg_types, expr->call.n_args, args, res);
-		return res;
-	}
+	} break;
 
 	case E_VARIABLE:
 		// TODO: Remove some of these unnecessary copies in an optimization pass.
@@ -649,15 +669,13 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		return expression_to_address(expr->args[0]);
 
 	case E_ARRAY_PTR_DECAY:
-		IR_PUSH_CAST(res, expr->data_type,
-					 expression_to_address(expr->args[0]), type_pointer(expr->args[0]->data_type));
-		break;
+		return expression_to_address(expr->args[0]);
 
-	case E_POINTER_ADD: {
+	case E_POINTER_ADD:
 		pointer_increment(res, expression_to_ir(expr->args[0]),
 						  expr->args[1], 0,
 						  expr->args[0]->data_type);
-	} break;
+		break;
 
 	case E_POINTER_SUB:
 		pointer_increment(res, expression_to_ir(expr->args[0]),
@@ -693,12 +711,12 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 
 		if (expr->assignment_op.cast) {
 			var_id ac = new_variable(expr->assignment_op.cast, 1, 1);
-			IR_PUSH_CAST(ac, expr->assignment_op.cast, a, a_expr->data_type);
+			ac = ir_cast(ac, expr->assignment_op.cast, a, a_expr->data_type);
 
 			IR_PUSH_BINARY_OPERATOR(ibo_from_type_and_op(expr->args[1]->data_type, expr->assignment_op.op),
 									ac, b, ac);
 
-			IR_PUSH_CAST(a, a_expr->data_type, ac, expr->assignment_op.cast);
+			a = ir_cast(a, a_expr->data_type, ac, expr->assignment_op.cast);
 		} else {
 			IR_PUSH_BINARY_OPERATOR(ibo_from_type_and_op(expr->args[1]->data_type, expr->assignment_op.op),
 									a, b, a);
@@ -725,7 +743,7 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 	}
 
 	case E_CAST:
-		IR_PUSH_CAST(res, expr->cast.target, expression_to_ir(expr->cast.arg), expr->cast.arg->data_type);
+		res = ir_cast(res, expr->cast.target, expression_to_ir(expr->cast.arg), expr->cast.arg->data_type);
 		break;
 
 	case E_DOT_OPERATOR: {
