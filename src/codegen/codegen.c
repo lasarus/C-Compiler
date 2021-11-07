@@ -433,15 +433,13 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 	case IR_NEGATE_FLOAT:
 		scalar_to_reg(ins.int_cast.rhs, REG_RAX);
 		if (get_variable_size(ins.result) == 4) {
-			emit("movd %%eax, %%xmm0");
+			emit("movd %%eax, %%xmm1");
 			emit("negq %%rax");
-			emit("movaps %%xmm0, %%xmm1");
 			emit("xorps %%xmm0, %%xmm0");
 			emit("subss %%xmm1, %%xmm0");
 			emit("movd %%xmm0, %%eax");
 		} else if (get_variable_size(ins.result) == 8) {
-			emit("movq %%rax, %%xmm0");
-			emit("movaps %%xmm0, %%xmm1");
+			emit("movq %%rax, %%xmm1");
 			emit("xorps %%xmm0, %%xmm0");
 			emit("subsd %%xmm1, %%xmm0");
 			emit("movq %%xmm0, %%rax");

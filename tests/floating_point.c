@@ -30,5 +30,10 @@ int main() {
 	unsigned long ul = d;
 	assert(ul >= 999999998 && ul <= 1000000000);
 
+	{
+		double f = 100.0;
+		assert(-f == -100.0);
+	}
+
 	return 0;
 }
