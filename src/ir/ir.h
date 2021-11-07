@@ -7,20 +7,6 @@
 typedef int block_id;
 block_id new_block(void);
 
-enum operand_type {
-	OT_INT,
-	OT_UINT,
-	OT_LONG,
-	OT_ULONG,
-	OT_LLONG,
-	OT_ULLONG,
-	OT_FLOAT,
-	OT_DOUBLE,
-	OT_PTR,
-
-	OT_TYPE_COUNT
-};
-
 enum ir_binary_operator {
 	IBO_ADD, IBO_SUB,
 	IBO_MUL, IBO_IMUL,

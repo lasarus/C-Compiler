@@ -643,7 +643,6 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 
 	case E_UNARY_OP:
 		res = unary_op(res, expression_to_ir(expr->args[0]), expr->args[0]->data_type, expr->unary_op);
-		//IR_PUSH_UNARY_OPERATOR(expr->unary_op, ot_from_type(expr->args[0]->data_type), expression_to_ir(expr->args[0]), res);
 		break;
 
 	case E_CONSTANT:
