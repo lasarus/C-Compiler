@@ -478,12 +478,15 @@ static struct constant integer_constant_from_string(struct string_view str) {
 	enum {
 		BASE_DECIMAL,
 		BASE_HEXADECIMAL,
-		BASE_OCTAL
+		BASE_OCTAL,
+		BASE_BINARY
 	} base = BASE_DECIMAL;
 
 	if (str.len > 0 && str.str[0] == '0') {
 		if (str.len > 1 && (str.str[1] == 'x' || str.str[1] == 'X'))
 			base = BASE_HEXADECIMAL;
+		else if (str.len > 1 && (str.str[1] == 'b' || str.str[1] == 'B'))
+			base = BASE_BINARY;
 		else
 			base = BASE_OCTAL;
 	} else if (str.len > 0 && str.str[0] >= '1' && str.str[0] <= '9') {
@@ -493,10 +496,11 @@ static struct constant integer_constant_from_string(struct string_view str) {
 	}
 
 	int start = 0;
-	if (base == BASE_HEXADECIMAL)
+	if (base == BASE_HEXADECIMAL || base == BASE_BINARY)
 		start += 2;
 
 	for (; start < str.len; start++) {
+		int binary_digit = (str.str[start] >= '0' && str.str[start] <= '1');
 		int octal_digit = (str.str[start] >= '0' && str.str[start] <= '7');
 		int decimal_digit = (str.str[start] >= '0' && str.str[start] <= '9');
 		int low_hex_digit = (str.str[start] >= 'a' && str.str[start] <= 'f');
@@ -514,6 +518,10 @@ static struct constant integer_constant_from_string(struct string_view str) {
 			if (!octal_digit)
 				break;
 			parsed *= 8;
+		} else if (base == BASE_BINARY) {
+			if (!binary_digit)
+				break;
+			parsed *= 2;
 		}
 
 		if (decimal_digit)
@@ -524,7 +532,7 @@ static struct constant integer_constant_from_string(struct string_view str) {
 			parsed += str.str[start] - 'A' + 10;
 	}
 
-	int allow_unsigned = base == BASE_HEXADECIMAL || base == BASE_OCTAL;
+	int allow_unsigned = base == BASE_HEXADECIMAL || base == BASE_OCTAL || base == BASE_BINARY;
 	int allow_signed = 1;
 	int allow_int = 1;
 	int allow_long = 1;
