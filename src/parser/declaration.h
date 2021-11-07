@@ -16,7 +16,7 @@ struct initializer {
 		int offset, bit_offset, bit_size;
 		union {
 			struct expr *expr;
-			const char *str;
+			struct string_view str;
 		} u;
 	} *pairs;
 };

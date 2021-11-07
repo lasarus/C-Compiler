@@ -6,6 +6,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include <string_view.h>
+
 // This describes the types used for all parts of the compiler.
 // These should be able to describe all types of the C programming
 // language.
@@ -96,7 +98,7 @@ struct type {
 };
 
 struct struct_data {
-	char *name;
+	struct string_view name;
 
 	int is_complete,
 		is_union,
@@ -104,7 +106,7 @@ struct struct_data {
 
 	int n;
 	struct field {
-		char *name;
+		struct string_view name;
 		struct type *type;
 		int bitfield; // -1 means no bit-field.
 		int offset;
@@ -117,7 +119,7 @@ struct struct_data {
 };
 
 struct enum_data {
-	char *name;
+	struct string_view name;
 	int is_complete;
 };
 
@@ -140,8 +142,7 @@ struct type *type_adjust_parameter(struct type *type);
 void type_evaluate_vla(struct type *type);
 int type_contains_unevaluated_vla(struct type *type);
 
-int type_member_idx(struct type *type,
-					const char *name);
+int type_member_idx(struct type *type, struct string_view name);
 
 void type_select(struct type *type, int index,
 				 int *field_offset, struct type **field_type);

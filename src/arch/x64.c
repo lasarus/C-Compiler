@@ -250,7 +250,7 @@ int alignof_struct(struct struct_data *struct_data) {
 	int max_align = 0;
 
 	if (!struct_data->is_complete)
-		ERROR("Struct %s not complete", struct_data->name);
+		ERROR("Struct %.*s not complete", struct_data->name.len, struct_data->name.str);
 
 	for (int i = 0; i < struct_data->n; i++) {
 		struct type *type = struct_data->fields[i].type;
@@ -431,20 +431,21 @@ struct constant constant_zero(struct type *type) {
 }
 
 // Basically if string is not of the format (0x|0X)[0-9a-fA-F]+[ulUL]*
-int is_float(const char *str) {
-	if (str[0] == '0' && (str[1] == 'x' || str[1] == 'X'))
-		str += 2;
+int is_float(struct string_view str) {
+	int i = 0;
+	if (str.len > 1 && str.str[0] == '0' && (str.str[1] == 'x' || str.str[1] == 'X'))
+		i += 2;
 	// [0-9]*
-	for (; *str; str++)
-		if (!((*str >= '0' && *str <= '9') ||
-			  (*str >= 'a' && *str <= 'f') ||
-			  (*str >= 'A' && *str <= 'F')))
+	for (; i < str.len; i++)
+		if (!((str.str[i] >= '0' && str.str[i] <= '9') ||
+			  (str.str[i] >= 'a' && str.str[i] <= 'f') ||
+			  (str.str[i] >= 'A' && str.str[i] <= 'F')))
 			break;
 
 	// [ulUL]*
-	for (; *str; str++) {
-		if (!(*str == 'u' || *str == 'U' ||
-			  *str == 'l' || *str == 'L')) {
+	for (; i < str.len; i++) {
+		if (!(str.str[i] == 'u' || str.str[i] == 'U' ||
+			  str.str[i] == 'l' || str.str[i] == 'L')) {
 			return 1;
 		}
 	}
@@ -452,7 +453,8 @@ int is_float(const char *str) {
 	return 0;
 }
 
-static struct constant floating_point_constant_from_string(const char *str) {
+static struct constant floating_point_constant_from_string(struct string_view sv) {
+	char *str = sv_to_str(sv);
 	double d = strtod(str, NULL);
 	char suffix = str[strlen(str) - 1];
 
@@ -470,34 +472,35 @@ static struct constant floating_point_constant_from_string(const char *str) {
 	return res;
 }
 
-static struct constant integer_constant_from_string(const char *str) {
+static struct constant integer_constant_from_string(struct string_view str) {
 	unsigned long long parsed = 0;
-	const char *start = str;
 
 	enum {
 		BASE_DECIMAL,
 		BASE_HEXADECIMAL,
 		BASE_OCTAL
 	} base = BASE_DECIMAL;
-	if (str[0] == '0') {
-		if (str[1] == 'x' || str[1] == 'X')
+
+	if (str.len > 0 && str.str[0] == '0') {
+		if (str.len > 1 && (str.str[1] == 'x' || str.str[1] == 'X'))
 			base = BASE_HEXADECIMAL;
 		else
 			base = BASE_OCTAL;
-	} else if (str[0] >= '1' && str[0] <= '9') {
+	} else if (str.len > 0 && str.str[0] >= '1' && str.str[0] <= '9') {
 		base = BASE_DECIMAL;
 	} else {
-		ERROR("%s has unknown base encoding.", str);
+		ERROR("%.*s has unknown base encoding.", str.len, str.str);
 	}
 
+	int start = 0;
 	if (base == BASE_HEXADECIMAL)
 		start += 2;
 
-	for (; *start; start++) {
-		int octal_digit = (*start >= '0' && *start <= '7');
-		int decimal_digit = (*start >= '0' && *start <= '9');
-		int low_hex_digit = (*start >= 'a' && *start <= 'f');
-		int high_hex_digit = (*start >= 'A' && *start <= 'F');
+	for (; start < str.len; start++) {
+		int octal_digit = (str.str[start] >= '0' && str.str[start] <= '7');
+		int decimal_digit = (str.str[start] >= '0' && str.str[start] <= '9');
+		int low_hex_digit = (str.str[start] >= 'a' && str.str[start] <= 'f');
+		int high_hex_digit = (str.str[start] >= 'A' && str.str[start] <= 'F');
 
 		if (base == BASE_DECIMAL) {
 			if (!decimal_digit)
@@ -514,11 +517,11 @@ static struct constant integer_constant_from_string(const char *str) {
 		}
 
 		if (decimal_digit)
-			parsed += *start - '0';
+			parsed += str.str[start] - '0';
 		else if (low_hex_digit)
-			parsed += *start - 'a' + 10;
+			parsed += str.str[start] - 'a' + 10;
 		else if (high_hex_digit)
-			parsed += *start - 'A' + 10;
+			parsed += str.str[start] - 'A' + 10;
 	}
 
 	int allow_unsigned = base == BASE_HEXADECIMAL || base == BASE_OCTAL;
@@ -527,20 +530,21 @@ static struct constant integer_constant_from_string(const char *str) {
 	int allow_long = 1;
 	int allow_llong = 1;
 
-	while (*start) {
-		if ((start[0] == 'l' && start[1] == 'l') ||
-			(start[0] == 'L' && start[1] == 'L')) {
+	while (start < str.len) {
+		if (start + 1 < str.len &&
+			((str.str[start] == 'l' && str.str[start + 1] == 'l') ||
+			 (str.str[start] == 'L' && str.str[start + 1] == 'L'))) {
 			start += 2;
 			allow_int = allow_long = 0;
-		} else if (start[0] == 'l' || start[0] == 'L') {
+		} else if (str.str[start] == 'l' || str.str[start] == 'L') {
 			start += 1;
 			allow_int = 0;
-		} else if (start[0] == 'u' || start[0] == 'U') {
+		} else if (str.str[start] == 'u' || str.str[start] == 'U') {
 			start += 1;
 			allow_unsigned = 1;
 			allow_signed = 0;
 		} else {
-			ERROR("Invalid format of integer constant: %s", str);
+			ERROR("Invalid format of integer constant: %.*s", str.len, str.str);
 		}
 	}
 
@@ -565,13 +569,13 @@ static struct constant integer_constant_from_string(const char *str) {
 		res.data_type = type_simple(ST_ULLONG);
 		res.ullong_d = parsed;
 	} else {
-		ERROR("Cant fit %llu (%s) into any type", parsed, str);
+		ERROR("Cant fit %llu (%.*s) into any type", parsed, str.len, str.str);
 	}
 
 	return res;
 }
 
-struct constant constant_from_string(const char *str) {
+struct constant constant_from_string(struct string_view str) {
 	if (is_float(str)) {
 		return floating_point_constant_from_string(str);
 	} else {

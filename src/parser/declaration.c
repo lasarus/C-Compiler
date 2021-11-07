@@ -27,11 +27,11 @@ void accept_attribute(int *is_packed) {
 	TEXPECT(T_LPAR);
 	TEXPECT(T_LPAR);
 
-	const char *attribute_name = T0->str;
+	struct string_view attribute_name = T0->str;
 
 	TEXPECT(T_IDENT);
 
-	if (strcmp(attribute_name, "packed") == 0) {
+	if (sv_string_cmp(attribute_name, "packed")) {
 		*is_packed = 1;
 	} else {
 		NOTIMP();
@@ -51,7 +51,7 @@ struct type_ast {
 
 	union {
 		struct {
-			char *name; // NULL if no name.
+			struct string_view name; // NULL if no name.
 		} terminal;
 
 		struct {
@@ -84,7 +84,7 @@ struct type_ast {
 };
 
 struct type_ast *parse_declarator(int *was_abstract, int *has_symbols);
-struct type *ast_to_type(const struct type_specifiers *ts, const struct type_qualifiers *tq, struct type_ast *ast, char **name, int allow_tq_in_array);
+struct type *ast_to_type(const struct type_specifiers *ts, const struct type_qualifiers *tq, struct type_ast *ast, struct string_view *name, int allow_tq_in_array);
 
 int parse_struct(struct type_specifiers *ts);
 int parse_enum(struct type_specifiers *ts);
@@ -152,7 +152,7 @@ int parse_specifier(struct type_specifiers *ts,
 
 		if (T0->type == T_IDENT && !*got_ts) {
 			*got_ts = 1;
-			char *name = T0->str;
+			struct string_view name = T0->str;
 
 			struct symbol_typedef *sym = symbols_get_typedef(name);
 
@@ -221,7 +221,7 @@ int parse_enumerator(struct constant *prev, int first) {
 	if (T0->type != T_IDENT)
 		return 0;
 
-	char *name = T0->str;
+	struct string_view name = T0->str;
 	TNEXT();
 
 	struct constant val;
@@ -261,14 +261,14 @@ int parse_enum(struct type_specifiers *ts) {
 	if (!TACCEPT(T_KENUM))
 		return 0;
 
-	char *name = NULL;
+	struct string_view name = { 0 };
 
 	if (T0->type == T_IDENT) {
 		name = T0->str;
 		TNEXT();
 	} else {
 		static int anonymous_counter = 0;
-		name = allocate_printf("<enum-%d>", anonymous_counter++);
+		name = sv_from_str(allocate_printf("<enum-%d>", anonymous_counter++));
 	}
 
 	if (TACCEPT(T_LBRACE)) {
@@ -297,7 +297,7 @@ int parse_enum(struct type_specifiers *ts) {
 				ERROR("Redeclaring struct/union");
 		}
 
-		*data = (struct enum_data){
+		*data = (struct enum_data) {
 			.name = name
 		};
 
@@ -332,7 +332,7 @@ int parse_struct(struct type_specifiers *ts) {
 		is_union = 1;
 	else
 		return 0;
-	char *name = NULL;
+	struct string_view name = { 0 };
 
 	accept_attribute(&is_packed);
 
@@ -341,7 +341,7 @@ int parse_struct(struct type_specifiers *ts) {
 		TNEXT();
 	} else {
 		static int anonymous_counter = 0;
-		name = allocate_printf("<%d>", anonymous_counter++);
+		name = sv_from_str(allocate_printf("<%d>", anonymous_counter++));
 	}
 
 	if (TACCEPT(T_LBRACE)) {
@@ -356,7 +356,7 @@ int parse_struct(struct type_specifiers *ts) {
 			int was_abstract = 1;
 			while (1) {
 				struct type *type = NULL;
-				char *name = NULL;
+				struct string_view name = { 0 };
 				int bitfield = -1;
 				int needs_bitfield = 0;
 
@@ -402,7 +402,7 @@ int parse_struct(struct type_specifiers *ts) {
 				if (s.ts.data_type->type == TY_STRUCT) {
 					ADD_ELEMENT(fields_size, fields_cap, fields) = (struct field) {
 						.type = s.ts.data_type,
-						.name = NULL,
+						.name = { 0 },
 						.bitfield = -1
 					};
 				} else {
@@ -435,7 +435,7 @@ int parse_struct(struct type_specifiers *ts) {
 			data = def->struct_data;
 			if (data->is_complete) {
 				PRINT_POS(T0->pos);
-				ERROR("Redeclaring struct/union %s", name);
+				ERROR("Redeclaring struct/union %.*s", name.len, name.str);
 			}
 		}
 
@@ -478,7 +478,7 @@ int parse_struct(struct type_specifiers *ts) {
 
 		if (!is_union && def->type != STRUCT_STRUCT) {
 			PRINT_POS(T0->pos);
-			ERROR("%s Previously not a struct", name);
+			ERROR("%.*s Previously not a struct", name.len, name.str);
 		} else if (is_union && def->type != STRUCT_UNION) {
 			ERROR("Previously not a union");
 		}
@@ -617,7 +617,7 @@ struct type *apply_tq(struct type *type, const struct type_qualifiers *tq) {
 	return type;
 }
 
-struct type *ast_to_type(const struct type_specifiers *ts, const struct type_qualifiers *tq, struct type_ast *ast, char **name, int allow_tq_in_array) {
+struct type *ast_to_type(const struct type_specifiers *ts, const struct type_qualifiers *tq, struct type_ast *ast, struct string_view *name, int allow_tq_in_array) {
 	struct type *type = specifiers_to_type(ts);
 
 	type = apply_tq(type, tq);
@@ -737,7 +737,7 @@ struct parameter_list parse_parameter_list(void) {
 
 		ret.n++;
 		ret.types = realloc(ret.types, ret.n * sizeof(*ret.types));
-		char *name = NULL;
+		struct string_view name = { 0 };
 		struct type *type = ast_to_type(&s.ts, &s.tq, ast, &name, 1);
 		type = type_adjust_parameter(type);
 		ret.types[ret.n - 1] = type;
@@ -808,7 +808,7 @@ struct type_ast *parse_declarator(int *was_abstract, int *has_symbols) {
 	if (T0->type == T_IDENT) {
 		ast = type_ast_new((struct type_ast){
 				.type = TAST_TERMINAL,
-				.terminal.name = strdup(T0->str)
+				.terminal.name = T0->str
 			});
 		if (was_abstract)
 			*was_abstract = 0;
@@ -820,7 +820,7 @@ struct type_ast *parse_declarator(int *was_abstract, int *has_symbols) {
 			*was_abstract = 1;
 			ast = type_ast_new((struct type_ast) {
 					.type = TAST_TERMINAL,
-					.terminal.name = NULL
+					.terminal.name = { 0 }
 				});
 			ast = parse_function_parameters(ast, has_symbols);
 		} else {
@@ -842,7 +842,7 @@ struct type_ast *parse_declarator(int *was_abstract, int *has_symbols) {
 		if (ast->parent == NULL) {
 			ast->parent = type_ast_new((struct type_ast){
 					.type = TAST_TERMINAL,
-					.terminal.name = NULL
+					.terminal.name = { 0 }
 				});
 			*was_abstract = 1;
 		}
@@ -851,7 +851,7 @@ struct type_ast *parse_declarator(int *was_abstract, int *has_symbols) {
 		*was_abstract = 1;
 		ast = type_ast_new((struct type_ast) {
 				.type = TAST_TERMINAL,
-				.terminal.name = NULL
+				.terminal.name = { 0 }
 			});
 	} else {
 		*was_abstract = 1; // Is this correct?
@@ -923,7 +923,7 @@ void add_expr_init_pair(struct initializer *init, int offset, int bit_offset, in
 	};
 }
 
-void add_string_init_pair(struct initializer *init, int offset, const char *str) {
+void add_string_init_pair(struct initializer *init, int offset, struct string_view str) {
 	ADD_ELEMENT(init->size, init->cap, init->pairs) = (struct init_pair) {
 		.type = IP_STRING,
 		.offset = offset,
@@ -967,7 +967,7 @@ int parse_non_brace_initializer(struct type **type, int offset, int bit_offset,
 			   (type_is_simple((*type)->children[0], ST_CHAR) ||
 				type_is_simple((*type)->children[0], ST_UCHAR) ||
 				type_is_simple((*type)->children[0], ST_SCHAR))) {
-		char *str;
+		struct string_view str;
 		if (T0->type == T_LBRACE && T1->type == T_STRING &&
 			T2->type == T_RBRACE) {
 			str = T1->str;
@@ -984,7 +984,7 @@ int parse_non_brace_initializer(struct type **type, int offset, int bit_offset,
 		if ((*type)->type == TY_INCOMPLETE_ARRAY) {
 			struct type complete_array_params = {
 				.type = TY_ARRAY,
-				.array.length = strlen(str) + 1,
+				.array.length = str.len,
 				.n = 1
 			};
 
@@ -1035,7 +1035,7 @@ int parse_brace_initializer(struct type **current_object, int offset, struct ini
 			int index;
 
 			if (TACCEPT(T_DOT)) {
-				char *ident = T0->str;
+				struct string_view ident = T0->str;
 				TEXPECT(T_IDENT);
 
 				index = type_member_idx(parent_type, ident);
@@ -1256,7 +1256,7 @@ struct type *parse_type_name(void) {
 
 struct {
 	size_t size, cap;
-	const char **names;
+	struct string_view *names;
 } potentially_tentative;
 
 int parse_init_declarator(struct specifiers s, int external, int *was_func) {
@@ -1273,7 +1273,7 @@ int parse_init_declarator(struct specifiers s, int external, int *was_func) {
 	}
 
 	struct type *type;
-	char *name;
+	struct string_view name;
 	type = ast_to_type(&s.ts, &s.tq, ast, &name, 0);
 
 	if (T0->type == T_LBRACE) {
@@ -1390,7 +1390,7 @@ int parse_init_declarator(struct specifiers s, int external, int *was_func) {
 			symbol->is_tentative = 0;
 	}
 	if (is_tentative && !prev_definition)
-		ADD_ELEMENT(potentially_tentative.size, potentially_tentative.cap, potentially_tentative.names) = strdup(name);
+		ADD_ELEMENT(potentially_tentative.size, potentially_tentative.cap, potentially_tentative.names) = name;
 
 	if (has_definition) {
 		if (definition_is_static) {
@@ -1398,7 +1398,7 @@ int parse_init_declarator(struct specifiers s, int external, int *was_func) {
 
 			if (!external) {
 				static int local_var = 0;
-				name = allocate_printf(".LVAR%d%s", local_var++, name);
+				name = sv_from_str(allocate_printf(".LVAR%d%.*s", local_var++, name.len, name.str));
 			}
 
 			symbol->label.name = name;
@@ -1409,6 +1409,7 @@ int parse_init_declarator(struct specifiers s, int external, int *was_func) {
 				init = parse_initializer(&type);
 				symbol->label.type = type;
 			}
+
 			data_register_static_var(name, type, init, is_global);
 		} else {
 			if (type_has_variable_size(type)) {
@@ -1464,7 +1465,7 @@ int parse_declaration(int external) {
 			if (T0->type != T_STRING)
 				ERROR("Second argument to _Static_assert must be a string.");
 
-			const char *msg = T0->str;
+			struct string_view msg = T0->str;
 			TNEXT();
 
 			TEXPECT(T_RPAR);
@@ -1472,7 +1473,7 @@ int parse_declaration(int external) {
 			TEXPECT(T_SEMI_COLON);
 
 			if (constant->int_d)
-				ERROR("Static assert failed: %s\n", msg);
+				ERROR("Static assert failed: %.*s\n", msg.len, msg.str);
 			return 1;
 		}
 		return 0;
@@ -1491,7 +1492,7 @@ int parse_declaration(int external) {
 
 void generate_tentative_definitions(void) {
 	for (size_t i = 0; i < potentially_tentative.size; i++) {
-		const char *name = potentially_tentative.names[i];
+		struct string_view name = potentially_tentative.names[i];
 
 		struct symbol_identifier *symbol = symbols_get_identifier_global(name);
 

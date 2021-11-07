@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <stdint.h>
 
+#include <string_view.h>
+
 #define ERROR(STR, ...) do { printf("Error on line %d file %s: \"" STR "\"\n", __LINE__, __FILE__, ##__VA_ARGS__); exit(1); } while(0)
 #define NOTIMP() ERROR("Not implemented");
 
@@ -17,7 +19,7 @@
 
 uint32_t hash32(uint32_t a);
 
-uint32_t hash_str(const char *str);
+//uint32_t hash_str(const char *str);
 char *allocate_printf(const char *fmt, ...);
 
 int str_contains(const char *str, char c);
@@ -28,7 +30,7 @@ char *strdup(const char *s);
 
 uint64_t gen_mask(unsigned char left_pad, unsigned char right_pad);
 
-int character_constant_to_int(const char *str);
+int character_constant_to_int(struct string_view str);
 void character_to_escape_sequence(char character, char *output);
 
 void init_source_character_set(void);

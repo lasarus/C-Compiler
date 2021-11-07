@@ -145,7 +145,7 @@ void input_open(struct input **input, const char *path, int system) {
 		ERROR("\"%s\" not found in search path, with origin %s", path, *input ? (*input)->filename : (const char *)".");
 	}
 
-	if (string_set_contains(disabled_headers, path_buffer)) {
+	if (string_set_contains(disabled_headers, sv_from_str(path_buffer))) {
 		fclose(fp);
 		return;
 	}

@@ -3,7 +3,7 @@
 
 #include "parser.h"
 
-void parse_function(const char *name, struct type *type, int arg_n, var_id *args, int global);
-const char *get_current_function_name(void);
+void parse_function(struct string_view name, struct type *type, int arg_n, var_id *args, int global);
+struct string_view get_current_function_name(void);
 
 #endif

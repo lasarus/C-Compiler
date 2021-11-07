@@ -3,10 +3,10 @@
 
 #include <common.h>
 
-static enum ttype get_ident(char *str) {
+static enum ttype get_ident(struct string_view str) {
 #define X(A, B)
 #define SYM(A, B)
-#define KEY(A, B) if(strcmp(str, B) == 0) { return A; }
+#define KEY(A, B) if(sv_string_cmp(str, B)) { return A; }
 #include "tokens.h"
 #undef KEY
 #undef X
@@ -32,9 +32,9 @@ struct token string_concat_next(void) {
 			prev = nt;
 			break;
 		} else {
-			char *concat = malloc(strlen(t.str) + strlen(nt.str) + 1);
-			sprintf(concat, "%s%s", t.str, nt.str);
-			t = token_init(T_STRING, concat, t.pos);
+			t.str.len--;
+			struct string_view concat = sv_concat(t.str, nt.str);
+			t.str = concat;
 		}
 	}
 

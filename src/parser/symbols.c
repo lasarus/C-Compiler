@@ -15,7 +15,7 @@ struct entry_id {
 		ENTRY_STRUCT,
 		ENTRY_IDENTIFIER
 	} type;
-	const char *name;
+	struct string_view name;
 };
 
 struct table_entry {
@@ -43,12 +43,11 @@ static struct table {
 static int current_block = 0;
 
 uint32_t hash_entry(struct entry_id id) {
-	return hash32(id.type) ^ hash_str(id.name);
+	return hash32(id.type) ^ sv_hash(id.name);
 }
 
 int compare_entry(struct entry_id a, struct entry_id b) {
-	return a.type == b.type &&
-		strcmp(a.name, b.name) == 0;
+	return a.type == b.type && sv_cmp(a.name, b.name);
 }
 
 void symbols_push_scope(void) {
@@ -143,50 +142,50 @@ struct table_entry *add_entry(struct entry_id id) {
 }
 
 // table_entry querying.
-struct table_entry *symbols_add(enum entry_type type, const char *name) {
+struct table_entry *symbols_add(enum entry_type type, struct string_view name) {
 	struct table_entry *entry = get_entry((struct entry_id) { type, name }, 0);
 
 	if (entry && entry->block == current_block)
-		ERROR("Name already declared, %s", name);
+		ERROR("Name already declared, %.*s", name.len, name.str);
 
 	return add_entry((struct entry_id) { type, name });
 }
 
-struct table_entry *symbols_get(enum entry_type type, const char *name) {
+struct table_entry *symbols_get(enum entry_type type, struct string_view name) {
 	return get_entry((struct entry_id) { type, name }, 0);
 }
 
-struct table_entry *symbols_get_in_current_scope(enum entry_type type, const char *name) {
+struct table_entry *symbols_get_in_current_scope(enum entry_type type, struct string_view name) {
 	struct table_entry *entry = get_entry((struct entry_id) { type, name }, 0);
 
 	return (entry && entry->block == current_block) ? entry : NULL;
 }
 
 // Identifier help functions.
-struct symbol_identifier *symbols_add_identifier(const char *name) {
+struct symbol_identifier *symbols_add_identifier(struct string_view name) {
 	return &symbols_add(ENTRY_IDENTIFIER, name)->identifier_data;
 }
 
-struct symbol_identifier *symbols_get_identifier(const char *name) {
+struct symbol_identifier *symbols_get_identifier(struct string_view name) {
 	struct table_entry *entry = symbols_get(ENTRY_IDENTIFIER, name);
 	return entry ? &entry->identifier_data : NULL;
 }
 
-struct symbol_identifier *symbols_get_identifier_in_current_scope(const char *name) {
+struct symbol_identifier *symbols_get_identifier_in_current_scope(struct string_view name) {
 	struct table_entry *entry = symbols_get_in_current_scope(ENTRY_IDENTIFIER, name);
 	return entry ? &entry->identifier_data : NULL;
 }
 
-struct symbol_identifier *symbols_add_identifier_global(const char *name) {
+struct symbol_identifier *symbols_add_identifier_global(struct string_view name) {
 	struct table_entry *entry = get_entry((struct entry_id) { ENTRY_IDENTIFIER, name }, 1);
 
 	if (entry && entry->block == current_block)
-		ERROR("Name already declared, %s", name);
+		ERROR("Name already declared, %.*s", name.len, name.str);
 
 	return &add_entry_with_block((struct entry_id) { ENTRY_IDENTIFIER, name }, 0)->identifier_data;
 }
 
-struct symbol_identifier *symbols_get_identifier_global(const char *name) {
+struct symbol_identifier *symbols_get_identifier_global(struct string_view name) {
 	struct table_entry *entry = get_entry((struct entry_id) { ENTRY_IDENTIFIER, name }, 1);
 	return entry ? &entry->identifier_data : NULL;
 }
@@ -202,22 +201,22 @@ struct type *symbols_get_identifier_type(struct symbol_identifier *symbol) {
 }
 
 // Struct help functions.
-struct symbol_struct *symbols_add_struct(const char *name) {
+struct symbol_struct *symbols_add_struct(struct string_view name) {
 	return &symbols_add(ENTRY_STRUCT, name)->struct_data;
 }
 
-struct symbol_struct *symbols_get_struct(const char *name) {
+struct symbol_struct *symbols_get_struct(struct string_view name) {
 	struct table_entry *entry = symbols_get(ENTRY_STRUCT, name);
 	return entry ? &entry->struct_data : NULL;
 }
 
-struct symbol_struct *symbols_get_struct_in_current_scope(const char *name) {
+struct symbol_struct *symbols_get_struct_in_current_scope(struct string_view name) {
 	struct table_entry *entry = symbols_get_in_current_scope(ENTRY_STRUCT, name);
 	return entry ? &entry->struct_data : NULL;
 }
 
 // Typedef help functions.
-struct symbol_typedef *symbols_add_typedef(const char *name) {
+struct symbol_typedef *symbols_add_typedef(struct string_view name) {
 	struct entry_id id = {ENTRY_TYPEDEF, name};
 	struct table_entry *entry = get_entry(id, 0);
 
@@ -227,7 +226,7 @@ struct symbol_typedef *symbols_add_typedef(const char *name) {
 	return &add_entry(id)->typedef_data;
 }
 
-struct symbol_typedef *symbols_get_typedef(const char *name) {
+struct symbol_typedef *symbols_get_typedef(struct string_view name) {
 	struct table_entry *entry = symbols_get(ENTRY_TYPEDEF, name);
 	return entry ? &entry->typedef_data : NULL;
 }

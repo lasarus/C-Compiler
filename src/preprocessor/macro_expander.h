@@ -6,7 +6,7 @@
 
 struct define {
 	struct define *next;
-	char *name;
+	struct string_view name;
 	int func;
 	int vararg;
 
@@ -14,13 +14,13 @@ struct define {
 };
 
 void define_string(char *name, char *value);
-struct define define_init(char *name);
+struct define define_init(struct string_view name);
 void define_add_def(struct define *d, struct token t);
 void define_add_par(struct define *d, struct token t);
 
 void define_map_add(struct define def);
-struct define *define_map_get(char *str);
-void define_map_remove(char *name);
+struct define *define_map_get(struct string_view str);
+void define_map_remove(struct string_view name);
 
 struct token expander_next(void);
 

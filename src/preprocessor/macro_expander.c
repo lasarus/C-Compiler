@@ -27,14 +27,15 @@ void define_map_init(void) {
 	}
 }
 
-struct define **define_map_find(char *name) {
+struct define **define_map_find(struct string_view name) {
 	if (!define_map)
 		define_map_init();
-	uint32_t hash_idx = hash_str(name) % MAP_SIZE;
+
+	uint32_t hash_idx = sv_hash(name) % MAP_SIZE;
 
 	struct define **it = &define_map->entries[hash_idx];
 
-	while (*it && strcmp((*it)->name, name) != 0) {
+	while (*it && !sv_cmp((*it)->name, name)) {
 		it = &(*it)->next;
 	}
 
@@ -54,11 +55,11 @@ void define_map_add(struct define define) {
 	}
 }
 
-struct define *define_map_get(char *str) {
+struct define *define_map_get(struct string_view str) {
 	return *define_map_find(str);
 }
 
-void define_map_remove(char *str) {
+void define_map_remove(struct string_view str) {
 	struct define **elem = define_map_find(str);
 	if (*elem) {
 		struct define *next = (*elem)->next;
@@ -68,7 +69,7 @@ void define_map_remove(char *str) {
 	}
 }
 
-struct define define_init(char *name) {
+struct define define_init(struct string_view name) {
 	return (struct define) {
 		.name = name,
 	};
@@ -97,7 +98,7 @@ int get_param(struct define *def, struct token tok) {
 }
 
 void define_string(char *name, char *value) {
-	struct define def = define_init(name);
+	struct define def = define_init(sv_from_str(name));
 	struct input input = input_open_string(value);
 	def.def = tokenizer_whole(&input);
 	define_map_add(def);
@@ -142,9 +143,9 @@ struct token glue(struct token a, struct token b) {
 		if (paste_table[i][1] == a.type && paste_table[i][0] == b.type)
 			ret.type = paste_table[i][2];
 	if (!ret.type)
-		ERROR("Invalid paste of %s and %s", b.str, a.str);
+		ERROR("Invalid paste of %.*s and %.*s", b.str.len, b.str.str, a.str.len, a.str.str);
 
-	ret.str = allocate_printf("%s%s", b.str, a.str);
+	ret.str = sv_from_str(allocate_printf("%s%s", sv_to_str(b.str), sv_to_str(a.str))); // TODO: This can be done better.
 	ret.hs = string_set_intersection(a.hs, b.hs);
 
 	return ret;
@@ -166,9 +167,9 @@ void stringify_add(struct token *t, int start) {
 	switch (t->type) {
 	case T_STRING:
 		ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = '"';
-		for (int i = 0; t->str[i]; i++) {
+		for (int i = 0; i < t->str.len - 1; i++) {
 			char escape_seq[5];
-			character_to_escape_sequence(t->str[i], escape_seq);
+			character_to_escape_sequence(t->str.str[i], escape_seq);
 			for (int j = 0; escape_seq[j]; j++)
 				ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = escape_seq[j];
 		}
@@ -176,18 +177,18 @@ void stringify_add(struct token *t, int start) {
 		break;
 
 	default:
-		for (int i = 0; t->str[i]; i++)
-			ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = t->str[i];
+		for (int i = 0; i < t->str.len; i++)
+			ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = t->str.str[i];
 	}
 	ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = '\0';
 }
 
 int builtin_macros(struct token *t) {
 	// These are only single tokens.
-	if (strcmp(t->str, "__LINE__") == 0) {
-		*t = token_init(T_NUM, allocate_printf("%d", t->pos.line), t->pos);
-	} else if (strcmp(t->str, "__FILE__") == 0) {
-		*t = token_init(T_STRING, allocate_printf("%s", t->pos.path), t->pos);
+	if (sv_string_cmp(t->str, "__LINE__")) {
+		*t = (struct token) { .type = T_NUM, .str = sv_from_str(allocate_printf("%d", t->pos.line)), .pos = t->pos };
+	} else if (sv_string_cmp(t->str, "__FILE__")) {
+		*t = (struct token) { .type = T_STRING, .str = sv_from_str(allocate_printf("%s", t->pos.path)), .pos = t->pos };
 	} else
 		return 0;
 	return 1;
@@ -270,7 +271,7 @@ void expand_argument(struct token_list tl, int *concat_with_prev, int concat, in
 	int run_expand_again = 0;
 	if (!(concat || stringify)) {
 		run_expand_again = 1;
-		struct token t = token_init(T_EOI, "", (struct position) { 0 });
+		struct token t = { .type = T_EOI };
 		input_buffer_push(&t);
 	}
 
@@ -327,7 +328,7 @@ void subs_buffer(struct define *def, struct string_set *hs, struct position new_
 	}
 	(void)vararg_included;
 
-	string_set_insert(hs, strdup(def->name));
+	string_set_insert(hs, sv_to_str(def->name));
 
 	size_t input_start = input_buffer.size;
 	int concat_with_prev = 0;
@@ -347,7 +348,7 @@ void subs_buffer(struct define *def, struct string_set *hs, struct position new_
 
 		int idx;
 
-		int is_va_args = strcmp(t.str, "__VA_ARGS__") == 0;
+		int is_va_args = sv_string_cmp(t.str, "__VA_ARGS__");
 
 		if (!is_va_args)
 			idx = get_param(def, t);
@@ -361,7 +362,7 @@ void subs_buffer(struct define *def, struct string_set *hs, struct position new_
 				expand_argument(vararg, &concat_with_prev, concat, stringify, input);
 			} else {
 				PRINT_POS(T0->pos);
-				ERROR("Not implemented, %s (%d)", def->name, def->func);
+				ERROR("Not implemented, %.*s (%d)", def->name.len, def->name.str, def->func);
 				NOTIMP();
 			}
 		} else if (idx >= 0 && stringify) {
@@ -371,7 +372,7 @@ void subs_buffer(struct define *def, struct string_set *hs, struct position new_
 			for(int i = 0; i < tl.size; i++)
 				stringify_add(tl.list + i, i == 0);
 
-			struct token t = token_init(T_STRING, strdup(stringify_buffer), (struct position) { 0 });
+			struct token t = { .type = T_STRING, .str = sv_from_str(strdup(stringify_buffer)) };
 			input_buffer_push(&t);
 		} else if(idx >= 0) {
 			expand_argument(arguments[idx], &concat_with_prev, concat, stringify, input);
@@ -444,7 +445,7 @@ void expand_buffer(int input, int return_output, struct token *t) {
 	}
 
 	if (return_output)
-		*t = token_init(T_EOI, NULL, (struct position) { 0 });
+		*t = (struct token) { .type = T_EOI };
 }
 
 struct token expander_next(void) {
@@ -455,7 +456,7 @@ struct token expander_next(void) {
 }
 
 void expand_token_list(struct token_list *ts) {
-	input_buffer_push(&(struct token) { .type = T_EOI, .str = "" });
+	input_buffer_push(&(struct token) { .type = T_EOI });
 
 	for(int i = ts->size - 1; i >= 0; i--) {
 		struct token t = ts->list[i];

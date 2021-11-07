@@ -95,9 +95,9 @@ void string_set_insert(struct string_set *a, char *str) {
 	a->strings[s] = str;
 }
 
-int string_set_contains(struct string_set a, char *str) {
+int string_set_contains(struct string_set a, struct string_view str) {
 	for (int i = 0; i < a.size; i++) {
-		if (strcmp(a.strings[i], str) == 0)
+		if (sv_string_cmp(str, a.strings[i]))
 			return 1;
 	}
 

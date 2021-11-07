@@ -5,6 +5,9 @@
 #include "parser/parser.h"
 #include "preprocessor/preprocessor.h"
 
+struct token;
+struct type;
+
 const char *dbg_type(struct type *type);
 const char *dbg_instruction(struct instruction ins);
 const char *dbg_token(struct token *t);

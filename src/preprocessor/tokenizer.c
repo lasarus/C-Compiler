@@ -86,8 +86,13 @@ static void buffer_write(char c) {
 	ADD_ELEMENT(buffer_size, buffer_cap, buffer) = c;
 }
 
-static char *buffer_get(void) {
-	return strdup(buffer);
+struct string_view buffer_get(void) {
+	struct string_view ret = { .len = buffer_size - 1 };
+	ret.str = malloc(buffer_size);
+	memcpy(ret.str, buffer, buffer_size);
+	return ret;
+	/* return (struct string_view) { .len = buffer_size, .buffer =  }; */
+	/* return sv_from_str(strdup(buffer)); */
 }
 
 static int parse_identifier(struct token *next) {
@@ -210,7 +215,7 @@ static int parse_cs_char(int *character, char end_char) {
 	}
 }
 
-static char *parse_string_like(void) {
+struct string_view parse_string_like(int null_terminate) {
 	char end_char = C0 == '<' ? '>' : C0;
 	CNEXT();
 
@@ -223,6 +228,8 @@ static char *parse_string_like(void) {
 	if (C0 != end_char)
 		ERROR("Expected %c", end_char);
 
+	if (null_terminate)
+		buffer_write('\0');
 	buffer_write('\0');
 
 	CNEXT();
@@ -249,7 +256,7 @@ static int parse_string(struct token *next) {
 	}
 
 	next->type = T_STRING;
-	next->str = parse_string_like();
+	next->str = parse_string_like(1);
 
 	return 1;
 }
@@ -259,7 +266,7 @@ static int parse_pp_header_name(struct token *next) {
 		return 0;
 
 	next->type = C0 == '<' ? PP_HEADER_NAME_H : PP_HEADER_NAME_Q;
-	next->str = parse_string_like();
+	next->str = parse_string_like(1);
 
 	return 1;
 }
@@ -269,7 +276,7 @@ static int parse_character_constant(struct token *next) {
 		return 0;
 
 	next->type = T_CHARACTER_CONSTANT;
-	next->str = parse_string_like();
+	next->str = parse_string_like(0);
 
 	return 1;
 }
@@ -308,7 +315,7 @@ static int parse_punctuator(struct token *next) {
 static int is_header, is_directive;
 
 struct token tokenizer_next(void) {
-	struct token next = token_init(T_NONE, NULL, (struct position){0});
+	struct token next = { 0 };
 
 	flush_whitespace(&next.whitespace,
 					 &next.first_of_line);
@@ -318,7 +325,7 @@ struct token tokenizer_next(void) {
 
 #define IFSTR(S, TOK)	(C0 == S[0] &&						\
 						 (sizeof(S) == 2 || C1 == S[1])) &&	\
-		(next.type = TOK, next.str = strdup(S),				\
+		(next.type = TOK, next.str = sv_from_str(S),		\
 		 CNEXT(), (sizeof(S) == 3) && (CNEXT(), 1), 1)		\
 
 	next.pos = input->pos[0];
@@ -331,7 +338,7 @@ struct token tokenizer_next(void) {
 	} else if(parse_string(&next)) {
 	} else if(parse_identifier(&next)) {
 		if (is_directive) {
-			is_header = strcmp(next.str, "include") == 0;
+			is_header = sv_string_cmp(next.str, "include");
 			is_directive = 0;
 		}
 	} else if(parse_punctuator(&next)) {

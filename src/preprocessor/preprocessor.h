@@ -4,6 +4,8 @@
 #include "input.h"
 #include "string_set.h"
 
+#include <string_view.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -22,7 +24,7 @@ enum ttype {
 struct token {
     enum ttype type;
 
-    char *str;
+	struct string_view str;
 
     int first_of_line;
     int whitespace;
@@ -31,8 +33,6 @@ struct token {
 
     struct string_set hs; // Hide set. Only unsed internally.
 };
-
-struct token token_init(enum ttype type, char *str, struct position pos);
 
 #define EXPECT(T0, ETYPE) do {											\
 		if ((T0)->type != ETYPE) {										\

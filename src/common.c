@@ -47,12 +47,12 @@ int round_up_to_nearest(int num, int div) {
 	return num;
 }
 
-int character_constant_to_int(const char *str) {
+int character_constant_to_int(struct string_view str) {
 	int constant = 0;
 
-	for (; *str; str++) {
+	for (int i = 0; i < str.len; i++) {
 		constant <<= 8; // TODO: UB on overflow?
-		constant += *str;
+		constant += str.str[i];
 	}
 
 	return constant;

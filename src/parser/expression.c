@@ -937,7 +937,7 @@ struct expr *parse_prefix() {
 
 		if (!sym) {
 			PRINT_POS(T0->pos);
-			ERROR("Could not find identifier %s", T0->str);
+			ERROR("Could not find identifier %.*s", T0->str.len, T0->str.str);
 		}
 
 		switch (sym->type) {
@@ -972,11 +972,11 @@ struct expr *parse_prefix() {
 				});
 
 		default:
-			printf("%s\n", T0->str);
+			printf("%.*s\n", T0->str.len, T0->str.str);
 			NOTIMP();
 		}
 	} else if (T0->type == T_STRING) {
-		const char *str = T0->str;
+		struct string_view str = T0->str;
 		TNEXT();
 		return EXPR_STR(str);
 	} else if (T0->type == T_NUM) {
@@ -987,7 +987,7 @@ struct expr *parse_prefix() {
 				.constant = c
 			});
 	} else if (T0->type == T_CHARACTER_CONSTANT) {
-		const char *str = T0->str;
+		struct string_view str = T0->str;
 		TNEXT();
 		return EXPR_INT(character_constant_to_int(str));
 	} else if (TACCEPT(T_CHAR)) {
@@ -1173,7 +1173,7 @@ struct expr *parse_pratt(int precedence) {
 				});
 
 		} else if (TACCEPT(T_DOT)) {
-			const char *identifier = T0->str;
+			struct string_view identifier = T0->str;
 			TNEXT();
 			struct type *lhs_type = lhs->data_type;
 			int idx = type_member_idx(lhs_type, identifier);
@@ -1183,7 +1183,7 @@ struct expr *parse_pratt(int precedence) {
 					.member = { lhs, idx }
 				});
 		} else if (TACCEPT(T_ARROW)) {
-			const char *identifier = T0->str;
+			struct string_view identifier = T0->str;
 			TNEXT();
 			decay_array(&lhs);
 			struct type *lhs_type = type_deref(lhs->data_type);

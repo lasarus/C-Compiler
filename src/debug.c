@@ -73,7 +73,7 @@ const char *dbg_type(struct type *type) {
 			type = type->children[0];
 			break;
 		case TY_STRUCT:
-			DBG_PRINT("STRUCT (%s)", type->struct_data->name);
+			DBG_PRINT("STRUCT (%.*s)", type->struct_data->name.len, type->struct_data->name.str);
 			type = NULL;
 			break;
 		case TY_INCOMPLETE_ARRAY:
@@ -197,9 +197,9 @@ const char *dbg_token(struct token *t) {
 	int curr_pos = 0;
 
 	if (t->type == T_IDENT) {
-		DBG_PRINT("%s", t->str);
+		DBG_PRINT("%.*s", t->str.len, t->str.str);
 	} else if (t->type == T_NUM) {
-		DBG_PRINT("%s", t->str);
+		DBG_PRINT("%.*s", t->str.len, t->str.str);
 	} else {
 		DBG_PRINT("%s", dbg_token_type(t->type));
 	}

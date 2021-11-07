@@ -22,13 +22,13 @@ struct function_scope {
 	int size, cap;
 
 	struct function_scope_label {
-		const char *label;
+		struct string_view label;
 		block_id id;
 		int used;
 	} *labels;
 } function_scope;
 
-void add_function_scope_label(const char *label, block_id id, int used) {
+void add_function_scope_label(struct string_view label, block_id id, int used) {
 	ADD_ELEMENT(function_scope.size, function_scope.cap, function_scope.labels) =
 		(struct function_scope_label) { label, id, used };
 }
@@ -45,14 +45,14 @@ int parse_jump_statement(struct jump_blocks jump_blocks);
 int parse_labeled_statement(struct jump_blocks jump_blocks) {
 	if (T0->type == T_IDENT &&
 		T1->type == T_COLON) {
-		const char *label = T0->str;
+		struct string_view label = T0->str;
 		TNEXT();
 		TNEXT();
 
 		for (int i = 0; i < function_scope.size; i++) {
-			if (strcmp(label, function_scope.labels[i].label) == 0) {
+			if (sv_cmp(label, function_scope.labels[i].label)) {
 				if (function_scope.labels[i].used)
-					ERROR("Label declared more than once %s", label);
+					ERROR("Label declared more than once %.*s", label.len, label.str);
 				ir_goto(function_scope.labels[i].id);
 				ir_block_start(function_scope.labels[i].id);
 				function_scope.labels[i].used = 1;
@@ -373,11 +373,11 @@ struct type *current_ret_val = NULL;
 
 int parse_jump_statement(struct jump_blocks jump_blocks) {
 	if (TACCEPT(T_KGOTO)) {
-		const char *label = T0->str;
+		struct string_view label = T0->str;
 		TNEXT();
 		TEXPECT(T_SEMI_COLON);
 		for (int i = 0; i < function_scope.size; i++) {
-			if (strcmp(label, function_scope.labels[i].label) == 0) {
+			if (sv_cmp(label, function_scope.labels[i].label)) {
 				ir_goto(function_scope.labels[i].id);
 				ir_block_start(new_block());
 				return 1;
@@ -427,13 +427,13 @@ int parse_statement(struct jump_blocks jump_blocks) {
 		TACCEPT(T_SEMI_COLON);
 }
 
-static const char *current_function = "";
+static struct string_view current_function = { 0 };
 
-const char *get_current_function_name() {
+struct string_view get_current_function_name() {
 	return current_function;
 }
 
-void parse_function(const char *name, struct type *type, int arg_n, var_id *args, int global) {
+void parse_function(struct string_view name, struct type *type, int arg_n, var_id *args, int global) {
 	current_function = name;
 	struct symbol_identifier *symbol = symbols_get_identifier_global(name);
 
@@ -451,7 +451,7 @@ void parse_function(const char *name, struct type *type, int arg_n, var_id *args
 
 	assert(type->type == TY_FUNCTION);
 
-	ir_new_function(type, args, name, global);
+	ir_new_function(type, args, name.str, global);
 	ir_block_start(new_block());
 
 	type_evaluate_vla(type);
@@ -463,7 +463,7 @@ void parse_function(const char *name, struct type *type, int arg_n, var_id *args
 	struct jump_blocks jump_blocks = { 0 };
 	parse_compound_statement(jump_blocks);
 
-	if (strcmp(name, "main") == 0) {
+	if (sv_string_cmp(name, "main")) {
 		struct block *b = get_current_block();
 		if (b->exit.type == BLOCK_EXIT_NONE)
 			b->exit.type = BLOCK_EXIT_RETURN_ZERO;

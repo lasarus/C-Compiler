@@ -147,15 +147,13 @@ int main() {
 	assert(strcmp((char *)ustr, "string") == 0);
 	assert(strcmp((char *)sstr, "string") == 0);
 
-	/* { */
-	/* 	char str1[] = "ABC\0\0\0DEF"; */
-	/* 	char str2[] = "\0\0\0ABCDEF"; */
-	/* 	char str3[] = "ABCDEF\0\0\0"; */
+	{
+		char str1[] = "ABC\0\0\0DEF";
+		char str2[] = "\0\0\0ABCDEF";
+		char str3[] = "ABCDEF\0\0\0";
 
-	/* 	assert((sizeof str1) == 1); */
-	/* 	assert(sizeof str2 == 10);  */
-	/* 	assert(sizeof str3 == 10);  */
-
-	/* 	return 1; */
-	/* } */
+		assert(sizeof str1 == 10);
+		assert(sizeof str2 == 10);
+		assert(sizeof str3 == 10);
+	}
 }

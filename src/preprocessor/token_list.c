@@ -16,7 +16,7 @@ void token_list_pop(struct token_list *list) {
 
 int token_list_index_of(struct token_list *list, struct token t) {
 	for (int i = 0; i < list->size; i++) {
-		if (strcmp(list->list[i].str, t.str) == 0) return i;
+		if (sv_cmp(list->list[i].str, t.str)) return i;
 	}
 	return -1;
 }

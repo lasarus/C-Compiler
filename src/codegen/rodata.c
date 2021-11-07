@@ -15,17 +15,17 @@ struct entry {
 		ENTRY_STR,
 		ENTRY_LABEL_NAME
 	} type;
-	const char *name;
+	struct string_view name;
 	label_id id;
 };
 
 static struct entry *entries = NULL;
 static int entries_size = 0, entries_cap = 0;
 
-label_id label_register(enum entry_type type, const char *str) {
+label_id label_register(enum entry_type type, struct string_view str) {
 	if (type == ENTRY_STR) {
 			for (int i = 0; i < entries_size; i++) {
-				if (strcmp(entries[i].name, str) == 0) {
+				if (sv_cmp(entries[i].name, str)) {
 					return entries[i].id;
 				}
 			}
@@ -41,7 +41,7 @@ label_id label_register(enum entry_type type, const char *str) {
 	return id;
 }
 
-label_id rodata_register(const char *str) {
+label_id rodata_register(struct string_view str) {
 	return label_register(ENTRY_STR, str);
 }
 
@@ -55,7 +55,7 @@ const char *rodata_get_label_string(label_id id) {
 		sprintf(buffer, ".L_rodata%d", id);
 		return buffer;
 	} else if (entries[id].type == ENTRY_LABEL_NAME) {
-		return entries[id].name;
+		return sv_to_str(entries[id].name);
 	} else {
 		NOTIMP();
 	}
@@ -68,22 +68,22 @@ void rodata_codegen(void) {
 		emit("%s:", rodata_get_label_string(entries[i].id));
 
 		emit_no_newline("\t.string \"", entries[i].name);
-		const char *str = entries[i].name;
-		for (; *str; str++) {
+		struct string_view str = entries[i].name;
+		for (int i = 0; i < str.len; i++) {
 			char buffer[5];
-			character_to_escape_sequence(*str, buffer);
+			character_to_escape_sequence(str.str[i], buffer);
 			emit_no_newline("%s", buffer);
 		}
 		emit_no_newline("\"\n");
 	}
 }
 
-label_id register_label_name(const char *str) {
+label_id register_label_name(struct string_view str) {
 	return label_register(ENTRY_LABEL_NAME, str);
 }
 
 struct static_var {
-	const char *label;
+	struct string_view label;
 	struct type *type;
 	struct initializer *init;
 	int global;
@@ -92,7 +92,7 @@ struct static_var {
 static struct static_var *static_vars = NULL;
 static int static_vars_size, static_vars_cap;
 
-void data_register_static_var(const char *label, struct type *type, struct initializer *init, int global) {
+void data_register_static_var(struct string_view label, struct type *type, struct initializer *init, int global) {
 	ADD_ELEMENT(static_vars_size, static_vars_cap, static_vars) = (struct static_var) {
 		.label = label,
 		.type = type,
@@ -148,8 +148,8 @@ void codegen_initializer_recursive(struct initializer *init,
 			}
 		} break;
 		case IP_STRING:
-			for (unsigned i = 0; i == 0 || pair->u.str[i - 1]; i++)
-				buffer[offset + i] = pair->u.str[i];
+			for (int i = 0; i < pair->u.str.len; i++) 
+				buffer[offset + i] = pair->u.str.str[i];
 			break;
 		}
 	}
@@ -170,7 +170,7 @@ void codegen_compound_literals(struct expr **expr, int lvalue) {
 			codegen_initializer((*expr)->compound_literal.type,
 								(*expr)->compound_literal.init);
 
-			label_id label = register_label_name(strdup(name));
+			label_id label = register_label_name(sv_from_str(strdup(name)));
 
 			*expr = expr_new((struct expr) {
 					.type = E_CONSTANT,
@@ -289,16 +289,16 @@ void codegen_initializer(struct type *type,
 void codegen_static_var(struct static_var *static_var) {
 	set_section(".data");
 	if (static_var->global)
-		emit(".global %s", static_var->label);
+		emit(".global %.*s", static_var->label.len, static_var->label.str);
 	if (static_var->init) {
 		codegen_pre_initializer(static_var->init);
 
-		emit("%s:", static_var->label);
+		emit("%.*s:", static_var->label.len, static_var->label.str);
 
 		codegen_initializer(static_var->type,
 							static_var->init);
 	} else {
-		emit("%s:", static_var->label);
+		emit("%.*s:", static_var->label.len, static_var->label.str);
 
 		emit(".zero %d", calculate_size(static_var->type));
 	}

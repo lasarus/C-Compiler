@@ -80,7 +80,7 @@ struct constant {
 
 struct constant constant_increment(struct constant a);
 struct constant constant_zero(struct type *type);
-struct constant constant_from_string(const char *str);
+struct constant constant_from_string(struct string_view str);
 struct constant constant_cast(struct constant a, struct type *target);
 
 void convert_rax(enum simple_type from, enum simple_type to);

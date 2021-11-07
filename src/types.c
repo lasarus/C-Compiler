@@ -174,8 +174,7 @@ struct enum_data *register_enum(void) {
 	return malloc(sizeof (struct enum_data));
 }
 
-int type_member_idx(struct type *type,
-					const char *name) {
+int type_member_idx(struct type *type, struct string_view name) {
 	if (type->type != TY_STRUCT) {
 		ERROR("%s is not a struct", dbg_type(type));
 	}
@@ -186,11 +185,11 @@ int type_member_idx(struct type *type,
 		ERROR("Member access on incomplete type not allowed");
 
 	for (int i = 0; i < data->n; i++) {
-		if (data->fields[i].name && strcmp(name, data->fields[i].name) == 0)
+		if (sv_cmp(name, data->fields[i].name))
 			return i;
 	}
 
-	ERROR("%s has no member with name %s", dbg_type(type), name);
+	ERROR("%s has no member with name %.*s", dbg_type(type), name.len, name.str);
 }
 
 // Make arrays into pointers, and functions into function pointers.
@@ -317,7 +316,7 @@ void type_select(struct type *type, int index,
 static void type_remove_unnamed(struct struct_data *data) {
 	int k = 0;
 	for (int i = 0; i < data->n; i++) {
-		if (data->fields[i].name)
+		if (data->fields[i].name.len)
 			data->fields[k++] = data->fields[i];
 	}
 	data->n = k;
@@ -326,7 +325,7 @@ static void type_remove_unnamed(struct struct_data *data) {
 void type_merge_anonymous_substructures(struct struct_data *data) {
 	// types names offsets need to be modified.
 	for (int i = 0; i < data->n; i++) {
-		if (data->fields[i].name)
+		if (data->fields[i].name.len)
 			continue;
 
 		int offset = data->fields[i].offset;

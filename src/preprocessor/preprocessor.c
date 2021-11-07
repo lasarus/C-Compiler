@@ -8,10 +8,6 @@ struct token_stream {
 	struct token buffer[3], pushed;
 } ts;
 
-struct token token_init(enum ttype type, char *str, struct position pos) {
-	return (struct token) { .type = type, .str = str, .pos = pos };
-}
-
 void t_next() {
 	ts.buffer[0] = ts.buffer[1];
 	ts.buffer[1] = ts.buffer[2];
