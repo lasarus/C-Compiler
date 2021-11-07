@@ -52,7 +52,9 @@ void push_ir(struct instruction instruction);
 struct instruction {
 	enum {
 		IR_BINARY_OPERATOR,
-		IR_UNARY_OPERATOR,
+		IR_NEGATE_INT,
+		IR_NEGATE_FLOAT,
+		IR_BINARY_NOT,
 		IR_LOAD,
 		IR_STORE,
 		IR_ADDRESS_OF,
@@ -84,11 +86,17 @@ struct instruction {
 		} binary_operator;
 #define IR_PUSH_BINARY_OPERATOR(TYPE, LHS, RHS, RESULT) IR_PUSH(.type = IR_BINARY_OPERATOR, .result = (RESULT), .binary_operator = {(TYPE), (LHS), (RHS)})
 		struct {
-			enum unary_operator_type type;
-			enum operand_type operand_type;
 			var_id operand;
-		} unary_operator;
-#define IR_PUSH_UNARY_OPERATOR(TYPE, OPERAND_TYPE, OPERAND, RESULT) IR_PUSH(.type = IR_UNARY_OPERATOR, .result = (RESULT), .unary_operator = { (TYPE), (OPERAND_TYPE), (OPERAND)})
+		} binary_not;
+#define IR_PUSH_BINARY_NOT(RESULT, OPERAND) IR_PUSH(.type = IR_BINARY_NOT, .result = (RESULT), .binary_not = { (OPERAND)})
+		struct {
+			var_id operand;
+		} negate_int;
+#define IR_PUSH_NEGATE_INT(RESULT, OPERAND) IR_PUSH(.type = IR_NEGATE_INT, .result = (RESULT), .negate_int = { (OPERAND)})
+		struct {
+			var_id operand;
+		} negate_float;
+#define IR_PUSH_NEGATE_FLOAT(RESULT, OPERAND) IR_PUSH(.type = IR_NEGATE_FLOAT, .result = (RESULT), .negate_float = { (OPERAND)})
 		struct {
 			var_id pointer;
 		} load;

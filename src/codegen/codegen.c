@@ -1,7 +1,6 @@
 #include "codegen.h"
 #include "registers.h"
 #include "binary_operators.h"
-#include "unary_operators.h"
 
 #include <common.h>
 #include <arch/builtins.h>
@@ -79,15 +78,6 @@ void codegen_binary_operator(enum ir_binary_operator ibo,
 	emit("%s", binary_operator_outputs[size == 4 ? 0 : 1][ibo]);
 
 	reg_to_scalar(REG_RAX, res);
-}
-
-void codegen_unary_operator(int operator_type, enum operand_type ot, var_id out,
-							var_id rhs) {
-	scalar_to_reg(rhs, REG_RDI);
-
-	emit("%s", unary_operator_outputs[ot][operator_type]);
-
-	reg_to_scalar(REG_RAX, out);
 }
 
 struct classification {
@@ -428,11 +418,37 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 								ins.result);
 		break;
 
-	case IR_UNARY_OPERATOR:
-		codegen_unary_operator(ins.unary_operator.type,
-							   ins.unary_operator.operand_type,
-							   ins.result,
-							   ins.unary_operator.operand);
+	case IR_BINARY_NOT:
+		scalar_to_reg(ins.int_cast.rhs, REG_RAX);
+		emit("notq %%rax");
+		reg_to_scalar(REG_RAX, ins.result);
+		break;
+
+	case IR_NEGATE_INT:
+		scalar_to_reg(ins.int_cast.rhs, REG_RAX);
+		emit("negq %%rax");
+		reg_to_scalar(REG_RAX, ins.result);
+		break;
+
+	case IR_NEGATE_FLOAT:
+		scalar_to_reg(ins.int_cast.rhs, REG_RAX);
+		if (get_variable_size(ins.result) == 4) {
+			emit("movd %%eax, %%xmm0");
+			emit("negq %%rax");
+			emit("movaps %%xmm0, %%xmm1");
+			emit("xorps %%xmm0, %%xmm0");
+			emit("subss %%xmm1, %%xmm0");
+			emit("movd %%xmm0, %%eax");
+		} else if (get_variable_size(ins.result) == 8) {
+			emit("movq %%rax, %%xmm0");
+			emit("movaps %%xmm0, %%xmm1");
+			emit("xorps %%xmm0, %%xmm0");
+			emit("subsd %%xmm1, %%xmm0");
+			emit("movq %%xmm0, %%rax");
+		} else {
+			NOTIMP();
+		}
+		reg_to_scalar(REG_RAX, ins.result);
 		break;
 
 	case IR_CALL_VARIABLE:

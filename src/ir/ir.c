@@ -134,7 +134,7 @@ void ir_set_bits(var_id result, var_id field, var_id value, int offset, int leng
 				.data_type = type_simple(ST_ULLONG), .ullong_d = mask }),
 				mask_var);
 	IR_PUSH_BINARY_OPERATOR(IBO_BAND, mask_var, field_large, result_large);
-	IR_PUSH_UNARY_OPERATOR(UOP_BNOT, OT_ULLONG, mask_var, mask_var);
+	IR_PUSH_BINARY_NOT(mask_var, mask_var);
 	IR_PUSH_BINARY_OPERATOR(IBO_LSHIFT, value_large, shift_var, value_large);
 	IR_PUSH_BINARY_OPERATOR(IBO_BAND, mask_var, value_large, mask_var);
 	IR_PUSH_BINARY_OPERATOR(IBO_BOR, mask_var, result_large, result_large);

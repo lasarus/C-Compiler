@@ -607,6 +607,28 @@ var_id ir_cast(var_id res, struct type *result_type, var_id rhs, struct type *rh
 	return res;
 }
 
+var_id unary_op(var_id res, var_id operand, struct type *type, enum unary_operator_type uop) {
+	if (uop == UOP_PLUS)
+		return operand;
+	if (type_is_integer(type)) {
+		if (uop == UOP_BNOT) {
+			IR_PUSH_BINARY_NOT(res, operand);
+		} else if (uop == UOP_NEG) {
+			IR_PUSH_NEGATE_INT(res, operand);
+		} else {
+			NOTIMP();
+		}
+	} else if (type_is_floating(type)) {
+		if (uop == UOP_NEG) {
+			IR_PUSH_NEGATE_FLOAT(res, operand);
+		} else {
+			NOTIMP();
+		}
+	} else {
+		NOTIMP();
+	}
+	return res;
+}
 
 var_id expression_to_ir_result(struct expr *expr, var_id res) {
 	if (!res)
@@ -620,7 +642,8 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		break;
 
 	case E_UNARY_OP:
-		IR_PUSH_UNARY_OPERATOR(expr->unary_op, ot_from_type(expr->args[0]->data_type), expression_to_ir(expr->args[0]), res);
+		res = unary_op(res, expression_to_ir(expr->args[0]), expr->args[0]->data_type, expr->unary_op);
+		//IR_PUSH_UNARY_OPERATOR(expr->unary_op, ot_from_type(expr->args[0]->data_type), expression_to_ir(expr->args[0]), res);
 		break;
 
 	case E_CONSTANT:

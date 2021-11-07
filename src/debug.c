@@ -109,9 +109,19 @@ const char *dbg_instruction(struct instruction ins) {
 				  ins.binary_operator.type);
 		break;
 
-	case IR_UNARY_OPERATOR:
-		DBG_PRINT("%d = unary_op(%d)", ins.result,
-			   ins.unary_operator.operand);
+	case IR_BINARY_NOT:
+		DBG_PRINT("%d = bnot(%d)", ins.result,
+			   ins.binary_not.operand);
+		break;
+
+	case IR_NEGATE_INT:
+		DBG_PRINT("%d = negate int(%d)", ins.result,
+			   ins.negate_int.operand);
+		break;
+
+	case IR_NEGATE_FLOAT:
+		DBG_PRINT("%d = negate float(%d)", ins.result,
+			   ins.negate_float.operand);
 		break;
 
 	case IR_CALL_VARIABLE:
