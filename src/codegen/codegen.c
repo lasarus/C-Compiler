@@ -624,16 +624,6 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 		emit("andq $-16, %%rsp"); // Round down to nearest 16 by clearing last 4 bits.
 	} break;
 
-	case IR_GET_BITS:
-		scalar_to_reg(ins.get_bits.field, REG_RAX);
-		emit("shl $%d, %%rax", 64 - ins.get_bits.offset - ins.get_bits.length);
-		if (ins.get_bits.sign_extend)
-			emit("sar $%d, %%rax", 64 - ins.get_bits.length);
-		else
-			emit("shr $%d, %%rax", 64 - ins.get_bits.length);
-		reg_to_scalar(REG_RAX, ins.result);
-		break;
-
 	case IR_CLEAR_STACK_BUCKET: // no-op
 	case IR_ADD_TEMPORARY:
 		break;

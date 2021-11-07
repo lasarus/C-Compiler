@@ -65,8 +65,6 @@ struct instruction {
 		IR_VA_START,
 		IR_VA_ARG, //IR_VA_COPY,
 		IR_STACK_ALLOC,
-		IR_SET_BITS,
-		IR_GET_BITS,
 		IR_ADD_TEMPORARY,
 		IR_CLEAR_STACK_BUCKET,
 		IR_RESIZE,
@@ -136,12 +134,6 @@ struct instruction {
 			int dominance;
 		} stack_alloc;
 #define IR_PUSH_STACK_ALLOC(RESULT, LENGTH, SLOT, DOMINANCE) IR_PUSH(.type = IR_STACK_ALLOC, .result = (RESULT), .stack_alloc = {(LENGTH), (SLOT), (DOMINANCE)})
-
-		struct {
-			var_id field;
-			int offset, length, sign_extend;
-		} get_bits;
-#define IR_PUSH_GET_BITS(RESULT, FIELD, OFFSET, LENGTH, SIGN_EXTEND) IR_PUSH(.type = IR_GET_BITS, .result = (RESULT), .get_bits = {(FIELD), (OFFSET), (LENGTH), (SIGN_EXTEND)})
 
 #define IR_PUSH_ADD_TEMPORARY(RESULT) IR_PUSH(.type = IR_ADD_TEMPORARY, .result = (RESULT))
 
