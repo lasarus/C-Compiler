@@ -28,7 +28,7 @@ char *sv_to_str(struct string_view sv) {
 	if (sv.len == 0)
 		return NULL;
 	char *buffer = malloc(sv.len + 1);
-	strncpy(buffer, sv.str, sv.len);
+	memcpy(buffer, sv.str, sv.len);
 	buffer[sv.len] = '\0';
 	return buffer;
 }

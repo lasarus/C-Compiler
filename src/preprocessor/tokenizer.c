@@ -87,12 +87,10 @@ static void buffer_write(char c) {
 }
 
 struct string_view buffer_get(void) {
-	struct string_view ret = { .len = buffer_size - 1 };
+	struct string_view ret = { .len = buffer_size };
 	ret.str = malloc(buffer_size);
 	memcpy(ret.str, buffer, buffer_size);
 	return ret;
-	/* return (struct string_view) { .len = buffer_size, .buffer =  }; */
-	/* return sv_from_str(strdup(buffer)); */
 }
 
 static int parse_identifier(struct token *next) {
@@ -105,8 +103,6 @@ static int parse_identifier(struct token *next) {
 		buffer_write(C0);
 		CNEXT();
 	}
-
-	buffer_write('\0');
 
 	next->type = T_IDENT;
 	next->str = buffer_get();
@@ -135,8 +131,6 @@ static int parse_pp_number(struct token *next) {
 			break;
 		}
 	}
-
-	buffer_write('\0');
 
 	next->type = T_NUM;
 	next->str = buffer_get();
@@ -230,7 +224,6 @@ struct string_view parse_string_like(int null_terminate) {
 
 	if (null_terminate)
 		buffer_write('\0');
-	buffer_write('\0');
 
 	CNEXT();
 
@@ -304,8 +297,6 @@ static int parse_punctuator(struct token *next) {
 		buffer_write(C0);
 		CNEXT();
 	}
-
-	buffer_write('\0');
 
 	next->str = buffer_get();
 

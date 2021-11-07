@@ -451,7 +451,7 @@ void parse_function(struct string_view name, struct type *type, int arg_n, var_i
 
 	assert(type->type == TY_FUNCTION);
 
-	ir_new_function(type, args, name.str, global);
+	ir_new_function(type, args, sv_to_str(name), global);
 	ir_block_start(new_block());
 
 	type_evaluate_vla(type);
