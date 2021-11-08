@@ -209,21 +209,27 @@ static int parse_cs_char(int *character, char end_char) {
 	}
 }
 
-struct string_view parse_string_like(int null_terminate) {
+struct string_view parse_string_like(int null_terminate, int pad) {
 	char end_char = C0 == '<' ? '>' : C0;
 	CNEXT();
 
 	buffer_start();
 
 	int character;
-	while (parse_cs_char(&character, end_char))
+	while (parse_cs_char(&character, end_char)) {
+		if (pad)
+			buffer_write('\0');
 		buffer_write((char)character);
+	}
 
 	if (C0 != end_char)
 		ERROR("Expected %c", end_char);
 
-	if (null_terminate)
+	if (null_terminate) {
+		if (pad)
+			buffer_write('\0');
 		buffer_write('\0');
+	}
 
 	CNEXT();
 
@@ -231,25 +237,24 @@ struct string_view parse_string_like(int null_terminate) {
 }
 
 static int parse_string(struct token *next) {
+	int pad = 0;
 	if (C0 == 'u' &&
 		C1 == '8' &&
 		C2 == '"') {
 		NOTIMP();
-	} else if (C0 == 'u' &&
-		C1 == '"') {
+	} else if (C0 == 'u' && C1 == '"') {
 		NOTIMP();
-	} else if (C0 == 'U' &&
-		C1 == '"') {
+	} else if (C0 == 'U' && C1 == '"') {
 		NOTIMP();
-	} else if (C0 == 'L' &&
-		C1 == '"') {
-		NOTIMP();
+	} else if (C0 == 'L' && C1 == '"') {
+		pad = 1;
+		CNEXT();
 	} else if (C0 != '"') {
 		return 0;
 	}
 
 	next->type = T_STRING;
-	next->str = parse_string_like(1);
+	next->str = parse_string_like(1, pad);
 
 	return 1;
 }
@@ -259,17 +264,28 @@ static int parse_pp_header_name(struct token *next) {
 		return 0;
 
 	next->type = C0 == '<' ? PP_HEADER_NAME_H : PP_HEADER_NAME_Q;
-	next->str = parse_string_like(1);
+	next->str = parse_string_like(1, 0);
 
 	return 1;
 }
 
 static int parse_character_constant(struct token *next) {
-	if (C0 != '\'')
+	// All of these are handled in the same way.
+	int pad = 0;
+	if (C0 == 'u' && C1 == '\'') {
+		pad = 1;
+		CNEXT();
+	} else if (C0 == 'U' && C1 == '\'') {
+		NOTIMP();
+	} else if (C0 == 'L' && C1 == '\'') {
+		pad = 1;
+		CNEXT();
+	} else if (C0 != '\'') {
 		return 0;
+	}
 
 	next->type = T_CHARACTER_CONSTANT;
-	next->str = parse_string_like(0);
+	next->str = parse_string_like(0, pad);
 
 	return 1;
 }
@@ -327,13 +343,13 @@ struct token tokenizer_next(void) {
 	} else if(IFSTR("#", PP_HASH)) {
 	} else if (is_header && parse_pp_header_name(&next)) {
 	} else if(parse_string(&next)) {
+	} else if(parse_character_constant(&next)) {
 	} else if(parse_identifier(&next)) {
 		if (is_directive) {
 			is_header = sv_string_cmp(next.str, "include");
 			is_directive = 0;
 		}
 	} else if(parse_punctuator(&next)) {
-	} else if(parse_character_constant(&next)) {
 	} else if(parse_pp_number(&next)) {
 	} else if(C0 == '\0') {
 		if (input->next) {
