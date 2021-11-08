@@ -124,8 +124,8 @@ void ir_set_bits(var_id result, var_id field, var_id value, int offset, int leng
 	var_id field_large = new_variable_sz(8, 1, 1);
 	var_id result_large = new_variable_sz(8, 1, 1);
 
-	IR_PUSH_COPY(value_large, value);
-	IR_PUSH_COPY(field_large, field);
+	IR_PUSH_INT_CAST(value_large, value, 0);
+	IR_PUSH_INT_CAST(field_large, field, 0);
 
 	IR_PUSH_CONSTANT(((struct constant) { .type = CONSTANT_TYPE,
 				.data_type = type_simple(ST_UCHAR), .ullong_d = offset }),
@@ -139,14 +139,14 @@ void ir_set_bits(var_id result, var_id field, var_id value, int offset, int leng
 	IR_PUSH_BINARY_OPERATOR(IBO_BAND, mask_var, value_large, mask_var);
 	IR_PUSH_BINARY_OPERATOR(IBO_BOR, mask_var, result_large, result_large);
 
-	IR_PUSH_COPY(result, result_large);
+	IR_PUSH_INT_CAST(result, result_large, 0);
 }
 
 void ir_get_bits(var_id result, var_id field, int offset, int length, int sign_extend) {
 	var_id field_large = new_variable_sz(8, 1, 1);
 	var_id shift_var = new_variable_sz(8, 1, 1);
 
-	IR_PUSH_COPY(field_large, field);
+	IR_PUSH_INT_CAST(field_large, field, 0);
 
 	IR_PUSH_CONSTANT(((struct constant) { .type = CONSTANT_TYPE,
 				.data_type = type_simple(ST_ULLONG), .ullong_d = 64 - offset - length }),
@@ -164,7 +164,7 @@ void ir_get_bits(var_id result, var_id field, int offset, int length, int sign_e
 		IR_PUSH_BINARY_OPERATOR(IBO_RSHIFT, field_large, shift_var, field_large);
 	}
 
-	IR_PUSH_COPY(result, field_large);
+	IR_PUSH_INT_CAST(result, field_large, 0);
 }
 
 void ir_init_var(struct initializer *init, var_id result) {

@@ -15,8 +15,6 @@ struct S {
 	};
 };
 
-
-
 int main() {
 	struct S s;
 	s.val = 0;
@@ -76,5 +74,16 @@ int main() {
 		t.c2 = 5;
 		assert(t.c == 1);
 		assert(t.c2 == 5);
+	}
+	{
+		// This tests for a bug where reading a bitfield
+		// caused a neighbouring variable to be overwritten.
+		struct T {
+			int a:4;
+		} t = { 2 };
+
+		char buffer[256];
+		int len = sprintf(buffer, "%d\n", t.a);
+		assert(len > 0);
 	}
 }
