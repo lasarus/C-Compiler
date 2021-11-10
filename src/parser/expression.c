@@ -1357,8 +1357,9 @@ int evaluate_constant_expression(struct expr *expr,
 		assert(mid.type == CONSTANT_TYPE);
 		assert(rhs.type == CONSTANT_TYPE);
 
-		assert(lhs.data_type == type_simple(ST_INT));
-		if (lhs.int_d) {
+		assert(is_scalar(lhs.data_type));
+
+		if (constant_is_zero(&lhs)) {
 			*constant = mid;
 		} else {
 			*constant = rhs;
@@ -1393,6 +1394,16 @@ int evaluate_constant_expression(struct expr *expr,
 		} else {
 			return 0;
 		}
+	} break;
+
+	case E_COMMA: {
+		struct constant lhs, rhs;
+		if (!evaluate_constant_expression(expr->args[0], &lhs))
+			return 0;
+		if (!evaluate_constant_expression(expr->args[1], &rhs))
+			return 0;
+
+		*constant = rhs;
 	} break;
 
 	default:

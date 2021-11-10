@@ -279,10 +279,9 @@ int calculate_alignment(struct type *type) {
 		return -1;
 
 	case TY_ARRAY:
-		return calculate_alignment(type->children[0]);
-
+	case TY_VARIABLE_LENGTH_ARRAY:
 	case TY_INCOMPLETE_ARRAY:
-		return -1;
+		return calculate_alignment(type->children[0]);
 
 	default:
 		NOTIMP();
