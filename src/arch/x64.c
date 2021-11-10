@@ -429,16 +429,22 @@ struct constant constant_zero(struct type *type) {
 	};
 }
 
-// Basically if string is not of the format (0x|0X)[0-9a-fA-F]+[ulUL]*
+// Basically if string is not of the format (0b|0B)?[0-9]+[ulUL]?
+// or (0x|0X)[0-9a-fA-F]+[ulUL]?
 int is_float(struct string_view str) {
 	int i = 0;
-	if (str.len > 1 && str.str[0] == '0' && (str.str[1] == 'x' || str.str[1] == 'X'))
+	int is_hex = 0;
+	if (str.len > 1 && str.str[0] == '0' && (str.str[1] == 'x' || str.str[1] == 'X')) {
+		is_hex = 1;
 		i += 2;
+	} else if (str.len > 1 && str.str[0] == '0' && (str.str[1] == 'b' || str.str[1] == 'B')) {
+		i += 2;
+	}
 	// [0-9]*
 	for (; i < str.len; i++)
 		if (!((str.str[i] >= '0' && str.str[i] <= '9') ||
-			  (str.str[i] >= 'a' && str.str[i] <= 'f') ||
-			  (str.str[i] >= 'A' && str.str[i] <= 'F')))
+			  (is_hex && str.str[i] >= 'a' && str.str[i] <= 'f') ||
+			  (is_hex && str.str[i] >= 'A' && str.str[i] <= 'F')))
 			break;
 
 	// [ulUL]*

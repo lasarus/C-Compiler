@@ -1360,9 +1360,9 @@ int evaluate_constant_expression(struct expr *expr,
 		assert(is_scalar(lhs.data_type));
 
 		if (constant_is_zero(&lhs)) {
-			*constant = mid;
-		} else {
 			*constant = rhs;
+		} else {
+			*constant = mid;
 		}
 	} break;
 

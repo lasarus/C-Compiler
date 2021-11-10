@@ -117,14 +117,14 @@ static int parse_pp_number(struct token *next) {
 	buffer_start();
 
 	for (;;) {
-		if (HAS_PROP(C0, C_DIGIT | C_IDENTIFIER_NONDIGIT) || C0 == '.') {
+		if ((C0 == 'e' || C0 == 'E' ||
+			 C0 == 'p' || C0 == 'P') &&
+			(C1 == '+' || C1 == '-')) {
 			buffer_write(C0);
 			CNEXT();
-		} else if ((C0 == 'e' || C0 == 'E' ||
-					C0 == 'p' || C0 == 'P') &&
-				   (C1 == '+' || C1 == '-')) {
 			buffer_write(C0);
 			CNEXT();
+		} else if (HAS_PROP(C0, C_DIGIT | C_IDENTIFIER_NONDIGIT) || C0 == '.') {
 			buffer_write(C0);
 			CNEXT();
 		} else {
