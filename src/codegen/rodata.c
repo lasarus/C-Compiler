@@ -71,7 +71,7 @@ void rodata_codegen(void) {
 		struct string_view str = entries[i].name;
 		for (int i = 0; i < str.len; i++) {
 			char buffer[5];
-			character_to_escape_sequence(str.str[i], buffer);
+			character_to_escape_sequence(str.str[i], buffer, 0);
 			emit_no_newline("%s", buffer);
 		}
 		emit_no_newline("\"\n");

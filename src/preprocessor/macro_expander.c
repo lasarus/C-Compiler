@@ -169,7 +169,7 @@ void stringify_add(struct token *t, int start) {
 		ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = '"';
 		for (int i = 0; i < t->str.len - 1; i++) {
 			char escape_seq[5];
-			character_to_escape_sequence(t->str.str[i], escape_seq);
+			character_to_escape_sequence(t->str.str[i], escape_seq, 1);
 			for (int j = 0; escape_seq[j]; j++)
 				ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = escape_seq[j];
 		}

@@ -60,6 +60,7 @@ int character_constant_to_int(struct string_view str) {
 
 unsigned char needs_no_escape[CHAR_MAX];
 unsigned char has_simple_escape[CHAR_MAX];
+unsigned char has_complicated_escape[CHAR_MAX]; // Some assemblers don't support escape codes like \a
 
 void init_source_character_set(void) {
 	const char *str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!#%&()*+,-./:;<=>[]^_{|}~ ";
@@ -73,18 +74,18 @@ void init_source_character_set(void) {
 	has_simple_escape['\t'] = 't';
 	has_simple_escape['\"'] = '\"';
 	has_simple_escape['\''] = '\'';
-	has_simple_escape['?'] = '?';
 	has_simple_escape['\\'] = '\\';
-	has_simple_escape['\a'] = 'a';
-	has_simple_escape['\b'] = 'b';
-	has_simple_escape['\f'] = 'f';
 	has_simple_escape['\n'] = 'n';
-	has_simple_escape['\r'] = 'r';
 	has_simple_escape['\t'] = 't';
-	has_simple_escape['\v'] = 'v';
+	has_complicated_escape['?'] = '?';
+	has_complicated_escape['\a'] = 'a';
+	has_complicated_escape['\b'] = 'b';
+	has_complicated_escape['\f'] = 'f';
+	has_complicated_escape['\r'] = 'r';
+	has_complicated_escape['\v'] = 'v';
 }
 
-void character_to_escape_sequence(char character, char *output) {
+void character_to_escape_sequence(char character, char *output, int allow_complicated_escape) {
 	int octal[3] = { 0 };
 
 	if ((int)character >= 0 && needs_no_escape[(int)character]) {
@@ -94,6 +95,12 @@ void character_to_escape_sequence(char character, char *output) {
 	} else if ((int)character >= 0 && has_simple_escape[(int)character]) {
 		output[0] = '\\';
 		output[1] = has_simple_escape[(int)character];
+		output[2] = '\0';
+		return;
+	} else if (allow_complicated_escape && (int)character >= 0 &&
+			   has_complicated_escape[(int)character]) {
+		output[0] = '\\';
+		output[1] = has_complicated_escape[(int)character];
 		output[2] = '\0';
 		return;
 	}
