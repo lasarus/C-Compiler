@@ -28,12 +28,9 @@ int type_register(struct type *type);
 int is_scalar(struct type *type);
 int is_signed(enum simple_type type);
 int type_rank(enum simple_type t1);
-int is_contained_in(enum simple_type large,
-					enum simple_type small);
+int is_contained_in(enum simple_type large, int large_bitfield,
+					enum simple_type small, int small_bitfield);
 enum simple_type to_unsigned(enum simple_type type);
-
-struct type *usual_arithmetic_conversion(struct type *a,
-										 struct type *b);
 
 int calculate_alignment(struct type *type);
 int calculate_size(struct type *type);

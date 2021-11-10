@@ -85,52 +85,28 @@ struct range {
 	// such that the range
 	// becomes
 	// [-2^min, 2^max-1]
-	// If min == 0
+	// If min == -1
 	// then the range is
 	// [0, 2^max - 1]
 	int min, max;
 };
-// 
-struct range get_range(enum simple_type type) {
-	switch (type) {
-	case ST_CHAR:
-		if (IS_CHAR_SIGNED)
-			return get_range(ST_SCHAR);
-		else
-			return get_range(ST_UCHAR);
 
-	case ST_SCHAR:
-		return (struct range){7, 7};
-	case ST_SHORT:
-		return (struct range){15, 15};
-	case ST_INT:
-		return (struct range){31, 31};
-	case ST_LONG:
-	case ST_LLONG:
-		return (struct range){63, 63};
-	case ST_UCHAR:
-		return (struct range){0, 8};
-	case ST_UINT:
-		return (struct range){0, 16};
-	case ST_USHORT:
-		return (struct range){0, 32};
-	case ST_ULONG:
-	case ST_ULLONG:
-		return (struct range){0, 64};
+struct range get_range(enum simple_type type, int bitfield) {
+	int n_bits = bitfield == -1 ? sizeof_simple(type) * 8 : bitfield;
 
-	default:
-		ERROR("Type has no integer range");
-	}
+	if (is_signed(type))
+		return (struct range) { n_bits - 1, n_bits - 1};
+	else
+		return (struct range) { -1, n_bits};
 }
 
-int is_contained_in(enum simple_type large,
-					enum simple_type small) {
-	struct range large_range = get_range(large),
-		small_range = get_range(small);
+int is_contained_in(enum simple_type large, int large_bitfield,
+					enum simple_type small, int small_bitfield) {
+	struct range large_range = get_range(large, large_bitfield),
+		small_range = get_range(small, small_bitfield);
 
 	return large_range.min >= small_range.min &&
 		large_range.max >= small_range.max;
-		
 }
 
 
@@ -181,64 +157,11 @@ int type_rank(enum simple_type t1) {
 		return 4;
 	case ST_LLONG:
 	case ST_ULLONG:
-		return 4;
+		return 5;
 	default:
 		ERROR("NOt imp %d\n", t1);
 		NOTIMP();
 	}
-}
-
-struct type *usual_arithmetic_conversion(struct type *a,
-										 struct type *b) {
-	assert(a->type == TY_SIMPLE);
-	assert(b->type == TY_SIMPLE);
-
-	enum simple_type a_s = a->simple,
-		b_s = b->simple;
-
-	if (type_is_floating(a))
-		NOTIMP();
-
-	// TODO: Make this more standard.
-	// 6.3.1.1p2
-	if (type_rank(a_s) < type_rank(ST_INT) &&
-		type_rank(b_s) < type_rank(ST_INT))
-		return type_simple(ST_INT);
-
-	// 6.3.1.8
-	if (a == b)
-		return a;
-
-	if (is_signed(a_s) == is_signed(b_s)) {
-		if (type_rank(a_s) > type_rank(b_s))
-			return a;
-		return b;
-	}
-
-	if (!is_signed(a_s) &&
-		type_rank(a_s) >= type_rank(b_s)) {
-		return a;
-	}
-
-	if (!is_signed(b_s) &&
-		type_rank(b_s) >= type_rank(a_s)) {
-		return b;
-	}
-
-	if (is_signed(a_s) &&
-		is_contained_in(a_s, b_s)) {
-		return a;
-	}
-
-	if (is_signed(b_s) &&
-		is_contained_in(b_s, a_s)) {
-		return b;
-	}
-
-	NOTIMP();
-	// Promote to integer if not already integer.
-
-	return NULL;
 }
 
 int is_scalar(struct type *type) {

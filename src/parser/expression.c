@@ -10,8 +10,8 @@
 #include <assert.h>
 
 // Type conversions
-enum simple_type get_arithmetic_type(enum simple_type a,
-									 enum simple_type b) {
+enum simple_type get_arithmetic_type(enum simple_type a, int bitfield_a,
+									 enum simple_type b, int bitfield_b) {
 	if (a == ST_LDOUBLE || b == ST_LDOUBLE)
 		return ST_LDOUBLE;
     else if (a == ST_DOUBLE || b == ST_DOUBLE)
@@ -32,10 +32,10 @@ enum simple_type get_arithmetic_type(enum simple_type a,
 		return b;
 
 	} else if (is_signed(a) &&
-		is_contained_in(a, b)) {
+			   is_contained_in(a, bitfield_a, b, bitfield_b)) {
 		return a;
 	} else if (is_signed(b) &&
-		is_contained_in(b, a)) {
+			   is_contained_in(b, bitfield_b, a, bitfield_a)) {
 		return b;
 
 	} else if (is_signed(b)) {
@@ -48,6 +48,16 @@ enum simple_type get_arithmetic_type(enum simple_type a,
 	}
 }
 
+int get_expression_bitfield(struct expr *expr) {
+	if (expr->type == E_DOT_OPERATOR) {
+		assert(expr->member.lhs->data_type->type == TY_STRUCT);
+		struct struct_data *data = expr->member.lhs->data_type->struct_data;
+
+		return data->fields[expr->member.member_idx].bitfield;
+	}
+	return -1;
+}
+
 void convert_arithmetic(struct expr **a,
 						struct expr **b) {
 	struct type *a_type = (*a)->data_type,
@@ -57,8 +67,11 @@ void convert_arithmetic(struct expr **a,
 		b_type->type != TY_SIMPLE)
 		return;
 
+	int bitfield_a = get_expression_bitfield(*a),
+		bitfield_b = get_expression_bitfield(*b);
+
 	enum simple_type target_type =
-		get_arithmetic_type(a_type->simple, b_type->simple);
+		get_arithmetic_type(a_type->simple, bitfield_a, b_type->simple, bitfield_b);
 
 	*a = expression_cast(*a, type_simple(target_type));
 	*b = expression_cast(*b, type_simple(target_type));
@@ -77,21 +90,12 @@ void decay_array(struct expr **expr) {
 
 void do_integer_promotion(struct expr **expr) {
 	struct type *current_type = (*expr)->data_type;
-	
-	if (current_type->type != TY_SIMPLE)
-		return;
+	int bitfield = get_expression_bitfield(*expr);
 
-	enum simple_type simple_type = current_type->simple;
-
-	switch(simple_type) {
-	case ST_BOOL:
-	case ST_CHAR:
-	case ST_SCHAR:
-	case ST_UCHAR:
-	case ST_SHORT:
-	case ST_USHORT:
+	if (type_is_integer(current_type) &&
+		is_contained_in(ST_INT, -1, current_type->simple, bitfield)) {
 		*expr = expression_cast(*expr, type_simple(ST_INT));
-	default: break;
+		return;
 	}
 }
 

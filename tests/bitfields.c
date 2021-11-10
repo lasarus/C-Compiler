@@ -86,4 +86,11 @@ int main() {
 		int len = sprintf(buffer, "%d\n", t.a);
 		assert(len > 0);
 	}
+	{
+		struct {
+			unsigned a : 23;
+		} t;
+
+		assert(t.a > -1);
+	}
 }
