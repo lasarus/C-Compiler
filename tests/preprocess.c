@@ -27,6 +27,18 @@ int main() {
 #
 	include = "Hello";
 assert(strcmp(include, "Hello") == 0);
+
+  #if defined(__LLP64__)
+#error
+  #elif defined(__LP64__)
+//#error
+  #elif defined(__ILP32__)
+#error
+  #else
+	#error
+  #endif
+
+	return 0;
 }
 
 #if defined(BBBB)

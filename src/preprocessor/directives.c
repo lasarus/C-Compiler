@@ -264,6 +264,9 @@ int directiver_evaluate_conditional(struct token dir) {
 	ERROR("Invalid conditional directive");
 }
 
+static int else_stack_n = 0, else_stack_cap = 0;
+static int *else_stack = NULL;
+
 void directiver_flush_if(void) {
 	int nest_level = 1;
 	while (nest_level > 0) {
@@ -287,13 +290,13 @@ void directiver_flush_if(void) {
 				return;
 			}
 		} else if (sv_string_cmp(name, "else")) {
-			if (nest_level == 1) {
+			if (nest_level == 1 && !else_stack[else_stack_n - 1])
 				return;
-			}
 		} else if (sv_string_cmp(name, "endif")) {
 			nest_level--;
 		}
 	}
+	else_stack_n--;
 }
 
 void directiver_handle_pragma(void) {
@@ -319,6 +322,7 @@ struct token directiver_next(void) {
 		struct string_view name = directive.str;
 		assert(directive.type == T_IDENT);
 
+		int is_if = 0;
 		if (sv_string_cmp(name, "define")) {
 			directiver_define();
 		} else if (sv_string_cmp(name, "undef")) {
@@ -334,11 +338,15 @@ struct token directiver_next(void) {
 			int system = path_tok.type == PP_HEADER_NAME_H;
 			struct string_view path = path_tok.str;
 			tokenizer_push_input(sv_to_str(path), system);
-		} else if (sv_string_cmp(name, "ifndef") ||
-				   sv_string_cmp(name, "ifdef") ||
-				   sv_string_cmp(name, "if") ||
+		} else if ((is_if = sv_string_cmp(name, "ifndef")) ||
+				   (is_if = sv_string_cmp(name, "ifdef")) ||
+				   (is_if = sv_string_cmp(name, "if")) ||
 				   sv_string_cmp(name, "elif")) {
+			if (is_if)
+				ADD_ELEMENT(else_stack_n, else_stack_cap, else_stack) = 0;
 			int result = directiver_evaluate_conditional(directive);
+			if (result)
+				else_stack[else_stack_n - 1] = 1;
 			if (!result)
 				directiver_flush_if();
 		} else if (sv_string_cmp(name, "else")) {

@@ -103,6 +103,18 @@ void add_implementation_defs(void) {
 	define_string("__STDC_HOSTED__", "0");
 	define_string("__STDC_VERSION__", "201710L");
 	define_string("__x86_64__", "1");
+
+	switch (parser_flags.dmodel) {
+	case DMODEL_LP64:
+		define_string("__LP64__", "1");
+		break;
+	case DMODEL_LLP64:
+		define_string("__LLP64__", "1");
+		break;
+	case DMODEL_ILP64:
+		define_string("__ILP64__", "1");
+		break;
+	}
 }
 
 int main(int argc, char **argv) {
