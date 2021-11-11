@@ -123,7 +123,7 @@ int parse_specifier(struct type_specifiers *ts,
 			(TACCEPT(T_KSHORT) && set_sbit(ts, TSF_SHORT)) ||
 			(TACCEPT(T_KLONG) && (set_sbit(ts, TSF_LONG1) &&
 								  set_sbit(ts, TSF_LONG2)))) {
-			ERROR("Invalid type");
+			ERROR(T0->pos, "Invalid type");
 		}
 
 		if (prev != ts->specifiers) {
@@ -142,12 +142,11 @@ int parse_specifier(struct type_specifiers *ts,
 		}
 
 		if (TACCEPT(T_KENUM)) {
-			PRINT_POS(T0->pos);
-			ERROR("Not implemented");
+			ERROR(T0->pos, "Not implemented");
 		}
 
 		if (TACCEPT(T_KATOMIC)) {
-			ERROR("Not implemented");
+			ERROR(T0->pos, "Not implemented");
 		}
 
 		if (T0->type == T_IDENT && !*got_ts) {
@@ -164,7 +163,7 @@ int parse_specifier(struct type_specifiers *ts,
 		}
 			
 		if (TACCEPT(T_TYPEDEF_NAME)) {
-			ERROR("Not implemented");
+			ERROR(T0->pos, "Not implemented");
 		}
 	}
 	if (scs) {
@@ -188,7 +187,7 @@ int parse_specifier(struct type_specifiers *ts,
 	if (as) {
 		switch (T0->type) {
 		case T_KALIGNAS:
-			ERROR("_Alignas not implemented");
+			ERROR(T0->pos, "_Alignas not implemented");
 		default: break;
 		}
 	}
@@ -228,11 +227,11 @@ int parse_enumerator(struct constant *prev, int first) {
 	if (TACCEPT(T_A)) {
 		struct expr *expr = parse_assignment_expression();
 		if (!expr)
-			ERROR("Expected expression");
+			ERROR(T0->pos, "Expected expression");
 			
 		struct constant *ret = expression_to_constant(expr);
 		if (!ret)
-			ERROR("Could not evaluate constant expression, is of type %d", expr->type);
+			ERROR(T0->pos, "Could not evaluate constant expression, is of type %d", expr->type);
 
 		val = *ret;
 	} else {
@@ -284,7 +283,7 @@ int parse_enum(struct type_specifiers *ts) {
 		struct symbol_struct *def = symbols_get_struct_in_current_scope(name);
 
 		if (def && def->type != STRUCT_ENUM)
-			ERROR("Name not declared as enum.");
+			ERROR(T0->pos, "Name not declared as enum.");
 
 		if (!def) {
 			def = symbols_add_struct(name);
@@ -294,7 +293,7 @@ int parse_enum(struct type_specifiers *ts) {
 		} else {
 			data = def->enum_data;
 			if (data->is_complete)
-				ERROR("Redeclaring struct/union");
+				ERROR(T0->pos, "Redeclaring struct/union");
 		}
 
 		*data = (struct enum_data) {
@@ -315,7 +314,7 @@ int parse_enum(struct type_specifiers *ts) {
 		}
 
 		if (def->type != STRUCT_ENUM) {
-			ERROR("Previously not a enum");
+			ERROR(T0->pos, "Previously not a enum");
 		}
 
 		ts->data_type = type_simple(ST_INT);
@@ -363,7 +362,7 @@ int parse_struct(struct type_specifiers *ts) {
 				if ((ast = parse_declarator(&was_abstract, 0))) {
 					found_one = 1;
 					if (was_abstract)
-						ERROR("Can't have abstract in struct declaration");
+						ERROR(T0->pos, "Can't have abstract in struct declaration");
 
 					type = ast_to_type(&s.ts, &s.tq, ast, &name, 0);
 				} else {
@@ -378,9 +377,9 @@ int parse_struct(struct type_specifiers *ts) {
 					struct constant *c = expression_to_constant(
 						expression_cast(bitfield_expr, type_simple(ST_INT)));
 					if (!c)
-						ERROR("Bit-field must be a constant expression");
+						ERROR(T0->pos, "Bit-field must be a constant expression");
 					if (!type_is_simple(c->data_type, ST_INT))
-						ERROR("Bit-field must an integer");
+						ERROR(T0->pos, "Bit-field must an integer");
 					assert(c->type == CONSTANT_TYPE);
 					bitfield = c->int_d;
 				} else if (needs_bitfield) {
@@ -406,7 +405,7 @@ int parse_struct(struct type_specifiers *ts) {
 						.bitfield = -1
 					};
 				} else {
-					ERROR("!!!");
+					ERROR(T0->pos, "Anonymous member must be struct or bitfield.");
 				}
 			}
 		}
@@ -420,10 +419,10 @@ int parse_struct(struct type_specifiers *ts) {
 
 		if (is_union) {
 			if (def && def->type != STRUCT_UNION)
-				ERROR("Name not declared as union.");
+				ERROR(T0->pos, "Name not declared as union.");
 		} else {
 			if (def && def->type != STRUCT_STRUCT)
-				ERROR("Name not declared as struct.");
+				ERROR(T0->pos, "Name not declared as struct.");
 		}
 
 		if (!def) {
@@ -434,8 +433,7 @@ int parse_struct(struct type_specifiers *ts) {
 		} else {
 			data = def->struct_data;
 			if (data->is_complete) {
-				PRINT_POS(T0->pos);
-				ERROR("Redeclaring struct/union %.*s", name.len, name.str);
+				ERROR(T0->pos, "Redeclaring struct/union %.*s", name.len, name.str);
 			}
 		}
 
@@ -477,10 +475,9 @@ int parse_struct(struct type_specifiers *ts) {
 		}
 
 		if (!is_union && def->type != STRUCT_STRUCT) {
-			PRINT_POS(T0->pos);
-			ERROR("%.*s Previously not a struct", name.len, name.str);
+			ERROR(T0->pos, "%.*s Previously not a struct", name.len, name.str);
 		} else if (is_union && def->type != STRUCT_UNION) {
-			ERROR("Previously not a union");
+			ERROR(T0->pos, "Previously not a union");
 		}
 
 		struct type params = {
@@ -518,10 +515,10 @@ void ast_get_parameters(struct type_ast *ast,
 			break;
 
 		default:
-			ERROR("Not implemented");
+			NOTIMP();
 		}
 	}
-	ERROR("Did not find parameter names");
+	ICE("Did not find parameter names");
 }
 
 struct type_ast *type_ast_new(struct type_ast ast) {
@@ -600,8 +597,7 @@ static struct type *specifiers_to_type(const struct type_specifiers *ts) {
 	if (ts->data_type)
 		return ts->data_type;
 
-	PRINT_POS(ts->pos);
-	ERROR("Invalid type %X", ts->specifiers);
+	ERROR(ts->pos, "Invalid type %X", ts->specifiers);
 }
 
 int null_type_qualifier(struct type_qualifiers *tq) {
@@ -691,7 +687,7 @@ struct type *ast_to_type(const struct type_specifiers *ts, const struct type_qua
 				NOTIMP();
 			}
 			if (!allow_tq_in_array && !null_type_qualifier(&ast->array.tq)) {
-				ERROR("Can't have type qualifiers in array outside of function prototype.");
+				ICE("Can't have type qualifiers in array outside of function prototype.");
 			} else if (allow_tq_in_array) {
 				type = apply_tq(type, &ast->array.tq);
 			}
@@ -699,7 +695,7 @@ struct type *ast_to_type(const struct type_specifiers *ts, const struct type_qua
 		} break;
 
 		default:
-			ERROR("Not implemented");
+			NOTIMP();
 		}
 	}
 
@@ -730,9 +726,6 @@ struct parameter_list parse_parameter_list(void) {
 		if (first) {
 			ret.abstract = was_abstract;
 			first = 0;
-		} else if (was_abstract != ret.abstract) {
-			if (was_abstract == 10)
-				ERROR("Something went wrong");
 		}
 
 		ret.n++;
@@ -881,14 +874,14 @@ struct type_ast *parse_declarator(int *was_abstract, int *has_symbols) {
 			if (TACCEPT(T_RBRACK)) {
 				arr.array.type = ARR_EMPTY;
 				if (need_expression)
-					ERROR("Missing expression after static");
+					ERROR(T0->pos, "Missing expression after static.");
 			} else if (TACCEPT(T_STAR)) {
 				arr.array.type = ARR_STAR;
 				TEXPECT(T_RBRACK);
 			} else {
 				struct expr *expression = parse_expression();
 				if (!expression)
-					ERROR("Didn't find expression");
+					ERROR(T0->pos, "Expected size expression.");
 
 				arr.array.type = ARR_EXPRESSION;
 				arr.array.expr = expression;
@@ -968,23 +961,19 @@ int parse_string_initializer(struct type **type, int offset,
 
 int parse_non_brace_initializer(struct type **type, int offset, int bit_offset,
 								int bitfield, struct initializer *init,
-	struct expr **failed_expr) {
+								struct expr **failed_expr) {
 	if (failed_expr)
 		*failed_expr = NULL;
 	if (is_scalar(*type)) {
 		int has_braces = TACCEPT(T_LBRACE);
 
 		struct expr *expr = parse_assignment_expression();
-		if (!expr) {
-			printf("%s\n%d\n", dbg_type(*type), has_braces);
-			PRINT_POS(T0->pos);
-			ERROR("Expected expression, got: %s", dbg_token(T0));
-		}
+		if (!expr)
+			ERROR(T0->pos, "Expected expression, got: %s", dbg_token(T0));
 
 		if (expr->data_type->type == TY_STRUCT) {
-			if (!failed_expr) {
-				ERROR("Got invalid rhs for type %s\n", dbg_type(*type));
-			}
+			if (!failed_expr)
+				ERROR(T0->pos, "Got invalid initializer for type %s\n", dbg_type(*type));
 			assert(failed_expr);
 			*failed_expr = expr;
 			return 0;
@@ -1064,7 +1053,7 @@ int parse_brace_initializer(struct type **current_object, int offset, struct ini
 
 				struct constant *constant = expression_to_constant(expression_cast(expr, type_simple(ST_INT)));
 				if (!constant)
-					ERROR("Array designator must have constant expression.");
+					ERROR(T0->pos, "Array designator must have constant expression.");
 				assert(type_is_simple(constant->data_type, ST_INT));
 
 				index = constant->int_d;
@@ -1094,10 +1083,6 @@ int parse_brace_initializer(struct type **current_object, int offset, struct ini
 		if (has_designator_list)
 			TEXPECT(T_A);
 
-		if (type_is_simple(type_stack[stack_count - 1], ST_CHAR)) {
-			PRINT_POS(T0->pos);
-			ERROR("Should not be here");
-		}
 		struct type *selected_type = NULL;
 		int selected_offset = 0, selected_bit_offset = 0, selected_bitfield = -1;
 		type_select(type_stack[stack_count - 1], index_stack[stack_count - 1], &selected_offset, &selected_type);
@@ -1149,9 +1134,9 @@ int parse_brace_initializer(struct type **current_object, int offset, struct ini
 				// This 
 				struct expr *expr = failed_expr ? failed_expr : parse_assignment_expression();
 				if (!expr)
-					ERROR("Expected expression");
+					ERROR(T0->pos, "Expected expression.");
 				if (!type_is_aggregate(expr->data_type))
-					ERROR("Expected expression of aggregate data type, but got %s", dbg_type(expr->data_type));
+					ERROR(T0->pos, "Expected expression of aggregate data type, but got %s", dbg_type(expr->data_type));
 
 				for (; stack_count > start_count; stack_count--) {
 					if (expr->data_type == type_stack[stack_count - 1]) {
@@ -1161,7 +1146,7 @@ int parse_brace_initializer(struct type **current_object, int offset, struct ini
 				}
 
 				if (stack_count == start_count) {
-					ERROR("Can't cast aggregate type");
+					ERROR(T0->pos, "Can't cast aggregate type");
 				}
 
 				stack_count--;
@@ -1192,7 +1177,7 @@ int parse_brace_initializer(struct type **current_object, int offset, struct ini
 					idx = ++index_stack[stack_count - 1];
 				}
 				break;
-			default: ERROR("Invalid top type");
+			default: ICE("Invalid top type");
 			}
 
 			if (num_members >= 0 &&
@@ -1249,8 +1234,7 @@ struct initializer *parse_initializer(struct type **type) {
 	}
 
 	if ((*type)->type == TY_INCOMPLETE_ARRAY) {
-		PRINT_POS(T0->pos);
-		ERROR("Should have completed");
+		ERROR(T0->pos, "Should have completed");
 	}
 
 	return init;
@@ -1266,7 +1250,7 @@ struct type *parse_type_name(void) {
 	int was_abstract = 1;
 	struct type_ast *ast = parse_declarator(&was_abstract, 0);
 	if (!was_abstract)
-		ERROR("Type name must be abstract");
+		ERROR(T0->pos, "Type name must be abstract");
 
 	struct type *type = ast_to_type(&s.ts, &s.tq, ast, NULL, 0);
 	type_evaluate_vla(type);
@@ -1286,10 +1270,8 @@ int parse_init_declarator(struct specifiers s, int external, int *was_func) {
 	if (!ast)
 		return 0;
 
-	if (was_abstract) {
-		PRINT_POS(T0->pos);
-		ERROR("\nDeclaration can't be abstract");
-	}
+	if (was_abstract)
+		ERROR(T0->pos, "Declaration can't be abstract");
 
 	struct type *type;
 	struct string_view name;
@@ -1304,10 +1286,10 @@ int parse_init_declarator(struct specifiers s, int external, int *was_func) {
 			symbols_push_scope();
 
 		if (!external)
-			ERROR("Function definition are not allowed inside functions.");
+			ERROR(T0->pos, "Function definition are not allowed inside functions.");
 
 		if (arg_n && !args)
-			ERROR("Should not be null");
+			ERROR(T0->pos, "Should not be null");
 
 		parse_function(name, type, arg_n, args, s.scs.static_n ? 0 : 1);
 		*was_func = 1;
@@ -1321,7 +1303,7 @@ int parse_init_declarator(struct specifiers s, int external, int *was_func) {
 	// Evaluate all unevaluated VLAs.
 	if (external) {
 		if (type_contains_unevaluated_vla(type))
-			ERROR("Global declaration can't contain VLA.");
+			ERROR(T0->pos, "Global declaration can't contain VLA.");
 	} else {
 		type_evaluate_vla(type);
 	}
@@ -1341,7 +1323,7 @@ int parse_init_declarator(struct specifiers s, int external, int *was_func) {
 		struct type *composite_type = type_make_composite(type, prev_type);
 
 		if (!composite_type)
-			ERROR("Conflicting types: %s and %s\n", strdup(dbg_type(prev_type)),
+			ERROR(T0->pos, "Conflicting types: %s and %s\n", strdup(dbg_type(prev_type)),
 				  strdup(dbg_type(type)));
 
 		type = composite_type;
@@ -1354,9 +1336,9 @@ int parse_init_declarator(struct specifiers s, int external, int *was_func) {
 	// Handle function definitions first, since they differ a bit from the others.
 	if (type->type == TY_FUNCTION) {
 		if (has_init)
-			ERROR("Function definition can't have initializer.");
+			ERROR(T0->pos, "Function definition can't have initializer.");
 		if (!external && s.scs.static_n)
-			ERROR("Function declarations outside file-scope can't be static.");
+			ERROR(T0->pos, "Function declarations outside file-scope can't be static.");
 
 		symbol->type = IDENT_LABEL;
 		symbol->label.name = name;
@@ -1371,7 +1353,7 @@ int parse_init_declarator(struct specifiers s, int external, int *was_func) {
 	int is_tentative = 0;
 
 	if (s.scs.extern_n && has_init)
-		ERROR("Extern declaration can't have initializer.");
+		ERROR(T0->pos, "Extern declaration can't have initializer.");
 
 	if (s.scs.register_n)
 		symbol->is_register = 1;
@@ -1437,7 +1419,7 @@ int parse_init_declarator(struct specifiers s, int external, int *was_func) {
 				symbol->variable_length_array.type = type;
 
 				if (has_init)
-					ERROR("Variable length array can't have initializer");
+					ERROR(T0->pos, "Variable length array can't have initializer");
 			} else {
 				symbol->type = IDENT_VARIABLE;
 				symbol->variable.id = new_variable(type, 1, 0);
@@ -1470,19 +1452,17 @@ int parse_declaration(int external) {
 			TEXPECT(T_LPAR);
 			struct expr *expr = EXPR_BINARY_OP(OP_EQUAL, EXPR_INT(0), parse_assignment_expression());
 			struct constant *constant = expression_to_constant(expr);
-			if (!constant) {
-				ERROR("Expresison in _Static_assert must be constant.");
-			}
+			if (!constant)
+				ERROR(T0->pos, "Expresison in _Static_assert must be constant.");
 
 			assert(constant->type == CONSTANT_TYPE);
 
-			if (!type_is_simple(constant->data_type, ST_INT)) {
-				ERROR("Invalid _Static_assert type: %s\n", dbg_type(constant->data_type));
-			}
+			if (!type_is_simple(constant->data_type, ST_INT))
+				ERROR(T0->pos, "Invalid _Static_assert type: %s\n", dbg_type(constant->data_type));
 
 			TEXPECT(T_COMMA);
 			if (T0->type != T_STRING)
-				ERROR("Second argument to _Static_assert must be a string.");
+				ERROR(T0->pos, "Second argument to _Static_assert must be a string.");
 
 			struct string_view msg = T0->str;
 			TNEXT();
@@ -1492,7 +1472,7 @@ int parse_declaration(int external) {
 			TEXPECT(T_SEMI_COLON);
 
 			if (constant->int_d)
-				ERROR("Static assert failed: %.*s\n", msg.len, msg.str);
+				ERROR(T0->pos, "Static assert failed: %.*s\n", msg.len, msg.str);
 			return 1;
 		}
 		return 0;

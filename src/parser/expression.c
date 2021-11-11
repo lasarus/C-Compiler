@@ -44,7 +44,7 @@ enum simple_type get_arithmetic_type(enum simple_type a, int bitfield_a,
 	} else if (is_signed(a)) {
 		return to_unsigned(a);
 	} else {
-		ERROR("Internal compiler error!");
+		ICE("Error in arithmetic conversion.");
 	}
 }
 
@@ -120,16 +120,11 @@ struct type *calculate_type(struct expr *expr) {
 
 	case E_CALL: {
 		struct type *callee_type = expr->call.callee->data_type;
-		if (callee_type->type == TY_FUNCTION)
-			return callee_type->children[0];
-		else if (callee_type->type == TY_POINTER)
+		if (callee_type->type == TY_POINTER &&
+			callee_type->children[0]->type == TY_FUNCTION)
 			return type_deref(callee_type)->children[0];
-		else {
-			printf("POS: ");
-			PRINT_POS(expr->pos);
-			printf("\n");
-			ERROR("Can't call type %s\n", dbg_type(callee_type));
-		}
+		else
+			ICE("Can't call type %s\n", dbg_type(callee_type));
 	}
 
 	case E_VARIABLE:
@@ -237,9 +232,9 @@ void cast_conditional(struct expr *expr) {
 		else if (type_deref(b) == type_simple(ST_VOID))
 			expr->args[2] = expression_cast(expr->args[2], a);
 		else {
-			ERROR("Invalid combination of data types:\n%s and %s\n",
-				  strdup(dbg_type(a)),
-				  strdup(dbg_type(b)));
+			ICE("Invalid combination of data types:\n%s and %s\n",
+				strdup(dbg_type(a)),
+				strdup(dbg_type(b)));
 		}
 	} else if (type_is_pointer(a) && is_null_pointer_constant(expr->args[2])) {
 		expr->args[2] = expression_cast(expr->args[2], a);
@@ -249,9 +244,9 @@ void cast_conditional(struct expr *expr) {
 			   type_is_arithmetic(b)) {
 		convert_arithmetic(&expr->args[1], &expr->args[2]);
 	} else if (a != b) {
-		ERROR("Invalid combination of data types:\n%s and %s\n",
-			  strdup(dbg_type(a)),
-			  strdup(dbg_type(b)));
+		ICE("Invalid combination of data types:\n%s and %s\n",
+			strdup(dbg_type(a)),
+			strdup(dbg_type(b)));
 	}
 }
 
@@ -279,7 +274,7 @@ void fix_binary_operator(struct expr *expr) {
 		} else if (lhs_ptr) {
 			expr->type = E_POINTER_SUB;
 		} else if (rhs_ptr) {
-			ERROR("Can't subtract with pointer as rhs.");
+			ICE("Can't subtract with pointer as rhs.");
 		}
 		break;
 
@@ -288,7 +283,7 @@ void fix_binary_operator(struct expr *expr) {
 			return;
 
 		if (lhs_ptr && rhs_ptr) {
-			ERROR("Invalid");
+			ICE("Invalid addition of pointers.");
 		}
 
 		if (!lhs_ptr && rhs_ptr) {
@@ -314,7 +309,7 @@ void fix_binary_operator(struct expr *expr) {
 
 			if (!non_ptr || non_ptr->type != CONSTANT_TYPE ||
 				!constant_is_zero(non_ptr)) {
-				ERROR("can only compare pointers with pointers or null pointer constant");
+				ICE("can only compare pointers with pointers or null pointer constant");
 			}
 
 			if (!rhs_ptr)
@@ -360,7 +355,7 @@ void check_const_correctness(struct expr *expr) {
 	case E_ASSIGNMENT_OP:
 	case E_ASSIGNMENT_POINTER:
 		if (expr->args[0]->data_type->is_const) {
-			ERROR("Can't modify constant variable");
+			ICE("Can't modify constant variable");
 		}
 		break;
 	default:
@@ -370,10 +365,8 @@ void check_const_correctness(struct expr *expr) {
 
 struct expr *expr_new(struct expr expr) {
 	for (int i = 0; i < num_args[expr.type]; i++) {
-		if (!expr.args[i]) {
-			PRINT_POS(T0->pos);
-			ERROR("Wrongly constructed expression of type %d", expr.type);
-		}
+		if (!expr.args[i])
+			ICE("Wrongly constructed expression of type %d", expr.type);
 	}
 
 	if (!dont_decay_ptr[expr.type]) {
@@ -451,7 +444,7 @@ int try_expression_to_address(struct expr *expr, var_id *var) {
 	case E_VARIABLE: {
 		var_id address = new_variable(type_pointer(expr->data_type), 1, 1);
 		if (expr->variable.is_register)
-			ERROR("Taking address of register is not allowed.");
+			ICE("Taking address of register is not allowed.");
 		IR_PUSH_ADDRESS_OF(address, expr->variable.id);
 		*var = address;
 		return 1;
@@ -516,7 +509,7 @@ int try_expression_to_address(struct expr *expr, var_id *var) {
 var_id expression_to_address(struct expr *expr) {
 	var_id res;
 	if (!try_expression_to_address(expr, &res))
-		ERROR("Can't take expression as lvalue");
+		ICE("Can't take expression as lvalue");
 	return res;
 }
 
@@ -676,7 +669,7 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		struct type *func_type = callee->data_type;
 
 		if (func_type->type != TY_POINTER) {
-			ERROR("Can't call type %s", dbg_type(func_type));
+			ICE("Can't call type %s", dbg_type(func_type));
 		}
 
 		IR_PUSH_CALL_VARIABLE(func_var, type_deref(func_type), arg_types, expr->call.n_args, args, res);
@@ -897,13 +890,13 @@ void parse_call_parameters(struct expr ***args, int *n_args) {
 		struct expr *expr = parse_assignment_expression();
 
 		if (!expr)
-			ERROR("Expected expression");
+			ERROR(T0->pos, "Expected expression");
 
 		buffer[pos] = expr;
 	}
 
 	if (pos == MAX_ARGUMENTS)
-		ERROR("Too many arguments passed to function");
+		ERROR(T0->pos, "Too many arguments passed to function (maximum: %d)", MAX_ARGUMENTS);
 
 	*args = NULL;
 	if (pos) {
@@ -931,7 +924,7 @@ struct expr *parse_prefix() {
 			} else {
 				struct expr *rhs = parse_pratt(PREFIX_PREC);
 				if (!rhs)
-					ERROR("Expected expression");
+					ERROR(T0->pos, "Expected expression");
 				return expression_cast(rhs, cast_type);
 			}
 		} else {
@@ -979,10 +972,8 @@ struct expr *parse_prefix() {
 	} else if (T0->type == T_IDENT) {
 		struct symbol_identifier *sym = symbols_get_identifier(T0->str);
 
-		if (!sym) {
-			PRINT_POS(T0->pos);
-			ERROR("Could not find identifier %.*s", T0->str.len, T0->str.str);
-		}
+		if (!sym)
+			ERROR(T0->pos, "Could not find identifier %.*s", T0->str.len, T0->str.str);
 
 		switch (sym->type) {
 		case IDENT_LABEL:
@@ -1052,7 +1043,7 @@ struct expr *parse_prefix() {
 		TEXPECT(T_LPAR);
 		struct expr *expr = parse_assignment_expression();
 		if (!expr)
-			ERROR("Expected expression.");
+			ERROR(T0->pos, "Expected expression.");
 
 		decay_array(&expr);
 		// Remove all constness. This is a part of lvalue conversions.
@@ -1079,7 +1070,7 @@ struct expr *parse_prefix() {
 			} else {
 				if (type == match_type) {
 					if (res && !res_is_default)
-						ERROR("More than one compatible type in _Generic association list, %s",
+						ERROR(T0->pos, "More than one compatible type in _Generic association list, %s",
 							  strdup(dbg_type(type)));
 					res = rhs;
 				}
@@ -1087,7 +1078,7 @@ struct expr *parse_prefix() {
 		}
 
 		if (!res)
-			ERROR("No type matched the expresison in _Generic");
+			ERROR(T0->pos, "No type matched the expresison in _Generic");
 
 		TEXPECT(T_RPAR);
 		return res;
@@ -1126,7 +1117,7 @@ struct expr *parse_prefix() {
 		TEXPECT(T_COMMA);
 		struct type *t = parse_type_name();
 		if (!t)
-			ERROR("Expected typename in var_arg");
+			ERROR(T0->pos, "Expected typename in var_arg");
 		TEXPECT(T_RPAR);
 		return expr_new((struct expr) {
 				.type = E_BUILTIN_VA_ARG,

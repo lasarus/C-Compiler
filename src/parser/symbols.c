@@ -146,7 +146,7 @@ struct table_entry *symbols_add(enum entry_type type, struct string_view name) {
 	struct table_entry *entry = get_entry((struct entry_id) { type, name }, 0);
 
 	if (entry && entry->block == current_block)
-		ERROR("Name already declared, %.*s", name.len, name.str);
+		ICE("Name already declared, %.*s", name.len, name.str);
 
 	return add_entry((struct entry_id) { type, name });
 }
@@ -180,7 +180,7 @@ struct symbol_identifier *symbols_add_identifier_global(struct string_view name)
 	struct table_entry *entry = get_entry((struct entry_id) { ENTRY_IDENTIFIER, name }, 1);
 
 	if (entry && entry->block == current_block)
-		ERROR("Name already declared, %.*s", name.len, name.str);
+		ICE("Name already declared, %.*s", name.len, name.str);
 
 	return &add_entry_with_block((struct entry_id) { ENTRY_IDENTIFIER, name }, 0)->identifier_data;
 }

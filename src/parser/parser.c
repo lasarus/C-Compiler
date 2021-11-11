@@ -17,10 +17,10 @@ void parse_into_ir() {
 	init_variables();
 
 	while (parse_declaration(1));
-	if (TACCEPT(T_SEMI_COLON)) {
-		PRINT_POS(T0->pos);
-		ERROR("Extra semicolon outside function.");
-	}
+
+	if (TACCEPT(T_SEMI_COLON))
+		ERROR(T0->pos, "Extra semicolon outside function.");
+
 	TEXPECT(T_EOI);
 
 	generate_tentative_definitions();
@@ -40,7 +40,7 @@ enum ir_binary_operator ibo_from_type_and_op(struct type *type, enum operator_ty
 		case OP_GREATER_EQ: return IBO_FLT_GREATER_EQ;
 		case OP_EQUAL: return IBO_FLT_EQUAL;
 		case OP_NOT_EQUAL: return IBO_FLT_NOT_EQUAL;
-		default: ERROR("Internal compiler error");
+		default: NOTIMP();
 		}
 	} else if (type->type == TY_SIMPLE) {
 		sign = is_signed(type->simple);
@@ -67,6 +67,6 @@ enum ir_binary_operator ibo_from_type_and_op(struct type *type, enum operator_ty
 	case OP_GREATER_EQ: return sign ? IBO_IGREATER_EQ : IBO_GREATER_EQ;
 	case OP_EQUAL: return IBO_EQUAL;
 	case OP_NOT_EQUAL: return IBO_NOT_EQUAL;
-	default: ERROR("Internal compiler error");
+	default: NOTIMP();
 	}
 }

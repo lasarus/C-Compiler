@@ -29,10 +29,9 @@ struct type *operators_get_result_type(enum operator_type op,
 	if (lhs_type != rhs_type) {
 		if (!supports_pointer[op] ||
 			type_is_pointer(lhs_type) != type_is_pointer(rhs_type)) {
-			PRINT_POS(T0->pos);
-			ERROR("Can't perform op %d on %s and %s\n", op,
-				  strdup(dbg_type(lhs_type)),
-				  strdup(dbg_type(rhs_type)));
+			ICE("Can't perform op %d on %s and %s\n", op,
+				strdup(dbg_type(lhs_type)),
+				strdup(dbg_type(rhs_type)));
 		}
 	}
 
@@ -49,7 +48,7 @@ struct constant operators_constant(enum operator_type op,
 
 	struct type *type = lhs.data_type;
 	if (type != rhs.data_type)
-		ERROR("Can't perform binary operator on constant of differing type");
+		ICE("Can't perform binary operator on constant of differing type");
 
 	if (type->type != TY_SIMPLE)
 		NOTIMP();

@@ -59,7 +59,7 @@ struct arguments parse_arguments(int argc, char **argv) {
 					printf("DBG STACK MIN: %d\n", codegen_flags.debug_stack_min);
 				}
 			} else {
-				ERROR("invalid flag %s", argv[i]);
+				ARG_ERROR(i, "Invalid flag.");
 			}
 		} else {
 			switch (state) {
@@ -74,13 +74,13 @@ struct arguments parse_arguments(int argc, char **argv) {
 				break;
 
 			case STATE_END:
-				ERROR("Too many arguments");
+				ARG_ERROR(i, "Too many arguments.");
 			}
 		}
 	}
 
 	if (!args.input || !args.output) {
-		ERROR("Requires input and output");
+		ARG_ERROR(0, "requires input and output.");
 	}
 
 	return args;

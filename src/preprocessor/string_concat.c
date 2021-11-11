@@ -41,7 +41,7 @@ static struct string_view buffer_get(void) {
 	return ret;
 }
 
-static uint32_t take_utf8(struct string_view *input) {
+static uint32_t take_utf8(struct position pos, struct string_view *input) {
 	assert(input->len);
 	unsigned char c1 = input->str[0];
 	uint32_t codepoint = 0;
@@ -63,9 +63,8 @@ static uint32_t take_utf8(struct string_view *input) {
 		codepoint |= c1 & 0x07;
 	}
 
-	if (input->len < (int)n_bytes) {
-		ERROR("Invalid UTF-8 encoding.");
-	}
+	if (input->len < (int)n_bytes)
+		ERROR(pos, "Invalid UTF-8 encoding.");
 
 	for (unsigned i = 0; i < n_bytes; i++) {
 		codepoint <<= 6;
@@ -80,7 +79,8 @@ static uint32_t take_utf8(struct string_view *input) {
 
 static int escape_char_to_buffer(struct string_view *input,
 								 char end_char,
-								 enum string_type type) {
+								 enum string_type type,
+								 struct position pos) {
 	if (input->len == 0 || input->str[0] == end_char)
 		return 0;
 
@@ -88,7 +88,7 @@ static int escape_char_to_buffer(struct string_view *input,
 	if (!parse_escape_sequence(input, &character)) {
 		if (type == STRING_L || type == STRING_U_LARGE ||
 			type == STRING_U_SMALL) {
-			character = take_utf8(input);
+			character = take_utf8(pos, input);
 		} else {
 			character = input->str[0];
 			sv_tail(input, 1);
@@ -135,7 +135,7 @@ enum string_type take_string_prefix(struct string_view *input) {
 	return STRING_DEFAULT;
 }
 
-static void escape_string_to_buffer(struct string_view input, enum string_type type) {
+static void escape_string_to_buffer(struct string_view input, enum string_type type, struct position pos) {
 	assert(input.len);
 
 	char end_char = input.str[0];
@@ -144,7 +144,7 @@ static void escape_string_to_buffer(struct string_view input, enum string_type t
 
 	sv_tail(&input, 1);
 
-	while (escape_char_to_buffer(&input, end_char, type));
+	while (escape_char_to_buffer(&input, end_char, type, pos));
 
 	if (!(input.len && input.str[0] == end_char)) {
 		printf("Left over: \"%.*s\"\n", input.len, input.str);
@@ -186,12 +186,12 @@ struct token string_concat_next(void) {
 			if (combined_type == STRING_DEFAULT)
 				combined_type = type;
 			else
-				ERROR("Invalid combination of strings with different prefix.");
+				ERROR(string_tokens[i].pos, "Invalid combination of strings with different prefix.");
 		}
 
 		buffer_start();
 		for (unsigned i = 0; i < string_tokens_size; i++)
-			escape_string_to_buffer(string_tokens[i].str, combined_type);
+			escape_string_to_buffer(string_tokens[i].str, combined_type, string_tokens[i].pos);
 		struct token ret = string_tokens[0];
 
 		switch (combined_type) {
@@ -229,9 +229,8 @@ struct token string_concat_next(void) {
 		t.type = get_ident(t.str);
 	} else if (t.type == T_CHARACTER_CONSTANT) {
 		enum string_type type = take_string_prefix(&t.str);
-		(void)type;
 		buffer_start();
-		escape_string_to_buffer(t.str, type);
+		escape_string_to_buffer(t.str, type, t.pos);
 		t.str = buffer_get();
 	}
 

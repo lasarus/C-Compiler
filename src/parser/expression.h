@@ -155,7 +155,6 @@ struct expr {
 	
 	struct expr *args[3];
 
-	struct position pos;
 	struct type *data_type;
 };
 

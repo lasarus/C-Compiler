@@ -104,7 +104,7 @@ static FILE *try_open_file(const char *path) {
 	FILE *fp = fopen(path, "r");
 	if (!fp && errno != ENOENT) {
 		char *str = strerror(errno);
-		ERROR("Error opening file %s, %s", path, str);
+		ICE("Error opening file %s, %s", path, str);
 	}
 	return fp;
 }
@@ -142,7 +142,7 @@ void input_open(struct input **input, const char *path, int system) {
 	}
 
 	if (!fp) {
-		ERROR("\"%s\" not found in search path, with origin %s", path, *input ? (*input)->filename : (const char *)".");
+		ICE("\"%s\" not found in search path, with origin %s", path, *input ? (*input)->filename : (const char *)".");
 	}
 
 	if (string_set_contains(disabled_headers, sv_from_str(path_buffer))) {

@@ -110,7 +110,7 @@ void codegen_initializer_recursive(struct initializer *init,
 		size_t offset = pair->offset;
 
 		if (offset >= size)
-			ERROR("Internal compiler error");
+			ICE("Ran out of buffer.");
 
 		switch (pair->type) {
 		case IP_EXPRESSION: {
@@ -143,8 +143,8 @@ void codegen_initializer_recursive(struct initializer *init,
 											  is_label + offset,
 											  size - offset);
 			} else {
-				ERROR("Invalid constant expression in static initializer of type %s.",
-					  dbg_type(expr->data_type));
+				ICE("Invalid constant expression in static initializer of type %s.",
+					dbg_type(expr->data_type));
 			}
 		} break;
 		case IP_STRING:

@@ -3,6 +3,7 @@
 #include "string_concat.h"
 
 #include <common.h>
+#include <assert.h>
 
 struct token_stream {
 	struct token buffer[3], pushed;
@@ -17,7 +18,7 @@ void t_next() {
 
 void t_push(struct token t) {
 	if (ts.pushed.type != T_NONE)
-		ERROR("Internal compiler error.");
+		ICE("Pushed buffer overfull.");
 	ts.pushed = ts.buffer[2];
 	ts.buffer[2] = ts.buffer[1];
 	ts.buffer[1] = ts.buffer[0];
@@ -32,7 +33,6 @@ void preprocessor_init(const char *path) {
 }
 
 struct token *t_peek(int n) {
-	if (n > 2)
-		ERROR("Can't peek that far");
+	assert(n <= 2);
 	return &ts.buffer[n];
 }

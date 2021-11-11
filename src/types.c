@@ -55,7 +55,7 @@ static int compare_types(struct type *a, struct type **a_children,
 		break;
 
 	default:
-		ERROR("Not implemented %d", a->type);
+		NOTIMP();
 		break;
 	}
 
@@ -93,7 +93,7 @@ static uint32_t type_hash(struct type *type, struct type **children) {
 		hash ^= hash32((size_t)type->variable_length_array.length_expr);
 		break;
 	default:
-		ERROR("Not implemented %d", (int)type->type);
+		NOTIMP();
 	}
 
 	for (int i = 0; i < type->n; i++) {
@@ -155,7 +155,7 @@ struct type *type_array(struct type *type, int length) {
 
 struct type *type_deref(struct type *type) {
 	if (type->type != TY_POINTER)
-		ERROR("Expected type to be pointer when dereffing %s", dbg_type(type));
+		ICE("Can't deref non-pointer: %s", dbg_type(type));
 	return type->children[0];
 }
 
@@ -175,21 +175,21 @@ struct enum_data *register_enum(void) {
 }
 
 int type_member_idx(struct type *type, struct string_view name) {
-	if (type->type != TY_STRUCT) {
-		ERROR("%s is not a struct", dbg_type(type));
-	}
+	if (type->type != TY_STRUCT)
+		ICE("%s is not a struct", dbg_type(type));
 
 	struct struct_data *data = type->struct_data;
 
 	if (!data->is_complete)
-		ERROR("Member access on incomplete type not allowed");
+		ICE("Member access on incomplete type not allowed");
 
 	for (int i = 0; i < data->n; i++) {
 		if (sv_cmp(name, data->fields[i].name))
 			return i;
 	}
 
-	ERROR("%s has no member with name %.*s", dbg_type(type), name.len, name.str);
+	ICE("%.*s has no member with name %.*s",
+		data->name.len, data->name.str, name.len, name.str);
 }
 
 // Make arrays into pointers, and functions into function pointers.
@@ -340,10 +340,6 @@ void type_merge_anonymous_substructures(struct struct_data *data) {
 		int n_new_elements = sub_data->n;
 		int new_n = data->n + n_new_elements - 1;
 
-		if (n_new_elements == 0) {
-			ERROR("This should not be allowed");
-		}
-
 		// Make place for new elements.
 		data->fields = realloc(data->fields, sizeof *data->fields * new_n);
 
@@ -410,7 +406,7 @@ struct expr *type_sizeof(struct type *type) {
 			return EXPR_BINARY_OP(OP_MUL, EXPR_INT(type->array.length),
 								  type_sizeof(type->children[0]));
 		default:
-			ERROR("Type can't have variable size");
+			ICE("Type can't have variable size");
 		}
 	} else {
 		struct constant c = {.type = CONSTANT_TYPE, .data_type = type_simple(ST_ULONG), .ulong_d = calculate_size(type) };

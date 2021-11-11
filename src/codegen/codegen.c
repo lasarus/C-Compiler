@@ -108,7 +108,7 @@ void classify_parameters(struct type *return_type, int n_args, struct type **typ
 			return_classification->pass_in_memory = 0;
 			static const int return_convention[] = {REG_RAX, REG_RDX};
 			if (return_classification->n_parts > 2)
-				ERROR("Internal compiler error");
+				ICE("Classification error.");
 			for (int j = 0; j < return_classification->n_parts; j++) {
 				if (return_classification->classes[j] == CLASS_INTEGER) {
 					return_classification->regs[j] = return_convention[j];
@@ -716,11 +716,9 @@ void codegen_block(struct block *block, struct reg_save_info reg_save_info) {
 			const char *reg_name = get_reg_name(REG_RDI, size);
 			emit("test%c %s, %s", size_to_suffix(size), reg_name, reg_name);
 			emit("je .LB%d", block_exit->if_.block_false);
-			/* if (!(next_ins.type == IR_START_BLOCK && */
-			/* 	  next_ins.start_block.block == ins.if_selection.block_true)) */
 			emit("jmp .LB%d", block_exit->if_.block_true);
 		} else {
-			ERROR("Invalid argument to if selection");
+			ICE("Invalid argument to if selection");
 		}
 	} break;
 
@@ -943,7 +941,7 @@ void codegen(const char *path) {
 	data.local_counter = 0;
 
 	if (!data.out)
-		ERROR("Could not open file %s", path);
+		ICE("Could not open file %s", path);
 
 	for (int i = 0; i < ir.size; i++)
 		codegen_function(ir.functions + i);

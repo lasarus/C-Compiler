@@ -143,7 +143,7 @@ struct token glue(struct token a, struct token b) {
 		if (paste_table[i][1] == a.type && paste_table[i][0] == b.type)
 			ret.type = paste_table[i][2];
 	if (!ret.type)
-		ERROR("Invalid paste of %.*s and %.*s", b.str.len, b.str.str, a.str.len, a.str.str);
+		ERROR(a.pos, "Invalid paste of %.*s and %.*s", b.str.len, b.str.str, a.str.len, a.str.str);
 
 	ret.str = sv_from_str(allocate_printf("%s%s", sv_to_str(b.str), sv_to_str(a.str))); // TODO: This can be done better.
 	ret.hs = string_set_intersection(a.hs, b.hs);
@@ -210,7 +210,7 @@ struct token input_buffer_take(int input) {
 	if (input) {
 		return NEXT();
 	} else {
-		ERROR("Reached end of input buffer.");
+		ICE("Reached end of input buffer.");
 	}
 }
 
@@ -223,7 +223,7 @@ struct token *input_buffer_top(int input) {
 		input_buffer_push(&t);
 		return input_buffer_top(input);
 	} else {
-		ERROR("Reached end of input buffer.");
+		ICE("Reached end of input buffer.");
 	}
 }
 
@@ -290,7 +290,7 @@ void expand_argument(struct token_list tl, int *concat_with_prev, int concat, in
 void subs_buffer(struct define *def, struct string_set *hs, struct position new_pos, int input) {
 	int n_args = def->par.size;
 	if (n_args > 16)
-		ERROR("Unsupported number of elements");
+		ICE("Unsupported number of elements");
 	struct token_list arguments[16] = {0};
 	struct token_list vararg = {0};
 	int vararg_included = 0;
@@ -303,7 +303,7 @@ void subs_buffer(struct define *def, struct string_set *hs, struct position new_
 			if (input_buffer_parse_argument(&arguments[i], 0, input)) {
 				finished = 1;
 				if (i != n_args - 1)
-					ERROR("Wrong number of arguments to macro");
+					ERROR(lpar.pos, "Wrong number of arguments to macro");
 			}
 		}
 
@@ -311,7 +311,7 @@ void subs_buffer(struct define *def, struct string_set *hs, struct position new_
 		if (def->vararg && !finished) {
 			vararg_included = 1;
 			if (!input_buffer_parse_argument(&vararg, 1, input)) {
-				ERROR("__VA_ARGS__ Not end of input");
+				ERROR(lpar.pos, "__VA_ARGS__ Not end of input");
 			}
 		}
 		
@@ -339,7 +339,7 @@ void subs_buffer(struct define *def, struct string_set *hs, struct position new_
 		}
 
 		if (t.type == PP_HHASH)
-			ERROR("Concat token at edge of macro expansion.");
+			ERROR(t.pos, "Concat token at edge of macro expansion.");
 
 		int idx;
 
@@ -356,8 +356,7 @@ void subs_buffer(struct define *def, struct string_set *hs, struct position new_
 			} else if (vararg_included) {
 				expand_argument(vararg, &concat_with_prev, concat, stringify, input);
 			} else {
-				PRINT_POS(T0->pos);
-				ERROR("Not implemented, %.*s (%d)", def->name.len, def->name.str, def->func);
+				ERROR(t.pos, "Not implemented, %.*s (%d)", def->name.len, def->name.str, def->func);
 				NOTIMP();
 			}
 		} else if (idx >= 0 && stringify) {
@@ -387,7 +386,7 @@ void subs_buffer(struct define *def, struct string_set *hs, struct position new_
 				*end = glue(*end, t);
 				concat_with_prev = 0;
 			} else if (stringify) {
-				ERROR("# Should be followed by macro parameter");
+				ERROR(t.pos, "# Should be followed by macro parameter");
 			} else {
 				t.pos = new_pos;
 				input_buffer_push(&t);

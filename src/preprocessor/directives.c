@@ -13,7 +13,7 @@ static struct token pushed[2];
 
 void push(struct token t) {
 	if (pushed_idx > 1)
-		ERROR("Internal compiler error");
+		ICE("Pushed too many directive tokens.");
 	pushed[pushed_idx++] = t;
 }
 
@@ -111,25 +111,22 @@ intmax_t evaluate_expression(int prec, int evaluate) {
 	} else if (t.type == T_LPAR) {
 		expr = evaluate_expression(0, evaluate);
 		struct token rpar = buffer_next();
-		if (rpar.type != T_RPAR) {
-			PRINT_POS(rpar.pos);
-			ERROR("Expected ), got %s", dbg_token_type(rpar.type));
-		}
+		if (rpar.type != T_RPAR)
+			ERROR(rpar.pos, "Expected ), got %s", dbg_token_type(rpar.type));
 	} else if (t.type == T_NUM) {
 		struct constant c = constant_from_string(t.str);
-		if (c.type != CONSTANT_TYPE)
-			ERROR("Internal compiler error.");
+		assert(c.type == CONSTANT_TYPE);
 		if (type_is_floating(c.data_type))
-			ERROR("Floating point arithmetic in the preprocessor is not allowed.");
+			ERROR(t.pos, "Floating point arithmetic in the preprocessor is not allowed.");
 		if (!type_is_integer(c.data_type))
-			ERROR("Preprocessor variables must be of integer type.");
+			ERROR(t.pos, "Preprocessor variables must be of integer type.");
 		switch (c.data_type->simple) {
-	case ST_INT:
-		expr = c.int_d;
-		break;
-	case ST_UINT:
-		expr = c.uint_d;
-		break;
+		case ST_INT:
+			expr = c.int_d;
+			break;
+		case ST_UINT:
+			expr = c.uint_d;
+			break;
 		case ST_LONG:
 			expr = c.long_d;
 			break;
@@ -142,12 +139,12 @@ intmax_t evaluate_expression(int prec, int evaluate) {
 		case ST_ULLONG:
 			expr = c.ullong_d;
 			break;
-		default: ERROR("Internal compiler error.");
+		default: NOTIMP();
 		}
 	} else if (t.type == T_CHARACTER_CONSTANT) {
 		expr = character_constant_to_int(t.str);
 	} else {
-		ERROR("Invalid token in preprocessor expression. %s, in %s:%d", dbg_token(&t), t.pos.path, t.pos.line);
+		ERROR(t.pos, "Invalid token in preprocessor expression. %s", dbg_token(&t));
 	}
 
 	t = buffer_next();
@@ -190,16 +187,16 @@ intmax_t evaluate_expression(int prec, int evaluate) {
 					if (rhs)
 						expr = expr / rhs;
 					else
-						ERROR("Division by zero");
+						ERROR(t.pos, "Division by zero");
 					break;
 				case T_MOD:
 					if (rhs)
 						expr = expr % rhs;
 					else
-						ERROR("Modulo by zero");
+						ERROR(t.pos, "Modulo by zero");
 					break;
 				default:
-					ERROR("Invalid infix %s", dbg_token(&t));
+					ERROR(t.pos, "Invalid infix %s", dbg_token(&t));
 				}
 			}
 		}
@@ -208,7 +205,7 @@ intmax_t evaluate_expression(int prec, int evaluate) {
 	}
 
 	if (buffer_pos == 0)
-		ERROR("Internal compiler error.");
+		ICE("Buffer should not be empty.");
 	buffer.list[--buffer_pos] = t;
 
 	return expr;
@@ -261,7 +258,7 @@ int directiver_evaluate_conditional(struct token dir) {
 		return evaluate_until_newline();
 	}
 
-	ERROR("Invalid conditional directive");
+	ERROR(dir.pos, "Invalid conditional directive");
 }
 
 static int else_stack_n = 0, else_stack_cap = 0;
@@ -274,7 +271,7 @@ void directiver_flush_if(void) {
 		do {
 			t = NEXT();
 			if (t.type == T_EOI)
-				ERROR("Reading past end of file");
+				ERROR(t.pos, "Reading past end of file");
 		} while (t.type != PP_DIRECTIVE);
 
 		struct token dir = NEXT();
@@ -305,7 +302,7 @@ void directiver_handle_pragma(void) {
 	if (sv_string_cmp(command.str, "once")) {
 		tokenizer_disable_current_path();
 	} else {
-		ERROR("\"#pragma %.*s\" not supported", command.str.len, command.str.str);
+		ERROR(command.pos, "\"#pragma %s\" not supported", dbg_token(&command));
 	}
 }
 
@@ -328,7 +325,7 @@ struct token directiver_next(void) {
 		} else if (sv_string_cmp(name, "undef")) {
 			define_map_remove(NEXT().str);
 		} else if (sv_string_cmp(name, "error")) {
-			ERROR("#error directive was invoked on %s:%d", directive.pos.path, directive.pos.line);
+			ERROR(directive.pos, "#error directive was invoked.");
 		} else if (sv_string_cmp(name, "include")) {
 			// There is an issue with just resetting after include. But
 			// I'm interpreting the standard liberally to allow for this.
@@ -362,7 +359,7 @@ struct token directiver_next(void) {
 			struct token digit_seq = NEXT(), s_char_seq;
 
 			if (digit_seq.first_of_line)
-				ERROR("Expected digit sequence after #line");
+				ERROR(digit_seq.pos, "Expected digit sequence after #line");
 
 			int has_s_char_seq = 0;
 			if (digit_seq.type != T_NUM) {
@@ -378,8 +375,7 @@ struct token directiver_next(void) {
 				expand_token_list(&buffer);
 
 				if (buffer.size == 0) {
-					PRINT_POS(digit_seq.pos);
-					ERROR("Invalid #line macro expansion");
+					ERROR(digit_seq.pos, "Invalid #line macro expansion");
 				} else if (buffer.size >= 1) {
 					digit_seq = buffer.list[0];
 				} else if (buffer.size >= 2) {
@@ -396,20 +392,19 @@ struct token directiver_next(void) {
 			}
 
 			if (digit_seq.first_of_line || digit_seq.type != T_NUM)
-				ERROR("Expected digit sequence after #line");
+				ERROR(digit_seq.pos, "Expected digit sequence after #line");
 
 			line_diff += atoi(sv_to_str(digit_seq.str)) - directive.pos.line - 1;
 
 			if (has_s_char_seq) {
 				if (s_char_seq.type != T_STRING)
-					ERROR("Expected s char sequence as second argument to #line");
+					ERROR(s_char_seq.pos, "Expected s char sequence as second argument to #line");
 				s_char_seq.str.len -= 2;
 				s_char_seq.str.str++;
 				new_filename = sv_to_str(s_char_seq.str);
 			}
 		} else {
-			PRINT_POS(directive.pos);
-			ERROR("#%.*s not implemented", name.len, name.str);
+			ERROR(directive.pos, "#%s not implemented", dbg_token(&directive));
 		}
 
 		t = NEXT();

@@ -57,7 +57,7 @@ static void flush_whitespace(int *whitespace, int *first_of_line) {
 				CNEXT();
 
 				if (C0 == '\0')
-					ERROR("Comment reached end of file");
+					ERROR(input->pos[0], "Comment reached end of file");
 			}
 			CNEXT();
 			CNEXT();
@@ -66,7 +66,7 @@ static void flush_whitespace(int *whitespace, int *first_of_line) {
 				CNEXT();
 
 				if (C0 == '\0')
-					ERROR("Comment reached end of file");
+					ERROR(input->pos[0], "Comment reached end of file");
 			}
 		} else {
 			break;
@@ -187,7 +187,7 @@ int parse_escape_sequence(struct string_view *string, uint32_t *character) {
 	case 'v': *character = '\v'; break;
 
 	default:
-		ERROR("Invalid escape sequence \\%c", string->str[0]);
+		ICE("Invalid escape sequence \\%c", string->str[0]);
 	}
 
 	sv_tail(string, 1);
@@ -221,7 +221,7 @@ static int eat_escape_sequence() {
 	case 'r': case 't': case 'v': break;
 
 	default:
-		ERROR("Invalid escape sequence \\%c", C0);
+		ERROR(input->pos[0], "Invalid escape sequence \\%c", C0);
 	}
 
 	buffer_eat();
@@ -247,10 +247,9 @@ struct string_view eat_string_like() {
 	while (eat_cs_char(end_char));
 
 	if (C0 != end_char) {
-		PRINT_POS(input->pos[0]);
 		char output[5];
 		character_to_escape_sequence(C0, output, 1);
-		ERROR("Expected '%c', got '%s', while parsing \"%.*s\"", end_char, output,
+		ERROR(input->pos[0], "Expected '%c', got '%s', while parsing \"%.*s\"", end_char, output,
 			  (int)buffer_size, buffer);
 	}
 
@@ -381,8 +380,7 @@ struct token tokenizer_next(void) {
 		next.first_of_line = 1;
 		next.type = T_EOI;
 	} else {
-		PRINT_POS(next.pos);
-		ERROR("Unrecognized preprocessing token! Starting with '%c', %d\n", C0, C0);
+		ERROR(next.pos, "Unrecognized preprocessing token! Starting with '%c', %d\n", C0, C0);
 	}
 #undef IFSTR
 

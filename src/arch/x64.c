@@ -76,7 +76,7 @@ int is_signed(enum simple_type type) {
 		return 0;
 
 	default:
-		ERROR("Type has no signedness");
+		ICE("Type has no signedness");
 	}
 }
 
@@ -136,7 +136,7 @@ int type_register(struct type *type) {
 		return 0;
 
 	default:
-		ERROR("Not implemented");
+		NOTIMP();
 	}
 }
 
@@ -159,7 +159,6 @@ int type_rank(enum simple_type t1) {
 	case ST_ULLONG:
 		return 5;
 	default:
-		ERROR("NOt imp %d\n", t1);
 		NOTIMP();
 	}
 }
@@ -173,7 +172,7 @@ int alignof_struct(struct struct_data *struct_data) {
 	int max_align = 0;
 
 	if (!struct_data->is_complete)
-		ERROR("Struct %.*s not complete", struct_data->name.len, struct_data->name.str);
+		ICE("Struct %.*s not complete", struct_data->name.len, struct_data->name.str);
 
 	for (int i = 0; i < struct_data->n; i++) {
 		struct type *type = struct_data->fields[i].type;
@@ -249,7 +248,7 @@ int calculate_offset(struct type *type, int index) {
 		return calculate_size(type->children[0]) * index;
 		break;
 	default:
-		ERROR("Not imp: %d", type->type);
+		NOTIMP();
 	}
 }
 
@@ -300,7 +299,7 @@ void calculate_offsets(struct struct_data *data) {
 		} else {
 			new_size = calculate_size(field);
 			if (new_size == -1)
-				ERROR("%s has invalid size", dbg_type(field));
+				ICE("%s has invalid size", dbg_type(field));
 		}
 
 		if (calculate_alignment(field) > alignment)
@@ -391,7 +390,7 @@ static struct constant floating_point_constant_from_string(struct string_view sv
 		res.data_type = type_simple(ST_FLOAT);
 		res.float_d = d;
 	} else if (suffix == 'l' || suffix == 'L') {
-		ERROR("Constants of type long double is not supported by this compiler. %s", str);
+		ICE("Constants of type long double is not supported by this compiler. %s", str);
 	} else {
 		res.data_type = type_simple(ST_DOUBLE);
 		res.double_d = d;
@@ -420,7 +419,7 @@ static struct constant integer_constant_from_string(struct string_view str) {
 	} else if (str.len > 0 && str.str[0] >= '1' && str.str[0] <= '9') {
 		base = BASE_DECIMAL;
 	} else {
-		ERROR("%.*s has unknown base encoding.", str.len, str.str);
+		ICE("%.*s has unknown base encoding.", str.len, str.str);
 	}
 
 	int start = 0;
@@ -480,7 +479,7 @@ static struct constant integer_constant_from_string(struct string_view str) {
 			allow_unsigned = 1;
 			allow_signed = 0;
 		} else {
-			ERROR("Invalid format of integer constant: %.*s", str.len, str.str);
+			ICE("Invalid format of integer constant: %.*s", str.len, str.str);
 		}
 	}
 
@@ -505,7 +504,7 @@ static struct constant integer_constant_from_string(struct string_view str) {
 		res.data_type = type_simple(ST_ULLONG);
 		res.ullong_d = parsed;
 	} else {
-		ERROR("Cant fit %llu (%.*s) into any type", parsed, str.len, str.str);
+		ICE("Cant fit %llu (%.*s) into any type", parsed, str.len, str.str);
 	}
 
 	return res;
@@ -540,7 +539,7 @@ struct constant simple_cast(struct constant from, enum simple_type target) {
 		case ST_ULLONG: from.NAME = from.ullong_d; break;\
 		case ST_FLOAT: from.NAME = from.float_d; break;\
 		case ST_DOUBLE: from.NAME = from.double_d; break;\
-		default: ERROR("Trying to convert from %s to %s", strdup(dbg_type(from.data_type)), strdup(dbg_type(type_simple(target)))); \
+		default: ICE("Trying to convert from %s to %s", strdup(dbg_type(from.data_type)), strdup(dbg_type(type_simple(target)))); \
 		}\
 
 	switch (target) {
@@ -559,7 +558,7 @@ struct constant simple_cast(struct constant from, enum simple_type target) {
 	case ST_ULLONG: CONVERT_TO(ullong_d); break;
 	case ST_FLOAT: CONVERT_TO(float_d); break;
 	case ST_DOUBLE: CONVERT_TO(double_d); break;
-	default: ERROR("NOTIMP: %d\n", target);
+	default: NOTIMP();
 	}
 	from.data_type = type_simple(target);
 	return from;
@@ -719,7 +718,7 @@ const char *constant_to_string(struct constant constant) {
 	if (constant.data_type->type == TY_SIMPLE)
 		st = constant.data_type->simple;
 	else
-		ERROR("Tried to print type %s to number\n", dbg_type(constant.data_type));
+		ICE("Tried to print type %s to number\n", dbg_type(constant.data_type));
 
 	switch (st) {
 	case ST_BOOL:

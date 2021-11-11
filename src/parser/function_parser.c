@@ -52,7 +52,7 @@ int parse_labeled_statement(struct jump_blocks jump_blocks) {
 		for (int i = 0; i < function_scope.size; i++) {
 			if (sv_cmp(label, function_scope.labels[i].label)) {
 				if (function_scope.labels[i].used)
-					ERROR("Label declared more than once %.*s", label.len, label.str);
+					ERROR(T0->pos, "Label declared more than once %.*s", label.len, label.str);
 				ir_goto(function_scope.labels[i].id);
 				ir_block_start(function_scope.labels[i].id);
 				function_scope.labels[i].used = 1;
@@ -70,15 +70,15 @@ int parse_labeled_statement(struct jump_blocks jump_blocks) {
 	} else if (TACCEPT(T_KCASE)) {
 		struct expr *value = parse_expression();
 		if (!value)
-			ERROR("Expected expression");
+			ERROR(T0->pos, "Expected expression");
 		TEXPECT(T_COLON);
 		struct constant *constant = expression_to_constant(expression_cast(value, type_simple(ST_INT)));
 		if (!constant)
-			ERROR("Expression not constant, is of type %d", value->type);
+			ERROR(T0->pos, "Expression not constant, is of type %d", value->type);
 
 		struct case_labels *labels = jump_blocks.case_labels;
 		if (!labels)
-			ERROR("Not currently in a switch statement");
+			ERROR(T0->pos, "Not currently in a switch statement");
 
 		block_id block_case = new_block();
 		ir_goto(block_case);
@@ -95,7 +95,7 @@ int parse_labeled_statement(struct jump_blocks jump_blocks) {
 		ir_goto(block_default);
 		ir_block_start(block_default);
 		if (!jump_blocks.case_labels)
-			ERROR("Not currently in a switch statement");
+			ERROR(T0->pos, "Not currently in a switch statement");
 		jump_blocks.case_labels->default_ = block_default;
 
 		parse_statement(jump_blocks);
@@ -132,7 +132,7 @@ int parse_switch(struct jump_blocks jump_blocks) {
 	TEXPECT(T_LPAR);
 	struct expr *condition = parse_expression();
 	if (!condition)
-		ERROR("Expected expression");
+		ERROR(T0->pos, "Expected expression");
 	TEXPECT(T_RPAR);
 
 	int block_body = new_block(),
@@ -165,7 +165,7 @@ int parse_selection_statement(struct jump_blocks jump_blocks) {
 		TEXPECT(T_LPAR);
 		struct expr *expr = parse_expression();
 		if(!expr)
-			ERROR("Expected expression in if condition");
+			ERROR(T0->pos, "Expected expression in if condition");
 
 		var_id condition = expression_to_ir_clear_temp(expr);
 
@@ -224,7 +224,7 @@ int parse_do_while_statement(struct jump_blocks jump_blocks) {
 
 	struct expr *control_expression = parse_expression();
 	if (!control_expression)
-		ERROR("Expected expression");
+		ERROR(T0->pos, "Expected expression");
 
 	var_id control_variable = expression_to_ir_clear_temp(control_expression);
 
@@ -263,7 +263,7 @@ int parse_while_statement(struct jump_blocks jump_blocks) {
 
 	struct expr *control_expression = parse_expression();
 	if (!control_expression)
-		ERROR("Expected expression");
+		ERROR(T0->pos, "Expected expression");
 
 	TEXPECT(T_RPAR);
 
@@ -321,7 +321,7 @@ int parse_for_statement(struct jump_blocks jump_blocks) {
 	if (!(TACCEPT(T_SEMI_COLON) ||
 		  parse_declaration(0) ||
 		  parse_expression_statement()))
-		ERROR("Invalid first part of for loop");
+		ERROR(T0->pos, "Invalid first part of for loop");
 
 	ir_goto(block_control);
 	ir_block_start(block_control);

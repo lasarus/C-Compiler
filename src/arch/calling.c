@@ -88,7 +88,6 @@ void classify_recursively(enum parameter_class *current,
 	} break;
 
 	default:
-		ERROR("Not imp %d\n", type->type);
 		NOTIMP();
 	}
 }

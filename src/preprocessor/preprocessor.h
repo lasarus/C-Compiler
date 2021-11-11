@@ -35,11 +35,9 @@ struct token {
 };
 
 #define EXPECT(T0, ETYPE) do {											\
-		if ((T0)->type != ETYPE) {										\
-			printf("On line %d col %d file %s\n", (T0)->pos.line, (T0)->pos.column, (T0)->pos.path); \
-			printf("Got %s, expected %s\n", strdup(dbg_token((T0))), dbg_token_type(ETYPE)); \
-			ERROR("Expected other token");								\
-		}																\
+	if ((T0)->type != ETYPE) {											\
+		ERROR((T0)->pos, "Got %s expected %s\n", strdup(dbg_token((T0))), dbg_token_type(ETYPE)); \
+			  }															\
 	} while (0)
 
 #define TNEXT() t_next()

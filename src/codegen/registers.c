@@ -30,7 +30,7 @@ int size_to_idx(int size) {
 	case 4: return 1;
 	case 2: return 2;
 	case 1: return 3;
-	default: ERROR("Invalid register size, %d", size);
+	default: ICE("Invalid register size, %d", size);
 	}
 }
 
@@ -40,7 +40,7 @@ char size_to_suffix(int size) {
 	case 4: return 'l';
 	case 2: return 'w';
 	case 1: return 'b';
-	default: ERROR("Invalid register size %d", size);
+	default: ICE("Invalid register size %d", size);
 	}
 }
 
@@ -78,7 +78,7 @@ void load_address(struct type *type, var_id result) {
 			NOTIMP();
 		}
 	} else {
-		ERROR("Can't load type %s", dbg_type(type));
+		ICE("Can't load type %s", dbg_type(type));
 	}
 }
 
