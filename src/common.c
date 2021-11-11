@@ -105,11 +105,12 @@ void character_to_escape_sequence(char character, char *output, int allow_compli
 		return;
 	}
 
-	octal[2] = character % 8;
-	character /= 8;
-	octal[1] = character % 8;
-	character /= 8;
-	octal[0] = character % 8;
+	unsigned char uchar = character;
+	octal[2] = uchar % 8;
+	uchar /= 8;
+	octal[1] = uchar % 8;
+	uchar /= 8;
+	octal[0] = uchar % 8;
 	
 	output[0] = '\\';
 	output[1] = octal[0] + '0';

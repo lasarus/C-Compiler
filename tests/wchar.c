@@ -24,5 +24,7 @@ int main() {
 	assert(s2[0] == 0x16a0);
 	assert(s2[sizeof s2 / sizeof *s2 - 2] == 0x16b1);
 
+	assert((L"" "\355\300\300")[0] == 0355);
+
 	return L'\0';
 }
