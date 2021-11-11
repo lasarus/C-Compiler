@@ -75,18 +75,19 @@ static void flush_whitespace(int *whitespace, int *first_of_line) {
 	}
 }
 
-char *buffer = NULL;
-size_t buffer_size = 0, buffer_cap = 0;
+static char *buffer = NULL;
+static size_t buffer_size = 0, buffer_cap = 0;
 
 static void buffer_start(void) {
 	buffer_size = 0;
 }
 
-static void buffer_write(char c) {
-	ADD_ELEMENT(buffer_size, buffer_cap, buffer) = c;
+static void buffer_eat() {
+	ADD_ELEMENT(buffer_size, buffer_cap, buffer) = C0;
+	CNEXT();
 }
 
-struct string_view buffer_get(void) {
+static struct string_view buffer_get(void) {
 	struct string_view ret = { .len = buffer_size };
 	ret.str = malloc(buffer_size);
 	memcpy(ret.str, buffer, buffer_size);
@@ -99,10 +100,8 @@ static int parse_identifier(struct token *next) {
 
 	buffer_start();
 
-	while(HAS_PROP(C0, C_IDENTIFIER_NONDIGIT | C_DIGIT)) {
-		buffer_write(C0);
-		CNEXT();
-	}
+	while(HAS_PROP(C0, C_IDENTIFIER_NONDIGIT | C_DIGIT))
+		buffer_eat();
 
 	next->type = T_IDENT;
 	next->str = buffer_get();
@@ -120,13 +119,10 @@ static int parse_pp_number(struct token *next) {
 		if ((C0 == 'e' || C0 == 'E' ||
 			 C0 == 'p' || C0 == 'P') &&
 			(C1 == '+' || C1 == '-')) {
-			buffer_write(C0);
-			CNEXT();
-			buffer_write(C0);
-			CNEXT();
+			buffer_eat();
+			buffer_eat();
 		} else if (HAS_PROP(C0, C_DIGIT | C_IDENTIFIER_NONDIGIT) || C0 == '.') {
-			buffer_write(C0);
-			CNEXT();
+			buffer_eat();
 		} else {
 			break;
 		}
@@ -137,30 +133,31 @@ static int parse_pp_number(struct token *next) {
 	return 1;
 }
 
-static int parse_escape_sequence(int *character) {
-	if (C0 != '\\')
+int parse_escape_sequence(struct string_view *string, uint32_t *character) {
+	if (string->len == 0 || string->str[0] != '\\')
 		return 0;
 
-	CNEXT();
+	sv_tail(string, 1);
 
-	if (HAS_PROP(C0, C_OCTAL_DIGIT)) {
+	if (HAS_PROP(string->str[0], C_OCTAL_DIGIT)) {
 		int result = 0;
-		for (int i = 0; i < 3 && HAS_PROP(C0, C_OCTAL_DIGIT); i++) {
+		for (int i = 0; i < 3 && string->len &&
+				 HAS_PROP(string->str[0], C_OCTAL_DIGIT); i++) {
 			result *= 8;
-			result += C0 - '0';
-			CNEXT();
+			result += string->str[0] - '0';
+			sv_tail(string, 1);
 		}
 
 		*character = result;
 
 		return 1;
-	} else if (C0 == 'x') {
-		CNEXT();
+	} else if (string->str[0] == 'x') {
+		sv_tail(string, 1);
 		int result = 0;
 
-		for (; HAS_PROP(C0, C_HEXADECIMAL_DIGIT); CNEXT()) {
+		while (string->len && HAS_PROP(string->str[0], C_HEXADECIMAL_DIGIT)) {
 			result *= 16;
-			char digit = C0;
+			char digit = string->str[0];
 			if (HAS_PROP(digit, C_DIGIT)) {
 				result += digit - '0';
 			} else if (digit >= 'a' && digit <= 'f') {
@@ -168,13 +165,15 @@ static int parse_escape_sequence(int *character) {
 			} else if (digit >= 'A' && digit <= 'F') {
 				result += digit - 'A' + 10;
 			}
+
+			sv_tail(string, 1);
 		}
 
 		*character = result;
 		return 1;
 	}
 
-	switch (C0) {
+	switch (string->str[0]) {
 	case '\'': *character = '\''; break;
 	case '\"': *character = '\"'; break;
 	case '\?': *character = '?'; break; // Trigraphs are stupid.
@@ -188,104 +187,127 @@ static int parse_escape_sequence(int *character) {
 	case 'v': *character = '\v'; break;
 
 	default:
-		ERROR("Invalid escape sequence \\%c", C0);
+		ERROR("Invalid escape sequence \\%c", string->str[0]);
 	}
 
-	CNEXT();
+	sv_tail(string, 1);
 
 	return 1;
 }
 
-static int parse_cs_char(int *character, char end_char) {
-	char c = C0;
-	if (parse_escape_sequence(character)) {
-		return 1;
-	} else if (c == '\n' || c == end_char) {
+static int eat_escape_sequence() {
+	if (C0 != '\\')
 		return 0;
-	} else {
-		CNEXT();
-		*character = c;
+
+	buffer_eat();
+
+	if (HAS_PROP(C0, C_OCTAL_DIGIT)) {
+		for (int i = 0; i < 3 && HAS_PROP(C0, C_OCTAL_DIGIT); i++)
+			buffer_eat();
+
+		return 1;
+	} else if (C0 == 'x') {
+		buffer_eat();
+
+		while (HAS_PROP(C0, C_HEXADECIMAL_DIGIT))
+			buffer_eat();
+
 		return 1;
 	}
+
+	switch (C0) {
+	case '\'': case '\"': case '\?': case '\\':
+	case 'a': case 'b': case 'f': case 'n':
+	case 'r': case 't': case 'v': break;
+
+	default:
+		ERROR("Invalid escape sequence \\%c", C0);
+	}
+
+	buffer_eat();
+
+	return 1;
 }
 
-struct string_view parse_string_like(int null_terminate, int pad) {
+static int eat_cs_char(char end_char) {
+	if (C0 == '\n' || C0 == end_char)
+		return 0;
+
+	if (!eat_escape_sequence())
+		buffer_eat();
+
+	return 1;
+}
+
+struct string_view eat_string_like() {
 	char end_char = C0 == '<' ? '>' : C0;
-	CNEXT();
 
-	buffer_start();
+	buffer_eat();
 
-	int character;
-	while (parse_cs_char(&character, end_char)) {
-		if (pad)
-			buffer_write('\0');
-		buffer_write((char)character);
+	while (eat_cs_char(end_char));
+
+	if (C0 != end_char) {
+		PRINT_POS(input->pos[0]);
+		char output[5];
+		character_to_escape_sequence(C0, output, 1);
+		ERROR("Expected '%c', got '%s', while parsing \"%.*s\"", end_char, output,
+			  (int)buffer_size, buffer);
 	}
 
-	if (C0 != end_char)
-		ERROR("Expected %c", end_char);
-
-	if (null_terminate) {
-		if (pad)
-			buffer_write('\0');
-		buffer_write('\0');
-	}
-
-	CNEXT();
+	buffer_eat();
 
 	return buffer_get();
 }
 
 static int parse_string(struct token *next) {
-	int pad = 0;
+	buffer_start();
 	if (C0 == 'u' &&
 		C1 == '8' &&
 		C2 == '"') {
-		NOTIMP();
+		buffer_eat();
+		buffer_eat();
 	} else if (C0 == 'u' && C1 == '"') {
-		NOTIMP();
+		buffer_eat();
 	} else if (C0 == 'U' && C1 == '"') {
-		NOTIMP();
+		buffer_eat();
 	} else if (C0 == 'L' && C1 == '"') {
-		pad = 1;
-		CNEXT();
+		buffer_eat();
 	} else if (C0 != '"') {
 		return 0;
 	}
 
 	next->type = T_STRING;
-	next->str = parse_string_like(1, pad);
+	next->str = eat_string_like();
 
 	return 1;
 }
 
 static int parse_pp_header_name(struct token *next) {
+	buffer_start();
 	if (C0 != '"' && C0 != '<')
 		return 0;
 
 	next->type = C0 == '<' ? PP_HEADER_NAME_H : PP_HEADER_NAME_Q;
-	next->str = parse_string_like(1, 0);
+	next->str = eat_string_like();
 
 	return 1;
 }
 
 static int parse_character_constant(struct token *next) {
 	// All of these are handled in the same way.
-	int pad = 0;
+	buffer_start();
 	if (C0 == 'u' && C1 == '\'') {
-		pad = 1;
-		CNEXT();
+		buffer_eat();
 	} else if (C0 == 'U' && C1 == '\'') {
-		NOTIMP();
+		buffer_eat();
 	} else if (C0 == 'L' && C1 == '\'') {
-		pad = 1;
-		CNEXT();
+		buffer_eat();
 	} else if (C0 != '\'') {
 		return 0;
 	}
 
 	next->type = T_CHARACTER_CONSTANT;
-	next->str = parse_string_like(0, pad);
+	next->str = eat_string_like();
 
 	return 1;
 }
@@ -309,10 +331,8 @@ static int parse_punctuator(struct token *next) {
 
 	buffer_start();
 
-	for (int i = 0; i < count; i++) {
-		buffer_write(C0);
-		CNEXT();
-	}
+	for (int i = 0; i < count; i++)
+		buffer_eat();
 
 	next->str = buffer_get();
 

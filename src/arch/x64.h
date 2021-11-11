@@ -24,6 +24,7 @@
 — long double _Complex
 */
 
+int sizeof_simple(enum simple_type type);
 int type_register(struct type *type);
 int is_scalar(struct type *type);
 int is_signed(enum simple_type type);
@@ -41,6 +42,9 @@ int calculate_offset(struct type *type, int index);
 #define IS_CHAR_SIGNED 1
 #define ENUM_TYPE ST_INT
 #define SIZE_TYPE ST_ULONG
+#define WCHAR_TYPE ST_INT
+#define CHAR32_TYPE ST_UINT
+#define CHAR16_TYPE ST_USHORT
 
 struct constant {
 	enum {

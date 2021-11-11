@@ -14,4 +14,6 @@ struct token tokenizer_next(void);
 
 struct token_list tokenizer_whole(struct input *new_input);
 
+int parse_escape_sequence(struct string_view *string, uint32_t *character);
+
 #endif

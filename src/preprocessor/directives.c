@@ -124,12 +124,12 @@ intmax_t evaluate_expression(int prec, int evaluate) {
 		if (!type_is_integer(c.data_type))
 			ERROR("Preprocessor variables must be of integer type.");
 		switch (c.data_type->simple) {
-		case ST_INT:
-			expr = c.int_d;
-			break;
-		case ST_UINT:
-			expr = c.uint_d;
-			break;
+	case ST_INT:
+		expr = c.int_d;
+		break;
+	case ST_UINT:
+		expr = c.uint_d;
+		break;
 		case ST_LONG:
 			expr = c.long_d;
 			break;
@@ -337,6 +337,8 @@ struct token directiver_next(void) {
 			struct token path_tok = NEXT();
 			int system = path_tok.type == PP_HEADER_NAME_H;
 			struct string_view path = path_tok.str;
+			path.str++;
+			path.len -= 2;
 			tokenizer_push_input(sv_to_str(path), system);
 		} else if ((is_if = sv_string_cmp(name, "ifndef")) ||
 				   (is_if = sv_string_cmp(name, "ifdef")) ||
@@ -401,6 +403,8 @@ struct token directiver_next(void) {
 			if (has_s_char_seq) {
 				if (s_char_seq.type != T_STRING)
 					ERROR("Expected s char sequence as second argument to #line");
+				s_char_seq.str.len -= 2;
+				s_char_seq.str.str++;
 				new_filename = sv_to_str(s_char_seq.str);
 			}
 		} else {

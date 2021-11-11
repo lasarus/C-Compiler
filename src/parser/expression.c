@@ -1022,7 +1022,19 @@ struct expr *parse_prefix() {
 	} else if (T0->type == T_STRING) {
 		struct string_view str = T0->str;
 		TNEXT();
-		return EXPR_STR(str);
+		return EXPR_STR(str, ST_CHAR);
+	} else if (T0->type == T_STRING_CHAR16) {
+		struct string_view str = T0->str;
+		TNEXT();
+		return EXPR_STR(str, CHAR16_TYPE);
+	} else if (T0->type == T_STRING_CHAR32) {
+		struct string_view str = T0->str;
+		TNEXT();
+		return EXPR_STR(str, CHAR32_TYPE);
+	} else if (T0->type == T_STRING_WCHAR) {
+		struct string_view str = T0->str;
+		TNEXT();
+		return EXPR_STR(str, WCHAR_TYPE);
 	} else if (T0->type == T_NUM) {
 		struct constant c = constant_from_string(T0->str);
 		TNEXT();
@@ -1121,7 +1133,7 @@ struct expr *parse_prefix() {
 				.va_arg_ = {v, t}
 			});
 	} else if (TACCEPT(T_KFUNC)) {
- 		return EXPR_STR(get_current_function_name());
+ 		return EXPR_STR(get_current_function_name(), ST_CHAR);
 	}
 	return NULL;
 }

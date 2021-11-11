@@ -34,11 +34,11 @@ struct expr *expr_new(struct expr expr);
 			.args = {(RHS)}									\
 		})
 
-#define EXPR_STR(STR) expr_new((struct expr) {							\
+#define EXPR_STR(STR, CHAR_TYPE) expr_new((struct expr) {				\
 			.type = E_CONSTANT,											\
 			.constant = {												\
 				.type = CONSTANT_LABEL,									\
-				.data_type = type_array(type_simple(ST_CHAR), (STR).len), \
+				.data_type = type_array(type_simple(CHAR_TYPE), (STR).len / sizeof_simple(CHAR_TYPE)), \
 				.label = {rodata_register(STR)}							\
 			}})
 

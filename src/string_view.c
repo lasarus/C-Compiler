@@ -50,3 +50,8 @@ struct string_view sv_concat(struct string_view a, struct string_view b) {
 	memcpy(ret.str + a.len, b.str, b.len);
 	return ret;
 }
+
+void sv_tail(struct string_view *sv, int n) {
+	sv->len -= n;
+	sv->str += n;
+}

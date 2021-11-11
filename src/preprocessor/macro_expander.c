@@ -156,31 +156,26 @@ static char *stringify_buffer;
 
 void stringify_start() {
 	stringify_size = 0;
-	ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = '\0';
+	ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = '\"';
 }
 
 void stringify_add(struct token *t, int start) {
-	stringify_size--;
-	
 	if (!start && t->whitespace)
 		ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = ' ';
 	switch (t->type) {
 	case T_STRING:
-		ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = '"';
-		for (int i = 0; i < t->str.len - 1; i++) {
+		for (int i = 0; i < t->str.len; i++) {
 			char escape_seq[5];
 			character_to_escape_sequence(t->str.str[i], escape_seq, 1);
 			for (int j = 0; escape_seq[j]; j++)
 				ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = escape_seq[j];
 		}
-		ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = '"';
 		break;
 
 	default:
 		for (int i = 0; i < t->str.len; i++)
 			ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = t->str.str[i];
 	}
-	ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = '\0';
 }
 
 int builtin_macros(struct token *t) {
@@ -188,7 +183,7 @@ int builtin_macros(struct token *t) {
 	if (sv_string_cmp(t->str, "__LINE__")) {
 		*t = (struct token) { .type = T_NUM, .str = sv_from_str(allocate_printf("%d", t->pos.line)), .pos = t->pos };
 	} else if (sv_string_cmp(t->str, "__FILE__")) {
-		*t = (struct token) { .type = T_STRING, .str = sv_from_str(allocate_printf("%s", t->pos.path)), .pos = t->pos };
+		*t = (struct token) { .type = T_STRING, .str = sv_from_str(allocate_printf("\"%s\"", t->pos.path)), .pos = t->pos };
 	} else
 		return 0;
 	return 1;
@@ -372,8 +367,15 @@ void subs_buffer(struct define *def, struct string_set *hs, struct position new_
 			for(int i = 0; i < tl.size; i++)
 				stringify_add(tl.list + i, i == 0);
 
-			struct token t = { .type = T_STRING, .str = sv_from_str(strdup(stringify_buffer)) };
-			input_buffer_push(&t);
+			ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = '\"';
+
+			struct token t_new = t;
+			t_new.type = T_STRING;
+			t_new.str = (struct string_view) {
+				.len = stringify_size,
+				.str = stringify_buffer
+			};
+			input_buffer_push(&t_new);
 		} else if(idx >= 0) {
 			expand_argument(arguments[idx], &concat_with_prev, concat, stringify, input);
 

@@ -931,6 +931,41 @@ void add_string_init_pair(struct initializer *init, int offset, struct string_vi
 	};
 }
 
+int parse_string_initializer(struct type **type, int offset,
+							 struct initializer *init, enum simple_type char_type,
+							 enum ttype str_token) {
+	if (((*type)->type == TY_ARRAY || (*type)->type == TY_INCOMPLETE_ARRAY) &&
+		(type_is_simple((*type)->children[0], char_type))) {
+		struct string_view str;
+		if (T0->type == T_LBRACE && T1->type == str_token &&
+			T2->type == T_RBRACE) {
+			str = T1->str;
+			TNEXT();
+			TNEXT();
+			TNEXT();
+		} else if (T0->type == str_token) {
+			str = T0->str;
+			TNEXT();
+		} else {
+			return 0;
+		}
+
+		if ((*type)->type == TY_INCOMPLETE_ARRAY) {
+			struct type complete_array_params = {
+				.type = TY_ARRAY,
+				.array.length = str.len / sizeof_simple(char_type),
+				.n = 1
+			};
+
+			*type = type_create(&complete_array_params, (*type)->children);
+		}
+
+		add_string_init_pair(init, offset, str);
+		return 1;
+	}
+	return 0;
+}
+
 int parse_non_brace_initializer(struct type **type, int offset, int bit_offset,
 								int bitfield, struct initializer *init,
 	struct expr **failed_expr) {
@@ -963,35 +998,19 @@ int parse_non_brace_initializer(struct type **type, int offset, int bit_offset,
 		if (has_braces)
 			TEXPECT(T_RBRACE);
 		return 1;
-	} else if (((*type)->type == TY_ARRAY || (*type)->type == TY_INCOMPLETE_ARRAY) &&
-			   (type_is_simple((*type)->children[0], ST_CHAR) ||
-				type_is_simple((*type)->children[0], ST_UCHAR) ||
-				type_is_simple((*type)->children[0], ST_SCHAR))) {
-		struct string_view str;
-		if (T0->type == T_LBRACE && T1->type == T_STRING &&
-			T2->type == T_RBRACE) {
-			str = T1->str;
-			TNEXT();
-			TNEXT();
-			TNEXT();
-		} else if (T0->type == T_STRING) {
-			str = T0->str;
-			TNEXT();
-		} else {
-			return 0;
-		}
-
-		if ((*type)->type == TY_INCOMPLETE_ARRAY) {
-			struct type complete_array_params = {
-				.type = TY_ARRAY,
-				.array.length = str.len,
-				.n = 1
-			};
-
-			*type = type_create(&complete_array_params, (*type)->children);
-		}
-
-		add_string_init_pair(init, offset, str);
+	}
+	if (parse_string_initializer(type, offset, init,
+								 ST_CHAR, T_STRING) ||
+		parse_string_initializer(type, offset, init,
+								 ST_UCHAR, T_STRING) ||
+		parse_string_initializer(type, offset, init,
+								 ST_SCHAR, T_STRING) ||
+		parse_string_initializer(type, offset, init,
+								 WCHAR_TYPE, T_STRING_WCHAR) ||
+		parse_string_initializer(type, offset, init,
+								 CHAR16_TYPE, T_STRING_CHAR16) ||
+		parse_string_initializer(type, offset, init,
+								 CHAR32_TYPE, T_STRING_CHAR32)) {
 		return 1;
 	}
 
