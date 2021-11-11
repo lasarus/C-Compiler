@@ -363,6 +363,21 @@ void check_const_correctness(struct expr *expr) {
 	}
 }
 
+static struct expr *expr_dot_operator(struct expr *lhs, struct token *name) {
+	int n = 0, *indices;
+	if (!type_search_member(lhs->data_type, name->str, &n, &indices))
+		return NULL;
+
+	for (int i = n - 1; i >= 0; i--) {
+		lhs = expr_new((struct expr) {
+				.type = E_DOT_OPERATOR,
+				.member = { lhs, indices[i] }
+			});
+	}
+
+	return lhs;
+}
+
 struct expr *expr_new(struct expr expr) {
 	for (int i = 0; i < num_args[expr.type]; i++) {
 		if (!expr.args[i])
@@ -1220,28 +1235,15 @@ struct expr *parse_pratt(int precedence) {
 				});
 
 		} else if (TACCEPT(T_DOT)) {
-			struct string_view identifier = T0->str;
+			lhs = expr_dot_operator(lhs, T0);
+			if (!lhs)
+				ERROR(T0->pos, "Could not find member of name %s", dbg_token(T0));
 			TNEXT();
-			struct type *lhs_type = lhs->data_type;
-			int idx = type_member_idx(lhs_type, identifier);
-
-			lhs = expr_new((struct expr) {
-					.type = E_DOT_OPERATOR,
-					.member = { lhs, idx }
-				});
 		} else if (TACCEPT(T_ARROW)) {
-			struct string_view identifier = T0->str;
+			lhs = expr_dot_operator(EXPR_ARGS(E_INDIRECTION, lhs), T0);
+			if (!lhs)
+				ERROR(T0->pos, "Could not find member of name %s", dbg_token(T0));
 			TNEXT();
-			decay_array(&lhs);
-			struct type *lhs_type = type_deref(lhs->data_type);
-			int idx = type_member_idx(lhs_type, identifier);
-
-			lhs = expr_new((struct expr) {
-					.type = E_DOT_OPERATOR,
-					.member = {
-						EXPR_ARGS(E_INDIRECTION, lhs), idx
-					}
-				});
 		} else if (TACCEPT(T_INC)) {
 			lhs = EXPR_ASSIGNMENT_OP(OP_ADD, lhs, EXPR_INT(1), 1);
 		} else if (TACCEPT(T_DEC)) {

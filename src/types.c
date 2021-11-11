@@ -174,9 +174,12 @@ struct enum_data *register_enum(void) {
 	return malloc(sizeof (struct enum_data));
 }
 
-int type_member_idx(struct type *type, struct string_view name) {
+int type_search_member(struct type *type, struct string_view name,
+					   int *n, int **indices) {
+	static int stack_cap = 0, *stack = NULL;
+
 	if (type->type != TY_STRUCT)
-		ICE("%s is not a struct", dbg_type(type));
+		return 0;
 
 	struct struct_data *data = type->struct_data;
 
@@ -184,12 +187,20 @@ int type_member_idx(struct type *type, struct string_view name) {
 		ICE("Member access on incomplete type not allowed");
 
 	for (int i = 0; i < data->n; i++) {
-		if (sv_cmp(name, data->fields[i].name))
-			return i;
-	}
+		if (sv_cmp(data->fields[i].name, name)) {
+			ADD_ELEMENT(*n, stack_cap, stack) = i;
+		} else if (data->fields[i].name.len == 0 &&
+				   type_search_member(data->fields[i].type, name,
+									  n, indices)) {
+			ADD_ELEMENT(*n, stack_cap, stack) = i;
+		} else {
+			continue;
+		}
 
-	ICE("%.*s has no member with name %.*s",
-		data->name.len, data->name.str, name.len, name.str);
+		*indices = stack;
+		return 1;
+	}
+	return 0;
 }
 
 // Make arrays into pointers, and functions into function pointers.
@@ -313,51 +324,14 @@ void type_select(struct type *type, int index,
 	}
 }
 
-static void type_remove_unnamed(struct struct_data *data) {
+void type_remove_unnamed(struct struct_data *data) {
 	int k = 0;
 	for (int i = 0; i < data->n; i++) {
-		if (data->fields[i].name.len)
+		if (data->fields[i].name.len ||
+			data->fields[i].type->type == TY_STRUCT)
 			data->fields[k++] = data->fields[i];
 	}
 	data->n = k;
-}
-
-void type_merge_anonymous_substructures(struct struct_data *data) {
-	// types names offsets need to be modified.
-	for (int i = 0; i < data->n; i++) {
-		if (data->fields[i].name.len)
-			continue;
-
-		int offset = data->fields[i].offset;
-		struct type *type = data->fields[i].type;
-
-		if (type->type != TY_STRUCT)
-			continue; // It is probably an anonymous bit-field.
-
-		assert(type->type == TY_STRUCT);
-		struct struct_data *sub_data = type->struct_data;
-
-		int n_new_elements = sub_data->n;
-		int new_n = data->n + n_new_elements - 1;
-
-		// Make place for new elements.
-		data->fields = realloc(data->fields, sizeof *data->fields * new_n);
-
-		for (int j = new_n - 1; j >= i + sub_data->n; j--) {
-			data->fields[j] = data->fields[j - sub_data->n + 1];
-		}
-
-		data->n = new_n;
-
-		for (int j = 0; j < sub_data->n; j++) {
-			data->fields[i + j] = sub_data->fields[j];
-			data->fields[i + j].offset += offset;
-		}
-
-		i += n_new_elements - 1;
-	}
-
-	type_remove_unnamed(data);
 }
 
 int type_has_variable_size(struct type *type) {

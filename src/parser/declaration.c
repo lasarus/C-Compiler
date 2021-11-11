@@ -449,7 +449,7 @@ int parse_struct(struct type_specifiers *ts) {
 		};
 
 		calculate_offsets(data);
-		type_merge_anonymous_substructures(data);
+		type_remove_unnamed(data);
 
 		struct type params = {
 			.type = TY_STRUCT,
@@ -1040,13 +1040,26 @@ int parse_brace_initializer(struct type **current_object, int offset, struct ini
 				stack_count = 0;
 			}
 
-			int index;
-
 			if (TACCEPT(T_DOT)) {
-				struct string_view ident = T0->str;
+				int n = 0, *indices = 0;
+				if (!type_search_member(parent_type, T0->str, &n, &indices))
+					ERROR(T0->pos, "Could not find member of name %s", dbg_token(T0));
+
 				TEXPECT(T_IDENT);
 
-				index = type_member_idx(parent_type, ident);
+				for (int i = n - 1; i >= 0; i--) {
+					int noffset;
+					struct type *ntype;
+					type_select(parent_type, indices[i], &noffset, &ntype);
+
+					stack_count++;
+					index_stack[stack_count - 1] = indices[i];
+					type_stack[stack_count - 1] = parent_type;
+					offset_stack[stack_count - 1] = parent_offset;
+
+					parent_type = ntype;
+					parent_offset += noffset;
+				}
 			} else if (TACCEPT(T_LBRACK)) {
 				struct expr *expr = parse_expression();
 				TEXPECT(T_RBRACK);
@@ -1056,22 +1069,22 @@ int parse_brace_initializer(struct type **current_object, int offset, struct ini
 					ERROR(T0->pos, "Array designator must have constant expression.");
 				assert(type_is_simple(constant->data_type, ST_INT));
 
-				index = constant->int_d;
+				int index = constant->int_d;
+
+				int noffset;
+				struct type *ntype;
+				type_select(parent_type, index, &noffset, &ntype);
+
+				stack_count++;
+				index_stack[stack_count - 1] = index;
+				type_stack[stack_count - 1] = parent_type;
+				offset_stack[stack_count - 1] = parent_offset;
+
+				parent_type = ntype;
+				parent_offset += noffset;
 			} else {
 				break;
 			}
-
-			int noffset;
-			struct type *ntype;
-			type_select(parent_type, index, &noffset, &ntype);
-
-			stack_count++;
-			index_stack[stack_count - 1] = index;
-			type_stack[stack_count - 1] = parent_type;
-			offset_stack[stack_count - 1] = parent_offset;
-
-			parent_type = ntype;
-			parent_offset += noffset;
 		}
 
 		if (must_have_designator_list && !has_designator_list) {

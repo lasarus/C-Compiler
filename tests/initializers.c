@@ -156,4 +156,13 @@ int main() {
 		assert(sizeof str2 == 10);
 		assert(sizeof str3 == 10);
 	}
+
+	{
+		struct T {
+			struct {
+				int a, b, c;
+			};
+		} t = { .a = 1, .c = 2, .b = 3 };
+		assert(t.b == 3);
+	}
 }

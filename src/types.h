@@ -142,7 +142,8 @@ struct type *type_adjust_parameter(struct type *type);
 void type_evaluate_vla(struct type *type);
 int type_contains_unevaluated_vla(struct type *type);
 
-int type_member_idx(struct type *type, struct string_view name);
+int type_search_member(struct type *type, struct string_view name,
+					   int *n, int **indices);
 
 void type_select(struct type *type, int index,
 				 int *field_offset, struct type **field_type);
@@ -157,7 +158,7 @@ int type_is_aggregate(struct type *type);
 
 struct type *type_make_composite(struct type *a, struct type *b);
 
-void type_merge_anonymous_substructures(struct struct_data *data);
+void type_remove_unnamed(struct struct_data *data);
 int type_has_variable_size(struct type *type);
 
 struct expr;
