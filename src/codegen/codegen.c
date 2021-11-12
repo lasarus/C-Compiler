@@ -780,6 +780,30 @@ void codegen_block(struct block *block, struct reg_save_info reg_save_info) {
 	}
 }
 
+void codegen_reg_to_stack(int reg, int size, int stack_location) {
+	int msize = 0;
+	for (int i = 0; i < size;) {
+		if (msize)
+			emit("shrq $%d, %s", msize * 8, get_reg_name(reg, 8));
+
+		if (i + 8 <= size) {
+			msize = 8;
+		} else if (i + 4 <= size) {
+			msize = 4;
+		} else if (i + 2 <= size) {
+			msize = 2;
+		} else if (i + 1 <= size) {
+			msize = 1;
+		}
+		emit("mov%c %s, -%d(%%rbp)",
+			 size_to_suffix(msize),
+			 get_reg_name(reg, msize),
+			 stack_location - i);
+
+		i += msize;
+	}
+}
+
 void codegen_function(struct function *func) {
 	int temp_stack_count = 0, perm_stack_count = 0;
 	int max_temp_stack = 0;
@@ -902,10 +926,9 @@ void codegen_function(struct function *func) {
 				int size = var_size - 8 * i;
 				if (size > 8) size = 8;
 				if (classification->classes[i] == CLASS_INTEGER) {
-					emit("mov%c %s, -%d(%%rbp)",
-						 size_to_suffix(size),
-						 get_reg_name(classification->regs[i], size),
-						 variable_info[var].stack_location - 8 * i);
+					codegen_reg_to_stack(classification->regs[i],
+										 size,
+										 variable_info[var].stack_location - 8 * i);
 				} else if (classification->classes[i] == CLASS_SSE) {
 					if (get_variable_size(var) == 4) {
 						emit("movss %%xmm%d, -%d(%%rbp)",
