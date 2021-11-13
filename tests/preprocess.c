@@ -7,6 +7,7 @@
 #define A 3
 
 #define COMBINE(X) START_ ## X
+#define CAT(A, B) A ## B
 
 #if '\xff' > 0
 #else
@@ -22,6 +23,8 @@ int main() {
 	a = 10;
 	#undef a
 	assert(a == 10);
+
+	assert(CAT(0x, ff) == 0xff);
 
 	const char *include = NULL;
 #

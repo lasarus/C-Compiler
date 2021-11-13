@@ -114,6 +114,8 @@ enum ttype paste_table[][3] = {
 	{T_IDENT, T_IDENT, T_IDENT},
 	{T_LSHIFT, T_A, T_LSHIFTA},
 	{T_RSHIFT, T_A, T_RSHIFTA},
+	{T_NUM, T_NUM, T_NUM},
+	{T_NUM, T_IDENT, T_NUM},
 	{T_ADD, T_ADD, T_INC},
 	{T_ADD, T_A, T_ADDA},
 	{T_SUB, T_SUB, T_DEC},
