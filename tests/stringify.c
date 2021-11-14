@@ -13,4 +13,7 @@ int main() {
 	assert(strcmp(STR(GLUE(AAA, BBB)), "GLUE(AAA, BBB)") == 0);
 	// Testing stringification of strings.
 	assert(strcmp(STR("Hello World!\n"), "\"Hello World!\\n\"") == 0);
+
+	// Bug with stringify overwriting previous stringification.
+	assert(strcmp(STR(A) STR(70), "A70") == 0);
 }

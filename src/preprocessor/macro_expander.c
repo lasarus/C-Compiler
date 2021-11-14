@@ -156,12 +156,21 @@ struct token glue(struct token a, struct token b) {
 static size_t stringify_size, stringify_cap;
 static char *stringify_buffer;
 
-void stringify_start() {
+static void stringify_start() {
 	stringify_size = 0;
 	ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = '\"';
 }
 
-void stringify_add(struct token *t, int start) {
+static struct string_view stringify_end() {
+	ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = '\"';
+	
+	struct string_view ret = { .len = stringify_size };
+	ret.str = malloc(stringify_size);
+	memcpy(ret.str, stringify_buffer, stringify_size);
+	return ret;
+}
+
+static void stringify_add(struct token *t, int start) {
 	if (!start && t->whitespace)
 		ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = ' ';
 	switch (t->type) {
@@ -372,10 +381,7 @@ void subs_buffer(struct define *def, struct string_set *hs, struct position new_
 
 			struct token t_new = t;
 			t_new.type = T_STRING;
-			t_new.str = (struct string_view) {
-				.len = stringify_size,
-				.str = stringify_buffer
-			};
+			t_new.str = stringify_end();
 			input_buffer_push(&t_new);
 		} else if(idx >= 0) {
 			expand_argument(arguments[idx], &concat_with_prev, concat, stringify, input);
