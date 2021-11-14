@@ -79,6 +79,7 @@ struct expr {
 		E_BUILTIN_VA_END,
 		E_BUILTIN_VA_ARG,
 		E_BUILTIN_VA_COPY,
+		E_CONST_REMOVE,
 
 		E_BINARY_OP,
 

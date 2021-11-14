@@ -50,6 +50,9 @@ const char *dbg_type(struct type *type) {
 
 	int curr_pos = 0;
 
+	if (type->is_const)
+		DBG_PRINT("CONST ");
+
 	while (type) {
 		switch (type->type) {
 		case TY_SIMPLE:

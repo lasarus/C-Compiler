@@ -86,6 +86,9 @@ void decay_array(struct expr **expr) {
 	} else if (type->type == TY_FUNCTION) {
 		*expr = EXPR_ARGS(E_ADDRESS_OF, *expr);
 	}
+
+	if ((*expr)->data_type->is_const)
+		*expr = EXPR_ARGS(E_CONST_REMOVE, *expr);
 }
 
 void do_integer_promotion(struct expr **expr) {
@@ -180,6 +183,9 @@ struct type *calculate_type(struct expr *expr) {
 	case E_COMMA:
 		return expr->args[1]->data_type;
 
+	case E_CONST_REMOVE:
+		return type_make_const(expr->args[0]->data_type, 0);
+
 	default:
 		printf("%d\n", expr->type);
 		NOTIMP();
@@ -189,6 +195,9 @@ struct type *calculate_type(struct expr *expr) {
 static const int dont_decay_ptr[E_NUM_TYPES] = {
 	[E_ADDRESS_OF] = 1,
 	[E_ARRAY_PTR_DECAY] = 1,
+	[E_ASSIGNMENT_OP] = 1,
+	[E_ASSIGNMENT] = 1,
+	[E_ASSIGNMENT_POINTER] = 1,
 };
 
 static const int num_args[E_NUM_TYPES] = {
@@ -384,22 +393,22 @@ struct expr *expr_new(struct expr expr) {
 			ICE("Wrongly constructed expression of type %d", expr.type);
 	}
 
-	if (!dont_decay_ptr[expr.type]) {
-		for (int i = 0; i < num_args[expr.type]; i++)
-			decay_array(&expr.args[i]);
+	for (int i = dont_decay_ptr[expr.type];
+		 i < num_args[expr.type]; i++) {
+		decay_array(&expr.args[i]);
+	}
 
-		if (expr.type == E_BUILTIN_VA_ARG) {
-			decay_array(&expr.va_arg_.v);
-		} else if (expr.type == E_BUILTIN_VA_START) {
-			decay_array(&expr.va_start_.array);
-		} else if (expr.type == E_BUILTIN_VA_COPY) {
-			decay_array(&expr.va_copy_.d);
-			decay_array(&expr.va_copy_.s);
-		} else if (expr.type == E_CALL) {
-			for (int i = 0; i < expr.call.n_args; i++)
-				decay_array(&expr.call.args[i]);
-			decay_array(&expr.call.callee);
-		}
+	if (expr.type == E_BUILTIN_VA_ARG) {
+		decay_array(&expr.va_arg_.v);
+	} else if (expr.type == E_BUILTIN_VA_START) {
+		decay_array(&expr.va_start_.array);
+	} else if (expr.type == E_BUILTIN_VA_COPY) {
+		decay_array(&expr.va_copy_.d);
+		decay_array(&expr.va_copy_.s);
+	} else if (expr.type == E_CALL) {
+		for (int i = 0; i < expr.call.n_args; i++)
+			decay_array(&expr.call.args[i]);
+		decay_array(&expr.call.callee);
 	}
 
 	int integer_promotion = does_integer_conversion[expr.type];
@@ -868,6 +877,10 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		res = expression_to_ir_result(expr->args[1], res);
 		break;
 
+	case E_CONST_REMOVE:
+		res = expression_to_ir_result(expr->args[0], res);
+		break;
+
 	default:
 		printf("%d\n", expr->type);
 		NOTIMP();
@@ -1061,9 +1074,7 @@ struct expr *parse_prefix() {
 			ERROR(T0->pos, "Expected expression.");
 
 		decay_array(&expr);
-		// Remove all constness. This is a part of lvalue conversions.
-		// TODO: Make removing constness a bit more robust.
-		struct type *match_type = type_make_const(expr->data_type, 0);
+		struct type *match_type = expr->data_type;
 
 		struct expr *res = NULL;
 		int res_is_default = 0;
