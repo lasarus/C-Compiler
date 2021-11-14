@@ -85,7 +85,7 @@ static int escape_char_to_buffer(struct string_view *input,
 		return 0;
 
 	uint32_t character = 0;
-	if (!parse_escape_sequence(input, &character)) {
+	if (!parse_escape_sequence(input, &character, pos)) {
 		if (type == STRING_L || type == STRING_U_LARGE ||
 			type == STRING_U_SMALL) {
 			character = take_utf8(pos, input);

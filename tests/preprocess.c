@@ -13,6 +13,11 @@
 #else
 #endif
 
+#if 0
+// Invalid escape sequences should be ignored.
+const char *str = "adfadf\\\\asdfasdf\dd\d\\d\d\asd\s";
+#endif
+
 int main() {
 	int COMBINE(HELLO) = 10;
 	COMBINE(HELLO) = 30;

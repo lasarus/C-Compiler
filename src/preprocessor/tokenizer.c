@@ -133,7 +133,7 @@ static int parse_pp_number(struct token *next) {
 	return 1;
 }
 
-int parse_escape_sequence(struct string_view *string, uint32_t *character) {
+int parse_escape_sequence(struct string_view *string, uint32_t *character, struct position pos) {
 	if (string->len == 0 || string->str[0] != '\\')
 		return 0;
 
@@ -187,44 +187,10 @@ int parse_escape_sequence(struct string_view *string, uint32_t *character) {
 	case 'v': *character = '\v'; break;
 
 	default:
-		ICE("Invalid escape sequence \\%c", string->str[0]);
+		ERROR(pos, "Invalid escape sequence \\%c", string->str[0]);
 	}
 
 	sv_tail(string, 1);
-
-	return 1;
-}
-
-static int eat_escape_sequence() {
-	if (C0 != '\\')
-		return 0;
-
-	buffer_eat();
-
-	if (HAS_PROP(C0, C_OCTAL_DIGIT)) {
-		for (int i = 0; i < 3 && HAS_PROP(C0, C_OCTAL_DIGIT); i++)
-			buffer_eat();
-
-		return 1;
-	} else if (C0 == 'x') {
-		buffer_eat();
-
-		while (HAS_PROP(C0, C_HEXADECIMAL_DIGIT))
-			buffer_eat();
-
-		return 1;
-	}
-
-	switch (C0) {
-	case '\'': case '\"': case '\?': case '\\':
-	case 'a': case 'b': case 'f': case 'n':
-	case 'r': case 't': case 'v': break;
-
-	default:
-		ERROR(input->pos[0], "Invalid escape sequence \\%c", C0);
-	}
-
-	buffer_eat();
 
 	return 1;
 }
@@ -233,8 +199,9 @@ static int eat_cs_char(char end_char) {
 	if (C0 == '\n' || C0 == end_char)
 		return 0;
 
-	if (!eat_escape_sequence())
+	if (C0 == '\\')
 		buffer_eat();
+	buffer_eat();
 
 	return 1;
 }
