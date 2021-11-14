@@ -5,4 +5,6 @@ float f3 = 0.0 ? 1.0 : 2.2;
 
 int main() {
 	_Static_assert(sizeof(sizeof(int)) == 8, "");
+
+	int a = 10 * (0 / 0);
 }

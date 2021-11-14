@@ -53,13 +53,14 @@ struct constant operators_constant(enum operator_type op,
 	if (type->type != TY_SIMPLE)
 		NOTIMP();
 
+	// TODO: Make division by zero not generate constant expression at all.
 #define OP(TYPE, FIELD) case TYPE:										\
 		switch (op) {													\
 		case OP_ADD: res.FIELD = lhs.FIELD + rhs.FIELD; break;			\
 		case OP_SUB: res.FIELD = lhs.FIELD - rhs.FIELD; break;			\
 		case OP_MUL: res.FIELD = lhs.FIELD * rhs.FIELD; break;			\
-		case OP_DIV: res.FIELD = lhs.FIELD / rhs.FIELD; break;			\
-		case OP_MOD: res.FIELD = lhs.FIELD % rhs.FIELD; break;			\
+		case OP_DIV: res.FIELD = rhs.FIELD ? lhs.FIELD / rhs.FIELD : 0; break; \
+		case OP_MOD: res.FIELD = rhs.FIELD ? lhs.FIELD % rhs.FIELD : 0; break; \
 		case OP_BXOR: res.FIELD = lhs.FIELD ^ rhs.FIELD; break;			\
 		case OP_BOR: res.FIELD = lhs.FIELD | rhs.FIELD; break;			\
 		case OP_BAND: res.FIELD = lhs.FIELD & rhs.FIELD; break;			\
