@@ -62,12 +62,8 @@ static void flush_whitespace(int *whitespace, int *first_of_line) {
 			CNEXT();
 			CNEXT();
 		} else if (C0 == '/' && C1 == '/') {
-			while (!(C0 == '\n')) {
+			while (C0 != '\n' && C0 != '\0')
 				CNEXT();
-
-				if (C0 == '\0')
-					ERROR(input->pos[0], "Comment reached end of file");
-			}
 		} else {
 			break;
 		}
