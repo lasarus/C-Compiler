@@ -1390,9 +1390,8 @@ int evaluate_constant_expression(struct expr *expr,
 
 	case E_ADDRESS_OF: {
 		struct constant operand;
-		if (!evaluate_constant_expression(expr->args[0], &operand)) {
+		if (!evaluate_constant_expression(expr->args[0], &operand))
 			return 0;
-		}
 
 		if (operand.type == CONSTANT_LABEL) {
 			*constant = operand;
@@ -1405,9 +1404,8 @@ int evaluate_constant_expression(struct expr *expr,
 
 	case E_INDIRECTION: {
 		struct constant operand;
-		if (!evaluate_constant_expression(expr->args[0], &operand)) {
+		if (!evaluate_constant_expression(expr->args[0], &operand))
 			return 0;
-		}
 
 		if (operand.type == CONSTANT_LABEL_POINTER) {
 			*constant = operand;
@@ -1426,6 +1424,13 @@ int evaluate_constant_expression(struct expr *expr,
 			return 0;
 
 		*constant = rhs;
+	} break;
+
+	case E_CONST_REMOVE: {
+		struct constant c;
+		if (!evaluate_constant_expression(expr->args[0], &c))
+			return 0;
+		*constant = c;
 	} break;
 
 	default:
