@@ -48,6 +48,7 @@ struct instruction {
 		IR_SWITCH_SELECTION,
 		IR_CALL_VARIABLE,
 		IR_COPY,
+		IR_BOOL_CAST,
 		IR_INT_CAST,
 		IR_FLOAT_CAST,
 		IR_INT_FLOAT_CAST,
@@ -118,6 +119,11 @@ struct instruction {
 			int sign_extend;
 		} int_cast;
 #define IR_PUSH_INT_CAST(RESULT, RHS, SIGN_EXTEND) IR_PUSH(.type = IR_INT_CAST, .result = (RESULT), .int_cast = {(RHS), (SIGN_EXTEND)})
+
+		struct {
+			var_id rhs;
+		} bool_cast;
+#define IR_PUSH_BOOL_CAST(RESULT, RHS) IR_PUSH(.type = IR_BOOL_CAST, .result = (RESULT), .bool_cast = {(RHS)})
 
 		struct {
 			var_id rhs;

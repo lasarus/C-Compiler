@@ -153,6 +153,10 @@ const char *dbg_instruction(struct instruction ins) {
 		DBG_PRINT("%d = int_cast %d (%s)", ins.result, ins.int_cast.rhs, ins.int_cast.sign_extend ? "signed" : "not signed");
 		break;
 
+	case IR_BOOL_CAST:
+		DBG_PRINT("%d = bool_cast %d", ins.result, ins.bool_cast.rhs);
+		break;
+
 	case IR_FLOAT_CAST:
 		DBG_PRINT("%d = float_cast %d", ins.result, ins.float_cast.rhs);
 		break;

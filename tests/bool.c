@@ -26,4 +26,8 @@ int main() {
 	assert(!ret_false());
 	assert(!(ret_true() && ret_false()));
 	assert(!(ret_true() && ret_false()));
+
+	int x = 2;
+	_Bool b = x;
+	assert(b == 1);
 }

@@ -494,6 +494,15 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 		reg_to_scalar(REG_RAX, ins.result);
 	} break;
 
+	case IR_BOOL_CAST: {
+		scalar_to_reg(ins.bool_cast.rhs, REG_RAX);
+
+		emit("testq %%rax, %%rax");
+		emit("setne %%al");
+
+		reg_to_scalar(REG_RAX, ins.result);
+	} break;
+
 	case IR_FLOAT_CAST: {
 		scalar_to_reg(ins.float_cast.rhs, REG_RAX);
 		int size_rhs = get_variable_size(ins.float_cast.rhs),

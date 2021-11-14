@@ -610,6 +610,8 @@ void bitfield_store(struct bitfield_address address, var_id value) {
 
 var_id ir_cast(var_id res, struct type *result_type, var_id rhs, struct type *rhs_type) {
 	if (type_is_simple(result_type, ST_VOID)) {
+	} else if (type_is_simple(result_type, ST_BOOL)) {
+		IR_PUSH_BOOL_CAST(res, rhs);
 	} else if ((type_is_integer(result_type) || type_is_pointer(result_type)) &&
 			   (type_is_integer(rhs_type) || type_is_pointer(rhs_type))) {
 		int sign_extend = type_is_integer(rhs_type) && is_signed(rhs_type->simple);
