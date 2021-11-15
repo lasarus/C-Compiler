@@ -167,92 +167,9 @@ void classify_parameters(struct type *return_type, int n_args, struct type **typ
 	}
 }
 
-void codegen_call(var_id variable, struct type *function_type, struct type **argument_types, int n_args, var_id *args, var_id result) {
-	int total_memory_argument_size, current_gp_reg, current_sse_reg;
-	struct type *return_type = function_type->children[0];
-
-	scalar_to_reg(variable, REG_RBX);
-
-	struct classification classifications[n_args];
-	struct classification return_classification;
-
-	classify_parameters(return_type, n_args, argument_types,
-						classifications,
-						&return_classification,
-						&total_memory_argument_size,
-						&current_gp_reg,
-						&current_sse_reg);
-
-	if (return_classification.pass_in_memory) {
-		emit("leaq -%d(%%rbp), %%rdi", variable_info[result].stack_location);
-	}
-
-	int stack_sub = round_up_to_nearest(total_memory_argument_size, 16);
-	if (stack_sub)
-		emit("subq $%d, %%rsp", stack_sub);
-
-	int current_stack_pos = 0;
-	for (int i = 0; i < n_args; i++) {
-		struct classification *classification = classifications + i;
-		var_id var = args[i];
-
-		if (classification->pass_in_memory) {
-			emit("#Passed in stack:");
-			int stack_loc = variable_info[var].stack_location;
-			for (int i = 0; i < classification->arg_size; i += 8) {
-				emit("movq %d(%%rbp), %%rax", -stack_loc + i);
-				emit("movq %%rax, %d(%%rsp)", current_stack_pos);
-				current_stack_pos += 8;
-			}
-		} else {
-			emit("#Passed in register:");
-			for (int i = 0; i < classification->n_parts; i++) {
-				if (classification->classes[i] == CLASS_INTEGER) {
-					emit("movq -%d(%%rbp), %s",
-						 variable_info[var].stack_location - 8 * i,
-						 get_reg_name(classification->regs[i], 8));
-				} else if (classification->classes[i] == CLASS_SSE) {
-					emit("movsd -%d(%%rbp), %%xmm%d",
-						 variable_info[var].stack_location - 8 * i,
-						 classification->regs[i]);
-				} else {
-					NOTIMP();
-				}
-			}
-		}
-	}
-
-	emit("movl $%d, %%eax", current_sse_reg);
-	emit("callq *%%rbx");
-
-	if (stack_sub)
-		emit("addq $%d, %%rsp", stack_sub);
-
-	if (!return_classification.pass_in_memory && return_type != type_simple(ST_VOID)) {
-		int var_size = get_variable_size(result);
-		for (int i = 0; i < return_classification.n_parts; i++) {
-			int size = var_size - 8 * i;
-			if (size > 8) size = 8;
-			if (return_classification.classes[i] == CLASS_INTEGER) {
-				emit("mov%c %s, -%d(%%rbp)",
-					 size_to_suffix(size),
-					 get_reg_name(return_classification.regs[i], size),
-					 variable_info[result].stack_location - 8 * i);
-			} else if (return_classification.classes[i] == CLASS_SSE) {
-				if (get_variable_size(result) == 4) {
-					emit("movss %%xmm%d, -%d(%%rbp)",
-						 return_classification.regs[i],
-						 variable_info[result].stack_location - 8 * i);
-				} else {
-					emit("movsd %%xmm%d, -%d(%%rbp)",
-						 return_classification.regs[i],
-						 variable_info[result].stack_location - 8 * i);
-				}
-			} else {
-				NOTIMP();
-			}
-		}
-	}
+void codegen_call(var_id variable, int non_clobbered_register) {
+	scalar_to_reg(variable, non_clobbered_register);
+	emit("callq *%s", get_reg_name(non_clobbered_register, 8));
 }
 
 struct reg_save_info {
@@ -282,6 +199,7 @@ void codegen_memzero(int len) {
 	}
 }
 
+// TODO: Why is rdi not destination?
 // From rdi to rsi address
 void codegen_memcpy(int len) {
 	for (int i = 0; i < len;) {
@@ -449,13 +367,8 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 		reg_to_scalar(REG_RAX, ins.result);
 		break;
 
-	case IR_CALL_VARIABLE:
-		codegen_call(ins.call_variable.function,
-					 ins.call_variable.function_type,
-					 ins.call_variable.argument_types,
-					 ins.call_variable.n_args,
-					 ins.call_variable.args,
-					 ins.result);
+	case IR_CALL:
+		codegen_call(ins.call.function, ins.call.non_clobbered_register);
 		break;
 
 	case IR_LOAD: {
@@ -470,6 +383,13 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 		emit("leaq -%d(%%rbp), %%rdi", variable_info[ins.store.value].stack_location);
 
 		codegen_memcpy(get_variable_size(ins.store.value));
+	} break;
+
+	case IR_STORE_STACK_RELATIVE: {
+		emit("leaq %d(%%rsp), %%rsi", ins.store_stack_relative.offset);
+		emit("leaq -%d(%%rbp), %%rdi", variable_info[ins.store_stack_relative.variable].stack_location);
+
+		codegen_memcpy(get_variable_size(ins.store_stack_relative.variable));
 	} break;
 
 	case IR_COPY:
@@ -695,6 +615,35 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 
 	case IR_CLEAR_STACK_BUCKET: // no-op
 	case IR_ADD_TEMPORARY:
+		break;
+
+	case IR_SET_REG:
+		if (ins.set_reg.is_ssa) {
+			emit("movsd -%d(%%rbp), %%xmm%d", variable_info[ins.set_reg.variable].stack_location,
+				 ins.set_reg.register_index);
+		} else {
+			scalar_to_reg(ins.set_reg.variable, ins.set_reg.register_index);
+		}
+		break;
+
+	case IR_GET_REG:
+		if (ins.get_reg.is_ssa) {
+			if (get_variable_size(ins.result) == 4) {
+				emit("movss %%xmm%d, -%d(%%rbp)",
+					 ins.get_reg.register_index,
+					 variable_info[ins.result].stack_location);
+			} else {
+				emit("movsd %%xmm%d, -%d(%%rbp)",
+					 ins.get_reg.register_index,
+					 variable_info[ins.result].stack_location);
+			}
+		} else {
+			reg_to_scalar(ins.get_reg.register_index, ins.result);
+		}
+		break;
+
+	case IR_MODIFY_STACK_POINTER:
+		emit("addq $%d, %%rsp", ins.modify_stack_pointer.change);
 		break;
 
 	default:

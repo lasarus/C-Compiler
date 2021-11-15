@@ -2,6 +2,8 @@
 
 #include <common.h>
 #include <parser/declaration.h>
+#include <arch/calling.h>
+#include <codegen/registers.h>
 
 #include <assert.h>
 
@@ -205,4 +207,163 @@ void ir_init_var(struct initializer *init, var_id result) {
 		} break;
 		}
 	}
+}
+
+void ir_call(var_id result, var_id func_var, struct type *function_type, int n_args, struct type **argument_types, var_id *args, enum call_abi abi) {
+	struct type *return_type = function_type->children[0];
+
+	static int regs_size = 0, regs_cap = 0;
+	regs_size = 0;
+	struct reg_info {
+		var_id variable;
+		int register_idx, is_sse;
+	} *regs = NULL;
+
+	static int ret_regs_size = 0, ret_regs_cap = 0;
+	ret_regs_size = 0;
+	struct reg_info *ret_regs = NULL;
+
+	static int stack_variables_size = 0, stack_variables_cap = 0;
+	stack_variables_size = 0;
+	var_id *stack_variables = NULL;
+
+	switch (abi) {
+	case CALL_ABI_MICROSOFT:
+		NOTIMP();
+		break;
+	case CALL_ABI_SYSV: {
+		static const int calling_convention[] = {REG_RDI, REG_RSI, REG_RDX, REG_RCX, REG_R8, REG_R9};
+		static const int return_convention[] = { REG_RAX, REG_RDX };
+
+		int current_gp_reg = 0, current_sse_reg = 0;
+		const int max_gp_reg = 6, max_sse_reg = 8;
+		if (!type_is_simple(return_type, ST_VOID)) {
+			int n_parts;
+			enum parameter_class classes[4];
+			classify(return_type, &n_parts, classes);
+
+			if (classes[0] == CLASS_MEMORY) {
+				var_id address = new_variable_sz(8, 1, 1);
+				IR_PUSH_ADDRESS_OF(address, result);
+				current_gp_reg = 1;
+				ADD_ELEMENT(regs_size, regs_cap, regs) = (struct reg_info) {
+					.variable = address,
+					.register_idx = calling_convention[0]
+				};
+			} else {
+				int gp_idx = 0, ssa_idx = 0;
+				for (int j = 0; j < n_parts; j++) {
+					var_id part = new_variable_sz(8, 1, 1);
+					if (classes[j] == CLASS_SSE || classes[j] == CLASS_SSEUP) {
+						ADD_ELEMENT(ret_regs_size, ret_regs_cap, ret_regs) = (struct reg_info) {
+							.variable = part,
+							.is_sse = 1,
+							.register_idx = ssa_idx++
+						};
+					} else {
+						ADD_ELEMENT(ret_regs_size, ret_regs_cap, ret_regs) = (struct reg_info) {
+							.variable = part,
+							.is_sse = 0,
+							.register_idx = return_convention[gp_idx++]
+						};
+					}
+				}
+			}
+		}
+
+		for (int i = 0; i < n_args; i++) {
+			struct type *type = argument_types[i];
+			int n_parts;
+			enum parameter_class classes[4];
+
+			classify(type, &n_parts, classes);
+
+			int is_memory = 0;
+
+			int n_gp_regs = 0, n_sse_regs = 0;
+			for (int j = 0; j < n_parts; j++) {
+				if (classes[j] == CLASS_MEMORY)
+					is_memory = 1;
+				else if (classes[j] == CLASS_SSE || classes[j] == CLASS_SSEUP)
+					n_sse_regs++;
+				else if (classes[j] == CLASS_INTEGER)
+					n_gp_regs++;
+				else
+					NOTIMP();
+			}
+
+			is_memory = classes[0] == CLASS_MEMORY ||
+				current_gp_reg + n_gp_regs > max_gp_reg ||
+				current_sse_reg + n_sse_regs > max_sse_reg;
+			if (is_memory) {
+				ADD_ELEMENT(stack_variables_size, stack_variables_cap, stack_variables) = args[i];
+			} else {
+				var_id address = new_variable_sz(8, 1, 1);
+				var_id eight_constant = new_variable_sz(8, 1, 1);
+				IR_PUSH_CONSTANT(((struct constant) { .type = CONSTANT_TYPE,
+							.data_type = type_simple(ST_ULLONG), .ullong_d = 8 }),
+					eight_constant);
+				IR_PUSH_ADDRESS_OF(address, args[i]);
+				for (int j = 0; j < n_parts; j++) {
+					var_id part = new_variable_sz(8, 1, 1);
+					IR_PUSH_LOAD(part, address);
+					IR_PUSH_BINARY_OPERATOR(IBO_ADD, address, eight_constant, address);
+
+					if (classes[j] == CLASS_SSE || classes[j] == CLASS_SSEUP) {
+						ADD_ELEMENT(regs_size, regs_cap, regs) = (struct reg_info) {
+							.variable = part,
+							.is_sse = 1,
+							.register_idx = current_sse_reg++
+						};
+					} else {
+						ADD_ELEMENT(regs_size, regs_cap, regs) = (struct reg_info) {
+							.variable = part,
+							.is_sse = 0,
+							.register_idx = calling_convention[current_gp_reg++]
+						};
+					}
+				}
+			}
+		}
+	} break;
+	}
+
+	int total_mem_needed = 0;
+	for (int i = 0; i < stack_variables_size; i++) {
+		total_mem_needed += round_up_to_nearest(get_variable_size(stack_variables[i]), 8);
+	}
+	int stack_sub = round_up_to_nearest(total_mem_needed, 16);
+
+	IR_PUSH_MODIFY_STACK_POINTER(-stack_sub);
+
+	int current_mem = 0;
+	for (int i = 0; i < stack_variables_size; i++) {
+		IR_PUSH_STORE_STACK_RELATIVE(current_mem, stack_variables[i]);
+		current_mem += round_up_to_nearest(get_variable_size(stack_variables[i]), 8);
+	}
+
+	for (int i = 0; i < regs_size; i++)
+		IR_PUSH_SET_REG(regs[i].variable, regs[i].register_idx, regs[i].is_sse);
+
+	IR_PUSH_CALL(func_var, REG_RBX);
+
+	for (int i = 0; i < ret_regs_size; i++)
+		IR_PUSH_GET_REG(ret_regs[i].variable, ret_regs[i].register_idx, ret_regs[i].is_sse);
+
+	if (ret_regs_size == 1) {
+		IR_PUSH_INT_CAST(result, ret_regs[0].variable, 0);
+	} else if (ret_regs_size == 2) {
+		var_id address = new_variable_sz(8, 1, 1);
+		var_id eight_constant = new_variable_sz(8, 1, 1);
+		IR_PUSH_CONSTANT(((struct constant) { .type = CONSTANT_TYPE,
+					.data_type = type_simple(ST_ULLONG), .ullong_d = 8 }),
+			eight_constant);
+		IR_PUSH_ADDRESS_OF(address, result);
+
+		IR_PUSH_STORE(ret_regs[0].variable, address);
+		IR_PUSH_BINARY_OPERATOR(IBO_ADD, address, eight_constant, address);
+		IR_PUSH_STORE(ret_regs[1].variable, address);
+	}
+
+	IR_PUSH_MODIFY_STACK_POINTER(+stack_sub);
 }

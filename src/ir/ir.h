@@ -46,7 +46,7 @@ struct instruction {
 		IR_ADDRESS_OF,
 		IR_CONSTANT,
 		IR_SWITCH_SELECTION,
-		IR_CALL_VARIABLE,
+		IR_CALL,
 		IR_COPY,
 		IR_BOOL_CAST,
 		IR_INT_CAST,
@@ -60,6 +60,15 @@ struct instruction {
 		IR_ADD_TEMPORARY,
 		IR_CLEAR_STACK_BUCKET,
 		IR_RESIZE,
+
+		// You should be careful with these instructions.
+		// They are here to allow for easier implementation
+		// of different calling conventions.
+		// Registers might be overwritten by other instructions.
+		IR_SET_REG,
+		IR_GET_REG,
+		IR_MODIFY_STACK_POINTER,
+		IR_STORE_STACK_RELATIVE,
 
 		IR_TYPE_COUNT
 	} type;
@@ -107,12 +116,10 @@ struct instruction {
 #define IR_PUSH_CONSTANT(CONSTANT, RESULT) IR_PUSH(.type = IR_CONSTANT, .result=(RESULT), .constant = {(CONSTANT)})
 		struct {
 			var_id function;
-			struct type *function_type;
-			struct type **argument_types;
-			int n_args;
-			var_id *args;
-		} call_variable;
-#define IR_PUSH_CALL_VARIABLE(VARIABLE, FUNCTION_TYPE, ARGUMENT_TYPES, N_ARGS, ARGS, RESULT) IR_PUSH(.type = IR_CALL_VARIABLE, .result = (RESULT), .call_variable = {(VARIABLE), (FUNCTION_TYPE), (ARGUMENT_TYPES), (N_ARGS), (ARGS)})
+			int non_clobbered_register;
+		} call;
+//#define IR_PUSH_CALL_VARIABLE(VARIABLE, RETURN_TYPE, ARGUMENT_TYPES, N_ARGS, ARGS, RESULT) IR_PUSH(.type = IR_CALL_VARIABLE, .result = (RESULT), .call_variable = {(VARIABLE), (RETURN_TYPE), (ARGUMENT_TYPES), (N_ARGS), (ARGS)})
+#define IR_PUSH_CALL(VARIABLE, NON_CLOBBERED_REGISTER) IR_PUSH(.type = IR_CALL, .call = {(VARIABLE), (NON_CLOBBERED_REGISTER)})
 
 		struct {
 			var_id rhs;
@@ -156,6 +163,26 @@ struct instruction {
 			int stack_bucket;
 		} clear_stack_bucket;
 #define IR_PUSH_CLEAR_STACK_BUCKET(STACK_BUCKET) IR_PUSH(.type = IR_CLEAR_STACK_BUCKET, .clear_stack_bucket = {(STACK_BUCKET)})
+
+		struct {
+			int register_index, is_ssa;
+			var_id variable;
+		} set_reg;
+#define IR_PUSH_SET_REG(VARIABLE, REGISTER_INDEX, IS_SSA) IR_PUSH(.type = IR_SET_REG, .set_reg = {(REGISTER_INDEX), (IS_SSA), (VARIABLE)})
+		struct {
+			int register_index, is_ssa;
+		} get_reg;
+#define IR_PUSH_GET_REG(RESULT, REGISTER_INDEX, IS_SSA) IR_PUSH(.type = IR_GET_REG, .result = (RESULT), .get_reg = {(REGISTER_INDEX), (IS_SSA)})
+
+		struct {
+			int change;
+		} modify_stack_pointer;
+#define IR_PUSH_MODIFY_STACK_POINTER(CHANGE) IR_PUSH(.type = IR_MODIFY_STACK_POINTER, .modify_stack_pointer = {(CHANGE)})
+		struct {
+			int offset;
+			var_id variable;
+		} store_stack_relative;
+#define IR_PUSH_STORE_STACK_RELATIVE(OFFSET, VARIABLE) IR_PUSH(.type = IR_STORE_STACK_RELATIVE, .store_stack_relative = {(OFFSET), (VARIABLE)})
 	};
 };
 
@@ -246,6 +273,12 @@ void ir_init_var(struct initializer *init, var_id result);
 void ir_get_offset(var_id member_address, var_id base_address, var_id offset_var, int offset);
 void ir_set_bits(var_id result, var_id field, var_id value, int offset, int length);
 void ir_get_bits(var_id result, var_id field, int offset, int length, int sign_extend);
+
+enum call_abi {
+	CALL_ABI_MICROSOFT,
+	CALL_ABI_SYSV
+};
+void ir_call(var_id result, var_id func_var, struct type *function_type, int n_args, struct type **argument_types, var_id *args, enum call_abi abi);
 
 struct function *get_current_function(void);
 struct block *get_current_block(void);

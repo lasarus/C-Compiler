@@ -698,7 +698,7 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 			ICE("Can't call type %s", dbg_type(func_type));
 		}
 
-		IR_PUSH_CALL_VARIABLE(func_var, type_deref(func_type), arg_types, expr->call.n_args, args, res);
+		ir_call(res, func_var, type_deref(func_type), expr->call.n_args, arg_types, args, CALL_ABI_SYSV);
 	} break;
 
 	case E_VARIABLE:
@@ -1076,7 +1076,7 @@ struct expr *parse_prefix() {
 			ERROR(T0->pos, "Expected expression.");
 
 		decay_array(&expr);
-		struct type *match_type = expr->data_type;
+		struct type *match_type = type_make_const(expr->data_type, 0);
 
 		struct expr *res = NULL;
 		int res_is_default = 0;

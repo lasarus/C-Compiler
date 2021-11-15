@@ -1,6 +1,7 @@
 #include "debug.h"
 
 #include <common.h>
+#include <codegen/registers.h>
 
 #include <stdlib.h>
 
@@ -127,14 +128,8 @@ const char *dbg_instruction(struct instruction ins) {
 			   ins.negate_float.operand);
 		break;
 
-	case IR_CALL_VARIABLE:
-		DBG_PRINT("%d = %d (", ins.result, ins.call_variable.function);
-		for (int i = 0; i < ins.call_variable.n_args; i++) {
-			if (i)
-				DBG_PRINT(", ");
-			DBG_PRINT("%d", ins.call_variable.args[i]);
-		}
-		DBG_PRINT(")");
+	case IR_CALL:
+		DBG_PRINT("%d = %d ( ... args ... )", ins.result, ins.call.function);
 		break;
 
 	case IR_LOAD:
@@ -143,6 +138,10 @@ const char *dbg_instruction(struct instruction ins) {
 
 	case IR_STORE:
 		DBG_PRINT("store %d into %d", ins.store.value, ins.store.pointer);
+		break;
+
+	case IR_STORE_STACK_RELATIVE:
+		DBG_PRINT("store %d into %d relative to stack", ins.store_stack_relative.variable, ins.store_stack_relative.offset);
 		break;
 
 	case IR_COPY:
@@ -193,6 +192,18 @@ const char *dbg_instruction(struct instruction ins) {
 
 	case IR_ADD_TEMPORARY:
 		DBG_PRINT("%d <- temporary", ins.result);
+		break;
+
+	case IR_GET_REG:
+		DBG_PRINT("%d <- %s", ins.result, get_reg_name(ins.get_reg.register_index, 8));
+		break;
+
+	case IR_SET_REG:
+		DBG_PRINT("set_reg %s %d", get_reg_name(ins.set_reg.register_index, 8), ins.set_reg.variable);
+		break;
+
+	case IR_MODIFY_STACK_POINTER:
+		DBG_PRINT("modify stack pointer by %d", ins.modify_stack_pointer.change);
 		break;
 
 	default:
