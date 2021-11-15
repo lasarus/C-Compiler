@@ -228,11 +228,68 @@ void ir_call(var_id result, var_id func_var, struct type *function_type, int n_a
 	var_id *stack_variables = NULL;
 
 	switch (abi) {
-	case CALL_ABI_MICROSOFT:
-		NOTIMP();
-		break;
+	case CALL_ABI_MICROSOFT: {
+		static const int calling_convention[] = { REG_RCX, REG_RDX, REG_R8, REG_R9 };
+		int current_reg = 0;
+
+		if (!type_is_simple(return_type, ST_VOID)) {
+			int ret_size = calculate_size(return_type);
+			int can_be_reg = ret_size == 1 || ret_size == 2 || ret_size == 4 || ret_size == 8;
+
+			if (can_be_reg) {
+				if (type_is_floating(return_type)) {
+					ADD_ELEMENT(ret_regs_size, ret_regs_cap, ret_regs) = (struct reg_info) {
+						.variable = result,
+						.is_sse = 1,
+						.register_idx = REG_RAX
+					};
+				} else {
+					ADD_ELEMENT(ret_regs_size, ret_regs_cap, ret_regs) = (struct reg_info) {
+						.variable = result,
+						.is_sse = 0,
+						.register_idx = 0 // xmm0
+					};
+				}
+			} else {
+				var_id address = new_variable_sz(8, 1, 1);
+				IR_PUSH_ADDRESS_OF(address, result);
+				current_reg = 1;
+				ADD_ELEMENT(regs_size, regs_cap, regs) = (struct reg_info) {
+					.variable = address,
+					.register_idx = calling_convention[0]
+				};
+			}
+		}
+
+		for (int i = 0; i < n_args; i++) {
+			struct type *type = argument_types[i];
+			var_id v = args[i];
+			int size = calculate_size(type);
+			int can_be_reg = size == 1 || size == 2 || size == 4 || size == 8;
+
+			var_id reg_to_push = v;
+			if (!can_be_reg) {
+				var_id copy = new_variable_sz(get_variable_size(v), 1, 1);
+				IR_PUSH_COPY(copy, v);
+				var_id address = new_variable_sz(8, 1, 1);
+				IR_PUSH_ADDRESS_OF(address, copy);
+				current_reg = 1;
+				reg_to_push = address;
+			}
+
+			if (current_reg < 4) {
+				ADD_ELEMENT(regs_size, regs_cap, regs) = (struct reg_info) {
+					.variable = reg_to_push,
+					.register_idx = calling_convention[current_reg++]
+				};
+			} else {
+				ADD_ELEMENT(stack_variables_size, stack_variables_cap, stack_variables) = reg_to_push;
+			}
+		}
+	} break;
+
 	case CALL_ABI_SYSV: {
-		static const int calling_convention[] = {REG_RDI, REG_RSI, REG_RDX, REG_RCX, REG_R8, REG_R9};
+		static const int calling_convention[] = { REG_RDI, REG_RSI, REG_RDX, REG_RCX, REG_R8, REG_R9 };
 		static const int return_convention[] = { REG_RAX, REG_RDX };
 
 		int current_gp_reg = 0, current_sse_reg = 0;
