@@ -439,7 +439,6 @@ static struct call_info get_calling_convention(var_id result, struct type *funct
 }
 
 void ir_call(var_id result, var_id func_var, struct type *function_type, int n_args, struct type **argument_types, var_id *args, enum call_abi abi) {
-	abi = CALL_ABI_MICROSOFT;
 	struct call_info c = get_calling_convention(result, function_type, n_args, argument_types, args, abi, 1);
 
 	if (c.returns_address) {
@@ -514,7 +513,6 @@ void ir_call(var_id result, var_id func_var, struct type *function_type, int n_a
 
 void ir_new_function(struct type *function_type, var_id *args, const char *name, int is_global,
 					 enum call_abi abi) {
-	abi = CALL_ABI_MICROSOFT;
 	int n_args = function_type->n - 1;
 
 	struct function *func = &ADD_ELEMENT(ir.size, ir.cap, ir.functions);
