@@ -136,6 +136,10 @@ const char *dbg_instruction(struct instruction ins) {
 		DBG_PRINT("%d = load %d", ins.result, ins.load.pointer);
 		break;
 
+	case IR_LOAD_BASE_RELATIVE:
+		DBG_PRINT("%d = load %d relative to base", ins.result, ins.load_base_relative.offset);
+		break;
+
 	case IR_STORE:
 		DBG_PRINT("store %d into %d", ins.store.value, ins.store.pointer);
 		break;

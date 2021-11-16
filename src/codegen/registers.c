@@ -59,8 +59,27 @@ void scalar_to_reg(var_id scalar, int reg) {
 
 void reg_to_scalar(int reg, var_id scalar) {
 	int size = get_variable_size(scalar);
-	emit("mov%c %s, -%d(%%rbp)", size_to_suffix(size),
-		 registers[reg][size_to_idx(size)], variable_info[scalar].stack_location);
+	int msize = 0;
+	for (int i = 0; i < size;) {
+		if (msize)
+			emit("shrq $%d, %s", msize * 8, get_reg_name(reg, 8));
+
+		if (i + 8 <= size) {
+			msize = 8;
+		} else if (i + 4 <= size) {
+			msize = 4;
+		} else if (i + 2 <= size) {
+			msize = 2;
+		} else if (i + 1 <= size) {
+			msize = 1;
+		}
+		emit("mov%c %s, -%d(%%rbp)",
+			 size_to_suffix(msize),
+			 get_reg_name(reg, msize),
+			 variable_info[scalar].stack_location - i);
+
+		i += msize;
+	}
 }
 
 void load_address(struct type *type, var_id result) {

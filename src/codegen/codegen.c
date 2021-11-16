@@ -12,8 +12,6 @@
 #include <assert.h>
 #include <stdarg.h>
 
-static const int calling_convention[] = {REG_RDI, REG_RSI, REG_RDX, REG_RCX, REG_R8, REG_R9};
-
 struct variable_info *variable_info;
 
 struct {
@@ -78,93 +76,6 @@ void codegen_binary_operator(enum ir_binary_operator ibo,
 	emit("%s", binary_operator_outputs[size == 4 ? 0 : 1][ibo]);
 
 	reg_to_scalar(REG_RAX, res);
-}
-
-struct classification {
-	int n_parts;
-	enum parameter_class classes[4];
-	int pass_in_memory; // TODO: remove
-	int arg_size; // TODO: remove this or n_parts
-	union {
-		int regs[4];
-		int mem_pos;
-	};
-};
-
-void classify_parameters(struct type *return_type, int n_args, struct type **types,
-						 struct classification *classifications,
-						 struct classification *return_classification,
-						 int *total_memory_argument_size,
-						 int *current_gp_reg,
-						 int *current_sse_reg) {
-	if (return_type != type_simple(ST_VOID)) {
-		classify(return_type, &return_classification->n_parts,
-				 return_classification->classes);
-
-		if (return_classification->n_parts == 1 &&
-			return_classification->classes[0] == CLASS_MEMORY) {
-			return_classification->pass_in_memory = 1;
-		} else {
-			return_classification->pass_in_memory = 0;
-			static const int return_convention[] = {REG_RAX, REG_RDX};
-			if (return_classification->n_parts > 2)
-				ICE("Classification error.");
-			for (int j = 0; j < return_classification->n_parts; j++) {
-				if (return_classification->classes[j] == CLASS_INTEGER) {
-					return_classification->regs[j] = return_convention[j];
-				} else if (return_classification->classes[j] == CLASS_SSE) {
-					return_classification->regs[j] = j;
-				} else {
-					NOTIMP();
-				}
-			}
-		}
-	} else {
-		return_classification->pass_in_memory = 0;
-	}
-
-	*total_memory_argument_size = 0;
-	*current_gp_reg = 0;
-	*current_sse_reg = 0;
-	if (return_classification->pass_in_memory)
-		(*current_gp_reg)++;
-
-	for (int i = 0; i < n_args; i++) {
-		struct type *type = types[i];
-		struct classification *classification = classifications + i;
-
-		int size_rounded = round_up_to_nearest(calculate_size(type), 8);
-
-		classification->pass_in_memory = 1;
-		classification->arg_size = size_rounded;
-
-		classify(type, &classification->n_parts, classification->classes);
-
-		if (classification->n_parts == 1 &&
-			classification->classes[0] == CLASS_MEMORY) {
-			classification->mem_pos = *total_memory_argument_size;
-			*total_memory_argument_size += size_rounded;
-		} else {
-			if (classification->n_parts + *current_gp_reg > 6) {
-				classification->mem_pos = *total_memory_argument_size;
-				*total_memory_argument_size += size_rounded;
-			} else {
-				for (int j = 0; j < classification->n_parts; j++) {
-					switch (classification->classes[j]) {
-					case CLASS_INTEGER:
-						classification->regs[j] = calling_convention[(*current_gp_reg)++];
-						break;
-					case CLASS_SSE:
-						classification->regs[j] = (*current_sse_reg)++;
-						break;
-					default:
-						NOTIMP();
-					}
-				}
-				classification->pass_in_memory = 0;
-			}
-		}
-	}
 }
 
 void codegen_call(var_id variable, int non_clobbered_register) {
@@ -377,6 +288,13 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 
 		codegen_memcpy(get_variable_size(ins.result));
 	} break;
+
+	case IR_LOAD_BASE_RELATIVE:
+		emit("leaq %d(%%rbp), %%rdi", ins.load_base_relative.offset);
+		emit("leaq -%d(%%rbp), %%rsi", variable_info[ins.result].stack_location);
+
+		codegen_memcpy(get_variable_size(ins.result));
+	break;
 
 	case IR_STORE: {
 		scalar_to_reg(ins.store.pointer, REG_RSI);
@@ -652,7 +570,7 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 	}
 }
 
-void codegen_block(struct block *block, struct reg_save_info reg_save_info) {
+void codegen_block(struct block *block, struct function *func, struct reg_save_info reg_save_info) {
 	emit(".LB%d:", block->id);
 
 	for (int i = 0; i < block->size; i++) {
@@ -690,7 +608,7 @@ void codegen_block(struct block *block, struct reg_save_info reg_save_info) {
 			classify(ret_type, &n_parts, classes);
 
 			if (n_parts == 1 && classes[0] == CLASS_MEMORY) {
-				emit("movq -%d(%%rbp), %%rsi", 8);
+				emit("movq -%d(%%rbp), %%rsi", variable_info[func->ret_ptr].stack_location);
 				emit("leaq -%d(%%rbp), %%rdi", variable_info[ret].stack_location);
 
 				codegen_memcpy(calculate_size(ret_type));
@@ -738,56 +656,11 @@ void codegen_block(struct block *block, struct reg_save_info reg_save_info) {
 	}
 }
 
-void codegen_reg_to_stack(int reg, int size, int stack_location) {
-	int msize = 0;
-	for (int i = 0; i < size;) {
-		if (msize)
-			emit("shrq $%d, %s", msize * 8, get_reg_name(reg, 8));
-
-		if (i + 8 <= size) {
-			msize = 8;
-		} else if (i + 4 <= size) {
-			msize = 4;
-		} else if (i + 2 <= size) {
-			msize = 2;
-		} else if (i + 1 <= size) {
-			msize = 1;
-		}
-		emit("mov%c %s, -%d(%%rbp)",
-			 size_to_suffix(msize),
-			 get_reg_name(reg, msize),
-			 stack_location - i);
-
-		i += msize;
-	}
-}
-
 void codegen_function(struct function *func) {
 	int temp_stack_count = 0, perm_stack_count = 0;
 	int max_temp_stack = 0;
 
-	struct type *return_type = func->signature->children[0];
-	int n_args = func->signature->n - 1;
-	int total_memory_argument_size, current_gp_reg, current_sse_reg;
-	struct classification classifications[n_args];
-	struct classification return_classification;
-
-	classify_parameters(return_type, func->signature->n - 1, func->signature->children + 1,
-						classifications,
-						&return_classification,
-						&total_memory_argument_size,
-						&current_gp_reg,
-						&current_sse_reg);
-
-	if (return_type != type_simple(ST_VOID) &&
-		return_classification.pass_in_memory) {
-		perm_stack_count += 8;
-	}
-
 	struct reg_save_info reg_save_info;
-	reg_save_info.fp_offset = 0;
-	reg_save_info.gp_offset = (current_gp_reg) * 8;
-	reg_save_info.overflow_position = 16;
 
 	for (int i = 0; i < func->var_size; i++) {
 		var_id var = func->vars[i];
@@ -802,10 +675,13 @@ void codegen_function(struct function *func) {
 		variable_info[var].stack_location = perm_stack_count;
 	}
 
-	if (func->uses_va) {
+	if (func->uses_va && func->abi == CALL_ABI_SYSV) {
 		perm_stack_count += 304; // Magic number, size of register save area.
 		// According to Figure 3.33 in sysV AMD64 ABI.
+		reg_save_info.fp_offset = 0;
 		reg_save_info.reg_save_position = perm_stack_count;
+		reg_save_info.gp_offset = func->gp_offset;
+		reg_save_info.overflow_position = func->overflow_position;
 	}
 
 	vla_info.size = 0;
@@ -849,65 +725,29 @@ void codegen_function(struct function *func) {
 	if (stack_sub)
 		emit("subq $%d, %%rsp", stack_sub);
 
-	if (return_type != type_simple(ST_VOID) &&
-		return_classification.pass_in_memory) {
-		emit("movq %%rdi, -%d(%%rbp)", 8);
-	}
-
 	if (func->uses_va) {
-		emit("leaq -%d(%%rbp), %%rax", reg_save_info.reg_save_position);
-		emit("movq %%rdi, %d(%%rax)", 0);
-		emit("movq %%rsi, %d(%%rax)", 8);
-		emit("movq %%rdx, %d(%%rax)", 16);
-		emit("movq %%rcx, %d(%%rax)", 24);
-		emit("movq %%r8, %d(%%rax)", 32);
-		emit("movq %%r9, %d(%%rax)", 40);
-		// TODO: xmm0-15
+		switch (func->abi) {
+		case CALL_ABI_SYSV:
+			emit("movq %%rdi, -%d(%%rbp)", reg_save_info.reg_save_position - 0);
+			emit("movq %%rsi, -%d(%%rbp)", reg_save_info.reg_save_position - 8);
+			emit("movq %%rdx, -%d(%%rbp)", reg_save_info.reg_save_position - 16);
+			emit("movq %%rcx, -%d(%%rbp)", reg_save_info.reg_save_position - 24);
+			emit("movq %%r8, -%d(%%rbp)", reg_save_info.reg_save_position - 32);
+			emit("movq %%r9, -%d(%%rbp)", reg_save_info.reg_save_position - 40);
+			// TODO: xmm0-15
+			break;
+
+		default:
+			NOTIMP();
+		}
 	}
 
 	for (size_t i = 0; i < vla_info.size; i++) {
 		emit("movq $0, -%d(%%rbp)", variable_info[vla_info.slots[i].slot].stack_location);
 	}
 
-	for (int i = 0; i < n_args; i++) {
-		struct classification *classification = classifications + i;
-		var_id var = func->named_arguments[i];
-		int var_size = get_variable_size(var);
-
-		if (classification->pass_in_memory) {
-			// TODO: This doesn't have to copy memory at all.
-			emit("#Passed in stack:");
-			codegen_stackcpy(-variable_info[var].stack_location, classification->mem_pos + 16, var_size);
-		} else {
-			emit("#Passed in register:");
-			for (int i = 0; i < classification->n_parts; i++) {
-				int size = var_size - 8 * i;
-				if (size > 8) size = 8;
-				if (classification->classes[i] == CLASS_INTEGER) {
-					codegen_reg_to_stack(classification->regs[i],
-										 size,
-										 variable_info[var].stack_location - 8 * i);
-				} else if (classification->classes[i] == CLASS_SSE) {
-					if (get_variable_size(var) == 4) {
-						emit("movss %%xmm%d, -%d(%%rbp)",
-							 classification->regs[i],
-							 variable_info[var].stack_location - 8 * i);
-					} else {
-						emit("movsd %%xmm%d, -%d(%%rbp)",
-							 classification->regs[i],
-							 variable_info[var].stack_location - 8 * i);
-					}
-				} else {
-					NOTIMP();
-				}
-			}
-		}
-	}
-
-	reg_save_info.overflow_position = total_memory_argument_size + 16;
-
 	for (int i = 0; i < func->size; i++) {
-		codegen_block(get_block(func->blocks[i]), reg_save_info);
+		codegen_block(get_block(func->blocks[i]), func, reg_save_info);
 	}
 
 	int total_stack_usage = max_temp_stack + perm_stack_count;

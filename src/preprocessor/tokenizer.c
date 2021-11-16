@@ -306,6 +306,7 @@ static int is_header, is_directive;
 struct token tokenizer_next(void) {
 	struct token next = { 0 };
 
+
 	flush_whitespace(&next.whitespace,
 					 &next.first_of_line);
 

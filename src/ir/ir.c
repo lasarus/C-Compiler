@@ -47,15 +47,6 @@ void ir_block_start(block_id id) {
 	ADD_ELEMENT(func->size, func->cap, func->blocks) = id;
 }
 
-void ir_new_function(struct type *signature, var_id *arguments, const char *name, int is_global) {
-	ADD_ELEMENT(ir.size, ir.cap, ir.functions) = (struct function) {
-		.signature = signature,
-		.named_arguments = arguments,
-		.name = name,
-		.is_global = is_global
-	};
-}
-
 void allocate_var(var_id var) {
 	struct function *func = &ir.functions[ir.size - 1];
 	ADD_ELEMENT(func->var_size, func->var_cap, func->vars) = var;
@@ -209,15 +200,36 @@ void ir_init_var(struct initializer *init, var_id result) {
 	}
 }
 
-void ir_call(var_id result, var_id func_var, struct type *function_type, int n_args, struct type **argument_types, var_id *args, enum call_abi abi) {
+struct reg_info {
+	var_id variable;
+	int register_idx, is_sse;
+	var_id merge_into, merge_pos;
+};
+
+struct call_info {
+	int regs_size;
+	struct reg_info *regs;
+
+	int ret_regs_size;
+	struct reg_info *ret_regs;
+
+	int stack_variables_size;
+	var_id *stack_variables;
+
+	int returns_address;
+	var_id ret_address;
+
+	int gp_offset;
+
+	int rax;
+};
+
+static struct call_info get_calling_convention(var_id result, struct type *function_type, int n_args, struct type **argument_types, var_id *args, enum call_abi abi, int calling) {
 	struct type *return_type = function_type->children[0];
 
 	static int regs_size = 0, regs_cap = 0;
 	regs_size = 0;
-	struct reg_info {
-		var_id variable;
-		int register_idx, is_sse;
-	} *regs = NULL;
+	struct reg_info *regs = NULL;
 
 	static int ret_regs_size = 0, ret_regs_cap = 0;
 	ret_regs_size = 0;
@@ -226,6 +238,13 @@ void ir_call(var_id result, var_id func_var, struct type *function_type, int n_a
 	static int stack_variables_size = 0, stack_variables_cap = 0;
 	stack_variables_size = 0;
 	var_id *stack_variables = NULL;
+
+	int returns_address = 0;
+	var_id ret_address;
+
+	int gp_offset = 0;
+
+	int rax = -1;
 
 	switch (abi) {
 	case CALL_ABI_MICROSOFT: {
@@ -251,11 +270,11 @@ void ir_call(var_id result, var_id func_var, struct type *function_type, int n_a
 					};
 				}
 			} else {
-				var_id address = new_variable_sz(8, 1, 1);
-				IR_PUSH_ADDRESS_OF(address, result);
+				returns_address = 1;
+				ret_address = new_variable_sz(8, 1, 1);
 				current_reg = 1;
 				ADD_ELEMENT(regs_size, regs_cap, regs) = (struct reg_info) {
-					.variable = address,
+					.variable = ret_address,
 					.register_idx = calling_convention[0]
 				};
 			}
@@ -292,6 +311,8 @@ void ir_call(var_id result, var_id func_var, struct type *function_type, int n_a
 		static const int calling_convention[] = { REG_RDI, REG_RSI, REG_RDX, REG_RCX, REG_R8, REG_R9 };
 		static const int return_convention[] = { REG_RAX, REG_RDX };
 
+		rax = 0;
+
 		int current_gp_reg = 0, current_sse_reg = 0;
 		const int max_gp_reg = 6, max_sse_reg = 8;
 		if (!type_is_simple(return_type, ST_VOID)) {
@@ -300,11 +321,12 @@ void ir_call(var_id result, var_id func_var, struct type *function_type, int n_a
 			classify(return_type, &n_parts, classes);
 
 			if (classes[0] == CLASS_MEMORY) {
-				var_id address = new_variable_sz(8, 1, 1);
-				IR_PUSH_ADDRESS_OF(address, result);
+				returns_address = 1;
+				ret_address = new_variable_sz(8, 1, 1);
+
 				current_gp_reg = 1;
 				ADD_ELEMENT(regs_size, regs_cap, regs) = (struct reg_info) {
-					.variable = address,
+					.variable = ret_address,
 					.register_idx = calling_convention[0]
 				};
 			} else {
@@ -333,6 +355,7 @@ void ir_call(var_id result, var_id func_var, struct type *function_type, int n_a
 			int n_parts;
 			enum parameter_class classes[4];
 
+			int argument_size = get_variable_size(args[i]);
 			classify(type, &n_parts, classes);
 
 			int is_memory = 0;
@@ -355,61 +378,117 @@ void ir_call(var_id result, var_id func_var, struct type *function_type, int n_a
 			if (is_memory) {
 				ADD_ELEMENT(stack_variables_size, stack_variables_cap, stack_variables) = args[i];
 			} else {
-				var_id address = new_variable_sz(8, 1, 1);
-				var_id eight_constant = new_variable_sz(8, 1, 1);
-				IR_PUSH_CONSTANT(((struct constant) { .type = CONSTANT_TYPE,
-							.data_type = type_simple(ST_ULLONG), .ullong_d = 8 }),
-					eight_constant);
-				IR_PUSH_ADDRESS_OF(address, args[i]);
 				for (int j = 0; j < n_parts; j++) {
-					var_id part = new_variable_sz(8, 1, 1);
-					IR_PUSH_LOAD(part, address);
-					IR_PUSH_BINARY_OPERATOR(IBO_ADD, address, eight_constant, address);
+					int part_size = MIN(argument_size - j * 8, 8);
+
+					if (calling)
+						part_size = 8;
+
+					var_id part = new_variable_sz(part_size, 1, 1);
 
 					if (classes[j] == CLASS_SSE || classes[j] == CLASS_SSEUP) {
 						ADD_ELEMENT(regs_size, regs_cap, regs) = (struct reg_info) {
 							.variable = part,
 							.is_sse = 1,
-							.register_idx = current_sse_reg++
+							.register_idx = current_sse_reg++,
+							.merge_into = args[i],
+							.merge_pos = j * 8
 						};
 					} else {
 						ADD_ELEMENT(regs_size, regs_cap, regs) = (struct reg_info) {
 							.variable = part,
 							.is_sse = 0,
-							.register_idx = calling_convention[current_gp_reg++]
+							.register_idx = calling_convention[current_gp_reg++],
+							.merge_into = args[i],
+							.merge_pos = j * 8
 						};
 					}
 				}
 			}
 		}
+
+		gp_offset = current_gp_reg * 8;
+		rax = current_sse_reg;
 	} break;
 	}
 
+	return (struct call_info) {
+		.regs_size = regs_size,
+		.regs = regs,
+
+		.ret_regs_size = ret_regs_size,
+		.ret_regs = ret_regs,
+
+		.stack_variables_size = stack_variables_size,
+		.stack_variables = stack_variables,
+
+		.returns_address = returns_address,
+		.ret_address = ret_address,
+
+		.gp_offset = gp_offset,
+
+		.rax = rax
+	};
+}
+
+void ir_call(var_id result, var_id func_var, struct type *function_type, int n_args, struct type **argument_types, var_id *args, enum call_abi abi) {
+	struct call_info c = get_calling_convention(result, function_type, n_args, argument_types, args, abi, 1);
+
+	if (c.returns_address) {
+		IR_PUSH_ADDRESS_OF(c.ret_address, result);
+	}
+
+	var_id rax_constant;
+	if (c.rax != -1) {
+		rax_constant = new_variable_sz(8, 1, 1);
+		IR_PUSH_CONSTANT(((struct constant) { .type = CONSTANT_TYPE,
+					.data_type = type_simple(ST_ULLONG), .ullong_d = c.rax }),
+			rax_constant);
+	}
+
+	for (int i = 0; i < c.regs_size; i++) {
+		if (!c.regs[i].merge_into)
+			continue;
+
+		var_id address = new_variable_sz(8, 1, 1);
+		var_id offset_constant = new_variable_sz(8, 1, 1);
+
+		IR_PUSH_CONSTANT(((struct constant) { .type = CONSTANT_TYPE,
+					.data_type = type_simple(ST_ULLONG), .ullong_d = c.regs[i].merge_pos }),
+			offset_constant);
+		IR_PUSH_ADDRESS_OF(address, c.regs[i].merge_into);
+		IR_PUSH_BINARY_OPERATOR(IBO_ADD, address, offset_constant, address);
+		IR_PUSH_LOAD(c.regs[i].variable, address);
+	}
+
 	int total_mem_needed = 0;
-	for (int i = 0; i < stack_variables_size; i++) {
-		total_mem_needed += round_up_to_nearest(get_variable_size(stack_variables[i]), 8);
+	for (int i = 0; i < c.stack_variables_size; i++) {
+		total_mem_needed += round_up_to_nearest(get_variable_size(c.stack_variables[i]), 8);
 	}
 	int stack_sub = round_up_to_nearest(total_mem_needed, 16);
 
 	IR_PUSH_MODIFY_STACK_POINTER(-stack_sub);
 
 	int current_mem = 0;
-	for (int i = 0; i < stack_variables_size; i++) {
-		IR_PUSH_STORE_STACK_RELATIVE(current_mem, stack_variables[i]);
-		current_mem += round_up_to_nearest(get_variable_size(stack_variables[i]), 8);
+	for (int i = 0; i < c.stack_variables_size; i++) {
+		IR_PUSH_STORE_STACK_RELATIVE(current_mem, c.stack_variables[i]);
+		current_mem += round_up_to_nearest(get_variable_size(c.stack_variables[i]), 8);
 	}
 
-	for (int i = 0; i < regs_size; i++)
-		IR_PUSH_SET_REG(regs[i].variable, regs[i].register_idx, regs[i].is_sse);
+	for (int i = 0; i < c.regs_size; i++)
+		IR_PUSH_SET_REG(c.regs[i].variable, c.regs[i].register_idx, c.regs[i].is_sse);
+
+	if (c.rax != -1)
+		IR_PUSH_SET_REG(rax_constant, REG_RAX, 0);
 
 	IR_PUSH_CALL(func_var, REG_RBX);
 
-	for (int i = 0; i < ret_regs_size; i++)
-		IR_PUSH_GET_REG(ret_regs[i].variable, ret_regs[i].register_idx, ret_regs[i].is_sse);
+	for (int i = 0; i < c.ret_regs_size; i++)
+		IR_PUSH_GET_REG(c.ret_regs[i].variable, c.ret_regs[i].register_idx, c.ret_regs[i].is_sse);
 
-	if (ret_regs_size == 1) {
-		IR_PUSH_INT_CAST(result, ret_regs[0].variable, 0);
-	} else if (ret_regs_size == 2) {
+	if (c.ret_regs_size == 1) {
+		IR_PUSH_INT_CAST(result, c.ret_regs[0].variable, 0);
+	} else if (c.ret_regs_size == 2) {
 		var_id address = new_variable_sz(8, 1, 1);
 		var_id eight_constant = new_variable_sz(8, 1, 1);
 		IR_PUSH_CONSTANT(((struct constant) { .type = CONSTANT_TYPE,
@@ -417,10 +496,63 @@ void ir_call(var_id result, var_id func_var, struct type *function_type, int n_a
 			eight_constant);
 		IR_PUSH_ADDRESS_OF(address, result);
 
-		IR_PUSH_STORE(ret_regs[0].variable, address);
+		IR_PUSH_STORE(c.ret_regs[0].variable, address);
 		IR_PUSH_BINARY_OPERATOR(IBO_ADD, address, eight_constant, address);
-		IR_PUSH_STORE(ret_regs[1].variable, address);
+		IR_PUSH_STORE(c.ret_regs[1].variable, address);
 	}
 
 	IR_PUSH_MODIFY_STACK_POINTER(+stack_sub);
+}
+
+void ir_new_function(struct type *function_type, var_id *args, const char *name, int is_global,
+					 enum call_abi abi) {
+	int n_args = function_type->n - 1;
+
+	struct function *func = &ADD_ELEMENT(ir.size, ir.cap, ir.functions);
+	*func = (struct function) {
+		.name = name,
+		.is_global = is_global,
+		.abi = abi,
+	};
+
+	ir_block_start(new_block());
+
+	struct call_info c = get_calling_convention(0, function_type, n_args, function_type->children + 1, args, abi, 0);
+	
+	if (c.returns_address) {
+		variable_set_stack_bucket(c.ret_address, 0);
+		func->ret_ptr = c.ret_address;
+	}
+
+	int total_mem_needed = 0;
+	for (int i = 0; i < c.stack_variables_size; i++) {
+		total_mem_needed += round_up_to_nearest(get_variable_size(c.stack_variables[i]), 8);
+	}
+
+	func->gp_offset = c.gp_offset;
+	func->overflow_position = total_mem_needed + 16;
+
+	for (int i = 0; i < c.regs_size; i++)
+		IR_PUSH_GET_REG(c.regs[i].variable, c.regs[i].register_idx, c.regs[i].is_sse);
+
+	int current_mem = 0;
+	for (int i = 0; i < c.stack_variables_size; i++) {
+		IR_PUSH_LOAD_BASE_RELATIVE(c.stack_variables[i], current_mem + 16);
+		current_mem += round_up_to_nearest(get_variable_size(c.stack_variables[i]), 8);
+	}
+
+	for (int i = 0; i < c.regs_size; i++) {
+		if (!c.regs[i].merge_into)
+			continue;
+
+		var_id address = new_variable_sz(8, 1, 1);
+		var_id offset_constant = new_variable_sz(8, 1, 1);
+
+		IR_PUSH_CONSTANT(((struct constant) { .type = CONSTANT_TYPE,
+					.data_type = type_simple(ST_ULLONG), .ullong_d = c.regs[i].merge_pos }),
+			offset_constant);
+		IR_PUSH_ADDRESS_OF(address, c.regs[i].merge_into);
+		IR_PUSH_BINARY_OPERATOR(IBO_ADD, address, offset_constant, address);
+		IR_PUSH_STORE(c.regs[i].variable, address);
+	}
 }

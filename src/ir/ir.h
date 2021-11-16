@@ -69,6 +69,7 @@ struct instruction {
 		IR_GET_REG,
 		IR_MODIFY_STACK_POINTER,
 		IR_STORE_STACK_RELATIVE,
+		IR_LOAD_BASE_RELATIVE,
 
 		IR_TYPE_COUNT
 	} type;
@@ -183,6 +184,10 @@ struct instruction {
 			var_id variable;
 		} store_stack_relative;
 #define IR_PUSH_STORE_STACK_RELATIVE(OFFSET, VARIABLE) IR_PUSH(.type = IR_STORE_STACK_RELATIVE, .store_stack_relative = {(OFFSET), (VARIABLE)})
+		struct {
+			int offset;
+		} load_base_relative;
+#define IR_PUSH_LOAD_BASE_RELATIVE(RESULT, OFFSET) IR_PUSH(.type = IR_LOAD_BASE_RELATIVE, .result = (RESULT), .load_base_relative = {(OFFSET)})
 	};
 };
 
@@ -193,10 +198,13 @@ struct ir {
 
 extern struct ir ir;
 
+enum call_abi {
+	CALL_ABI_MICROSOFT,
+	CALL_ABI_SYSV
+};
+
 struct function {
 	int is_global;
-	struct type *signature;
-	var_id *named_arguments;
 	const char *name;
 
 	int var_size, var_cap;
@@ -206,7 +214,15 @@ struct function {
 
 	int size, cap;
 	block_id *blocks;
+
+	enum call_abi abi;
+	int gp_offset, overflow_position;
+	var_id ret_ptr;
 };
+
+void ir_new_function(struct type *signature, var_id *arguments, const char *name, int is_global,
+					 enum call_abi abi);
+void ir_call(var_id result, var_id func_var, struct type *function_type, int n_args, struct type **argument_types, var_id *args, enum call_abi abi);
 
 struct block *get_block(block_id id);
 
@@ -259,8 +275,6 @@ struct block {
 	struct block_exit exit;
 };
 
-void ir_new_function(struct type *signature, var_id *arguments, const char *name, int is_global);
-
 void ir_block_start(block_id id);
 
 void ir_if_selection(var_id condition, block_id block_true, block_id block_false);
@@ -274,11 +288,6 @@ void ir_get_offset(var_id member_address, var_id base_address, var_id offset_var
 void ir_set_bits(var_id result, var_id field, var_id value, int offset, int length);
 void ir_get_bits(var_id result, var_id field, int offset, int length, int sign_extend);
 
-enum call_abi {
-	CALL_ABI_MICROSOFT,
-	CALL_ABI_SYSV
-};
-void ir_call(var_id result, var_id func_var, struct type *function_type, int n_args, struct type **argument_types, var_id *args, enum call_abi abi);
 
 struct function *get_current_function(void);
 struct block *get_current_block(void);
