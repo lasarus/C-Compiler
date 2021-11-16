@@ -222,6 +222,8 @@ struct call_info {
 	int gp_offset;
 
 	int rax;
+
+	int shadow_space;
 };
 
 static struct call_info get_calling_convention(var_id result, struct type *function_type, int n_args, struct type **argument_types, var_id *args, enum call_abi abi, int calling) {
@@ -246,8 +248,11 @@ static struct call_info get_calling_convention(var_id result, struct type *funct
 
 	int rax = -1;
 
+	int shadow_space = 0;
+
 	switch (abi) {
 	case CALL_ABI_MICROSOFT: {
+		shadow_space = 32;
 		static const int calling_convention[] = { REG_RCX, REG_RDX, REG_R8, REG_R9 };
 		int current_reg = 0;
 
@@ -427,11 +432,14 @@ static struct call_info get_calling_convention(var_id result, struct type *funct
 
 		.gp_offset = gp_offset,
 
-		.rax = rax
+		.rax = rax,
+
+		.shadow_space = shadow_space
 	};
 }
 
 void ir_call(var_id result, var_id func_var, struct type *function_type, int n_args, struct type **argument_types, var_id *args, enum call_abi abi) {
+	abi = CALL_ABI_MICROSOFT;
 	struct call_info c = get_calling_convention(result, function_type, n_args, argument_types, args, abi, 1);
 
 	if (c.returns_address) {
@@ -467,11 +475,11 @@ void ir_call(var_id result, var_id func_var, struct type *function_type, int n_a
 	}
 	int stack_sub = round_up_to_nearest(total_mem_needed, 16);
 
-	IR_PUSH_MODIFY_STACK_POINTER(-stack_sub);
+	IR_PUSH_MODIFY_STACK_POINTER(-stack_sub - c.shadow_space);
 
 	int current_mem = 0;
 	for (int i = 0; i < c.stack_variables_size; i++) {
-		IR_PUSH_STORE_STACK_RELATIVE(current_mem, c.stack_variables[i]);
+		IR_PUSH_STORE_STACK_RELATIVE(current_mem + c.shadow_space, c.stack_variables[i]);
 		current_mem += round_up_to_nearest(get_variable_size(c.stack_variables[i]), 8);
 	}
 
@@ -501,11 +509,12 @@ void ir_call(var_id result, var_id func_var, struct type *function_type, int n_a
 		IR_PUSH_STORE(c.ret_regs[1].variable, address);
 	}
 
-	IR_PUSH_MODIFY_STACK_POINTER(+stack_sub);
+	IR_PUSH_MODIFY_STACK_POINTER(+stack_sub + c.shadow_space);
 }
 
 void ir_new_function(struct type *function_type, var_id *args, const char *name, int is_global,
 					 enum call_abi abi) {
+	abi = CALL_ABI_MICROSOFT;
 	int n_args = function_type->n - 1;
 
 	struct function *func = &ADD_ELEMENT(ir.size, ir.cap, ir.functions);
@@ -537,7 +546,7 @@ void ir_new_function(struct type *function_type, var_id *args, const char *name,
 
 	int current_mem = 0;
 	for (int i = 0; i < c.stack_variables_size; i++) {
-		IR_PUSH_LOAD_BASE_RELATIVE(c.stack_variables[i], current_mem + 16);
+		IR_PUSH_LOAD_BASE_RELATIVE(c.stack_variables[i], current_mem + 16 + c.shadow_space);
 		current_mem += round_up_to_nearest(get_variable_size(c.stack_variables[i]), 8);
 	}
 
