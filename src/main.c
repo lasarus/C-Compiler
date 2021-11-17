@@ -3,8 +3,8 @@
 #include "codegen/codegen.h"
 #include "common.h"
 #include "preprocessor/macro_expander.h"
-#include "arch/builtins.h"
 #include "parser/symbols.h"
+#include "abi/abi.h"
 
 #include <time.h>
 #include <stdio.h>
@@ -23,6 +23,11 @@ struct arguments parse_arguments(int argc, char **argv) {
 		STATE_OUTPUT,
 		STATE_END
 	} state = STATE_INPUT;
+
+	enum {
+		ABI_SYSV,
+		ABI_MICROSOFT
+	} abi = ABI_SYSV;
 
 	for (int i = 1; i < argc; i++) {
 		if (argv[i][0] == '-' &&
@@ -58,6 +63,10 @@ struct arguments parse_arguments(int argc, char **argv) {
 					codegen_flags.debug_stack_min = atoi(argv[i] + 19);
 					printf("DBG STACK MIN: %d\n", codegen_flags.debug_stack_min);
 				}
+			} else if (strcmp(argv[i] + 2, "abi=ms") == 0) {
+				abi = ABI_MICROSOFT;
+			} else if (strcmp(argv[i] + 2, "abi=sysv") == 0) {
+				abi = ABI_SYSV;
 			} else {
 				ARG_ERROR(i, "Invalid flag.");
 			}
@@ -81,6 +90,11 @@ struct arguments parse_arguments(int argc, char **argv) {
 
 	if (!args.input || !args.output) {
 		ARG_ERROR(0, "requires input and output.");
+	}
+
+	switch (abi) {
+	case ABI_SYSV: abi_init_sysv(); break;
+	case ABI_MICROSOFT: abi_init_microsoft(); break;
 	}
 
 	return args;
@@ -118,13 +132,13 @@ void add_implementation_defs(void) {
 }
 
 int main(int argc, char **argv) {
+	symbols_init();
+
 	struct arguments arguments = parse_arguments(argc, argv);
 
 	init_source_character_set();
 
-	symbols_init();
 	add_implementation_defs();
-	builtins_init();
 
 	preprocessor_init(arguments.input);
 	parse_into_ir();

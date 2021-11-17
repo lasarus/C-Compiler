@@ -698,7 +698,7 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 			ICE("Can't call type %s", dbg_type(func_type));
 		}
 
-		ir_call(res, func_var, type_deref(func_type), expr->call.n_args, arg_types, args, CALL_ABI_SYSV);
+		ir_call(res, func_var, type_deref(func_type), expr->call.n_args, arg_types, args);
 	} break;
 
 	case E_VARIABLE:

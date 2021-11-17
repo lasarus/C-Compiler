@@ -28,4 +28,8 @@ void emit_char(char c); // Used for string printing.
 
 void codegen(const char *path);
 
+// TODO: Why is rdi not destination?
+// From rdi to rsi address
+void codegen_memcpy(int len);
+
 #endif

@@ -3,9 +3,8 @@
 #include "binary_operators.h"
 
 #include <common.h>
-#include <arch/builtins.h>
-#include <arch/calling.h>
 #include <parser/declaration.h>
+#include <abi/abi.h>
 
 #include <stdio.h>
 #include <string.h>
@@ -83,13 +82,6 @@ void codegen_call(var_id variable, int non_clobbered_register) {
 	emit("callq *%s", get_reg_name(non_clobbered_register, 8));
 }
 
-struct reg_save_info {
-	int reg_save_position;
-	int overflow_position;
-	int gp_offset;
-	int fp_offset;
-};
-
 // Address in rdi.
 void codegen_memzero(int len) {
 	for (int i = 0; i < len;) {
@@ -110,8 +102,6 @@ void codegen_memzero(int len) {
 	}
 }
 
-// TODO: Why is rdi not destination?
-// From rdi to rsi address
 void codegen_memcpy(int len) {
 	for (int i = 0; i < len;) {
 		if (i + 8 <= len) {
@@ -158,7 +148,7 @@ void codegen_stackcpy(int dest, int source, int len) {
 	}
 }
 
-void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_info) {
+void codegen_instruction(struct instruction ins, struct function *func) {
 	const char *ins_str = dbg_instruction(ins);
 	emit("#instruction start \"%s\":", ins_str);
 	switch (ins.type) {
@@ -405,96 +395,13 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 		reg_to_scalar(REG_RAX, ins.result);
 		break;
 
-	case IR_VA_START: {
-		int gp_offset_offset = builtin_va_list->fields[0].offset;
-		int fp_offset_offset = builtin_va_list->fields[1].offset;
-		int overflow_arg_area_offset = builtin_va_list->fields[2].offset;
-		int reg_save_area_offset = builtin_va_list->fields[3].offset;
-		scalar_to_reg(ins.result, REG_RAX);
-		emit("movl $%d, %d(%%rax)", reg_save_info.gp_offset, gp_offset_offset);
-		emit("movl $%d, %d(%%rax)", 0, fp_offset_offset);
-		emit("leaq %d(%%rbp), %%rdi", reg_save_info.overflow_position);
-		emit("movq %%rdi, %d(%%rax)", overflow_arg_area_offset);
+	case IR_VA_START:
+		abi_emit_va_start(ins.result, func);
+		break;
 
-		emit("leaq -%d(%%rbp), %%rdi", reg_save_info.reg_save_position);
-		emit("movq %%rdi, %d(%%rax)", reg_save_area_offset);
-	} break;
-
-	case IR_VA_ARG: {
-		struct type *type = ins.va_arg_.type;
-		int n_parts;
-		enum parameter_class classes[4];
-		classify(type, &n_parts, classes);
-
-		static int va_arg_labels = 0;
-		int gp_offset_offset = builtin_va_list->fields[0].offset;
-		int reg_save_area_offset = builtin_va_list->fields[3].offset;
-		int overflow_arg_area_offset = builtin_va_list->fields[2].offset;
-		va_arg_labels++;
-		// 1. Determine whether type may be passed in the registers. If not go to step 7
-		scalar_to_reg(ins.va_arg_.array, REG_RDI);
-		if (classes[0] != CLASS_MEMORY) {
-			// 2. Compute num_gp to hold the number of general purpose registers needed
-			// to pass type and num_fp to hold the number of floating point registers needed.
-
-			int num_gp = 0;
-			//int num_fp = 0;
-			for (int i = 0; i < n_parts; i++) {
-				if (classes[i] == CLASS_INTEGER)
-					num_gp++;
-				else
-					NOTIMP();
-			}
-
-			// 3. Verify whether arguments fit into registers. In the case:
-			//     l->gp_offset > 48 − num_gp ∗ 8
-			// or
-			//     l->fp_offset > 304 − num_fp ∗ 16
-			// go to step 7.
-
-			emit("movl %d(%%rdi), %%eax", gp_offset_offset);
-			emit("cmpl $%d, %%eax", 48 - 8 * num_gp);
-			emit("ja .va_arg_stack%d", va_arg_labels);
-
-			// 4. Fetch type from l->reg_save_area with an offset of l->gp_offset
-			// and/or l->fp_offset. This may require copying to a temporary loca-
-			// tion in case the parameter is passed in different register classes or requires
-			// an alignment greater than 8 for general purpose registers and 16 for XMM
-			// registers. [Note: Alignment is largely ignored in this implementation]
-
-			// 5. Set:
-			// l->gp_offset = l->gp_offset + num_gp ∗ 8
-			// l->fp_offset = l->fp_offset + num_fp ∗ 16.
-			// 6. Return the fetched type.
-
-			emit("leal %d(%%rax), %%edx", num_gp * 8);
-			emit("addq %d(%%rdi), %%rax", reg_save_area_offset);
-			emit("movl %%edx, %d(%%rdi)", gp_offset_offset);
-			emit("jmp .va_arg_fetch%d", va_arg_labels);
-		}
-		// 7. Align l->overflow_arg_area upwards to a 16 byte boundary if align-
-		//ment needed by type exceeds 8 byte boundary. [This is ignored.]
-		emit(".va_arg_stack%d:", va_arg_labels);
-
-		// 8. Fetch type from l->overflow_arg_area.
-
-		emit("movq %d(%%rdi), %%rax", overflow_arg_area_offset);
-
-		// 9. Set l->overflow_arg_area to:
-		// l->overflow_arg_area + sizeof(type)
-		// 10. Align l->overflow_arg_area upwards to an 8 byte boundary.
-		emit("leaq %d(%%rax), %%rdx", round_up_to_nearest(calculate_size(type), 8));
-		emit("movq %%rdx, %d(%%rdi)", overflow_arg_area_offset);
-
-		// 11. Return the fetched type.
-		emit(".va_arg_fetch%d:", va_arg_labels);
-
-		// Address is now in %%rax.
-		emit("movq %%rax, %%rdi");
-		emit("leaq -%d(%%rbp), %%rsi", variable_info[ins.result].stack_location);
-
-		codegen_memcpy(calculate_size(type));
-	} break;
+	case IR_VA_ARG:
+		abi_emit_va_arg(ins.result, ins.va_arg_.array, ins.va_arg_.type);
+		break;
 
 	case IR_SET_ZERO:
 		emit("leaq -%d(%%rbp), %%rdi", variable_info[ins.result].stack_location);
@@ -570,12 +477,11 @@ void codegen_instruction(struct instruction ins, struct reg_save_info reg_save_i
 	}
 }
 
-void codegen_block(struct block *block, struct function *func, struct reg_save_info reg_save_info) {
+void codegen_block(struct block *block, struct function *func) {
 	emit(".LB%d:", block->id);
 
-	for (int i = 0; i < block->size; i++) {
-		codegen_instruction(block->instructions[i], reg_save_info);
-	}
+	for (int i = 0; i < block->size; i++)
+		codegen_instruction(block->instructions[i], func);
 
 	struct block_exit *block_exit = &block->exit;
 	emit("# EXIT IS OF TYPE : %d", block_exit->type);
@@ -598,44 +504,16 @@ void codegen_block(struct block *block, struct function *func, struct reg_save_i
 		}
 	} break;
 
-	case BLOCK_EXIT_RETURN: {
-		var_id ret = block_exit->return_.value;
-		struct type *ret_type = block_exit->return_.type;
-		if (ret_type != type_simple(ST_VOID)) {
-			enum parameter_class classes[4];
-			int n_parts = 0;
-
-			classify(ret_type, &n_parts, classes);
-
-			if (n_parts == 1 && classes[0] == CLASS_MEMORY) {
-				emit("movq -%d(%%rbp), %%rsi", variable_info[func->ret_ptr].stack_location);
-				emit("leaq -%d(%%rbp), %%rdi", variable_info[ret].stack_location);
-
-				codegen_memcpy(calculate_size(ret_type));
-			} else if (n_parts == 1 && classes[0] == CLASS_INTEGER) {
-				emit("movq -%d(%%rbp), %%rax", variable_info[ret].stack_location);
-			} else if (n_parts == 2 && classes[0] == CLASS_INTEGER) {
-				emit("movq -%d(%%rbp), %%rax", variable_info[ret].stack_location);
-				emit("movq -%d(%%rbp), %%rdx", variable_info[ret].stack_location - 8);
-			} else if (n_parts == 1 && classes[0] == CLASS_SSE) {
-				if (get_variable_size(ret) == 4) {
-					emit("movss -%d(%%rbp), %%xmm0", variable_info[ret].stack_location);
-				} else {
-					emit("movsd -%d(%%rbp), %%xmm0", variable_info[ret].stack_location);
-				}
-			} else {
-				NOTIMP();
-			}
-		}
+	case BLOCK_EXIT_RETURN:
 		emit("leave");
 		emit("ret");
-	} break;
+		break;
 
-	case BLOCK_EXIT_RETURN_ZERO: {
+	case BLOCK_EXIT_RETURN_ZERO:
 		emit("xor %%rax, %%rax");
 		emit("leave");
 		emit("ret");
-	} break;
+		break;
 
 	case BLOCK_EXIT_SWITCH: {
 		emit("#SWITCH");
@@ -660,8 +538,6 @@ void codegen_function(struct function *func) {
 	int temp_stack_count = 0, perm_stack_count = 0;
 	int max_temp_stack = 0;
 
-	struct reg_save_info reg_save_info;
-
 	for (int i = 0; i < func->var_size; i++) {
 		var_id var = func->vars[i];
 		if (get_variable_stack_bucket(var))
@@ -673,15 +549,6 @@ void codegen_function(struct function *func) {
 
 		variable_info[var].storage = VAR_STOR_STACK;
 		variable_info[var].stack_location = perm_stack_count;
-	}
-
-	if (func->uses_va && func->abi == CALL_ABI_SYSV) {
-		perm_stack_count += 304; // Magic number, size of register save area.
-		// According to Figure 3.33 in sysV AMD64 ABI.
-		reg_save_info.fp_offset = 0;
-		reg_save_info.reg_save_position = perm_stack_count;
-		reg_save_info.gp_offset = func->gp_offset;
-		reg_save_info.overflow_position = func->overflow_position;
 	}
 
 	vla_info.size = 0;
@@ -725,30 +592,13 @@ void codegen_function(struct function *func) {
 	if (stack_sub)
 		emit("subq $%d, %%rsp", stack_sub);
 
-	if (func->uses_va) {
-		switch (func->abi) {
-		case CALL_ABI_SYSV:
-			emit("movq %%rdi, -%d(%%rbp)", reg_save_info.reg_save_position - 0);
-			emit("movq %%rsi, -%d(%%rbp)", reg_save_info.reg_save_position - 8);
-			emit("movq %%rdx, -%d(%%rbp)", reg_save_info.reg_save_position - 16);
-			emit("movq %%rcx, -%d(%%rbp)", reg_save_info.reg_save_position - 24);
-			emit("movq %%r8, -%d(%%rbp)", reg_save_info.reg_save_position - 32);
-			emit("movq %%r9, -%d(%%rbp)", reg_save_info.reg_save_position - 40);
-			// TODO: xmm0-15
-			break;
-
-		default:
-			NOTIMP();
-		}
-	}
-
-	for (size_t i = 0; i < vla_info.size; i++) {
+	for (size_t i = 0; i < vla_info.size; i++)
 		emit("movq $0, -%d(%%rbp)", variable_info[vla_info.slots[i].slot].stack_location);
-	}
 
-	for (int i = 0; i < func->size; i++) {
-		codegen_block(get_block(func->blocks[i]), func, reg_save_info);
-	}
+	abi_emit_function_preamble(func);
+
+	for (int i = 0; i < func->size; i++)
+		codegen_block(get_block(func->blocks[i]), func);
 
 	int total_stack_usage = max_temp_stack + perm_stack_count;
 	if (codegen_flags.debug_stack_size && total_stack_usage >= codegen_flags.debug_stack_min)

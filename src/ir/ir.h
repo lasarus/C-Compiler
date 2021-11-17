@@ -198,11 +198,6 @@ struct ir {
 
 extern struct ir ir;
 
-enum call_abi {
-	CALL_ABI_MICROSOFT,
-	CALL_ABI_SYSV
-};
-
 struct function {
 	int is_global;
 	const char *name;
@@ -215,14 +210,11 @@ struct function {
 	int size, cap;
 	block_id *blocks;
 
-	enum call_abi abi;
-	int gp_offset, overflow_position;
-	var_id ret_ptr;
+	void *abi_data;
 };
 
-void ir_new_function(struct type *signature, var_id *arguments, const char *name, int is_global,
-					 enum call_abi abi);
-void ir_call(var_id result, var_id func_var, struct type *function_type, int n_args, struct type **argument_types, var_id *args, enum call_abi abi);
+void ir_new_function(struct type *signature, var_id *arguments, const char *name, int is_global);
+void ir_call(var_id result, var_id func_var, struct type *function_type, int n_args, struct type **argument_types, var_id *args);
 
 struct block *get_block(block_id id);
 
