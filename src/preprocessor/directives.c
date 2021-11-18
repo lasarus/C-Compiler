@@ -281,7 +281,7 @@ void directiver_flush_if(void) {
 			sv_string_cmp(name, "ifndef")) {
 			nest_level++;
 		} else if (sv_string_cmp(name, "elif")) {
-			if (nest_level == 1) {
+			if (nest_level == 1 && !else_stack[else_stack_n - 1]) {
 				PUSH(dir);
 				PUSH(t);
 				return;
@@ -343,11 +343,16 @@ struct token directiver_next(void) {
 				   sv_string_cmp(name, "elif")) {
 			if (is_if)
 				ADD_ELEMENT(else_stack_n, else_stack_cap, else_stack) = 0;
-			int result = directiver_evaluate_conditional(directive);
-			if (result)
-				else_stack[else_stack_n - 1] = 1;
-			if (!result)
+
+			if (!is_if && else_stack[else_stack_n - 1]) {
 				directiver_flush_if();
+			} else {
+				int result = directiver_evaluate_conditional(directive);
+				if (result)
+					else_stack[else_stack_n - 1] = 1;
+				if (!result)
+					directiver_flush_if();
+			}
 		} else if (sv_string_cmp(name, "else")) {
 			directiver_flush_if();
 		} else if (sv_string_cmp(name, "endif")) {

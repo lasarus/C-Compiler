@@ -46,6 +46,14 @@ assert(strcmp(include, "Hello") == 0);
 	#error
   #endif
 
+  #if defined(__LLP64__)
+#error
+  #elif defined(__LP64__)
+//#error
+  #elif !defined(__ILP32__)
+#error
+  #endif
+
 	return 0;
 }
 
