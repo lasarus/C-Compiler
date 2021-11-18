@@ -301,6 +301,7 @@ static void sysv_ir_function_new(struct type *type, var_id *args, const char *na
 	if (c.returns_address) {
 		variable_set_stack_bucket(c.ret_address, 0);
 		abi_data.ret_address = c.ret_address;
+		abi_data.returns_address = 1;
 	}
 
 	int total_mem_needed = 0;
