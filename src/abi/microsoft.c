@@ -5,6 +5,7 @@
 #include <codegen/registers.h>
 #include <arch/calling.h>
 #include <common.h>
+#include <preprocessor/macro_expander.h>
 
 static const int calling_convention[] = { REG_RCX, REG_RDX, REG_R8, REG_R9 };
 //static const int return_convention[] = { REG_RAX };
@@ -28,6 +29,7 @@ static void ms_ir_function_call(var_id result, var_id func_var, struct type *typ
 	struct type *return_type = type->children[0];
 
 	var_id registers[4];
+	int is_floating[4];
 	int register_idx = 0;
 	int ret_in_register = 0;
 
@@ -55,6 +57,7 @@ static void ms_ir_function_call(var_id result, var_id func_var, struct type *typ
 		}
 
 		if (register_idx < 4) {
+			is_floating[register_idx] = (i < type->n - 1) ? type_is_floating(argument_types[i]) : 0;
 			registers[register_idx++] = reg_to_push;
 		} else {
 			IR_PUSH_STORE_STACK_RELATIVE(current_mem + shadow_space, reg_to_push);
@@ -62,13 +65,17 @@ static void ms_ir_function_call(var_id result, var_id func_var, struct type *typ
 		}
 	}
 
-	for (int i = 0; i < register_idx; i++)
-		IR_PUSH_SET_REG(registers[i], calling_convention[i], 0);
+	for (int i = 0; i < register_idx; i++) {
+		if (is_floating[i])
+			IR_PUSH_SET_REG(registers[i], i, 1);
+		else
+			IR_PUSH_SET_REG(registers[i], calling_convention[i], 0);
+	}
 
 	IR_PUSH_CALL(func_var, REG_RBX);
 
 	if (ret_in_register)
-		IR_PUSH_GET_REG(result, REG_RAX, 0);
+		IR_PUSH_GET_REG(result, REG_RAX, type_is_floating(return_type));
 
 	IR_PUSH_MODIFY_STACK_POINTER(+stack_sub + shadow_space);
 }
@@ -121,7 +128,10 @@ static void ms_ir_function_new(struct type *type, var_id *args, const char *name
 		}
 
 		if (register_idx < 4) {
-			IR_PUSH_GET_REG(reg_to_push, calling_convention[register_idx++], 0);
+			if (type_is_floating(type->children[i + 1]))
+				IR_PUSH_GET_REG(reg_to_push, register_idx++, 1);
+			else
+				IR_PUSH_GET_REG(reg_to_push, calling_convention[register_idx++], 0);
 		} else {
 			IR_PUSH_LOAD_BASE_RELATIVE(reg_to_push, current_mem + 16 + shadow_space);
 			current_mem += 8;
@@ -146,7 +156,7 @@ static void ms_ir_function_return(struct function *func, var_id value, struct ty
 	if (abi_data->returns_address) {
 		IR_PUSH_STORE(value, abi_data->ret_address);
 	} else {
-		IR_PUSH_SET_REG(value, 0, 0);
+		IR_PUSH_SET_REG(value, 0, type_is_floating(type));
 	}
 }
 
@@ -201,4 +211,6 @@ void abi_init_microsoft(void) {
 		symbols_add_typedef(sv_from_str("__builtin_va_list"));
 
 	sym->data_type = type_pointer(type_simple(ST_VOID));
+
+	define_string("_WIN32", "1");
 }
