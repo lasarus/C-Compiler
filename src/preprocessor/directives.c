@@ -302,7 +302,11 @@ void directiver_handle_pragma(void) {
 	if (sv_string_cmp(command.str, "once")) {
 		tokenizer_disable_current_path();
 	} else {
-		ERROR(command.pos, "\"#pragma %s\" not supported", dbg_token(&command));
+		WARNING(command.pos, "\"#pragma %s\" not supported", dbg_token(&command));
+		struct token t = NEXT();
+		while (!t.first_of_line)
+			t = NEXT();
+		PUSH(t);
 	}
 }
 

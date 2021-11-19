@@ -9,6 +9,7 @@
 
 #define ICE(STR, ...) do { printf("Internal compiler error on line %d file %s of compiler source: \"" STR "\"\n", __LINE__, __FILE__, ##__VA_ARGS__); exit(1); } while(0)
 #define ERROR(POS, STR, ...) do { printf("Error, %s:%d:%d: ", (POS).path, (POS).line, (POS).column); printf(STR, ##__VA_ARGS__); exit(1); } while(0)
+#define WARNING(POS, STR, ...) do { printf("Warning, %s:%d:%d: ", (POS).path, (POS).line, (POS).column); printf(STR "\n", ##__VA_ARGS__); } while(0)
 #define ARG_ERROR(IDX, STR, ...) do { printf("Argument error: %s (idx %d) ", argv[(IDX)], (IDX)); printf(STR, ##__VA_ARGS__); exit(1); } while(0)
 #define NOTIMP() ICE("Not implemented");
 
