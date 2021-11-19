@@ -66,7 +66,7 @@ static struct call_info get_calling_convention(struct type *function_type, int n
 	var_id *stack_variables = NULL;
 
 	int returns_address = 0;
-	var_id ret_address;
+	var_id ret_address = 0;
 
 	int gp_offset = 0;
 
