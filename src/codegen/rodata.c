@@ -159,8 +159,14 @@ void codegen_initializer(struct type *type, struct initializer *init);
 
 void codegen_compound_literals(struct expr **expr, int lvalue) {
 	switch ((*expr)->type) {
+	case E_DOT_OPERATOR:
+		if (lvalue) {
+			codegen_compound_literals(&(*expr)->member.lhs, 1);
+		} else {
+			NOTIMP();
+		}
+		break;
 	case E_GENERIC_SELECTION:
-	case E_DOT_OPERATOR: NOTIMP();
 	case E_COMPOUND_LITERAL:
 		if (lvalue) {
 			static int counter = 0;

@@ -197,4 +197,14 @@ int main() {
 
 		assert(t2.a.b == 2);
 	}
+
+	{
+		static struct T {
+			int a;
+		} t;
+
+		static int *ptr = &t.a;
+		*ptr = 13;
+		assert(t.a == 13);
+	}
 }

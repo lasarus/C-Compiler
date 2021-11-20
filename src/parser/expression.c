@@ -1314,6 +1314,31 @@ int evaluate_constant_expression(struct expr *expr,
 		return 0;
 	} break;
 
+	case E_DOT_OPERATOR: {
+		struct constant lhs;
+		if (!evaluate_constant_expression(expr->member.lhs, &lhs))
+			return 0;
+
+		if (lhs.type == CONSTANT_LABEL) {
+			int offset, bit_offset, bit_size;
+			type_get_offsets(lhs.data_type, expr->member.member_idx,
+							 &offset, &bit_offset, &bit_size);
+
+			if (bit_size != -1)
+				return 0;
+
+			struct type *child_type = type_select(lhs.data_type, expr->member.member_idx);
+
+			*constant = lhs;
+			constant->label.offset += offset;
+			constant->data_type = child_type;
+
+			return 1;
+		}
+
+		return 0;
+	} break;
+
 	case E_BINARY_OP: {
 		struct constant lhs, rhs;
 		if (!evaluate_constant_expression(expr->args[0], &lhs))
