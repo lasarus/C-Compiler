@@ -2,26 +2,30 @@
 #define PARSER_DECLARATION_H
 
 #include "parser.h"
-#include "expression.h"
+#include <preprocessor/preprocessor.h>
 
 #include <types.h>
 
 struct initializer {
-	int size, cap;
-	struct init_pair {
-		enum {
-			IP_EXPRESSION,
-			IP_STRING
-		} type;
-		int offset, bit_offset, bit_size;
-		union {
-			struct expr *expr;
-			struct string_view str;
-		} u;
-	} *pairs;
+	enum {
+		INIT_EMPTY,
+		INIT_EXPRESSION,
+		INIT_STRING,
+		INIT_BRACE
+	} type;
+
+	union {
+		struct expr *expr;
+		struct string_view string;
+
+		struct {
+			int size, cap;
+			struct initializer *entries;
+		} brace;
+	};
 };
 
-struct initializer *parse_initializer(struct type **type);
+struct initializer parse_initializer(struct type **type);
 
 struct declaration {
 	int n;

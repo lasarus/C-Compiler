@@ -14,7 +14,7 @@ void rodata_codegen(void);
 
 struct type;
 struct initializer;
-void data_register_static_var(struct string_view label, struct type *type, struct initializer *init, int global);
+void data_register_static_var(struct string_view label, struct type *type, struct initializer init, int global);
 void data_codegen(void);
 
 #endif

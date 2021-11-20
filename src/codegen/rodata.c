@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
+#include <assert.h>
 
 struct entry {
 	enum entry_type {
@@ -85,14 +86,14 @@ label_id register_label_name(struct string_view str) {
 struct static_var {
 	struct string_view label;
 	struct type *type;
-	struct initializer *init;
+	struct initializer init;
 	int global;
 };
 
 static struct static_var *static_vars = NULL;
 static int static_vars_size, static_vars_cap;
 
-void data_register_static_var(struct string_view label, struct type *type, struct initializer *init, int global) {
+void data_register_static_var(struct string_view label, struct type *type, struct initializer init, int global) {
 	ADD_ELEMENT(static_vars_size, static_vars_cap, static_vars) = (struct static_var) {
 		.label = label,
 		.type = type,
@@ -101,57 +102,56 @@ void data_register_static_var(struct string_view label, struct type *type, struc
 	};
 }
 
-void codegen_initializer_recursive(struct initializer *init,
+void codegen_initializer_recursive(struct initializer *init, struct type *type,
+								   int bit_size, int bit_offset,
 								   uint8_t *buffer, label_id *labels,
-								   int64_t *label_offsets, int *is_label,
-								   size_t size) {
-	for (int i = 0; i < init->size; i++) {
-		struct init_pair *pair = init->pairs + i;
-		size_t offset = pair->offset;
+								   int64_t *label_offsets, int *is_label) {
+	switch (init->type) {
+	case INIT_EMPTY: break;
+	case INIT_STRING:
+		for (int i = 0; i < init->string.len; i++)
+			buffer[i] = init->string.str[i];
+		break;
 
-		if (offset >= size)
-			ICE("Ran out of buffer.");
+	case INIT_EXPRESSION: {
+		struct constant *c = expression_to_constant(init->expr);
+		if (c) {
+			switch (c->type) {
+			case CONSTANT_TYPE:
+				constant_to_buffer(buffer, *c, bit_offset, bit_size);
+				break;
 
-		switch (pair->type) {
-		case IP_EXPRESSION: {
-			struct expr *expr = pair->u.expr;
-			struct constant *c = expression_to_constant(expr);
-			if (c) {
-				switch (c->type) {
-				case CONSTANT_TYPE:
-					constant_to_buffer(buffer + offset, *c, pair->bit_offset, pair->bit_size);
-					break;
+			case CONSTANT_LABEL_POINTER:
+				is_label[0] = 1;
+				labels[0] = c->label.label;
+				label_offsets[0] = c->label.offset;
+				break;
 
-				case CONSTANT_LABEL_POINTER:
-					is_label[offset] = 1;
-					labels[offset] = c->label.label;
-					label_offsets[offset] = c->label.offset;
-					break;
+			case CONSTANT_LABEL:
+				NOTIMP();
+				break;
 
-				case CONSTANT_LABEL:
-					NOTIMP();
-					break;
-
-				default:
-					NOTIMP();
-				}
-			} else if (expr->type == E_COMPOUND_LITERAL) {
-				codegen_initializer_recursive(expr->compound_literal.init,
-											  buffer + offset,
-											  labels + offset,
-											  label_offsets + offset,
-											  is_label + offset,
-											  size - offset);
-			} else {
-				ICE("Invalid constant expression in static initializer of type %s.",
-					dbg_type(expr->data_type));
+			default:
+				NOTIMP();
 			}
-		} break;
-		case IP_STRING:
-			for (int i = 0; i < pair->u.str.len; i++) 
-				buffer[offset + i] = pair->u.str.str[i];
-			break;
+		} else if (init->expr->type == E_COMPOUND_LITERAL) {
+			codegen_initializer_recursive(&init->expr->compound_literal.init, type,
+										  -1, -1,
+										  buffer, labels, label_offsets,
+										  is_label);
 		}
+	} break;
+	case INIT_BRACE:
+		for (int i = 0; i < init->brace.size; i++) {
+			int coffset, cbit_size, cbit_offset;
+			struct type *child_type = type_select(type, i);
+			type_get_offsets(type, i, &coffset, &cbit_offset, &cbit_size);
+			codegen_initializer_recursive(init->brace.entries + i, child_type,
+										  cbit_size, cbit_offset,
+										  buffer + coffset, labels + coffset,
+										  label_offsets + coffset, is_label + coffset);
+		}
+		break;
 	}
 }
 
@@ -168,7 +168,7 @@ void codegen_compound_literals(struct expr **expr, int lvalue) {
 			sprintf(name, ".compundliteral%d", counter++);
 			emit("%s:", name);
 			codegen_initializer((*expr)->compound_literal.type,
-								(*expr)->compound_literal.init);
+								&(*expr)->compound_literal.init);
 
 			label_id label = register_label_name(sv_from_str(strdup(name)));
 
@@ -230,34 +230,44 @@ void codegen_compound_literals(struct expr **expr, int lvalue) {
 
 void codegen_pre_initializer(struct initializer *init) {
 	// Iterate through all child expressions and find uninitialized compound literals.
-	for (int i = 0; i < init->size; i++) {
-		struct init_pair *pair = init->pairs + i;
+	switch (init->type) {
+	case INIT_BRACE:
+		for (int i = 0; i < init->brace.size; i++)
+			codegen_pre_initializer(init->brace.entries + i);
+		break;
 
-		if (pair->type == IP_EXPRESSION)
-			codegen_compound_literals(&pair->u.expr, 0);
+	case INIT_EXPRESSION:
+		codegen_compound_literals(&init->expr, 0);
+		break;
+
+	default: break;
 	}
 }
 
 void codegen_initializer(struct type *type,
 						 struct initializer *init) {
 	// TODO: Make this more portable.
-	size_t size = calculate_size(type);
+	int size = calculate_size(type);
+	if (size == -1) {
+		printf("TYPE FAIL: %s\n", dbg_type(type));
+	}
+	assert(size != -1);
 
 	uint8_t *buffer = malloc(sizeof *buffer * size);
 	label_id *labels = malloc(sizeof *labels * size);
 	int64_t *label_offsets = malloc(sizeof *label_offsets * size);
 	int *is_label = malloc(sizeof *is_label * size);
 
-	for (unsigned i = 0; i < size; i++) {
+	for (int i = 0; i < size; i++) {
 		buffer[i] = 0;
 		is_label[i] = 0;
 		labels[i] = 0;
 		label_offsets[i] = 0;
 	}
 
-	codegen_initializer_recursive(init, buffer, labels, label_offsets, is_label, size);
+	codegen_initializer_recursive(init, type, -1, -1, buffer, labels, label_offsets, is_label);
 
-	for (unsigned i = 0; i < size; i++) {
+	for (int i = 0; i < size; i++) {
 		if (is_label[i]) {
 			if (label_offsets[i] == 0)
 				emit(".quad %s", rodata_get_label_string(labels[i]));
@@ -287,21 +297,23 @@ void codegen_initializer(struct type *type,
 }
 
 void codegen_static_var(struct static_var *static_var) {
+	(void)static_var;
 	set_section(".data");
 	if (static_var->global)
 		emit(".global %.*s", static_var->label.len, static_var->label.str);
-	if (static_var->init) {
-		codegen_pre_initializer(static_var->init);
 
-		emit("%.*s:", static_var->label.len, static_var->label.str);
-
-		codegen_initializer(static_var->type,
-							static_var->init);
-	} else {
+	if (static_var->init.type == INIT_EMPTY) {
 		emit("%.*s:", static_var->label.len, static_var->label.str);
 
 		emit(".zero %d", calculate_size(static_var->type));
+	} else {
+		codegen_pre_initializer(&static_var->init);
+
+		emit("%.*s:", static_var->label.len, static_var->label.str);
+
+		codegen_initializer(static_var->type, &static_var->init);
 	}
+
 	set_section(".text");
 }
 

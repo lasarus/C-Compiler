@@ -301,22 +301,34 @@ int type_is_pointer(struct type *type) {
 	return type->type == TY_POINTER;
 }
 
-void type_select(struct type *type, int index,
-				 int *field_offset, struct type **field_type) {
-	if (field_offset)
-		*field_offset = calculate_offset(type, index);
-
-	if (!field_type)
-		return;
-
+struct type *type_select(struct type *type, int index) {
 	switch (type->type) {
 	case TY_STRUCT:
-		*field_type = type->struct_data->fields[index].type;
-		break;
+		return type->struct_data->fields[index].type;
 
 	case TY_ARRAY:
 	case TY_INCOMPLETE_ARRAY:
-		*field_type = type->children[0];
+		return type->children[0];
+
+	default:
+		NOTIMP();
+	}
+}
+
+void type_get_offsets(struct type *type, int index, int *offset, int *bit_offset, int *bit_size) {
+	switch (type->type) {
+	case TY_STRUCT: {
+		struct field f = type->struct_data->fields[index];
+		*bit_offset = f.bit_offset;
+		*bit_size = f.bitfield;
+		*offset = f.offset;
+	} break;
+
+	case TY_ARRAY:
+	case TY_INCOMPLETE_ARRAY:
+		*bit_offset = 0;
+		*bit_size = -1;
+		*offset = calculate_offset(type, index);
 		break;
 
 	default:

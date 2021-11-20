@@ -275,7 +275,7 @@ void ir_goto(block_id jump);
 void ir_return(var_id value, struct type *type);
 void ir_return_void(void);
 
-void ir_init_var(struct initializer *init, var_id result);
+void ir_init_var(struct initializer *init, struct type *type, var_id result);
 void ir_get_offset(var_id member_address, var_id base_address, var_id offset_var, int offset);
 void ir_set_bits(var_id result, var_id field, var_id value, int offset, int length);
 void ir_get_bits(var_id result, var_id field, int offset, int length, int sign_extend);

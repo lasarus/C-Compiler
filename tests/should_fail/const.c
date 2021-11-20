@@ -2,6 +2,7 @@
 
 #ifdef E
 const unsigned int a = 0, b = (int)(a * 8);
+#error
 #endif
 
 int main() {

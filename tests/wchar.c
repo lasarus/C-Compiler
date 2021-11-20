@@ -13,6 +13,8 @@ int main() {
 	_Static_assert(sizeof (U"abc") == 16, "");
 	_Static_assert(sizeof (u"abc") == 8, "");
 
+	char nstr[] = {"abc" "def"};
+
 	wchar_t wide_str[] = {L"abc" "def"};
 	assert(sizeof(wide_str) == sizeof(L"abcdef"));
 

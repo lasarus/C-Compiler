@@ -118,6 +118,8 @@ int main() {
 		[1][1] = "BBB",
 	};
 
+	assert(strcmp(matrix[0][0], "AAA") == 0);
+
 	{
 		struct T {
 			int a;
@@ -164,5 +166,35 @@ int main() {
 			};
 		} t = { .a = 1, .c = 2, .b = 3 };
 		assert(t.b == 3);
+	}
+
+	{
+		int a[] = {5, [2] = 2, 3};
+		assert(sizeof a == 4 * sizeof(int));
+	}
+
+	{
+		struct T {
+			struct {
+				int a, b;
+			};
+		};
+
+		struct T t = {
+			.a = 3,
+			.b = 10,
+		};
+
+		assert(t.a == 3);
+	}
+
+	{
+		struct Taa { int a, b; } t = {1, 2};
+		struct Tbb {
+			struct Taa a;
+			int b;
+		} t2 = {t, 10};
+
+		assert(t2.a.b == 2);
 	}
 }

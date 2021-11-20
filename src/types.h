@@ -145,8 +145,8 @@ int type_contains_unevaluated_vla(struct type *type);
 int type_search_member(struct type *type, struct string_view name,
 					   int *n, int **indices);
 
-void type_select(struct type *type, int index,
-				 int *field_offset, struct type **field_type);
+struct type *type_select(struct type *type, int index);
+void type_get_offsets(struct type *type, int index, int *offset, int *bit_offset, int *bit_size);
 
 int type_is_real(struct type *type);
 int type_is_arithmetic(struct type *type);

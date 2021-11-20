@@ -746,6 +746,7 @@ struct parameter_list parse_parameter_list(void) {
 
 		if (T0->type == T_RPAR)
 			break;
+
 		TEXPECT(T_COMMA);
 	}
 
@@ -899,49 +900,33 @@ struct type_ast *parse_declarator(int *was_abstract, int *has_symbols) {
 	return ast;
 }
 
-static struct initializer *initializer_init(void) {
-	struct initializer *init = malloc(sizeof *init);
-	*init = (struct initializer) { 0 };
+struct initializer *initializer_add_entry(struct initializer *init, int index) {
+	assert(init->type == INIT_BRACE);
 
-	return init;
+	while (init->brace.size <= index)
+		ADD_ELEMENT(init->brace.size, init->brace.cap, init->brace.entries) = (struct initializer) { .type = INIT_EMPTY };
+
+	return init->brace.entries + index;
 }
 
-void add_expr_init_pair(struct initializer *init, int offset, int bit_offset, int bit_size, struct expr *expr) {
-	ADD_ELEMENT(init->size, init->cap, init->pairs) = (struct init_pair) {
-		.type = IP_EXPRESSION,
-		.offset = offset,
-		.bit_offset = bit_offset,
-		.bit_size = bit_size,
-		.u.expr = expr
-	};
+int is_string_type(enum ttype token_type) {
+	return token_type == T_STRING || token_type == T_STRING_WCHAR ||
+		token_type == T_STRING_CHAR16 || token_type == T_STRING_CHAR32;
 }
 
-void add_string_init_pair(struct initializer *init, int offset, struct string_view str) {
-	ADD_ELEMENT(init->size, init->cap, init->pairs) = (struct init_pair) {
-		.type = IP_STRING,
-		.offset = offset,
-		.u.str = str
-	};
-}
+int match_specific_string(struct type **type, struct initializer *init, struct token string_token,
+						  enum simple_type char_type, enum ttype token_type) {
+	if (string_token.type != token_type)
+		return 0;
 
-int parse_string_initializer(struct type **type, int offset,
-							 struct initializer *init, enum simple_type char_type,
-							 enum ttype str_token) {
 	if (((*type)->type == TY_ARRAY || (*type)->type == TY_INCOMPLETE_ARRAY) &&
 		(type_is_simple((*type)->children[0], char_type))) {
-		struct string_view str;
-		if (T0->type == T_LBRACE && T1->type == str_token &&
-			T2->type == T_RBRACE) {
-			str = T1->str;
-			TNEXT();
-			TNEXT();
-			TNEXT();
-		} else if (T0->type == str_token) {
-			str = T0->str;
-			TNEXT();
-		} else {
-			return 0;
-		}
+		struct string_view str = string_token.str;
+
+		int braces = TACCEPT(T_LBRACE);
+		TEXPECT(token_type);
+		if (braces)
+			TEXPECT(T_RBRACE);
 
 		if ((*type)->type == TY_INCOMPLETE_ARRAY) {
 			struct type complete_array_params = {
@@ -953,304 +938,239 @@ int parse_string_initializer(struct type **type, int offset,
 			*type = type_create(&complete_array_params, (*type)->children);
 		}
 
-		add_string_init_pair(init, offset, str);
-		return 1;
-	}
-	return 0;
-}
+		init->type = INIT_STRING;
+		init->string = str;
 
-int parse_non_brace_initializer(struct type **type, int offset, int bit_offset,
-								int bitfield, struct initializer *init,
-								struct expr **failed_expr) {
-	if (failed_expr)
-		*failed_expr = NULL;
-	if (is_scalar(*type)) {
-		int has_braces = TACCEPT(T_LBRACE);
-
-		struct expr *expr = parse_assignment_expression();
-		if (!expr)
-			ERROR(T0->pos, "Expected expression, got: %s", dbg_token(T0));
-
-		if (expr->data_type->type == TY_STRUCT) {
-			if (!failed_expr)
-				ERROR(T0->pos, "Got invalid initializer for type %s\n", dbg_type(*type));
-			assert(failed_expr);
-			*failed_expr = expr;
-			return 0;
-		} else {
-			struct expr *casted_expr = expression_cast(expr, *type);
-			if (!expression_is_zero(casted_expr)) {
-				add_expr_init_pair(init, offset, bit_offset, bitfield, expression_cast(expr, *type));
-			}
-		}
-
-		if (has_braces)
-			TEXPECT(T_RBRACE);
-		return 1;
-	}
-	if (parse_string_initializer(type, offset, init,
-								 ST_CHAR, T_STRING) ||
-		parse_string_initializer(type, offset, init,
-								 ST_UCHAR, T_STRING) ||
-		parse_string_initializer(type, offset, init,
-								 ST_SCHAR, T_STRING) ||
-		parse_string_initializer(type, offset, init,
-								 WCHAR_TYPE, T_STRING_WCHAR) ||
-		parse_string_initializer(type, offset, init,
-								 CHAR16_TYPE, T_STRING_CHAR16) ||
-		parse_string_initializer(type, offset, init,
-								 CHAR32_TYPE, T_STRING_CHAR32)) {
 		return 1;
 	}
 
 	return 0;
 }
 
-int type_is_char_array(struct type *type) {
-	return (type->type == TY_ARRAY || type->type == TY_INCOMPLETE_ARRAY) &&
-		type_is_simple(type->children[0], ST_CHAR);
+static int match_string(struct type **type, struct initializer *init, struct token string_token) {
+	return match_specific_string(type, init, string_token, ST_CHAR, T_STRING) ||
+		match_specific_string(type, init, string_token, ST_UCHAR, T_STRING) ||
+		match_specific_string(type, init, string_token, ST_SCHAR, T_STRING) ||
+		match_specific_string(type, init, string_token, WCHAR_TYPE, T_STRING_WCHAR) ||
+		match_specific_string(type, init, string_token, CHAR16_TYPE, T_STRING_CHAR16) ||
+		match_specific_string(type, init, string_token, CHAR32_TYPE, T_STRING_CHAR32);
 }
 
-// 6.7.9p17-6.7.8p23 and some surrounding paragraph.
-// TODO: Too many for(;;) in this function.
-int parse_brace_initializer(struct type **current_object, int offset, struct initializer *init) {
-	if (!TACCEPT(T_LBRACE))
-		return 0;
+void parse_initializer_recursive(struct type **type, struct initializer *init, struct expr *expr,
+								 int inside_brace, int n, int *indices);
 
-	int stack_count = 1;
-	int index_stack[32]; // TODO: Remove arbitrary (but very reasonable) limit.
-	int offset_stack[32];
-	struct type *type_stack[32];
+void parse_brace_initializer(struct type **type, struct initializer *init, int idx, int inside_brace,
+							 struct expr *expr) {
+	if (init->type == INIT_EMPTY)
+		*init = (struct initializer) { .type = INIT_BRACE };
 
-	index_stack[0] = 0;
-	type_stack[0] = *current_object;
-	offset_stack[0] = offset;
+	if (!inside_brace)
+		TEXPECT(T_LBRACE);
 
-	int max_index = 0;
+	int max_members = -1;
+	switch ((*type)->type) {
+	case TY_ARRAY:
+		max_members = (*type)->array.length;
+		break;
+	case TY_INCOMPLETE_ARRAY:
+		max_members = -1;
+		break;
+	case TY_STRUCT:
+		max_members = (*type)->struct_data->n;
+		if ((*type)->struct_data->is_union)
+			max_members = 1;
+		// Advance until end of struct, or reaching a different offset.
+		break;
+	default: ICE("Invalid top type");
+	}
 
-	int must_have_designator_list = 0;
+	if (max_members != -1 && inside_brace && idx >= max_members)
+		return;
 
-	do {
-		int has_designator_list = 0;
-		struct type *parent_type = *current_object;
-		int parent_offset = offset;
+	for (;;) {
+		static int designator_cap = 0;
+		static int *designators = NULL;
+		int designator_size = 0;
+		struct type *current_type = *type;
 		for (;;) {
-			if (T0->type == T_DOT || T0->type == T_LBRACK) {
-				has_designator_list = 1;
-				stack_count = 0;
-			}
+			size_t index;
+			(void)index;
+			if (T0->type == T_LBRACK) {
+				if (inside_brace)
+					return;
+				TEXPECT(T_LBRACK);
+				struct expr *expr = expression_cast(parse_expression(), type_simple(ST_ULLONG));
+				struct constant *c = expression_to_constant(expr);
+				if (!c)
+					ERROR(T0->pos, "Expected constant expression in array designator.");
+				TEXPECT(T_RBRACK);
 
-			if (TACCEPT(T_DOT)) {
+				assert(c->type == CONSTANT_TYPE && type_is_simple(c->data_type, ST_ULLONG));
+
+				ADD_ELEMENT(designator_size, designator_cap, designators) = c->ullong_d;
+				current_type = type_select(current_type, c->ullong_d);
+			} else if (T0->type == T_DOT) {
+				if (inside_brace)
+					return;
+				TEXPECT(T_DOT);
 				int n = 0, *indices = 0;
-				if (!type_search_member(parent_type, T0->str, &n, &indices))
+				if (!type_search_member(current_type, T0->str, &n, &indices))
 					ERROR(T0->pos, "Could not find member of name %s", dbg_token(T0));
 
 				TEXPECT(T_IDENT);
 
 				for (int i = n - 1; i >= 0; i--) {
-					int noffset;
-					struct type *ntype;
-					type_select(parent_type, indices[i], &noffset, &ntype);
-
-					stack_count++;
-					index_stack[stack_count - 1] = indices[i];
-					type_stack[stack_count - 1] = parent_type;
-					offset_stack[stack_count - 1] = parent_offset;
-
-					parent_type = ntype;
-					parent_offset += noffset;
+					ADD_ELEMENT(designator_size, designator_cap, designators) = indices[i];
+					current_type = type_select(current_type, indices[i]);
 				}
-			} else if (TACCEPT(T_LBRACK)) {
-				struct expr *expr = parse_expression();
-				TEXPECT(T_RBRACK);
-
-				struct constant *constant = expression_to_constant(expression_cast(expr, type_simple(ST_INT)));
-				if (!constant)
-					ERROR(T0->pos, "Array designator must have constant expression.");
-				assert(type_is_simple(constant->data_type, ST_INT));
-
-				int index = constant->int_d;
-
-				int noffset;
-				struct type *ntype;
-				type_select(parent_type, index, &noffset, &ntype);
-
-				stack_count++;
-				index_stack[stack_count - 1] = index;
-				type_stack[stack_count - 1] = parent_type;
-				offset_stack[stack_count - 1] = parent_offset;
-
-				parent_type = ntype;
-				parent_offset += noffset;
 			} else {
 				break;
 			}
 		}
 
-		if (must_have_designator_list && !has_designator_list) {
-			break;
-		}
+		int *pass_designators = NULL;
+		int pass_n = 0;
 
-		must_have_designator_list = 0;
-
-		if (has_designator_list)
+		if (designator_size) {
 			TEXPECT(T_A);
 
-		struct type *selected_type = NULL;
-		int selected_offset = 0, selected_bit_offset = 0, selected_bitfield = -1;
-		type_select(type_stack[stack_count - 1], index_stack[stack_count - 1], &selected_offset, &selected_type);
-		if (type_stack[stack_count - 1]->type == TY_STRUCT) {
-			int index = index_stack[stack_count - 1];
-			struct struct_data *data = type_stack[stack_count - 1]->struct_data;
-			selected_bit_offset = data->fields[index].bit_offset;
-			selected_bitfield = data->fields[index].bitfield;
-		}
-		selected_offset += offset_stack[stack_count - 1];
+			if (designator_size > 0)
+				idx = designators[0];
 
-		if (type_is_char_array(selected_type) && parse_non_brace_initializer(&selected_type,
-																			 selected_offset,
-																			 selected_bit_offset,
-																			 selected_bitfield,
-																			 init, NULL)) {
-		} else if (!(type_is_aggregate(selected_type) &&
-			  parse_brace_initializer(&selected_type, selected_offset, init))) {
-			// Recurse down until parse_non_brace_initializer matches.
-			int start_count = stack_count;
-			int found = 0;
-
-			struct type *current = selected_type;
-			while (type_is_aggregate(current)) {
-				struct expr *failed_expr = NULL;
-				if (parse_non_brace_initializer(&current, selected_offset, selected_bit_offset, selected_bitfield,
-												init, &failed_expr)) {
-					found = 1;
-					break;
-				}
-
-				stack_count++;
-
-				type_stack[stack_count - 1] = current;
-				index_stack[stack_count - 1] = 0;
-				offset_stack[stack_count - 1] = selected_offset;
-
-				type_select(current, 0, NULL, &current);
-			}
-
-			struct expr *failed_expr = NULL;
-			if (!found && parse_non_brace_initializer(&current, selected_offset, selected_bit_offset,
-													  selected_bitfield,
-													  init, &failed_expr)) {
-				found = 1;
-			}
-
-			if (!found) {
-				// This 
-				struct expr *expr = failed_expr ? failed_expr : parse_assignment_expression();
-				if (!expr)
-					ERROR(T0->pos, "Expected expression.");
-				if (!type_is_aggregate(expr->data_type))
-					ERROR(T0->pos, "Expected expression of aggregate data type, but got %s", dbg_type(expr->data_type));
-
-				for (; stack_count > start_count; stack_count--) {
-					if (expr->data_type == type_stack[stack_count - 1]) {
-						add_expr_init_pair(init, selected_offset, selected_bit_offset, selected_bitfield, expr);
-						break;
-					}
-				}
-
-				if (stack_count == start_count) {
-					ERROR(T0->pos, "Can't cast aggregate type");
-				}
-
-				stack_count--;
+			if (designator_size > 1) {
+				pass_designators = designators + 1;
+				pass_n = designator_size - 1;
 			}
 		}
 
-		max_index = MAX(max_index, index_stack[0]);
+		struct type *child_type = type_select(*type, idx);
+		parse_initializer_recursive(&child_type,
+									initializer_add_entry(init, idx), expr, designator_size < 1, pass_n, pass_designators);
+		expr = NULL;
 
-		// Advance one step.
-		while (stack_count > 0) {
-			int idx = ++index_stack[stack_count - 1];
-			struct type *top_type = type_stack[stack_count - 1];
-			int num_members = 0;
-			switch (top_type->type) {
-			case TY_ARRAY:
-				num_members = top_type->array.length;
-				break;
-			case TY_INCOMPLETE_ARRAY:
-				num_members = -1;
-				break;
-			case TY_STRUCT:
-				num_members = top_type->struct_data->n;
-				// Advance until end of struct, or reaching a different offset.
-				while (idx < num_members && (top_type->struct_data->fields[idx - 1].offset ==
-											 top_type->struct_data->fields[idx].offset &&
-											 top_type->struct_data->fields[idx - 1].bit_offset ==
-											 top_type->struct_data->fields[idx].bit_offset)) {
-					idx = ++index_stack[stack_count - 1];
-				}
-				break;
-			default: ICE("Invalid top type");
-			}
-
-			if (num_members >= 0 &&
-				index_stack[stack_count - 1] >= num_members) {
-				stack_count--;
-			} else {
-				break;
-			}
-		}
-
-		if (stack_count == 0) {
-			must_have_designator_list = 1;
-			TACCEPT(T_COMMA);
+		if (T0->type == T_LBRACK || T0->type == T_DOT)
 			continue;
-		}
 
-		if (!TACCEPT(T_COMMA)) {
+		idx++;
+
+		if (inside_brace && idx == max_members)
 			break;
-		}
-		if (T0->type == T_RBRACE) {
+
+		if (!TACCEPT(T_COMMA))
 			break;
-		}
-	} while (1);
 
-	if ((*current_object)->type == TY_INCOMPLETE_ARRAY) {
-		struct type complete_array_params = {
-			.type = TY_ARRAY,
-			.array.length = max_index + 1,
-			.n = 1
-		};
-
-		struct type *ntype = type_create(&complete_array_params, (*current_object)->children);
-		*current_object = ntype;
+		if (T0->type == T_RBRACE)
+			break;
 	}
 
-	if (stack_count == 0)
-		TACCEPT(T_COMMA);
-
-	TEXPECT(T_RBRACE);
-	return 1;
+	if (!inside_brace)
+		TEXPECT(T_RBRACE);
 }
 
-struct initializer *parse_initializer(struct type **type) {
-	struct initializer *init = initializer_init();
+// 6.7.9p17-6.7.8p23 and some surrounding paragraphs.
 
-	if (!parse_non_brace_initializer(type, 0, 0, -1, init, NULL)) {
-		struct expr *expr = parse_assignment_expression();
+// This is tricky and very easy to get wrong.
+// See tests/initializers.c to see some examples.
+void parse_initializer_recursive(struct type **type, struct initializer *init, struct expr *expr,
+								 int inside_brace, int n, int *indices) {
+	int current_idx = 0;
+	if (n > 0) {
+		current_idx = indices[0];
+		struct type *selected = type_select(*type, current_idx);
+		if (init->type == INIT_EMPTY)
+			*init = (struct initializer) { .type = INIT_BRACE };
+		struct initializer *next_init = initializer_add_entry(init, current_idx);
 
-		if (expr) {
-			add_expr_init_pair(init, 0, 0, -1, expression_cast(expr, *type));
+		parse_initializer_recursive(&selected, next_init, expr, inside_brace, n - 1, indices + 1);
+
+		if (!TACCEPT(T_COMMA))
+			return;
+
+		if (T0->type == T_RBRACE)
+			return;
+
+		parse_brace_initializer(type, init, current_idx + 1, 1, expr);
+		return;
+	}
+
+	int is_aggregate = type_is_aggregate(*type);
+
+	int is_str = 0, is_brace = 0;
+	struct token string_token = { 0 };
+
+	if (!expr && is_scalar(*type)) {
+		int has_braces = TACCEPT(T_LBRACE);
+
+		expr = parse_assignment_expression();
+		if (!expr)
+			ERROR(T0->pos, "Expected expression in initializer to %s got %s.", dbg_type(*type), dbg_token(T0));
+
+		if (has_braces)
+			TEXPECT(T_RBRACE);
+	}
+
+	if (!expr) {
+		is_str = 1;
+		if (T0->type == T_LBRACE && is_string_type(T1->type) && T2->type == T_RBRACE)
+			string_token = *T1;
+		else if (is_string_type(T0->type))
+			string_token = *T0;
+		else
+			is_str = 0;
+	}
+
+	if (!expr && !is_str && T0->type == T_LBRACE)
+		is_brace = 1;
+
+	if (!is_str && !is_brace && !expr) {
+		expr = parse_assignment_expression();
+	}
+
+	if (is_aggregate && inside_brace && T0->type != T_LBRACE &&
+		!is_str && expr->data_type != *type) {
+		// TODO: This seems a bit hacky.
+		parse_brace_initializer(type, init, current_idx, 1, expr);
+		return;
+	}
+
+	if (is_str && match_string(type, init, string_token)) {
+	} else if (expr) {
+		if (is_aggregate && expr->data_type != *type) {
+			parse_initializer_recursive(type, init, expr, 1, -1, NULL);
 		} else {
-			parse_brace_initializer(type, 0, init);
+			init->type = INIT_EXPRESSION;
+			init->expr = expression_cast(expr, *type);
 		}
+	} else if (T0->type == T_LBRACE && is_aggregate) {
+		parse_brace_initializer(type, init, 0, 0, NULL);
+	} else {
+		ERROR(T0->pos, "Error initializing %s\n", strdup(dbg_type(*type)));
 	}
 
 	if ((*type)->type == TY_INCOMPLETE_ARRAY) {
-		ERROR(T0->pos, "Should have completed");
-	}
+		int max_index = 0;
+		switch (init->type) {
+		case INIT_BRACE: max_index = init->brace.size; break;
+		case INIT_STRING: NOTIMP();
+		default:
+			ERROR(T0->pos, "Expected incomplete array to be completed in initialzier.");
+		}
 
-	return init;
+		struct type complete_array_params = {
+			.type = TY_ARRAY,
+			.array.length = max_index,
+			.n = 1
+		};
+
+		struct type *ntype = type_create(&complete_array_params, (*type)->children);
+		*type = ntype;
+	}
+}
+
+struct initializer parse_initializer(struct type **type) {
+	struct initializer ret = { 0 };
+	parse_initializer_recursive(type, &ret, NULL, 0, -1, NULL);
+	return ret;
 }
 
 struct type *parse_type_name(void) {
@@ -1418,7 +1338,7 @@ int parse_init_declarator(struct specifiers s, int external, int *was_func) {
 			symbol->label.name = name;
 			symbol->label.type = type;
 
-			struct initializer *init = NULL;
+			struct initializer init = { 0 };
 			if (has_init) {
 				init = parse_initializer(&type);
 				symbol->label.type = type;
@@ -1438,10 +1358,10 @@ int parse_init_declarator(struct specifiers s, int external, int *was_func) {
 				symbol->variable.id = new_variable(type, 1, 0);
 				symbol->variable.type = type;
 				if (has_init) {
-					struct initializer *init = parse_initializer(&type);
+					struct initializer init = parse_initializer(&type);
 					symbol->variable.type = type;
 					change_variable_size(symbol->variable.id, calculate_size(type));
-					ir_init_var(init, symbol->variable.id);
+					ir_init_var(&init, type, symbol->variable.id);
 				}
 			}
 		}
@@ -1510,7 +1430,7 @@ void generate_tentative_definitions(void) {
 
 		if (symbol && symbol->is_tentative) {
 			struct type *type = symbols_get_identifier_type(symbol);
-			data_register_static_var(name, type, NULL, symbol->is_global);
+			data_register_static_var(name, type, (struct initializer) { 0 }, symbol->is_global);
 			symbol->is_tentative = 0;
 		}
 	}

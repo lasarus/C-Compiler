@@ -155,12 +155,8 @@ struct type *calculate_type(struct expr *expr) {
 	case E_CAST:
 		return expr->cast.target;
 
-	case E_DOT_OPERATOR: {
-		struct type *type;
-		int offset;
-		type_select(expr->member.lhs->data_type, expr->member.member_idx, &offset, &type);
-		return type;
-	}
+	case E_DOT_OPERATOR:
+		return type_select(expr->member.lhs->data_type, expr->member.member_idx);
 
 	case E_CONDITIONAL:
 		assert(expr->args[1]->data_type == expr->args[2]->data_type);
@@ -861,11 +857,10 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		IR_PUSH_STORE(tmp, dest);
 	} break;
 
-	case E_COMPOUND_LITERAL: {
-		struct initializer *init = expr->compound_literal.init;
-		ir_init_var(init, res);
+	case E_COMPOUND_LITERAL:
+		ir_init_var(&expr->compound_literal.init, expr->compound_literal.type, res);
 		variable_set_stack_bucket(res, 0); // compound literals live until end of block.
-	} break;
+		break;
 
 	case E_COMMA:
 		expression_to_ir(expr->args[0]);
@@ -939,7 +934,7 @@ struct expr *parse_prefix() {
 		if (cast_type) {
 			TEXPECT(T_RPAR);
 			if (T0->type == T_LBRACE) {
-				struct initializer *init = parse_initializer(&cast_type);
+				struct initializer init = parse_initializer(&cast_type);
 				return expr_new((struct expr) {
 						.type = E_COMPOUND_LITERAL,
 						.compound_literal = { cast_type, init }

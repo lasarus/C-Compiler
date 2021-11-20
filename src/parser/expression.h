@@ -89,7 +89,7 @@ struct expr {
 	union {
 		struct {
 			struct type *type;
-			struct initializer *init;
+			struct initializer init;
 		} compound_literal;
 
 		struct {

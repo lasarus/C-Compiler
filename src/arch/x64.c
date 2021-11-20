@@ -611,7 +611,7 @@ void constant_to_buffer(uint8_t *buffer, struct constant constant, int bit_offse
 	assert(constant.type == CONSTANT_TYPE);
 
 	if (type_is_pointer(constant.data_type)) {
-		assert(bit_offset == 0 && bit_size == -1);
+		assert(bit_size == -1);
 		*buffer = constant.long_d;
 		return;
 	}

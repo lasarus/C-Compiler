@@ -2,6 +2,7 @@
 
 #include <common.h>
 #include <parser/declaration.h>
+#include <parser/expression.h>
 #include <arch/calling.h>
 #include <codegen/registers.h>
 #include <abi/abi.h>
@@ -163,44 +164,75 @@ void ir_get_bits(var_id result, var_id field, int offset, int length, int sign_e
 	IR_PUSH_INT_CAST(result, field_large, 0);
 }
 
-void ir_init_var(struct initializer *init, var_id result) {
+static void ir_init_var_recursive(struct initializer *init, struct type *type, var_id offset,
+								  int bit_offset, int bit_size) {
+	switch (init->type) {
+	case INIT_BRACE: {
+		var_id child_offset_var = new_variable(type_pointer(type_simple(ST_VOID)), 1, 1);
+		for (int i = 0; i < init->brace.size; i++) {
+			int child_offset = calculate_offset(type, i);
+			struct type *child_type = type_select(type, i);
+			IR_PUSH_CONSTANT(((struct constant) {
+						.type = CONSTANT_TYPE,
+						.data_type = type_simple(ST_ULLONG),
+						.ullong_d = child_offset,
+					}), child_offset_var);
+			IR_PUSH_BINARY_OPERATOR(IBO_ADD, offset, child_offset_var, child_offset_var);
+			int bit_offset = -1, bit_size = -1;
+
+			if (type->type == TY_STRUCT) {
+				struct field f = type->struct_data->fields[i];
+				bit_offset = f.bit_offset;
+				bit_size = f.bitfield;
+			}
+
+			ir_init_var_recursive(init->brace.entries + i, child_type, child_offset_var,
+								  bit_offset, bit_size);
+		}
+	} break;
+
+	case INIT_EXPRESSION:
+		if (bit_size == -1) {
+			IR_PUSH_STORE(expression_to_ir(init->expr), offset);
+		} else {
+			var_id value = expression_to_ir(init->expr);
+			var_id prev = new_variable_sz(get_variable_size(value), 1, 1);
+			IR_PUSH_LOAD(prev, offset);
+
+			ir_set_bits(prev, prev, value, bit_offset, bit_size);
+
+			IR_PUSH_STORE(prev, offset);
+		}
+		break;
+
+	case INIT_STRING: {
+		var_id offset_var = new_variable(type_pointer(type_simple(ST_VOID)), 1, 1);
+		var_id char_val = new_variable_sz(1, 1, 1);
+		for (int j = 0; j < init->string.len; j++) {
+			IR_PUSH_CONSTANT(((struct constant) { .type = CONSTANT_TYPE,
+						.data_type = type_simple(ST_CHAR),
+						.char_d = init->string.str[j]}), char_val);
+			IR_PUSH_CONSTANT(((struct constant) {
+						.type = CONSTANT_TYPE,
+						.data_type = type_simple(ST_ULLONG),
+						.ullong_d = j,
+					}), offset_var);
+			IR_PUSH_BINARY_OPERATOR(IBO_ADD, offset, offset_var, offset_var);
+
+			IR_PUSH_STORE(char_val, offset_var);
+		}
+	} break;
+		
+	case INIT_EMPTY: break;
+	}
+}
+
+void ir_init_var(struct initializer *init, struct type *type, var_id result) {
 	IR_PUSH_SET_ZERO(result);
 	var_id base_address = new_variable(type_pointer(type_simple(ST_VOID)), 1, 1);
 	IR_PUSH_ADDRESS_OF(base_address, result);
-	var_id member_address = new_variable(type_pointer(type_simple(ST_VOID)), 1, 1);
-	var_id offset_var = new_variable(type_pointer(type_simple(ST_VOID)), 1, 1);
 
-	for (int i = 0; i < init->size; i++) {
-		struct init_pair *pair = init->pairs + i;
-		switch (pair->type) {
-		case IP_EXPRESSION: {
-			ir_get_offset(member_address, base_address, offset_var, pair->offset);
-			if (init->pairs[i].bit_offset) {
-				var_id value = expression_to_ir(pair->u.expr);
-				var_id prev = new_variable_sz(get_variable_size(value), 1, 1);
-				IR_PUSH_LOAD(prev, member_address);
-
-				ir_set_bits(prev, prev, value, init->pairs[i].bit_offset, init->pairs[i].bit_size);
-
-				IR_PUSH_STORE(prev, member_address);
-			} else {
-				IR_PUSH_STORE(expression_to_ir(pair->u.expr), member_address);
-			}
-		} break;
-
-		case IP_STRING: {
-			var_id char_val = new_variable_sz(1, 1, 1);
-			struct string_view str = pair->u.str;
-			for (int j = 0; j < str.len; j++) { 
-				ir_get_offset(member_address, base_address, offset_var, pair->offset + j);
-				IR_PUSH_CONSTANT(((struct constant) { .type = CONSTANT_TYPE,
-							.data_type = type_simple(ST_CHAR),
-							.char_d = str.str[j]}), char_val);
-				IR_PUSH_STORE(char_val, member_address);
-			}
-		} break;
-		}
-	}
+	ir_init_var_recursive(init, type, base_address, -1, -1);
 }
 
 void ir_call(var_id result, var_id func_var, struct type *function_type, int n_args, struct type **argument_types, var_id *args) {
