@@ -1383,16 +1383,10 @@ int evaluate_constant_expression(struct expr *expr,
 		if (!evaluate_constant_expression(expr->args[2], &rhs))
 			return 0;
 
-		if (lhs.type == CONSTANT_LABEL ||
-			mid.type == CONSTANT_LABEL ||
-			rhs.type == CONSTANT_LABEL)
+		if (lhs.type != CONSTANT_TYPE ||
+			mid.type != CONSTANT_TYPE ||
+			rhs.type != CONSTANT_TYPE)
 			return 0;
-
-		assert(lhs.type == CONSTANT_TYPE);
-		assert(mid.type == CONSTANT_TYPE);
-		assert(rhs.type == CONSTANT_TYPE);
-
-		assert(is_scalar(lhs.data_type));
 
 		if (constant_is_zero(&lhs)) {
 			*constant = rhs;
