@@ -300,9 +300,8 @@ void expand_argument(struct token_list tl, int *concat_with_prev, int concat, in
 
 void subs_buffer(struct define *def, struct string_set *hs, struct position new_pos, int input) {
 	int n_args = def->par.size;
-	if (n_args > 16)
-		ICE("Unsupported number of elements");
-	struct token_list arguments[16] = {0};
+	struct token_list *arguments = malloc(sizeof *arguments * n_args);
+
 	struct token_list vararg = {0};
 	int vararg_included = 0;
 	if(def->func) {
@@ -416,6 +415,8 @@ void subs_buffer(struct define *def, struct string_set *hs, struct position new_
 		struct token *tok = input_buffer.tokens + i;
 		tok->hs = string_set_union(*hs, tok->hs);
 	}
+
+	free(arguments);
 }
 
 // Expands until empty token.
