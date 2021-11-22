@@ -211,7 +211,9 @@ static struct {
 } output_buffer;
 
 void input_buffer_push(struct token *t) {
-	ADD_ELEMENT(input_buffer.size, input_buffer.cap, input_buffer.tokens) = *t;
+	struct token n_token = *t;
+	n_token.hs = string_set_dup(n_token.hs);
+	ADD_ELEMENT(input_buffer.size, input_buffer.cap, input_buffer.tokens) = n_token;
 }
 
 struct token input_buffer_take(int input) {
@@ -331,7 +333,6 @@ void subs_buffer(struct define *def, struct string_set *hs, struct position new_
 
 		*hs = string_set_intersection(*hs, rpar.hs);
 	}
-	(void)vararg_included;
 
 	string_set_insert(hs, sv_to_str(def->name));
 
@@ -365,9 +366,6 @@ void subs_buffer(struct define *def, struct string_set *hs, struct position new_
 				i--; // There is an additional i-- at the end of the loop.
 			} else if (vararg_included) {
 				expand_argument(vararg, &concat_with_prev, concat, stringify, input);
-			} else {
-				ERROR(t.pos, "Not implemented, %.*s (%d)", def->name.len, def->name.str, def->func);
-				NOTIMP();
 			}
 		} else if (idx >= 0 && stringify) {
 			struct token_list tl = arguments[idx];
