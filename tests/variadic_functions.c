@@ -41,6 +41,29 @@ int sum_structs(int n, ...) {
 	return sum;
 }
 
+int vsum(int n, __builtin_va_list ap)
+{
+	int sum = 0;
+    __builtin_va_list v;
+
+	__builtin_va_copy(v, ap);
+	for (int i = 0; i < n; i++) {
+		sum += __builtin_va_arg(v, int);
+	}
+	__builtin_va_end(v);
+
+	return sum;
+}
+
+int asum(int n, ...) {
+	__builtin_va_list v;
+	__builtin_va_start(v, n);
+	int sum = 0;
+	sum = vsum(n, v);
+	__builtin_va_end(v);
+	return sum;
+}
+
 int main() {
 	assert(sum(2, 100, 200) == 300);
 	assert(sum(3, 100, 200, 300) == 600);
@@ -51,4 +74,5 @@ int main() {
 			}, (struct large_struct) {
 				{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
 			}) == 110);
+	assert(asum(2, 100, 200) == 300);
 }

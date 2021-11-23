@@ -6,6 +6,7 @@
 #include <common.h>
 #include <codegen/rodata.h>
 #include <precedence.h>
+#include <abi/abi.h>
 
 #include <assert.h>
 
@@ -402,6 +403,9 @@ struct expr *expr_new(struct expr expr) {
 
 	if (expr.type == E_BUILTIN_VA_COPY) {
 		decay_array(&expr.va_copy_.d);
+		decay_array(&expr.va_copy_.s);
+	} else if (expr.type == E_BUILTIN_VA_ARG) {
+		decay_array(&expr.va_arg_.v);
 	} else if (expr.type == E_CALL) {
 		for (int i = 0; i < expr.call.n_args; i++)
 			decay_array(&expr.call.args[i]);
@@ -847,20 +851,36 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 	case E_BUILTIN_VA_START:
 		get_current_function()->uses_va = 1;
 		IR_PUSH_VA_START(expression_to_address(expr->va_start_.array));
-	break;
+		break;
 
 	case E_BUILTIN_VA_ARG:
-		IR_PUSH_VA_ARG(expression_to_address(expr->va_arg_.v), res, expr->va_arg_.t);
+		if (abi_info.va_list_is_reference) {
+			IR_PUSH_VA_ARG(expression_to_address(expr->va_arg_.v), res, expr->va_arg_.t);
+		} else {
+			IR_PUSH_VA_ARG(expression_to_ir(expr->va_arg_.v), res, expr->va_arg_.t);
+		}
 		break;
 
 	case E_BUILTIN_VA_COPY: {
-		var_id dest = expression_to_ir(expr->va_copy_.d);
-		var_id source = expression_to_address(expr->va_copy_.s);
+		if (abi_info.va_list_is_reference) {
+			var_id dest = expression_to_address(expr->va_copy_.d);
+			var_id source = expression_to_ir(expr->va_copy_.s);
 
-		var_id tmp = new_variable(type_deref(expr->va_copy_.d->data_type), 1, 1);
+			var_id address = new_variable_sz(8, 1, 1);
+			var_id tmp = new_variable(expr->va_copy_.d->data_type, 1, 1);
 
-		IR_PUSH_LOAD(tmp, source);
-		IR_PUSH_STORE(tmp, dest);
+			IR_PUSH_ADDRESS_OF(address, source);
+			IR_PUSH_LOAD(tmp, address);
+			IR_PUSH_STORE(tmp, dest);
+		} else {
+			var_id dest = expression_to_ir(expr->va_copy_.d);
+			var_id source = expression_to_ir(expr->va_copy_.s);
+
+			var_id tmp = new_variable(type_deref(expr->va_copy_.d->data_type), 1, 1);
+
+			IR_PUSH_LOAD(tmp, source);
+			IR_PUSH_STORE(tmp, dest);
+		}
 	} break;
 
 	case E_COMPOUND_LITERAL:

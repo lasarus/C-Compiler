@@ -478,6 +478,8 @@ static void sysv_emit_va_arg(var_id result, var_id va_list, struct type *type) {
 }
 
 void abi_init_sysv(void) {
+	abi_info.va_list_is_reference = 0;
+
 	abi_ir_function_call = sysv_ir_function_call;
 	abi_ir_function_new = sysv_ir_function_new;
 	abi_ir_function_return = sysv_ir_function_return;

@@ -198,6 +198,8 @@ static void ms_emit_va_arg(var_id result, var_id va_list, struct type *type) {
 }
 
 void abi_init_microsoft(void) {
+	abi_info.va_list_is_reference = 1;
+
 	abi_ir_function_call = ms_ir_function_call;
 	abi_ir_function_new = ms_ir_function_new;
 	abi_ir_function_return = ms_ir_function_return;

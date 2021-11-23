@@ -4,6 +4,12 @@
 #include <ir/variables.h>
 #include <ir/ir.h>
 
+struct abi_info {
+	int va_list_is_reference;
+};
+
+extern struct abi_info abi_info;
+
 void abi_init_sysv(void);
 void abi_init_microsoft(void);
 
