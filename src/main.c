@@ -114,6 +114,7 @@ void add_implementation_defs(void) {
 
 	define_string("__TIME__", allocate_printf("\"%02d:%02d:%02d\"", tm.tm_hour, tm.tm_min, tm.tm_sec));
 	define_string("__STDC__", "1");
+	define_string("__FUNCTION__", "__func__");
 	define_string("__STDC_HOSTED__", "0");
 	define_string("__STDC_VERSION__", "201710L");
 	define_string("__x86_64__", "1");
