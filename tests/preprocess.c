@@ -60,6 +60,19 @@ assert(strcmp(include, "Hello") == 0);
 #error
   #endif
 
+
+#define AAAA
+
+# if defined(AAAA)
+#  if defined(BBBB)
+#   error
+#  else
+//#   error
+#  endif
+# elif !defined(CCCC)
+#   error
+# endif
+
 	return 0;
 }
 
