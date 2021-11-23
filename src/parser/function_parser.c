@@ -49,21 +49,26 @@ int parse_labeled_statement(struct jump_blocks jump_blocks) {
 		TNEXT();
 		TNEXT();
 
+		block_id goto_block = 0;
+
 		for (int i = 0; i < function_scope.size; i++) {
 			if (sv_cmp(label, function_scope.labels[i].label)) {
 				if (function_scope.labels[i].used)
 					ERROR(T0->pos, "Label declared more than once %.*s", label.len, label.str);
-				ir_goto(function_scope.labels[i].id);
-				ir_block_start(function_scope.labels[i].id);
+
+				goto_block = function_scope.labels[i].id;
 				function_scope.labels[i].used = 1;
-				return 1;
+				break;
 			}
 		}
 
-		block_id id = new_block();
-		add_function_scope_label(label, id, 1);
-		ir_goto(id);
-		ir_block_start(id);
+		if (!goto_block) {
+			goto_block = new_block();
+			add_function_scope_label(label, goto_block, 1);
+		}
+
+		ir_goto(goto_block);
+		ir_block_start(goto_block);
 
 		parse_statement(jump_blocks);
 		return 1;
