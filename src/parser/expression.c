@@ -232,11 +232,17 @@ void cast_conditional(struct expr *expr) {
 		return;
 
 	if (type_is_pointer(a) && type_is_pointer(b)) {
+		struct type *composite;
 		if (type_deref(a) == type_simple(ST_VOID))
 			expr->args[1] = expression_cast(expr->args[1], b);
 		else if (type_deref(b) == type_simple(ST_VOID))
 			expr->args[2] = expression_cast(expr->args[2], a);
-		else {
+		else if ((composite = type_make_composite(type_remove_qualifications(type_deref(a)),
+												  type_remove_qualifications(type_deref(b))))) {
+			composite = type_pointer(composite);
+			expr->args[2] = expression_cast(expr->args[2], composite);
+			expr->args[1] = expression_cast(expr->args[1], composite);
+		} else {
 			ICE("Invalid combination of data types:\n%s and %s\n",
 				strdup(dbg_type(a)),
 				strdup(dbg_type(b)));

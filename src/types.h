@@ -138,6 +138,7 @@ struct type *type_deref(struct type *type);
 struct type *type_struct(struct struct_data *struct_data);
 struct type *type_make_const(struct type *type, int is_const);
 struct type *type_adjust_parameter(struct type *type);
+struct type *type_remove_qualifications(struct type *type);
 
 void type_evaluate_vla(struct type *type);
 int type_contains_unevaluated_vla(struct type *type);

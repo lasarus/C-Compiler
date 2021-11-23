@@ -165,6 +165,12 @@ struct type *type_make_const(struct type *type, int is_const) {
 	return type_create(&params, type->children);
 }
 
+struct type *type_remove_qualifications(struct type *type) {
+	struct type params = *type;
+	params.is_const = 0;
+	return type_create(&params, type->children);
+}
+
 // TODO: make this better.
 struct struct_data *register_struct(void) {
 	return malloc(sizeof (struct struct_data));
