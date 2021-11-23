@@ -149,6 +149,7 @@ struct token glue(struct token a, struct token b) {
 
 	ret.str = sv_from_str(allocate_printf("%s%s", sv_to_str(b.str), sv_to_str(a.str))); // TODO: This can be done better.
 	ret.hs = string_set_intersection(a.hs, b.hs);
+	ret.pos = a.pos;
 
 	return ret;
 }
@@ -395,10 +396,10 @@ void subs_buffer(struct define *def, struct string_set *hs, struct position new_
 			} else {
 				t.pos = new_pos;
 				input_buffer_push(&t);
-
-				if (concat)
-					concat_with_prev = 1;
 			}
+
+			if (concat)
+				concat_with_prev = 1;
 		}
 
 		if (concat || stringify)

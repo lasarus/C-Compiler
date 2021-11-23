@@ -9,6 +9,8 @@
 #define COMBINE(X) START_ ## X
 #define CAT(A, B) A ## B
 
+#define CAT3(X) A##_##X
+
 #if '\xff' > 0
 #else
 #endif
@@ -32,6 +34,10 @@ int main() {
 	assert(CAT(0x, ff) == 0xff);
 
 	const char *include = NULL;
+
+	int CAT3(HELLO) = 10;
+	A_HELLO = 20;
+
 #
 	include = "Hello";
 assert(strcmp(include, "Hello") == 0);
