@@ -332,8 +332,8 @@ struct token tokenizer_next(void) {
 			is_header = sv_string_cmp(next.str, "include");
 			is_directive = 0;
 		}
-	} else if(parse_punctuator(&next)) {
 	} else if(parse_pp_number(&next)) {
+	} else if(parse_punctuator(&next)) {
 	} else if(C0 == '\0') {
 		if (input->next) {
 			// Retry on popped source.
