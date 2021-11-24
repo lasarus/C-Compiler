@@ -73,6 +73,10 @@ assert(strcmp(include, "Hello") == 0);
 #   error
 # endif
 
+#if 0
+#!
+#endif
+
 	return 0;
 }
 

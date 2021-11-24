@@ -297,7 +297,14 @@ struct token directiver_next(void) {
 			continue;
 		}
 
+		if (directive.type != T_IDENT &&
+			cond_stack[cond_stack_n - 1] != 1) {
+			t = directive;
+			continue;
+		}
+
 		struct string_view name = directive.str;
+
 		assert(directive.type == T_IDENT);
 
 		if (sv_string_cmp(name, "ifndef") ||
