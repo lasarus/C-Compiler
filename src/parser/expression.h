@@ -38,13 +38,13 @@ struct expr *expr_new(struct expr expr);
 			.type = E_CONSTANT,											\
 			.constant = {												\
 				.type = CONSTANT_LABEL,									\
-				.data_type = type_array(type_simple(CHAR_TYPE), (STR).len / sizeof_simple(CHAR_TYPE)), \
+				.data_type = type_array(type_simple(CHAR_TYPE), (STR).len / calculate_size(type_simple(CHAR_TYPE))), \
 				.label = {rodata_register(STR)}							\
 			}})
 
 #define EXPR_INT(I) expr_new((struct expr) {							\
 			.type = E_CONSTANT,											\
-			.constant = {.type = CONSTANT_TYPE, .data_type = type_simple(ST_INT), .int_d = (I)} \
+			.constant = constant_simple_signed(ST_INT, I)				\
 		})
 #define EXPR_VAR(V, TYPE, IS_REG) expr_new((struct expr) {	\
 			.type = E_VARIABLE,								\

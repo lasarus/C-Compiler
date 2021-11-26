@@ -104,11 +104,7 @@ void ir_return_void(void) {
 void ir_get_offset(var_id member_address, var_id base_address, var_id offset_var, int offset) {
 	if (!offset_var)
 		offset_var = new_variable(type_pointer(type_simple(ST_VOID)), 1, 1);
-	IR_PUSH_CONSTANT(((struct constant) {
-				.type = CONSTANT_TYPE,
-				.data_type = type_simple(ST_ULLONG),
-				.ullong_d = offset
-			}), offset_var);
+	IR_PUSH_CONSTANT(constant_simple_unsigned(abi_info.pointer_type, offset), offset_var);
 	IR_PUSH_BINARY_OPERATOR(IBO_ADD, base_address, offset_var, member_address);
 }
 
@@ -124,12 +120,8 @@ void ir_set_bits(var_id result, var_id field, var_id value, int offset, int leng
 	IR_PUSH_INT_CAST(value_large, value, 0);
 	IR_PUSH_INT_CAST(field_large, field, 0);
 
-	IR_PUSH_CONSTANT(((struct constant) { .type = CONSTANT_TYPE,
-				.data_type = type_simple(ST_UCHAR), .ullong_d = offset }),
-				shift_var);
-	IR_PUSH_CONSTANT(((struct constant) { .type = CONSTANT_TYPE,
-				.data_type = type_simple(ST_ULLONG), .ullong_d = mask }),
-				mask_var);
+	IR_PUSH_CONSTANT(constant_simple_unsigned(abi_info.size_type, offset), shift_var);
+	IR_PUSH_CONSTANT(constant_simple_unsigned(abi_info.size_type, mask), mask_var);
 	IR_PUSH_BINARY_OPERATOR(IBO_BAND, mask_var, field_large, result_large);
 	IR_PUSH_BINARY_NOT(mask_var, mask_var);
 	IR_PUSH_BINARY_OPERATOR(IBO_LSHIFT, value_large, shift_var, value_large);
@@ -145,15 +137,10 @@ void ir_get_bits(var_id result, var_id field, int offset, int length, int sign_e
 
 	IR_PUSH_INT_CAST(field_large, field, 0);
 
-	IR_PUSH_CONSTANT(((struct constant) { .type = CONSTANT_TYPE,
-				.data_type = type_simple(ST_ULLONG), .ullong_d = 64 - offset - length }),
-				shift_var);
-
+	IR_PUSH_CONSTANT(constant_simple_unsigned(abi_info.size_type, 64 - offset - length), shift_var);
 	IR_PUSH_BINARY_OPERATOR(IBO_LSHIFT, field_large, shift_var, field_large);
 
-	IR_PUSH_CONSTANT(((struct constant) { .type = CONSTANT_TYPE,
-				.data_type = type_simple(ST_ULLONG), .ullong_d = 64 - length }),
-				shift_var);
+	IR_PUSH_CONSTANT(constant_simple_unsigned(abi_info.size_type, 64 - length), shift_var);
 
 	if (sign_extend) {
 		IR_PUSH_BINARY_OPERATOR(IBO_IRSHIFT, field_large, shift_var, field_large);
@@ -172,11 +159,7 @@ static void ir_init_var_recursive(struct initializer *init, struct type *type, v
 		for (int i = 0; i < init->brace.size; i++) {
 			int child_offset = calculate_offset(type, i);
 			struct type *child_type = type_select(type, i);
-			IR_PUSH_CONSTANT(((struct constant) {
-						.type = CONSTANT_TYPE,
-						.data_type = type_simple(ST_ULLONG),
-						.ullong_d = child_offset,
-					}), child_offset_var);
+			IR_PUSH_CONSTANT(constant_simple_unsigned(abi_info.size_type, child_offset), child_offset_var);
 			IR_PUSH_BINARY_OPERATOR(IBO_ADD, offset, child_offset_var, child_offset_var);
 			int bit_offset = -1, bit_size = -1;
 
@@ -207,19 +190,13 @@ static void ir_init_var_recursive(struct initializer *init, struct type *type, v
 
 	case INIT_STRING: {
 		var_id offset_var = new_variable(type_pointer(type_simple(ST_VOID)), 1, 1);
-		var_id char_val = new_variable_sz(1, 1, 1);
+		var_id char_var = new_variable_sz(1, 1, 1);
 		for (int j = 0; j < init->string.len; j++) {
-			IR_PUSH_CONSTANT(((struct constant) { .type = CONSTANT_TYPE,
-						.data_type = type_simple(ST_CHAR),
-						.char_d = init->string.str[j]}), char_val);
-			IR_PUSH_CONSTANT(((struct constant) {
-						.type = CONSTANT_TYPE,
-						.data_type = type_simple(ST_ULLONG),
-						.ullong_d = j,
-					}), offset_var);
+			IR_PUSH_CONSTANT(constant_simple_unsigned(ST_CHAR, init->string.str[j]), char_var);
+			IR_PUSH_CONSTANT(constant_simple_unsigned(abi_info.size_type, j), offset_var);
 			IR_PUSH_BINARY_OPERATOR(IBO_ADD, offset, offset_var, offset_var);
 
-			IR_PUSH_STORE(char_val, offset_var);
+			IR_PUSH_STORE(char_var, offset_var);
 		}
 	} break;
 		

@@ -8,6 +8,7 @@
 #include "types.h"
 #include "common.h"
 #include "parser/expression.h"
+#include <abi/abi.h>
 
 static int compare_types(struct type *a, struct type **a_children,
 						 struct type *b) {
@@ -401,7 +402,7 @@ struct expr *type_sizeof(struct type *type) {
 			ICE("Type can't have variable size");
 		}
 	} else {
-		struct constant c = {.type = CONSTANT_TYPE, .data_type = type_simple(ST_ULONG), .ulong_d = calculate_size(type) };
+		struct constant c = constant_simple_unsigned(abi_info.size_type, calculate_size(type));
 
 		return expr_new((struct expr) {
 				.type = E_CONSTANT,

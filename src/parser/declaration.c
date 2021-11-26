@@ -6,6 +6,7 @@
 #include "function_parser.h"
 
 #include <preprocessor/preprocessor.h>
+#include <abi/abi.h>
 
 #include <assert.h>
 
@@ -238,7 +239,7 @@ int parse_enumerator(struct constant *prev, int first) {
 		if (!first)
 			val = constant_increment(*prev);
 		else
-			val = constant_zero(type_simple(ENUM_TYPE));
+			val = constant_simple_signed(ENUM_TYPE, 0);
 	}
 
 	struct symbol_identifier *sym =
@@ -657,12 +658,12 @@ struct type *ast_to_type(const struct type_specifiers *ts, const struct type_qua
 			} break;
 			case ARR_EXPRESSION: {
 				struct constant *length;
-				struct expr *length_expr = expression_cast(ast->array.expr, type_simple(SIZE_TYPE));
+				struct expr *length_expr = expression_cast(ast->array.expr, type_simple(abi_info.size_type));
 				if ((length = expression_to_constant(length_expr))) {
 					assert(length->type == CONSTANT_TYPE);
 					struct type params = {
 						.type = TY_ARRAY,
-						.array.length = length->ullong_d,
+						.array.length = length->uint_d,
 						.n = 1
 					};
 					type = type_create(&params, &type);
@@ -931,7 +932,7 @@ int match_specific_string(struct type **type, struct initializer *init, struct t
 		if ((*type)->type == TY_INCOMPLETE_ARRAY) {
 			struct type complete_array_params = {
 				.type = TY_ARRAY,
-				.array.length = str.len / sizeof_simple(char_type),
+				.array.length = str.len / calculate_size(type_simple(char_type)),
 				.n = 1
 			};
 
@@ -1007,8 +1008,8 @@ void parse_brace_initializer(struct type **type, struct initializer *init, int i
 
 				assert(c->type == CONSTANT_TYPE && type_is_simple(c->data_type, ST_ULLONG));
 
-				ADD_ELEMENT(designator_size, designator_cap, designators) = c->ullong_d;
-				current_type = type_select(current_type, c->ullong_d);
+				ADD_ELEMENT(designator_size, designator_cap, designators) = c->uint_d;
+				current_type = type_select(current_type, c->uint_d);
 			} else if (T0->type == T_DOT) {
 				if (inside_brace)
 					return;
@@ -1404,7 +1405,7 @@ int parse_declaration(int external) {
 
 			TEXPECT(T_SEMI_COLON);
 
-			if (constant->int_d)
+			if (constant->uint_d)
 				ERROR(T0->pos, "Static assert failed: %.*s\n", msg.len, msg.str);
 			return 1;
 		}

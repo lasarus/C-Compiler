@@ -199,9 +199,7 @@ void split_variable(var_id variable, int n_parts, var_id *parts) {
 	var_id offset_constant = new_variable_sz(8, 1, 1);
 	IR_PUSH_ADDRESS_OF(address, variable);
 
-	IR_PUSH_CONSTANT(((struct constant) { .type = CONSTANT_TYPE,
-				.data_type = type_simple(ST_ULLONG), .ullong_d = 8 }),
-		offset_constant);
+	IR_PUSH_CONSTANT(constant_simple_unsigned(abi_info.size_type, 8), offset_constant);
 
 	for (int i = 0; i < n_parts; i++) {
 		parts[i] = new_variable_sz(8, 1, 1);
@@ -220,9 +218,7 @@ static void sysv_ir_function_call(var_id result, var_id func_var, struct type *f
 	var_id rax_constant;
 	if (c.rax != -1) {
 		rax_constant = new_variable_sz(8, 1, 1);
-		IR_PUSH_CONSTANT(((struct constant) { .type = CONSTANT_TYPE,
-					.data_type = type_simple(ST_ULLONG), .ullong_d = c.rax }),
-			rax_constant);
+		IR_PUSH_CONSTANT(constant_simple_unsigned(abi_info.size_type, c.rax), rax_constant);
 	}
 
 	for (int i = 0; i < c.regs_size; i++) {
@@ -232,9 +228,7 @@ static void sysv_ir_function_call(var_id result, var_id func_var, struct type *f
 		var_id address = new_variable_sz(8, 1, 1);
 		var_id offset_constant = new_variable_sz(8, 1, 1);
 
-		IR_PUSH_CONSTANT(((struct constant) { .type = CONSTANT_TYPE,
-					.data_type = type_simple(ST_ULLONG), .ullong_d = c.regs[i].merge_pos }),
-			offset_constant);
+		IR_PUSH_CONSTANT(constant_simple_unsigned(abi_info.size_type, c.regs[i].merge_pos), offset_constant);
 		IR_PUSH_ADDRESS_OF(address, c.regs[i].merge_into);
 		IR_PUSH_BINARY_OPERATOR(IBO_ADD, address, offset_constant, address);
 		IR_PUSH_LOAD(c.regs[i].variable, address);
@@ -270,9 +264,8 @@ static void sysv_ir_function_call(var_id result, var_id func_var, struct type *f
 	} else if (c.ret_regs_size == 2) {
 		var_id address = new_variable_sz(8, 1, 1);
 		var_id eight_constant = new_variable_sz(8, 1, 1);
-		IR_PUSH_CONSTANT(((struct constant) { .type = CONSTANT_TYPE,
-					.data_type = type_simple(ST_ULLONG), .ullong_d = 8 }),
-			eight_constant);
+
+		IR_PUSH_CONSTANT(constant_simple_unsigned(abi_info.size_type, 8), eight_constant);
 		IR_PUSH_ADDRESS_OF(address, result);
 
 		IR_PUSH_STORE(c.ret_regs[0].variable, address);
@@ -333,9 +326,7 @@ static void sysv_ir_function_new(struct type *type, var_id *args, const char *na
 		var_id address = new_variable_sz(8, 1, 1);
 		var_id offset_constant = new_variable_sz(8, 1, 1);
 
-		IR_PUSH_CONSTANT(((struct constant) { .type = CONSTANT_TYPE,
-					.data_type = type_simple(ST_ULLONG), .ullong_d = c.regs[i].merge_pos }),
-			offset_constant);
+		IR_PUSH_CONSTANT(constant_simple_unsigned(abi_info.size_type, c.regs[i].merge_pos), offset_constant);
 		IR_PUSH_ADDRESS_OF(address, c.regs[i].merge_into);
 		IR_PUSH_BINARY_OPERATOR(IBO_ADD, address, offset_constant, address);
 		IR_PUSH_STORE(c.regs[i].variable, address);
@@ -477,8 +468,28 @@ static void sysv_emit_va_arg(var_id result, var_id va_list, struct type *type) {
 	codegen_memcpy(calculate_size(type));
 }
 
+int sysv_sizeof_simple(enum simple_type type) {
+	static const int sizes[ST_COUNT] = {
+		[ST_BOOL] = 1,
+		[ST_CHAR] = 1, [ST_SCHAR] = 1, [ST_UCHAR] = 1,
+		[ST_SHORT] = 2, [ST_USHORT] = 2,
+		[ST_INT] = 4, [ST_UINT] = 4,
+		[ST_LONG] = 8, [ST_ULONG] = 8,
+		[ST_LLONG] = 8, [ST_ULLONG] = 8,
+		[ST_FLOAT] = 4,
+		[ST_DOUBLE] = 8,
+		[ST_LDOUBLE] = 16,
+		[ST_VOID] = 0,
+	};
+
+	return sizes[type];
+}
+
 void abi_init_sysv(void) {
 	abi_info.va_list_is_reference = 0;
+
+	abi_info.pointer_type = ST_ULONG;
+	abi_info.size_type = ST_ULONG;
 
 	abi_ir_function_call = sysv_ir_function_call;
 	abi_ir_function_new = sysv_ir_function_new;
@@ -487,6 +498,7 @@ void abi_init_sysv(void) {
 	abi_emit_va_start = sysv_emit_va_start;
 	abi_emit_va_start = sysv_emit_va_start;
 	abi_emit_va_arg = sysv_emit_va_arg;
+	abi_sizeof_simple = sysv_sizeof_simple;
 
 	// Initialize the __builtin_va_list typedef.
 	struct symbol_typedef *sym =

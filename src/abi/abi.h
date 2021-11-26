@@ -6,6 +6,7 @@
 
 struct abi_info {
 	int va_list_is_reference;
+	enum simple_type pointer_type, size_type;
 };
 
 extern struct abi_info abi_info;
@@ -20,5 +21,7 @@ extern void (*abi_ir_function_return)(struct function *func, var_id value, struc
 extern void (*abi_emit_function_preamble)(struct function *func);
 extern void (*abi_emit_va_start)(var_id result, struct function *func);
 extern void (*abi_emit_va_arg)(var_id result, var_id va_list, struct type *type);
+
+extern int (*abi_sizeof_simple)(enum simple_type type);
 
 #endif

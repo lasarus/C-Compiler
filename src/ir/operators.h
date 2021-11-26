@@ -33,9 +33,10 @@ enum unary_operator_type {
 struct type *operators_get_result_type(enum operator_type op,
 									   struct type *lhs_type,
 									   struct type *rhs_type);
-struct constant operators_constant(enum operator_type op,
-								   struct constant lhs, struct constant rhs);
-struct constant operators_constant_unary(enum unary_operator_type op,
-										 struct constant rhs);
+int operators_constant(enum operator_type op,
+					   struct constant lhs, struct constant rhs,
+					   struct constant *result);
+int operators_constant_unary(enum unary_operator_type op,
+					   struct constant rhs, struct constant *result);
 
 #endif

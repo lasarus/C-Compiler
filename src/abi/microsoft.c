@@ -197,8 +197,27 @@ static void ms_emit_va_arg(var_id result, var_id va_list, struct type *type) {
 	}
 }
 
+int ms_sizeof_simple(enum simple_type type) {
+	static const int sizes[ST_COUNT] = {
+		[ST_BOOL] = 1,
+		[ST_CHAR] = 1, [ST_SCHAR] = 1, [ST_UCHAR] = 1,
+		[ST_SHORT] = 2, [ST_USHORT] = 2,
+		[ST_INT] = 4, [ST_UINT] = 4,
+		[ST_LONG] = 4, [ST_ULONG] = 4,
+		[ST_LLONG] = 8, [ST_ULLONG] = 8,
+		[ST_FLOAT] = 4,
+		[ST_DOUBLE] = 8,
+		[ST_LDOUBLE] = 16,
+		[ST_VOID] = 0,
+	};
+
+	return sizes[type];
+}
+
 void abi_init_microsoft(void) {
 	abi_info.va_list_is_reference = 1;
+	abi_info.pointer_type = ST_ULLONG;
+	abi_info.size_type = ST_ULLONG;
 
 	abi_ir_function_call = ms_ir_function_call;
 	abi_ir_function_new = ms_ir_function_new;
@@ -207,6 +226,7 @@ void abi_init_microsoft(void) {
 	abi_emit_va_start = ms_emit_va_start;
 	abi_emit_va_start = ms_emit_va_start;
 	abi_emit_va_arg = ms_emit_va_arg;
+	abi_sizeof_simple = ms_sizeof_simple;
 
 	// Initialize the __builtin_va_list typedef.
 	struct symbol_typedef *sym =

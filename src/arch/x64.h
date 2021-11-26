@@ -24,7 +24,6 @@
 — long double _Complex
 */
 
-int sizeof_simple(enum simple_type type);
 int type_register(struct type *type);
 int is_scalar(struct type *type);
 int is_signed(enum simple_type type);
@@ -33,7 +32,6 @@ int is_contained_in(enum simple_type large, int large_bitfield,
 					enum simple_type small, int small_bitfield);
 enum simple_type to_unsigned(enum simple_type type);
 
-int calculate_alignment(struct type *type);
 int calculate_size(struct type *type);
 void calculate_offsets(struct struct_data *data);
 
@@ -41,10 +39,12 @@ int calculate_offset(struct type *type, int index);
 
 #define IS_CHAR_SIGNED 1
 #define ENUM_TYPE ST_INT
-#define SIZE_TYPE ST_ULONG
 #define WCHAR_TYPE ST_INT
 #define CHAR32_TYPE ST_UINT
 #define CHAR16_TYPE ST_USHORT
+
+typedef uint64_t constant_uint;
+typedef int64_t constant_int;
 
 struct constant {
 	enum {
@@ -56,18 +56,8 @@ struct constant {
 	struct type *data_type;
 
 	union {
-		_Bool bool_d;
-		int8_t char_d;
-		int8_t schar_d;
-		uint8_t uchar_d;
-		int16_t short_d;
-		uint16_t ushort_d;
-		int32_t int_d;
-		uint32_t uint_d;
-		int64_t long_d;
-		uint64_t ulong_d;
-		int64_t llong_d;
-		uint64_t ullong_d;
+		constant_int int_d;
+		constant_uint uint_d;
 
 		float float_d;
 		double double_d;
@@ -79,8 +69,11 @@ struct constant {
 	};
 };
 
+struct constant constant_simple_signed(enum simple_type type, constant_int value);
+struct constant constant_simple_unsigned(enum simple_type type, constant_uint value);
+struct constant constant_simple_float(enum simple_type type, double f);
+
 struct constant constant_increment(struct constant a);
-struct constant constant_zero(struct type *type);
 struct constant constant_from_string(struct string_view str);
 struct constant constant_cast(struct constant a, struct type *target);
 
@@ -88,6 +81,8 @@ void convert_rax(enum simple_type from, enum simple_type to);
 
 void constant_to_buffer(uint8_t *buffer, struct constant constant, int bit_offset, int bit_size);
 const char *constant_to_string(struct constant constant);
+
+void constant_normalize(struct constant *c);
 
 #endif
 

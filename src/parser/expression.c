@@ -256,9 +256,9 @@ void cast_conditional(struct expr *expr) {
 			   type_is_arithmetic(b)) {
 		convert_arithmetic(&expr->args[1], &expr->args[2]);
 	} else if (a != b) {
-		ICE("Invalid combination of data types:\n%s and %s\n",
-			strdup(dbg_type(a)),
-			strdup(dbg_type(b)));
+		ERROR(T0->pos, "Invalid combination of data types:\n%s and %s\n",
+			  strdup(dbg_type(a)),
+			  strdup(dbg_type(b)));
 	}
 }
 
@@ -1371,11 +1371,8 @@ int evaluate_constant_expression(struct expr *expr,
 			return 0;
 		if (!evaluate_constant_expression(expr->args[1], &rhs))
 			return 0;
-		if (lhs.type != CONSTANT_TYPE ||
-			rhs.type != CONSTANT_TYPE) {
+		if (!operators_constant(expr->binary_op, lhs, rhs, constant))
 			return 0;
-		}
-		*constant = operators_constant(expr->binary_op, lhs, rhs);
 	} break;
 
 	case E_UNARY_OP: {
@@ -1384,7 +1381,8 @@ int evaluate_constant_expression(struct expr *expr,
 			return 0;
 		if (rhs.type == CONSTANT_LABEL)
 			return 0;
-		*constant = operators_constant_unary(expr->unary_op, rhs);
+		if (!operators_constant_unary(expr->unary_op, rhs, constant))
+			return 0;
 	} break;
 
 	case E_ARRAY_PTR_DECAY: {
@@ -1489,38 +1487,19 @@ int constant_is_zero(struct constant *c) {
 	if (c->type != CONSTANT_TYPE)
 		return 0;
 
-	if (c->data_type->type == TY_SIMPLE) {
-		switch (c->data_type->simple) {
-		case ST_INT:
-			return c->int_d == 0;
-		case ST_UINT:
-			return c->uint_d == 0;
-		case ST_LONG:
-			return c->long_d == 0;
-		case ST_ULONG:
-			return c->ulong_d == 0;
-		case ST_LLONG:
-			return c->llong_d == 0;
-		case ST_ULLONG:
-			return c->ullong_d == 0;
-		case ST_CHAR:
-			return c->char_d == 0;
-		case ST_UCHAR:
-			return c->uchar_d == 0;
-		case ST_SCHAR:
-			return c->schar_d == 0;
-		case ST_SHORT:
-			return c->short_d == 0;
-		case ST_USHORT:
-			return c->ushort_d == 0;
-		default:
-			return 0;
-		}
+	if (type_is_simple(c->data_type, ST_FLOAT)) {
+		return c->double_d == 0;
+	} else if (type_is_simple(c->data_type, ST_DOUBLE)) {
+		return c->float_d == 0;
+	} else if (type_is_integer(c->data_type) && is_signed(c->data_type->simple)) {
+		return c->int_d == 0;
+	} else if (type_is_integer(c->data_type) && !is_signed(c->data_type->simple)) {
+		return c->uint_d == 0;
 	} else if (c->data_type->type == TY_POINTER) {
-		return c->ulong_d == 0;
-	} else {
-		return 0;
+		return c->uint_d == 0;
 	}
+
+	return 0;
 }
 
 int expression_is_zero(struct expr *expr) {

@@ -120,27 +120,8 @@ intmax_t evaluate_expression(int prec, int evaluate) {
 			ERROR(t.pos, "Floating point arithmetic in the preprocessor is not allowed.");
 		if (!type_is_integer(c.data_type))
 			ERROR(t.pos, "Preprocessor variables must be of integer type.");
-		switch (c.data_type->simple) {
-		case ST_INT:
-			expr = c.int_d;
-			break;
-		case ST_UINT:
-			expr = c.uint_d;
-			break;
-		case ST_LONG:
-			expr = c.long_d;
-			break;
-		case ST_ULONG:
-			expr = c.ulong_d;
-			break;
-		case ST_LLONG:
-			expr = c.llong_d;
-			break;
-		case ST_ULLONG:
-			expr = c.ullong_d;
-			break;
-		default: NOTIMP();
-		}
+		if (type_is_integer(c.data_type))
+			expr = is_signed(c.data_type->simple) ? (intmax_t)c.int_d : (intmax_t)c.uint_d;
 	} else if (t.type == T_CHARACTER_CONSTANT) {
 		expr = character_constant_to_int(t.str);
 	} else {

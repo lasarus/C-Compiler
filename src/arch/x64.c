@@ -2,57 +2,15 @@
 #include "../codegen/codegen.h"
 
 #include <common.h>
+#include <abi/abi.h>
 
 #include <assert.h>
 #include <string.h>
 #include <limits.h>
 #include <inttypes.h>
 
-int sizeof_simple(enum simple_type type) {
-	switch (type) {
-	case ST_BOOL:
-	case ST_CHAR:
-	case ST_SCHAR:
-	case ST_UCHAR:
-		return 1;
-
-	case ST_SHORT:
-	case ST_USHORT:
-		return 2;
-	case ST_INT:
-	case ST_UINT:
-		return 4;
-
-	case ST_LONG:
-	case ST_ULONG:
-	case ST_LLONG:
-	case ST_ULLONG:
-		return 8;
-
-	case ST_FLOAT:
-		return 4;
-	case ST_DOUBLE:
-		return 8;
-	case ST_LDOUBLE:
-		return 16;
-
-	case ST_VOID:
-		return 0;
-
-	case ST_FLOAT_COMPLEX:
-	case ST_DOUBLE_COMPLEX:
-	case ST_LDOUBLE_COMPLEX:
-		NOTIMP();
-		return -1;
-
-	default:
-		return -1;
-		//ERROR("Invalid type");
-	}
-}
-
-int alignof_simple(enum simple_type type) {
-	return sizeof_simple(type);
+static int alignof_simple(enum simple_type type) {
+	return abi_sizeof_simple(type);
 }
 
 int is_signed(enum simple_type type) {
@@ -92,7 +50,7 @@ struct range {
 };
 
 struct range get_range(enum simple_type type, int bitfield) {
-	int n_bits = bitfield == -1 ? sizeof_simple(type) * 8 : bitfield;
+	int n_bits = bitfield == -1 ? abi_sizeof_simple(type) * 8 : bitfield;
 
 	if (is_signed(type))
 		return (struct range) { n_bits - 1, n_bits - 1};
@@ -168,6 +126,8 @@ int is_scalar(struct type *type) {
 		type->type == TY_POINTER;
 }
 
+static int calculate_alignment(struct type *type);
+
 int alignof_struct(struct struct_data *struct_data) {
 	int max_align = 0;
 
@@ -183,19 +143,16 @@ int alignof_struct(struct struct_data *struct_data) {
 	return max_align;
 }
 
-int calculate_alignment(struct type *type) {
+static int calculate_alignment(struct type *type) {
 	switch (type->type) {
 	case TY_SIMPLE:
 		return alignof_simple(type->simple);
-		break;
 
 	case TY_STRUCT:
 		return alignof_struct(type->struct_data);
-		break;
 
 	case TY_POINTER:
-		return alignof_simple(ST_ULONG);
-		break;
+		return alignof_simple(abi_info.pointer_type);
 
 	case TY_FUNCTION:
 		return -1;
@@ -213,13 +170,13 @@ int calculate_alignment(struct type *type) {
 int calculate_size(struct type *type) {
 	switch (type->type) {
 	case TY_SIMPLE:
-		return sizeof_simple(type->simple);
+		return abi_sizeof_simple(type->simple);
 
 	case TY_STRUCT:
 		return type->struct_data->size;
 
 	case TY_POINTER:
-		return sizeof_simple(ST_ULONG);
+		return abi_sizeof_simple(abi_info.pointer_type);
 
 	case TY_FUNCTION:
 		return -1;
@@ -320,35 +277,13 @@ void calculate_offsets(struct struct_data *data) {
 	data->alignment = alignment;
 }
 
-/* // Constant */
 struct constant constant_increment(struct constant a) {
-	switch (a.type) {
-	case CONSTANT_TYPE:
-		switch(a.data_type->type) {
-		case TY_SIMPLE:
-			switch (a.data_type->simple) {
-			case ST_INT:
-				a.int_d++;
-				return a;
-			default:
-				NOTIMP();
-			}
-			break;
-		default:
-			NOTIMP();
-		} break;
-
-	default:
+	if (a.type != CONSTANT_TYPE)
 		NOTIMP();
-	}
-}
-
-struct constant constant_zero(struct type *type) {
-	return (struct constant) {
-		.type = CONSTANT_TYPE,
-		.data_type = type
-		// Rest will default to zero.
-	};
+	if (!(type_is_integer(a.data_type) && is_signed(a.data_type->simple)))
+		NOTIMP();
+	a.int_d++;
+	return a;
 }
 
 // Basically if string is not of the format (0b|0B)?[0-9]+[ulUL]?
@@ -400,7 +335,7 @@ static struct constant floating_point_constant_from_string(struct string_view sv
 }
 
 static struct constant integer_constant_from_string(struct string_view str) {
-	unsigned long long parsed = 0;
+	unsigned long long parsed = 0; // TODO: Avoid implementation defined behaviour.
 
 	enum {
 		BASE_DECIMAL,
@@ -483,31 +418,22 @@ static struct constant integer_constant_from_string(struct string_view str) {
 		}
 	}
 
-	struct constant res = { .type = CONSTANT_TYPE };
-
+	// TODO: Use abi defined *_MAX.
 	if (parsed <= INT_MAX && allow_int && allow_signed) {
-		res.data_type = type_simple(ST_INT);
-		res.int_d = parsed;
+		return constant_simple_signed(ST_INT, parsed);
 	} else if (parsed <= UINT_MAX && allow_int && allow_unsigned) {
-		res.data_type = type_simple(ST_UINT);
-		res.uint_d = parsed;
+		return constant_simple_unsigned(ST_UINT, parsed);
 	} else if (parsed <= LONG_MAX && allow_long && allow_signed) {
-		res.data_type = type_simple(ST_LONG);
-		res.long_d = parsed;
+		return constant_simple_signed(ST_LONG, parsed);
 	} else if (parsed <= ULONG_MAX && allow_long && allow_unsigned) {
-		res.data_type = type_simple(ST_ULONG);
-		res.ulong_d = parsed;
+		return constant_simple_unsigned(ST_ULONG, parsed);
 	} else if (parsed <= LLONG_MAX && allow_llong && allow_signed) {
-		res.data_type = type_simple(ST_LLONG);
-		res.llong_d = parsed;
+		return constant_simple_signed(ST_LLONG, parsed);
 	} else if (parsed <= ULLONG_MAX && allow_llong && allow_unsigned) {
-		res.data_type = type_simple(ST_ULLONG);
-		res.ullong_d = parsed;
+		return constant_simple_unsigned(ST_ULLONG, parsed);
 	} else {
 		ICE("Cant fit %llu (%.*s) into any type", parsed, str.len, str.str);
 	}
-
-	return res;
 }
 
 struct constant constant_from_string(struct string_view str) {
@@ -518,49 +444,100 @@ struct constant constant_from_string(struct string_view str) {
 	}
 }
 
+static constant_int conv_ui(constant_uint x, constant_uint range_min, constant_uint range_max) {
+    x = x & (range_min + range_max);
+	return (x > range_max) ? -((range_min + 1) - (x - range_max)) : x;
+}
+
+static constant_uint conv_iu(constant_int x, constant_uint range_max) {
+	return (constant_uint)x & range_max;
+}
+
+static constant_uint conv_uu(constant_uint x, constant_uint range_max) {
+	return x & range_max;
+}
+
+static constant_int conv_ii(constant_int x, constant_uint range_min, constant_uint range_max) {
+	return conv_ui(conv_iu(x, range_max + range_min), range_min, range_max);
+}
+
+void constant_normalize(struct constant *c) {
+	assert(type_is_integer(c->data_type));
+	struct range r = get_range(c->data_type->simple, -1);
+	constant_uint range_min = r.min == -1 ? 0 : (constant_uint)1 << r.min;
+	constant_uint range_max = r.max == -1 ? 0 : (((constant_uint)1 << (r.max - 1)) - 1
+												 + ((constant_uint)1 << (r.max - 1)));
+	if (is_signed(c->data_type->simple))
+		c->int_d = conv_ii(c->int_d, range_min, range_max);
+	else
+		c->uint_d = conv_uu(c->int_d, range_max);
+}
+
 struct constant simple_cast(struct constant from, enum simple_type target) {
 	assert(from.type == CONSTANT_TYPE);
 	assert(from.data_type->type == TY_SIMPLE);
+	enum simple_type from_type = from.data_type->simple;
 
-#define CONVERT_TO(NAME)\
-		switch (from.data_type->simple) {\
-		case ST_VOID: break;							\
-		case ST_BOOL: from.NAME = from.bool_d; break;\
-		case ST_CHAR: from.NAME = from.char_d; break;\
-		case ST_UCHAR: from.NAME = from.uchar_d; break;\
-		case ST_SCHAR: from.NAME = from.schar_d; break;\
-		case ST_SHORT: from.NAME = from.short_d; break;\
-		case ST_USHORT: from.NAME = from.ushort_d; break;\
-		case ST_INT: from.NAME = from.int_d; break;\
-		case ST_UINT: from.NAME = from.uint_d; break;\
-		case ST_LONG: from.NAME = from.long_d; break;\
-		case ST_ULONG: from.NAME = from.ulong_d; break;\
-		case ST_LLONG: from.NAME = from.llong_d; break;\
-		case ST_ULLONG: from.NAME = from.ullong_d; break;\
-		case ST_FLOAT: from.NAME = from.float_d; break;\
-		case ST_DOUBLE: from.NAME = from.double_d; break;\
-		default: ICE("Trying to convert from %s to %s", strdup(dbg_type(from.data_type)), strdup(dbg_type(type_simple(target)))); \
-		}\
+	int from_int = type_is_integer(from.data_type);
+	int to_int = type_is_integer(type_simple(target));
 
-	switch (target) {
-	case ST_VOID: break;
-	case ST_BOOL: CONVERT_TO(bool_d); break;
-	case ST_CHAR: CONVERT_TO(char_d); break;
-	case ST_SCHAR: CONVERT_TO(schar_d); break;
-	case ST_UCHAR: CONVERT_TO(uchar_d); break;
-	case ST_SHORT: CONVERT_TO(short_d); break;
-	case ST_USHORT: CONVERT_TO(ushort_d); break;
-	case ST_INT: CONVERT_TO(int_d); break;
-	case ST_UINT: CONVERT_TO(uint_d); break;
-	case ST_LONG: CONVERT_TO(long_d); break;
-	case ST_ULONG: CONVERT_TO(ulong_d); break;
-	case ST_LLONG: CONVERT_TO(llong_d); break;
-	case ST_ULLONG: CONVERT_TO(ullong_d); break;
-	case ST_FLOAT: CONVERT_TO(float_d); break;
-	case ST_DOUBLE: CONVERT_TO(double_d); break;
-	default: NOTIMP();
-	}
+	int from_float = type_is_floating(from.data_type);
+	int to_float = type_is_floating(type_simple(target));
+
 	from.data_type = type_simple(target);
+
+	if (target == ST_VOID || target == from_type)
+		return from;
+
+	if (from_int && to_int) {
+		struct range r = get_range(target, -1);
+		constant_uint range_min = r.min == -1 ? 0 : (constant_uint)1 << r.min;
+		constant_uint range_max = r.max == -1 ? 0 : (((constant_uint)1 << (r.max - 1)) - 1
+													 + ((constant_uint)1 << (r.max - 1)));
+
+		if (is_signed(from_type) && is_signed(target)) {
+			from.int_d = conv_ii(from.int_d, range_min, range_max);
+		} else if (is_signed(from_type) && !is_signed(target)) {
+			from.uint_d = conv_iu(from.int_d, range_max);
+		} else if (!is_signed(from_type) && is_signed(target)) {
+			from.int_d = conv_ui(from.uint_d, range_min, range_max);
+		} else if (!is_signed(from_type) && !is_signed(target)) {
+			from.uint_d = conv_uu(from.int_d, range_max);
+		}
+	} else if (from_int && to_float && target == ST_DOUBLE) {
+		if (is_signed(from_type))
+			from.double_d = from.int_d;
+		else
+			from.double_d = from.uint_d;
+	} else if (from_int && to_float && target == ST_FLOAT) {
+		if (is_signed(from_type))
+			from.float_d = from.int_d;
+		else
+			from.float_d = from.uint_d;
+	} else if (to_int && from_float && from_type == ST_DOUBLE) {
+		if (is_signed(target))
+			from.int_d = from.double_d;
+		else
+			from.uint_d = from.double_d;
+		constant_normalize(&from);
+	} else if (to_int && to_float && from_type == ST_FLOAT) {
+		if (is_signed(target))
+			from.int_d = from.float_d;
+		else
+			from.uint_d = from.float_d;
+		constant_normalize(&from);
+	} else if (from_float && to_float) {
+		if (target == ST_DOUBLE && from_type == ST_FLOAT) {
+			from.double_d = from.float_d;
+		} else if (target == ST_FLOAT && from_type == ST_DOUBLE) {
+			from.float_d = from.double_d;
+		}
+	} else {
+		ICE("From %s to %s\n", strdup(dbg_type(type_simple(from_type))),
+			strdup(dbg_type(type_simple(target))));
+		NOTIMP();
+	}
+
 	return from;
 }
 
@@ -591,7 +568,7 @@ struct constant constant_cast(struct constant a, struct type *target) {
 
 	if (type_is_pointer(target) && type_is_simple(a.data_type, ST_INT)) {
 		a.data_type = target;
-		a.long_d = a.int_d;
+		a.uint_d = a.int_d;
 		return a;
 	}
 
@@ -607,174 +584,72 @@ struct constant constant_cast(struct constant a, struct type *target) {
 	NOTIMP();
 }
 
+uint64_t constant_to_u64(struct constant constant) {
+	int is_unsigned = type_is_pointer(constant.data_type) ||
+		(type_is_integer(constant.data_type) && !is_signed(constant.data_type->simple));
+	int is_floating = type_is_floating(constant.data_type);
+
+	if (is_floating) {
+		if (constant.data_type->simple == ST_DOUBLE) {
+			return *(uint64_t *)&constant.double_d;
+		} else if (constant.data_type->simple == ST_FLOAT) {
+			return (uint64_t)*(uint32_t *)&constant.float_d;
+		}
+		NOTIMP();
+	} else {
+		return is_unsigned ? (uint64_t)constant.uint_d : (uint64_t)constant.int_d;
+	}
+}
+
 void constant_to_buffer(uint8_t *buffer, struct constant constant, int bit_offset, int bit_size) {
 	assert(constant.type == CONSTANT_TYPE);
 
-	if (type_is_pointer(constant.data_type)) {
-		assert(bit_size == -1);
-		*buffer = constant.long_d;
-		return;
-	}
-
-	assert(constant.data_type->type == TY_SIMPLE);
+	int size = calculate_size(constant.data_type);
+	uint64_t value = constant_to_u64(constant);
 
 	if (bit_size != -1) {
-		// TODO: Make this more portable.
-		assert(type_is_integer(constant.data_type));
-		uint64_t prev = 0;
-		int req_size = bit_size + bit_offset;
-		if (req_size <= 8) {
-			prev = *(uint8_t *)buffer;
-		} else if (req_size <= 16) {
-			prev = *(uint16_t *)buffer;
-		} else if (req_size <= 32) {
-			prev = *(uint32_t *)buffer;
-		} else {
-			prev = *(uint64_t *)buffer;
-		}
 		uint64_t mask = gen_mask(64 - bit_size - bit_offset, bit_offset);
-		uint64_t tmp_buffer = 0;
-		constant_to_buffer((uint8_t *)&tmp_buffer, constant, 0, -1);
 
-		tmp_buffer <<= bit_offset;
-		prev &= mask;
-		uint64_t out = (prev & mask) | (tmp_buffer & ~mask);
-		if (req_size <= 8) {
-			*(uint8_t *)buffer = out;
-		} else if (req_size <= 16) {
-			*(uint16_t *)buffer = out;
-		} else if (req_size <= 32) {
-			*(uint32_t *)buffer = out;
-		} else {
-			*(uint64_t *)buffer = out;
-		}
-		return;
+		value <<= bit_offset;
+		uint64_t prev_value = *(uint64_t *)buffer;
+		value = (prev_value & mask) | (value & ~mask);
+		size = 8;
 	}
 
-	switch (constant.data_type->simple) {
-	case ST_BOOL:
-		*buffer = constant.uchar_d;
-		break;
-	case ST_CHAR:
-		*buffer = constant.char_d;
-		break;
-	case ST_SCHAR:
-		*buffer = constant.char_d;
-		break;
-	case ST_UCHAR:
-		*buffer = constant.char_d;
-		break;
-	case ST_SHORT:
-		*(uint16_t *)buffer = constant.short_d;
-		break;
-	case ST_USHORT:
-		*(uint16_t *)buffer = constant.ushort_d;
-		break;
-	case ST_INT:
-		*(uint32_t *)buffer = constant.int_d;
-		break;
-	case ST_UINT:
-		*(uint32_t *)buffer = constant.uint_d;
-		break;
-	case ST_LONG:
-		*(uint64_t *)buffer = constant.long_d;
-		break;
-	case ST_ULONG:
-		*(uint64_t *)buffer = constant.ulong_d;
-		break;
-	case ST_LLONG:
-		*(uint64_t *)buffer = constant.llong_d;
-		break;
-	case ST_ULLONG:
-		*(uint64_t *)buffer = constant.ullong_d;
-		break;
-	case ST_FLOAT:
-		*(uint32_t *)buffer = constant.uint_d;
-		break;
-	case ST_DOUBLE:
-		*(uint64_t *)buffer = constant.ulong_d;
-		break;
-
-	case ST_LDOUBLE:
-	case ST_FLOAT_COMPLEX:
-	case ST_DOUBLE_COMPLEX:
-	case ST_LDOUBLE_COMPLEX:
-		NOTIMP();
-	default:
-		break;
+	switch (size) {
+	case 1: *buffer = value & 0xff; break;
+	case 2: *(uint16_t *)buffer = value & 0xffff; break;
+	case 4: *(uint32_t *)buffer = value & 0xffffffff; break;
+	case 8: *(uint64_t *)buffer = value; break;
+	default: NOTIMP();
 	}
 }
 
 const char *constant_to_string(struct constant constant) {
 	static char buffer[256];
 	assert(constant.type == CONSTANT_TYPE);
-
-	if (type_is_pointer(constant.data_type)) {
-		sprintf(buffer, "%" PRIu64, constant.long_d);
-		return buffer;
-	}
-
-	enum simple_type st;
-	if (constant.data_type->type == TY_SIMPLE)
-		st = constant.data_type->simple;
-	else
-		ICE("Tried to print type %s to number\n", dbg_type(constant.data_type));
-
-	switch (st) {
-	case ST_BOOL:
-		sprintf(buffer, "%d", constant.bool_d ? 1 : 0);
-		break;
-	case ST_CHAR:
-		sprintf(buffer, "%" PRId8, (int)constant.char_d);
-		break;
-	case ST_SCHAR:
-		sprintf(buffer, "%" PRId8, (int)constant.schar_d);
-		break;
-	case ST_UCHAR:
-		sprintf(buffer, "%" PRIu8, (int)constant.uchar_d);
-		break;
-	case ST_SHORT:
-		sprintf(buffer, "%" PRId16, (int)constant.short_d);
-		break;
-	case ST_USHORT:
-		sprintf(buffer, "%" PRIu16, (int)constant.ushort_d);
-		break;
-	case ST_INT:
-		sprintf(buffer, "%" PRId32, constant.int_d);
-		break;
-	case ST_UINT:
-		sprintf(buffer, "%" PRIu32, constant.uint_d);
-		break;
-	case ST_LONG:
-		sprintf(buffer, "%" PRId64, constant.long_d);
-		break;
-	case ST_ULONG:
-		sprintf(buffer, "%" PRIu64, constant.ulong_d);
-		break;
-	case ST_LLONG:
-		sprintf(buffer, "%" PRId64, constant.llong_d);
-		break;
-	case ST_ULLONG:
-		sprintf(buffer, "%" PRIu64, constant.ullong_d);
-		break;
-
-		// TODO: Avoid UB.
-	case ST_FLOAT:
-		sprintf(buffer, "%" PRIu32, constant.uint_d);
-		break;
-
-	case ST_DOUBLE:
-		sprintf(buffer, "%" PRIu64, constant.ulong_d);
-		break;
-		
-	case ST_LDOUBLE:
-	case ST_FLOAT_COMPLEX:
-	case ST_DOUBLE_COMPLEX:
-	case ST_LDOUBLE_COMPLEX:
-		NOTIMP();
-	default:
-		break;
-	}
-
+	uint64_t value = constant_to_u64(constant);
+	sprintf(buffer, "%" PRIu64, value);
 	return buffer;
+}
+
+struct constant constant_simple_signed(enum simple_type type, constant_int value) {
+	return (struct constant) {
+		.type = CONSTANT_TYPE,
+		.data_type = type_simple(type),
+		.int_d = value
+	};
+}
+
+struct constant constant_simple_unsigned(enum simple_type type, constant_uint value) {
+	return (struct constant) {
+		.type = CONSTANT_TYPE,
+		.data_type = type_simple(type),
+		.uint_d = value
+	};
+}
+
+struct constant constant_simple_float(enum simple_type type, double f) {
+	(void)type, (void)f;
+	NOTIMP();
 }
