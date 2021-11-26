@@ -5,6 +5,7 @@
 #include <codegen/registers.h>
 #include <arch/calling.h>
 #include <common.h>
+#include <preprocessor/macro_expander.h>
 
 static const int calling_convention[] = { REG_RDI, REG_RSI, REG_RDX, REG_RCX, REG_R8, REG_R9 };
 static const int return_convention[] = { REG_RAX, REG_RDX };
@@ -541,4 +542,6 @@ void abi_init_sysv(void) {
 	struct type *final = type_create(&final_params, &struct_type);
 
 	sym->data_type = final;
+
+	define_string("__LP64__", "1");
 }

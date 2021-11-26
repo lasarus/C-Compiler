@@ -9,10 +9,6 @@
 #include <string.h>
 #include <assert.h>
 
-struct parser_flags parser_flags = {
-	.dmodel = DMODEL_LP64
-};
-
 void parse_into_ir() {
 	init_variables();
 

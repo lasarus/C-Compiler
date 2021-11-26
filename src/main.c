@@ -51,12 +51,6 @@ struct arguments parse_arguments(int argc, char **argv) {
 				codegen_flags.cmodel = CMODEL_SMALL;
 			} else if (strcmp(argv[i] + 2, "cmodel=large") == 0) {
 				codegen_flags.cmodel = CMODEL_LARGE;
-			} else if (strcmp(argv[i] + 2, "dmodel=ILP64") == 0) {
-				parser_flags.dmodel = DMODEL_ILP64;
-			} else if (strcmp(argv[i] + 2, "dmodel=LLP64") == 0) {
-				parser_flags.dmodel = DMODEL_LLP64;
-			} else if (strcmp(argv[i] + 2, "dmodel=LP64") == 0) {
-				parser_flags.dmodel = DMODEL_LP64;
 			} else if (strncmp(argv[i] + 2, "debug-stack-size", 16) == 0) {
 				codegen_flags.debug_stack_size = 1;
 				if (argv[i][18] == '=') {
@@ -118,18 +112,6 @@ void add_implementation_defs(void) {
 	define_string("__STDC_HOSTED__", "0");
 	define_string("__STDC_VERSION__", "201710L");
 	define_string("__x86_64__", "1");
-
-	switch (parser_flags.dmodel) {
-	case DMODEL_LP64:
-		define_string("__LP64__", "1");
-		break;
-	case DMODEL_LLP64:
-		define_string("__LLP64__", "1");
-		break;
-	case DMODEL_ILP64:
-		define_string("__ILP64__", "1");
-		break;
-	}
 }
 
 int main(int argc, char **argv) {

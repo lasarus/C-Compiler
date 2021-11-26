@@ -235,4 +235,5 @@ void abi_init_microsoft(void) {
 	sym->data_type = type_pointer(type_simple(ST_VOID));
 
 	define_string("_WIN32", "1");
+	define_string("__LLP64__", "1");
 }
