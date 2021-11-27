@@ -587,18 +587,11 @@ struct constant constant_cast(struct constant a, struct type *target) {
 uint64_t constant_to_u64(struct constant constant) {
 	int is_unsigned = type_is_pointer(constant.data_type) ||
 		(type_is_integer(constant.data_type) && !is_signed(constant.data_type->simple));
-	int is_floating = type_is_floating(constant.data_type);
 
-	if (is_floating) {
-		if (constant.data_type->simple == ST_DOUBLE) {
-			return *(uint64_t *)&constant.double_d;
-		} else if (constant.data_type->simple == ST_FLOAT) {
-			return (uint64_t)*(uint32_t *)&constant.float_d;
-		}
-		NOTIMP();
-	} else {
+	if (type_is_floating(constant.data_type))
+		return constant.uint_d; // Type-punning constant.double_d/float_d.
+	else
 		return is_unsigned ? (uint64_t)constant.uint_d : (uint64_t)constant.int_d;
-	}
 }
 
 void constant_to_buffer(uint8_t *buffer, struct constant constant, int bit_offset, int bit_size) {
