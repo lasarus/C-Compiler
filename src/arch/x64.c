@@ -588,9 +588,11 @@ uint64_t constant_to_u64(struct constant constant) {
 	int is_unsigned = type_is_pointer(constant.data_type) ||
 		(type_is_integer(constant.data_type) && !is_signed(constant.data_type->simple));
 
-	if (type_is_floating(constant.data_type))
-		return constant.uint_d; // Type-punning constant.double_d/float_d.
-	else
+	if (type_is_simple(constant.data_type, ST_FLOAT)) {
+		return (uint32_t)constant.uint_d; // Type-punning constant.float_d.
+	} else if (type_is_simple(constant.data_type, ST_DOUBLE)) {
+		return constant.uint_d; // Type-punning constant.double_d.
+	} else
 		return is_unsigned ? (uint64_t)constant.uint_d : (uint64_t)constant.int_d;
 }
 

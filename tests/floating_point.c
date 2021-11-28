@@ -44,5 +44,7 @@ int main() {
 		float f = .1f;
 	}
 
+	float f2 = 3.14;
+
 	return 0;
 }
