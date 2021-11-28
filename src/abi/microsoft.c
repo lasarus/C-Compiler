@@ -238,3 +238,25 @@ void abi_init_microsoft(void) {
 	define_string("_WIN32", "1");
 	define_string("__LLP64__", "1");
 }
+
+void abi_init_mingw_workarounds(void) {
+	// These are definitions and typedefs that allow for
+	// compilation with the mingw libc headers.
+	// It is very annoying that they require va_list to be typedeffed.
+	define_string("_VA_LIST_DEFINED", "1");
+	symbols_add_typedef(sv_from_str("va_list"))->data_type = type_pointer(type_simple(ST_VOID));
+	define_string("_CRTIMP", "");
+	define_string("_SECIMP", "");
+	define_string("__MINGW_IMPORT", "");
+	define_string("__CRT__NO_INLINE", "1");
+	define_string("__cdecl", "");
+	define_string("__forceinline", "static inline");
+	define_string("__inline", "inline");
+	define_string("__int8", "int"); // Not typedef to allow for "unsigned __int8".
+	define_string("__int16", "short");
+	define_string("__int32", "int");
+	define_string("__int64", "long long");
+	define_string("__cdecl", "");
+	define_string("_MSVCRT_", "1");
+	define_string("__x86_64", "1");
+}

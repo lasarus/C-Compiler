@@ -15,6 +15,7 @@ extern struct abi_info abi_info;
 
 void abi_init_sysv(void);
 void abi_init_microsoft(void);
+void abi_init_mingw_workarounds(void);
 
 extern void (*abi_ir_function_call)(var_id result, var_id func_var, struct type *function_type, int n_args, struct type **argument_types, var_id *args);
 extern void (*abi_ir_function_new)(struct type *type, var_id *args, const char *name, int is_global);

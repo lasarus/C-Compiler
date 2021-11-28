@@ -42,7 +42,7 @@ void tokenizer_push_input(const char *path, int system) {
 }
 
 void tokenizer_disable_current_path(void) {
-	input_disable_path(input);
+	input_disable_path(input->filename);
 }
 
 static void flush_whitespace(int *whitespace, int *first_of_line) {

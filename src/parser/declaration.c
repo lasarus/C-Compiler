@@ -1237,7 +1237,7 @@ int parse_init_declarator(struct specifiers s, int external, int *was_func) {
 		struct type *composite_type = type_make_composite(type, prev_type);
 
 		if (!composite_type)
-			ERROR(T0->pos, "Conflicting types: %s and %s\n", strdup(dbg_type(prev_type)),
+			ERROR(T0->pos, "%.*s has conflicting types: %s and %s\n", name.len, name.str, strdup(dbg_type(prev_type)),
 				  strdup(dbg_type(type)));
 
 		type = composite_type;

@@ -29,12 +29,14 @@ int main() {
 	ptrdiff_t p;
 	intmax_t i;
 	int ai[3] = {0};
-	assert(typeid(s) == 9);
-	assert(typeid(p) == 8);
-	assert(typeid(i) == 8);
 	assert(typeid('0') == 6);
+#ifdef __LP64__
+	assert(typeid(i) == 8);
+	assert(typeid(p) == 8);
+	assert(typeid(s) == 9);
 	assert(typeid(0x7FFFFFFF) == 6);
 	assert(typeid(0xFFFFFFFF) == 7);
 	assert(typeid(0x7FFFFFFFU) == 7);
+#endif
 	assert(typeid(ai) == 17);
 }

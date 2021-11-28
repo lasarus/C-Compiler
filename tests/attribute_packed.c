@@ -28,7 +28,13 @@ int main() {
 	assert(t.a == 10);
 	assert(t.b == 20);
 	assert(t.c == 30);
+#if defined(__LP64__)
 	assert(sizeof(struct T_aligned) == 16);
 	assert(sizeof(struct T_packed) == 1 + 4 + 8);
 	assert(sizeof(struct T_packed2) == 1 + 4 + 8);
+#elif defined(__LLP64__)
+	assert(sizeof(struct T_aligned) == 12);
+	assert(sizeof(struct T_packed) == 1 + 4 + 4);
+	assert(sizeof(struct T_packed2) == 1 + 4 + 4);
+#endif
 }

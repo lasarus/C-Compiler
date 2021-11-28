@@ -165,6 +165,6 @@ void input_close(struct input **input) {
 	free(prev);
 }
 
-void input_disable_path(struct input *input) {
-	string_set_insert(&disabled_headers, strdup(input->filename));
+void input_disable_path(const char *filename) {
+	string_set_insert(&disabled_headers, strdup(filename));
 }

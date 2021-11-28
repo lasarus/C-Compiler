@@ -30,7 +30,7 @@ void input_next(struct input *input);
 void input_add_include_path(const char *path);
 void input_open(struct input **input, const char *path, int system);
 void input_close(struct input **input);
-void input_disable_path(struct input *input);
+void input_disable_path(const char *filename);
 
 struct input input_open_string(char *str);
 

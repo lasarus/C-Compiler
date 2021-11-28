@@ -61,6 +61,8 @@ struct arguments parse_arguments(int argc, char **argv) {
 				abi = ABI_MICROSOFT;
 			} else if (strcmp(argv[i] + 2, "abi=sysv") == 0) {
 				abi = ABI_SYSV;
+			} else if (strcmp(argv[i] + 2, "mingw-workarounds") == 0) {
+				abi_init_mingw_workarounds();
 			} else {
 				ARG_ERROR(i, "Invalid flag.");
 			}

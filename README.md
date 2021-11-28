@@ -18,7 +18,7 @@ to build.
 The output will be an **x86-64** assembly file with AT&T syntax that can be assembled with your assembler of choice.
 ## Self compilation
 To use musl for self compilation, create a directory called `musl/` and put the musl headers there.
-Alternatively, if no `musl/` exists, the self compilation script will use the headers found in `/usr/include/` as well as those in `include/`.
+Alternatively, if no `musl/` exists, the self compilation script will use the headers found in `/usr/include/` as well as those in `include/linux/`.
 Only musl and glibc are tested, but other alternatives will likely work.
 Compilation with glibc is approximately 3x slower than musl.
 
