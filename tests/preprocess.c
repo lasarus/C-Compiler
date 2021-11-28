@@ -42,21 +42,23 @@ int main() {
 	include = "Hello";
 assert(strcmp(include, "Hello") == 0);
 
-  #if defined(__LLP64__)
+#define TEST_DEF
+
+  #if defined(NOT_DEFINED)
 #error
-  #elif defined(__LP64__)
+  #elif defined(TEST_DEF)
 //#error
-  #elif defined(__ILP32__)
+  #elif defined(NOT_DEFINED)
 #error
   #else
 	#error
   #endif
 
-  #if defined(__LLP64__)
+  #if defined(NOT_DEFINED)
 #error
-  #elif defined(__LP64__)
+  #elif defined(TEST_DEF)
 //#error
-  #elif !defined(__ILP32__)
+  #elif !defined(NOT_DEFINED)
 #error
   #endif
 

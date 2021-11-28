@@ -6,7 +6,9 @@
 
 struct abi_info {
 	int va_list_is_reference;
-	enum simple_type pointer_type, size_type;
+	enum simple_type pointer_type,
+		size_type,
+		wchar_type;
 };
 
 extern struct abi_info abi_info;

@@ -491,6 +491,7 @@ void abi_init_sysv(void) {
 
 	abi_info.pointer_type = ST_ULONG;
 	abi_info.size_type = ST_ULONG;
+	abi_info.wchar_type = ST_INT;
 
 	abi_ir_function_call = sysv_ir_function_call;
 	abi_ir_function_new = sysv_ir_function_new;

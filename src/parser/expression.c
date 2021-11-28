@@ -1069,7 +1069,7 @@ struct expr *parse_prefix() {
 	} else if (T0->type == T_STRING_WCHAR) {
 		struct string_view str = T0->str;
 		TNEXT();
-		return EXPR_STR(str, WCHAR_TYPE);
+		return EXPR_STR(str, abi_info.wchar_type);
 	} else if (T0->type == T_NUM) {
 		struct constant c = constant_from_string(T0->str);
 		TNEXT();

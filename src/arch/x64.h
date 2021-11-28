@@ -39,7 +39,6 @@ int calculate_offset(struct type *type, int index);
 
 #define IS_CHAR_SIGNED 1
 #define ENUM_TYPE ST_INT
-#define WCHAR_TYPE ST_INT
 #define CHAR32_TYPE ST_UINT
 #define CHAR16_TYPE ST_USHORT
 

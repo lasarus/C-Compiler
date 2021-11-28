@@ -218,6 +218,7 @@ void abi_init_microsoft(void) {
 	abi_info.va_list_is_reference = 1;
 	abi_info.pointer_type = ST_ULLONG;
 	abi_info.size_type = ST_ULLONG;
+	abi_info.wchar_type = ST_USHORT;
 
 	abi_ir_function_call = ms_ir_function_call;
 	abi_ir_function_new = ms_ir_function_new;

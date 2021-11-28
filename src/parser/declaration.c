@@ -932,7 +932,7 @@ static int match_string(struct type **type, struct initializer *init, struct tok
 	return match_specific_string(type, init, string_token, ST_CHAR, T_STRING) ||
 		match_specific_string(type, init, string_token, ST_UCHAR, T_STRING) ||
 		match_specific_string(type, init, string_token, ST_SCHAR, T_STRING) ||
-		match_specific_string(type, init, string_token, WCHAR_TYPE, T_STRING_WCHAR) ||
+		match_specific_string(type, init, string_token, abi_info.wchar_type, T_STRING_WCHAR) ||
 		match_specific_string(type, init, string_token, CHAR16_TYPE, T_STRING_CHAR16) ||
 		match_specific_string(type, init, string_token, CHAR32_TYPE, T_STRING_CHAR32);
 }
