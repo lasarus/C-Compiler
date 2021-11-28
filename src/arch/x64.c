@@ -58,6 +58,12 @@ struct range get_range(enum simple_type type, int bitfield) {
 		return (struct range) { -1, n_bits};
 }
 
+static constant_uint get_type_max(enum simple_type st) {
+	struct range r = get_range(st, -1);
+	return r.max == -1 ? 0 : (((constant_uint)1 << (r.max - 1)) - 1
+							  + ((constant_uint)1 << (r.max - 1)));
+}
+
 int is_contained_in(enum simple_type large, int large_bitfield,
 					enum simple_type small, int small_bitfield) {
 	struct range large_range = get_range(large, large_bitfield),
@@ -418,18 +424,17 @@ static struct constant integer_constant_from_string(struct string_view str) {
 		}
 	}
 
-	// TODO: Use abi defined *_MAX.
-	if (parsed <= INT_MAX && allow_int && allow_signed) {
+	if (parsed <= get_type_max(ST_INT) && allow_int && allow_signed) {
 		return constant_simple_signed(ST_INT, parsed);
-	} else if (parsed <= UINT_MAX && allow_int && allow_unsigned) {
+	} else if (parsed <= get_type_max(ST_UINT) && allow_int && allow_unsigned) {
 		return constant_simple_unsigned(ST_UINT, parsed);
-	} else if (parsed <= LONG_MAX && allow_long && allow_signed) {
+	} else if (parsed <= get_type_max(ST_LONG) && allow_long && allow_signed) {
 		return constant_simple_signed(ST_LONG, parsed);
-	} else if (parsed <= ULONG_MAX && allow_long && allow_unsigned) {
+	} else if (parsed <= get_type_max(ST_ULONG) && allow_long && allow_unsigned) {
 		return constant_simple_unsigned(ST_ULONG, parsed);
-	} else if (parsed <= LLONG_MAX && allow_llong && allow_signed) {
+	} else if (parsed <= get_type_max(ST_LLONG) && allow_llong && allow_signed) {
 		return constant_simple_signed(ST_LLONG, parsed);
-	} else if (parsed <= ULLONG_MAX && allow_llong && allow_unsigned) {
+	} else if (parsed <= get_type_max(ST_ULLONG) && allow_llong && allow_unsigned) {
 		return constant_simple_unsigned(ST_ULLONG, parsed);
 	} else {
 		ICE("Cant fit %llu (%.*s) into any type", parsed, str.len, str.str);
