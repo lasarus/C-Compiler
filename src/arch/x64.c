@@ -546,6 +546,18 @@ struct constant simple_cast(struct constant from, enum simple_type target) {
 	return from;
 }
 
+uint64_t constant_to_u64(struct constant constant) {
+	int is_unsigned = type_is_pointer(constant.data_type) ||
+		(type_is_integer(constant.data_type) && !is_signed(constant.data_type->simple));
+
+	if (type_is_simple(constant.data_type, ST_FLOAT)) {
+		return (uint32_t)constant.uint_d; // Type-punning constant.float_d.
+	} else if (type_is_simple(constant.data_type, ST_DOUBLE)) {
+		return constant.uint_d; // Type-punning constant.double_d.
+	} else
+		return is_unsigned ? (uint64_t)constant.uint_d : (uint64_t)constant.int_d;
+}
+
 struct constant constant_cast(struct constant a, struct type *target) {
 	if (a.type == CONSTANT_LABEL) {
 		if (type_is_pointer(a.data_type) &&
@@ -571,9 +583,9 @@ struct constant constant_cast(struct constant a, struct type *target) {
 		return a;
 	}
 
-	if (type_is_pointer(target) && type_is_simple(a.data_type, ST_INT)) {
+	if (type_is_pointer(target) && type_is_integer(a.data_type)) {
 		a.data_type = target;
-		a.uint_d = a.int_d;
+		a.uint_d = constant_to_u64(a);
 		return a;
 	}
 
@@ -587,18 +599,6 @@ struct constant constant_cast(struct constant a, struct type *target) {
 		   strdup(dbg_type(target)));
 
 	NOTIMP();
-}
-
-uint64_t constant_to_u64(struct constant constant) {
-	int is_unsigned = type_is_pointer(constant.data_type) ||
-		(type_is_integer(constant.data_type) && !is_signed(constant.data_type->simple));
-
-	if (type_is_simple(constant.data_type, ST_FLOAT)) {
-		return (uint32_t)constant.uint_d; // Type-punning constant.float_d.
-	} else if (type_is_simple(constant.data_type, ST_DOUBLE)) {
-		return constant.uint_d; // Type-punning constant.double_d.
-	} else
-		return is_unsigned ? (uint64_t)constant.uint_d : (uint64_t)constant.int_d;
 }
 
 void constant_to_buffer(uint8_t *buffer, struct constant constant, int bit_offset, int bit_size) {

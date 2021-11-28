@@ -454,7 +454,7 @@ struct expr *expr_new(struct expr expr) {
 
 void pointer_increment(var_id result, var_id pointer, struct expr *index, int decrement, struct type *type) {
 	var_id size = expression_to_ir(type_sizeof(type_deref(type)));
-	var_id index_var = expression_to_ir(expression_cast(index, type_simple(ST_ULONG)));
+	var_id index_var = expression_to_ir(expression_cast(index, type_simple(abi_info.pointer_type)));
 	IR_PUSH_BINARY_OPERATOR(IBO_MUL, index_var, size, index_var);
 	IR_PUSH_BINARY_OPERATOR(decrement ? IBO_SUB : IBO_ADD, pointer, index_var, result);
 }
