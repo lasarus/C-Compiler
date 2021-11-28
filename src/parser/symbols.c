@@ -71,6 +71,7 @@ void symbols_pop_scope(void) {
 struct table_entry *get_entry(struct entry_id id, int global) {
 	uint32_t hash = hash_entry(id) % hash_table.size;
 	int current_idx = hash_table.entries[hash];
+
 	while (current_idx >= 0) {
 		struct table_entry *entry = table.entries + current_idx;
 		if (compare_entry(entry->id, id) &&
@@ -86,13 +87,15 @@ struct table_entry *get_entry(struct entry_id id, int global) {
 struct table_entry *add_entry_with_block(struct entry_id id, int block) {
 	// Move entire table one step down for entry->block > block.
 	(void)ADD_ELEMENT(table.size, table.cap, table.entries);
+
 	int i;
 	for (i = table.size - 2; i >= 0; i--) {
 		struct table_entry *entry = table.entries + i;
 		if (entry->block > block) {
 			uint32_t hash = hash_entry(entry->id) % hash_table.size;
 
-			hash_table.entries[hash]++;
+			if (hash_table.entries[hash] == i)
+				hash_table.entries[hash]++;
 
 			if (entry->link >= 0 && table.entries[entry->link].block > block) {
 				entry->link++;
