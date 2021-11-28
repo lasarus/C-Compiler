@@ -12,10 +12,7 @@
 void parse_into_ir() {
 	init_variables();
 
-	while (parse_declaration(1));
-
-	if (TACCEPT(T_SEMI_COLON))
-		ERROR(T0->pos, "Extra semicolon outside function.");
+	while (parse_declaration(1) || TACCEPT(T_SEMI_COLON));
 
 	TEXPECT(T_EOI);
 
