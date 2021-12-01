@@ -246,6 +246,10 @@ void abi_init_mingw_workarounds(void) {
 	// It is very annoying that they require va_list to be typedeffed.
 	define_string("_VA_LIST_DEFINED", "1");
 	symbols_add_typedef(sv_from_str("va_list"))->data_type = type_pointer(type_simple(ST_VOID));
+	define_string("_crt_va_start", "__builtin_va_start");
+	define_string("_crt_va_end", "__builtin_va_end");
+	define_string("_crt_va_arg", "__builtin_va_arg");
+	define_string("_crt_va_copy", "__builtin_va_copy");
 	define_string("_CRTIMP", "");
 	define_string("_SECIMP", "");
 	define_string("__MINGW_IMPORT", "");
