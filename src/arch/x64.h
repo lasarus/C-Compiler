@@ -79,7 +79,7 @@ struct constant constant_cast(struct constant a, struct type *target);
 void convert_rax(enum simple_type from, enum simple_type to);
 
 void constant_to_buffer(uint8_t *buffer, struct constant constant, int bit_offset, int bit_size);
-const char *constant_to_string(struct constant constant);
+uint64_t constant_to_u64(struct constant constant);
 
 void constant_normalize(struct constant *c);
 

@@ -66,16 +66,16 @@ void rodata_codegen(void) {
 	for (int i = 0; i < entries_size; i++) {
 		if (entries[i].type != ENTRY_STR)
 			continue;
-		emit("%s:", rodata_get_label_string(entries[i].id));
+		asm_emit("%s:", rodata_get_label_string(entries[i].id));
 
-		emit_no_newline("\t.string \"", entries[i].name);
+		asm_emit_no_newline("\t.string \"", entries[i].name);
 		struct string_view str = entries[i].name;
 		for (int i = 0; i < str.len; i++) {
 			char buffer[5];
 			character_to_escape_sequence(str.str[i], buffer, 0);
-			emit_no_newline("%s", buffer);
+			asm_emit_no_newline("%s", buffer);
 		}
-		emit_no_newline("\"\n");
+		asm_emit_no_newline("\"\n");
 	}
 }
 
@@ -172,7 +172,7 @@ void codegen_compound_literals(struct expr **expr, int lvalue) {
 			static int counter = 0;
 			char name[256];
 			sprintf(name, ".compundliteral%d", counter++);
-			emit("%s:", name);
+			asm_emit("%s:", name);
 			codegen_initializer((*expr)->compound_literal.type,
 								&(*expr)->compound_literal.init);
 
@@ -276,9 +276,9 @@ void codegen_initializer(struct type *type,
 	for (int i = 0; i < size; i++) {
 		if (is_label[i]) {
 			if (label_offsets[i] == 0)
-				emit(".quad %s", rodata_get_label_string(labels[i]));
+				asm_emit(".quad %s", rodata_get_label_string(labels[i]));
 			else
-				emit(".quad %s+%lld", rodata_get_label_string(labels[i]),
+				asm_emit(".quad %s+%lld", rodata_get_label_string(labels[i]),
 					label_offsets[i]);
 			i += 7;
 		} else {
@@ -288,10 +288,10 @@ void codegen_initializer(struct type *type,
 					break;
 			}
 			if (how_long == 8) {
-				emit(".quad %" PRIu64, *(uint64_t *)(buffer + i));
+				asm_emit(".quad %" PRIu64, *(uint64_t *)(buffer + i));
 				i += how_long - 1;
 			} else {
-				emit(".byte %d", (int)buffer[i]);
+				asm_emit(".byte %d", (int)buffer[i]);
 			}
 		}
 	}
@@ -304,23 +304,23 @@ void codegen_initializer(struct type *type,
 
 void codegen_static_var(struct static_var *static_var) {
 	(void)static_var;
-	set_section(".data");
+	asm_section(".data");
 	if (static_var->global)
-		emit(".global %.*s", static_var->label.len, static_var->label.str);
+		asm_emit(".global %.*s", static_var->label.len, static_var->label.str);
 
 	if (static_var->init.type == INIT_EMPTY) {
-		emit("%.*s:", static_var->label.len, static_var->label.str);
+		asm_emit("%.*s:", static_var->label.len, static_var->label.str);
 
-		emit(".zero %d", calculate_size(static_var->type));
+		asm_emit(".zero %d", calculate_size(static_var->type));
 	} else {
 		codegen_pre_initializer(&static_var->init);
 
-		emit("%.*s:", static_var->label.len, static_var->label.str);
+		asm_emit("%.*s:", static_var->label.len, static_var->label.str);
 
 		codegen_initializer(static_var->type, &static_var->init);
 	}
 
-	set_section(".text");
+	asm_section(".text");
 }
 
 void data_codegen(void) {

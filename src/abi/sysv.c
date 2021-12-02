@@ -370,12 +370,12 @@ static void sysv_emit_function_preamble(struct function *func) {
 		return;
 
 	int position = variable_info[abi_data->reg_save_area].stack_location;
-	emit("movq %%rdi, -%d(%%rbp)", position - 0);
-	emit("movq %%rsi, -%d(%%rbp)", position - 8);
-	emit("movq %%rdx, -%d(%%rbp)", position - 16);
-	emit("movq %%rcx, -%d(%%rbp)", position - 24);
-	emit("movq %%r8, -%d(%%rbp)", position - 32);
-	emit("movq %%r9, -%d(%%rbp)", position - 40);
+	asm_ins2("movq", R8(REG_RDI), MEM(0 - position, REG_RBP));
+	asm_ins2("movq", R8(REG_RSI), MEM(8 - position, REG_RBP));
+	asm_ins2("movq", R8(REG_RDX), MEM(16 - position, REG_RBP));
+	asm_ins2("movq", R8(REG_RCX), MEM(24 - position, REG_RBP));
+	asm_ins2("movq", R8(REG_R8), MEM(32 - position, REG_RBP));
+	asm_ins2("movq", R8(REG_R9), MEM(40 - position, REG_RBP));
 }
 
 static void sysv_emit_va_start(var_id result, struct function *func) {
@@ -385,13 +385,13 @@ static void sysv_emit_va_start(var_id result, struct function *func) {
 	int overflow_arg_area_offset = builtin_va_list->fields[2].offset;
 	int reg_save_area_offset = builtin_va_list->fields[3].offset;
 	scalar_to_reg(result, REG_RAX);
-	emit("movl $%d, %d(%%rax)", abi_data->gp_offset, gp_offset_offset);
-	emit("movl $%d, %d(%%rax)", 0, fp_offset_offset);
-	emit("leaq %d(%%rbp), %%rdi", abi_data->overflow_position);
-	emit("movq %%rdi, %d(%%rax)", overflow_arg_area_offset);
+	asm_ins2("movl", IMM(abi_data->gp_offset), MEM(gp_offset_offset, REG_RAX));
+	asm_ins2("movl", IMM(0), MEM(fp_offset_offset, REG_RAX));
+	asm_ins2("leaq", MEM(abi_data->overflow_position, REG_RBP), R8(REG_RDI));
+	asm_ins2("movq", R8(REG_RDI), MEM(overflow_arg_area_offset, REG_RAX));
 
-	emit("leaq -%d(%%rbp), %%rdi", variable_info[abi_data->reg_save_area].stack_location);
-	emit("movq %%rdi, %d(%%rax)", reg_save_area_offset);
+	asm_ins2("leaq", MEM(-variable_info[abi_data->reg_save_area].stack_location, REG_RBP), R8(REG_RDI));
+	asm_ins2("movq", R8(REG_RDI), MEM(reg_save_area_offset, REG_RAX));
 }
 
 static void sysv_emit_va_arg(var_id result, var_id va_list, struct type *type) {
@@ -425,9 +425,9 @@ static void sysv_emit_va_arg(var_id result, var_id va_list, struct type *type) {
 		//     l->fp_offset > 304 − num_fp ∗ 16
 		// go to step 7.
 
-		emit("movl %d(%%rdi), %%eax", gp_offset_offset);
-		emit("cmpl $%d, %%eax", 48 - 8 * num_gp);
-		emit("ja .va_arg_stack%d", va_arg_labels);
+		asm_ins2("movl", MEM(gp_offset_offset, REG_RDI), R4(REG_RAX));
+		asm_ins2("cmpl", IMM(48 - 8 * num_gp), R4(REG_RAX));
+		asm_emit("ja .va_arg_stack%d", va_arg_labels);
 
 		// 4. Fetch type from l->reg_save_area with an offset of l->gp_offset
 		// and/or l->fp_offset. This may require copying to a temporary loca-
@@ -440,31 +440,31 @@ static void sysv_emit_va_arg(var_id result, var_id va_list, struct type *type) {
 		// l->fp_offset = l->fp_offset + num_fp ∗ 16.
 		// 6. Return the fetched type.
 
-		emit("leal %d(%%rax), %%edx", num_gp * 8);
-		emit("addq %d(%%rdi), %%rax", reg_save_area_offset);
-		emit("movl %%edx, %d(%%rdi)", gp_offset_offset);
-		emit("jmp .va_arg_fetch%d", va_arg_labels);
+		asm_ins2("leal", MEM(num_gp * 8, REG_RAX), R4(REG_RDX));
+		asm_ins2("addq", MEM(reg_save_area_offset, REG_RDI), R8(REG_RAX));
+		asm_ins2("movl", R4(REG_RDX), MEM(gp_offset_offset, REG_RDI));
+		asm_emit("jmp .va_arg_fetch%d", va_arg_labels);
 	}
 	// 7. Align l->overflow_arg_area upwards to a 16 byte boundary if align-
 	//ment needed by type exceeds 8 byte boundary. [This is ignored.]
-	emit(".va_arg_stack%d:", va_arg_labels);
+	asm_emit(".va_arg_stack%d:", va_arg_labels);
 
 	// 8. Fetch type from l->overflow_arg_area.
 
-	emit("movq %d(%%rdi), %%rax", overflow_arg_area_offset);
+	asm_ins2("movq", MEM(overflow_arg_area_offset, REG_RDI), R8(REG_RAX));
 
 	// 9. Set l->overflow_arg_area to:
 	// l->overflow_arg_area + sizeof(type)
 	// 10. Align l->overflow_arg_area upwards to an 8 byte boundary.
-	emit("leaq %d(%%rax), %%rdx", round_up_to_nearest(calculate_size(type), 8));
-	emit("movq %%rdx, %d(%%rdi)", overflow_arg_area_offset);
+	asm_ins2("leaq", MEM(round_up_to_nearest(calculate_size(type), 8), REG_RAX), R8(REG_RDX));
+	asm_ins2("movq", R8(REG_RDX), MEM(overflow_arg_area_offset, REG_RDI));
 
 	// 11. Return the fetched type.
-	emit(".va_arg_fetch%d:", va_arg_labels);
+	asm_emit(".va_arg_fetch%d:", va_arg_labels);
 
 	// Address is now in %%rax.
-	emit("movq %%rax, %%rdi");
-	emit("leaq -%d(%%rbp), %%rsi", variable_info[result].stack_location);
+	asm_ins2("movq", R8(REG_RAX), R8(REG_RDI));
+	asm_ins2("leaq", MEM(-variable_info[result].stack_location, REG_RBP), R8(REG_RSI));
 
 	codegen_memcpy(calculate_size(type));
 }

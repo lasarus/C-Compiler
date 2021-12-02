@@ -625,14 +625,6 @@ void constant_to_buffer(uint8_t *buffer, struct constant constant, int bit_offse
 	}
 }
 
-const char *constant_to_string(struct constant constant) {
-	static char buffer[256];
-	assert(constant.type == CONSTANT_TYPE);
-	uint64_t value = constant_to_u64(constant);
-	sprintf(buffer, "%" PRIu64, value);
-	return buffer;
-}
-
 struct constant constant_simple_signed(enum simple_type type, constant_int value) {
 	return (struct constant) {
 		.type = CONSTANT_TYPE,

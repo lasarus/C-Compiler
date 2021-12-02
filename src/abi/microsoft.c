@@ -166,33 +166,33 @@ static void ms_emit_function_preamble(struct function *func) {
 	if (!abi_data->is_variadic)
 		return;
 
-	emit("movq %%rcx, 16(%%rbp)");
-	emit("movq %%rdx, 24(%%rbp)");
-	emit("movq %%r8, 32(%%rbp)");
-	emit("movq %%r9, 40(%%rbp)");
+	asm_ins2("movq", R8(REG_RCX), MEM(16, REG_RBP));
+	asm_ins2("movq", R8(REG_RDX), MEM(24, REG_RBP));
+	asm_ins2("movq", R8(REG_R8), MEM(32, REG_RBP));
+	asm_ins2("movq", R8(REG_R9), MEM(40, REG_RBP));
 }
 
 static void ms_emit_va_start(var_id result, struct function *func) {
 	struct ms_data *abi_data = func->abi_data;
 
-	emit("leaq %d(%%rbp), %%rax", abi_data->n_args * 8 + 16);
+	asm_ins2("leaq", MEM(abi_data->n_args * 8 + 16, REG_RBP), R8(REG_RAX));
 	scalar_to_reg(result, REG_RDX);
-	emit("movq %%rax, (%%rdx)");
+	asm_ins2("movq", R8(REG_RAX), MEM(0, REG_RDX));
 }
 
 static void ms_emit_va_arg(var_id result, var_id va_list, struct type *type) {
 	(void)result, (void)va_list, (void)type;
 
 	scalar_to_reg(va_list, REG_RBX); // va_list is a pointer to the actual va_list.
-	emit("movq (%%rbx), %%rax");
-	emit("leaq 8(%rax), %rdx");
-	emit("movq %%rdx, (%%rbx)");
-	emit("movq (%rax), %rax");
+	asm_ins2("movq", MEM(0, REG_RBX), R8(REG_RAX));
+	asm_ins2("leaq", MEM(8, REG_RAX), R8(REG_RDX));
+	asm_ins2("movq", R8(REG_RDX), MEM(0, REG_RBX));
+	asm_ins2("movq", MEM(0, REG_RAX), R8(REG_RAX));
 	if (fits_into_reg(type)) {
 		reg_to_scalar(REG_RAX, result);
 	} else {
-		emit("movq %%rax, %%rdi");
-		emit("leaq -%d(%%rbp), %rsi", variable_info[result].stack_location);
+		asm_ins2("movq", R8(REG_RAX), R8(REG_RDI));
+		asm_ins2("leaq", MEM(-variable_info[result].stack_location, REG_RBP), R8(REG_RSI));
 		codegen_memcpy(get_variable_size(result));
 	}
 }

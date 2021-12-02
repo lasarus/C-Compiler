@@ -49,12 +49,24 @@ const char *get_reg_name(int id, int size) {
 }
 
 void scalar_to_reg(var_id scalar, int reg) {
-	emit("xor %s, %s", registers[reg][0], registers[reg][0]);
-
 	int size = get_variable_size(scalar);
-
-	emit("mov%c -%d(%%rbp), %s", size_to_suffix(size),
-		 variable_info[scalar].stack_location, registers[reg][size_to_idx(size)]);
+	struct operand mem = MEM(-variable_info[scalar].stack_location, REG_RBP);
+	switch (size) {
+	case 1:
+		asm_ins2("xorq", R8(reg), R8(reg));
+		asm_ins2("movb", mem, R1(reg));
+		break;
+	case 2:
+		asm_ins2("xorq", R8(reg), R8(reg));
+		asm_ins2("movw", mem, R2(reg));
+		break;
+	case 4:
+		asm_ins2("movl", mem, R4(reg));
+		break;
+	case 8:
+		asm_ins2("movq", mem, R8(reg));
+		break;
+	}
 }
 
 void reg_to_scalar(int reg, var_id scalar) {
@@ -62,21 +74,22 @@ void reg_to_scalar(int reg, var_id scalar) {
 	int msize = 0;
 	for (int i = 0; i < size;) {
 		if (msize)
-			emit("shrq $%d, %s", msize * 8, get_reg_name(reg, 8));
+			asm_ins2("shrq", IMM(msize * 8), R8(reg));
 
+		struct operand mem = MEM(-variable_info[scalar].stack_location + i, REG_RBP);
 		if (i + 8 <= size) {
+			asm_ins2("movq", R8(reg), mem);
 			msize = 8;
 		} else if (i + 4 <= size) {
+			asm_ins2("movl", R4(reg), mem);
 			msize = 4;
 		} else if (i + 2 <= size) {
+			asm_ins2("movw", R2(reg), mem);
 			msize = 2;
 		} else if (i + 1 <= size) {
+			asm_ins2("movb", R1(reg), mem);
 			msize = 1;
 		}
-		emit("mov%c %s, -%d(%%rbp)",
-			 size_to_suffix(msize),
-			 get_reg_name(reg, msize),
-			 variable_info[scalar].stack_location - i);
 
 		i += msize;
 	}
@@ -84,12 +97,12 @@ void reg_to_scalar(int reg, var_id scalar) {
 
 void load_address(struct type *type, var_id result) {
 	if (type_is_pointer(type)) {
-		emit("movq (%%rdi), %%rax");
+		asm_ins2("movq", MEM(0, REG_RDI), R8(REG_RAX));
 		reg_to_scalar(REG_RAX, result);
 	} else if (type->type == TY_SIMPLE) {
 		switch (type->simple) {
 		case ST_INT:
-			emit("movl (%%rdi), %%eax");
+			asm_ins2("movl", MEM(0, REG_RDI), R4(REG_RAX));
 			reg_to_scalar(REG_RAX, result);
 			break;
 
@@ -104,12 +117,12 @@ void load_address(struct type *type, var_id result) {
 void store_address(struct type *type, var_id result) {
 	if (type_is_pointer(type)) {
 		scalar_to_reg(result, REG_RAX);
-		emit("movq %%rax, (%%rdi)");
+		asm_ins2("movq", R8(REG_RAX), MEM(0, REG_RDI));
 	} else if (type->type == TY_SIMPLE) {
 		switch (type->simple) {
 		case ST_INT:
 			scalar_to_reg(result, REG_RAX);
-			emit("movl %%eax, (%%rdi)");
+			asm_ins2("movl", R4(REG_RAX), MEM(0, REG_RDI));
 			break;
 
 		default:
