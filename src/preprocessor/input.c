@@ -21,6 +21,16 @@ struct input input_create(const char *filename, FILE *fp) {
 
 	read_contents(&input, fp);
 
+	// Read, and ignore, BOM (byte order mark).
+	// BOM signifies that the text file is utf-8.
+	// It has the form: 0xef 0xbb 0xbf.
+	if ((unsigned char)input.contents[0] == 0xef &&
+		(unsigned char)input.contents[1] == 0xbb &&
+		(unsigned char)input.contents[2] == 0xbf) {
+		for (int i = 0; i < 3; i++)
+			input_next(&input);
+	}
+
 	// Buffer should be initialized at the start.
 	for (int i = 0; i < N_BUFF - 1; i++)
 		input_next(&input);
