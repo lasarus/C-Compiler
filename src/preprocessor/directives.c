@@ -1,6 +1,7 @@
 #include "directives.h"
 #include "macro_expander.h"
 #include "tokenizer.h"
+#include "string_concat.h"
 
 #include <common.h>
 #include <precedence.h>
@@ -123,7 +124,7 @@ intmax_t evaluate_expression(int prec, int evaluate) {
 		if (type_is_integer(c.data_type))
 			expr = is_signed(c.data_type->simple) ? (intmax_t)c.int_d : (intmax_t)c.uint_d;
 	} else if (t.type == T_CHARACTER_CONSTANT) {
-		expr = character_constant_to_int(t.str);
+		expr = escaped_character_constant_to_int(t);
 	} else {
 		ERROR(t.pos, "Invalid token in preprocessor expression. %s", dbg_token(&t));
 	}

@@ -34,7 +34,7 @@ static void buffer_write(char c) {
 	ADD_ELEMENT(buffer_size, buffer_cap, buffer) = c;
 }
 
-static struct string_view buffer_get(void) {
+static struct string_view buffer_get() {
 	struct string_view ret = { .len = buffer_size };
 	ret.str = malloc(buffer_size);
 	memcpy(ret.str, buffer, buffer_size);
@@ -235,4 +235,19 @@ struct token string_concat_next(void) {
 	}
 
 	return t;
+}
+
+intmax_t escaped_character_constant_to_int(struct token t) {
+	enum string_type type = take_string_prefix(&t.str);
+	buffer_start();
+	escape_string_to_buffer(t.str, type, t.pos);
+
+	// No need to call buffer_get(), since we do not need
+	// a permanent string_view.
+	struct string_view tmp_view = {
+		.len = buffer_size,
+		.str = buffer
+	};
+
+	return character_constant_to_int(tmp_view);
 }
