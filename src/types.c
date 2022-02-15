@@ -128,7 +128,8 @@ struct type *type_create(struct type *params, struct type **children) {
 
 	struct type *new = malloc(sizeof(*params) + sizeof(*children) * params->n);
 	*new = *params;
-	memcpy(new->children, children, sizeof(*children) * params->n);
+	if (params->n)
+		memcpy(new->children, children, sizeof(*children) * params->n);
 
 	new->next = ffirst;
 	hashtable[hash_idx] = new;

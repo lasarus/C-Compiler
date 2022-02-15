@@ -62,8 +62,10 @@ struct string_set string_set_union(struct string_set a, struct string_set b) {
 
 struct string_set string_set_dup(struct string_set a) {
 	struct string_set ret = a;
-	ret.strings = malloc(sizeof *ret.strings * ret.cap);
-	memcpy(ret.strings, a.strings, sizeof *ret.strings * ret.cap);
+	if (a.cap) { // Avoid duplicating if empty.
+		ret.strings = malloc(sizeof *ret.strings * ret.cap);
+		memcpy(ret.strings, a.strings, sizeof *ret.strings * ret.cap);
+	}
 	return ret;
 }
 
