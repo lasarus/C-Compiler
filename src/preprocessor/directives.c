@@ -29,26 +29,23 @@ struct token next() {
 	return t;
 }
 
-#define NEXT() next()
-#define PUSH(T) push(T)
-
 void directiver_define(void) {
-	struct token name = NEXT();
+	struct token name = next();
 
 	struct define def = define_init(name.str);
 
-	struct token t = NEXT();
+	struct token t = next();
 	if(t.type == T_LPAR && !t.whitespace) {
 		int idx = 0;
 		do {
-			t = NEXT();
+			t = next();
 			if(idx == 0 && t.type == T_RPAR) {
 				def.func = 1;
 				break;
 			}
 
 			if (t.type == T_ELLIPSIS) {
-				t = NEXT();
+				t = next();
 				EXPECT(&t, T_RPAR);
 				def.vararg = 1;
 				def.func = 1;
@@ -57,28 +54,28 @@ void directiver_define(void) {
 			EXPECT(&t, T_IDENT);
 			define_add_par(&def, t);
 
-			t = NEXT();
+			t = next();
 			if (t.type != T_RPAR)
 				EXPECT(&t, T_COMMA);
 
 			idx++;
 		} while(t.type == T_COMMA);
 
-		t = NEXT();
+		t = next();
 	}
 
 	while(!t.first_of_line) {
 		define_add_def(&def, t);
-		t = NEXT();
+		t = next();
 	}
 
-	PUSH(t);
+	push(t);
 
 	define_map_add(def);
 }
 
 void directiver_undef(void) {
-	struct token name = NEXT();
+	struct token name = next();
 
 	EXPECT(&name, T_IDENT);
 	define_map_remove(name.str);
@@ -195,31 +192,31 @@ intmax_t evaluate_expression(int prec, int evaluate) {
 
 intmax_t evaluate_until_newline() {
 	buffer.size = 0;
-	struct token t = NEXT();
+	struct token t = next();
 	while (!t.first_of_line) {
 		if (sv_string_cmp(t.str, "defined")) {
-			t = NEXT();
+			t = next();
 			int has_lpar = t.type == T_LPAR;
 			if (has_lpar)
-				t = NEXT();
+				t = next();
 
 			int is_defined = define_map_get(t.str) != NULL;
 			token_list_add(&buffer, (struct token) {.type = T_NUM, .str = is_defined ? sv_from_str("1") :
 					sv_from_str("0")});
 
-			t = NEXT();
+			t = next();
 
 			if (has_lpar) {
 				EXPECT(&t, T_RPAR);
-				t = NEXT();
+				t = next();
 			}
 		} else {
 			token_list_add(&buffer, t);
 
-			t = NEXT();
+			t = next();
 		}
 	}
-	PUSH(t);
+	push(t);
 
 	expand_token_list(&buffer);
 	token_list_add(&buffer, (struct token) { .type = T_EOI });
@@ -232,9 +229,9 @@ intmax_t evaluate_until_newline() {
 
 int directiver_evaluate_conditional(struct token dir) {
 	if (sv_string_cmp(dir.str, "ifdef")) {
-		return (define_map_get(NEXT().str) != NULL);
+		return (define_map_get(next().str) != NULL);
 	} else if (sv_string_cmp(dir.str, "ifndef")) {
-		return !(define_map_get(NEXT().str) != NULL);
+		return !(define_map_get(next().str) != NULL);
 	} else if (sv_string_cmp(dir.str, "if") ||
 			   sv_string_cmp(dir.str, "elif")) {
 		return evaluate_until_newline();
@@ -246,16 +243,16 @@ int directiver_evaluate_conditional(struct token dir) {
 }
 
 void directiver_handle_pragma(void) {
-	struct token command = NEXT();
+	struct token command = next();
 
 	if (sv_string_cmp(command.str, "once")) {
 		tokenizer_disable_current_path();
 	} else {
 		WARNING(command.pos, "\"#pragma %s\" not supported", dbg_token(&command));
-		struct token t = NEXT();
+		struct token t = next();
 		while (!t.first_of_line)
-			t = NEXT();
-		PUSH(t);
+			t = next();
+		push(t);
 	}
 }
 
@@ -266,13 +263,13 @@ struct token directiver_next(void) {
 	if (cond_stack_n == 0)
 		ADD_ELEMENT(cond_stack_n, cond_stack_cap, cond_stack) = 1;
 
-	struct token t = NEXT();
+	struct token t = next();
 	while (t.type == PP_DIRECTIVE || cond_stack[cond_stack_n - 1] != 1) {
 		if (t.type != PP_DIRECTIVE) {
-			t = NEXT();
+			t = next();
 			continue;
 		}
-		struct token directive = NEXT();
+		struct token directive = next();
 
 		if (directive.first_of_line) {
 			t = directive;
@@ -312,7 +309,7 @@ struct token directiver_next(void) {
 			if (sv_string_cmp(name, "define")) {
 				directiver_define();
 			} else if (sv_string_cmp(name, "undef")) {
-				define_map_remove(NEXT().str);
+				define_map_remove(next().str);
 			} else if (sv_string_cmp(name, "error")) {
 				ERROR(directive.pos, "#error directive was invoked.");
 			} else if (sv_string_cmp(name, "include")) {
@@ -320,7 +317,7 @@ struct token directiver_next(void) {
 				// I'm interpreting the standard liberally to allow for this.
 				new_filename = NULL;
 				line_diff = 0;
-				struct token path_tok = NEXT();
+				struct token path_tok = next();
 				int system = path_tok.type == PP_HEADER_NAME_H;
 				struct string_view path = path_tok.str;
 				path.str++;
@@ -332,7 +329,7 @@ struct token directiver_next(void) {
 				directiver_handle_pragma();
 			} else if (sv_string_cmp(name, "line")) {
 				// 6.10.4
-				struct token digit_seq = NEXT(), s_char_seq;
+				struct token digit_seq = next(), s_char_seq;
 
 				if (digit_seq.first_of_line)
 					ERROR(digit_seq.pos, "Expected digit sequence after #line");
@@ -343,10 +340,10 @@ struct token directiver_next(void) {
 					struct token t = digit_seq;
 					while (!t.first_of_line) {
 						token_list_add(&buffer, t);
-						t = NEXT();
+						t = next();
 					}
 
-					PUSH(t);
+					push(t);
 
 					expand_token_list(&buffer);
 
@@ -359,9 +356,9 @@ struct token directiver_next(void) {
 						has_s_char_seq = 1;
 					}
 				} else {
-					s_char_seq = NEXT();
+					s_char_seq = next();
 					if (s_char_seq.first_of_line) {
-						PUSH(s_char_seq);
+						push(s_char_seq);
 					} else {
 						has_s_char_seq = 1;
 					}
@@ -384,7 +381,7 @@ struct token directiver_next(void) {
 			}
 		}
 
-		t = NEXT();
+		t = next();
 	}
 
 	return t;
