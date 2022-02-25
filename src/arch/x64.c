@@ -611,9 +611,15 @@ void constant_to_buffer(uint8_t *buffer, struct constant constant, int bit_offse
 		uint64_t mask = gen_mask(64 - bit_size - bit_offset, bit_offset);
 
 		value <<= bit_offset;
-		uint64_t prev_value = *(uint64_t *)buffer;
+		uint64_t prev_value;
+		switch (size) {
+		case 1: prev_value = *buffer; break;
+		case 2: prev_value = *(uint16_t *)buffer; break;
+		case 4: prev_value = *(uint32_t *)buffer; break;
+		case 8: prev_value = *(uint64_t *)buffer; break;
+		default: NOTIMP();
+		}
 		value = (prev_value & mask) | (value & ~mask);
-		size = 8;
 	}
 
 	switch (size) {
