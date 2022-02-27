@@ -3,6 +3,7 @@
 #include "codegen/codegen.h"
 #include "common.h"
 #include "preprocessor/macro_expander.h"
+#include "assembler/assembler.h"
 #include "parser/symbols.h"
 #include "abi/abi.h"
 
@@ -65,6 +66,11 @@ struct arguments parse_arguments(int argc, char **argv) {
 				abi_init_mingw_workarounds();
 			} else {
 				ARG_ERROR(i, "Invalid flag.");
+			}
+		} else if (argv[i][0] == '-' &&
+				   argv[i][1] == 'd') {
+			if (strcmp(argv[i] + 2, "half-assemble") == 0) {
+				assembler_flags.half_assemble = 1;
 			}
 		} else {
 			switch (state) {

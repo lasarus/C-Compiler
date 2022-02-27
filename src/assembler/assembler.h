@@ -3,6 +3,10 @@
 
 #include <stdint.h>
 
+extern struct assembler_flags {
+	int half_assemble;
+} assembler_flags;
+
 enum reg {
 	REG_RAX,
 	REG_RBX,

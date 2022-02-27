@@ -1,10 +1,15 @@
 #include "assembler.h"
+#include "encode.h"
 
 #include <common.h>
 #include <inttypes.h>
 #include <codegen/registers.h>
 
 #include <stdarg.h>
+
+struct assembler_flags assembler_flags = {
+	.half_assemble = 0
+};
 
 static FILE *out;
 static const char *current_section;
@@ -99,21 +104,72 @@ static void asm_emit_operand(struct operand op) {
 }
 
 void asm_ins0(const char *mnemonic) {
-	asm_emit_no_newline("\t%s\n", mnemonic);
+	if (assembler_flags.half_assemble) {
+		uint8_t output[15];
+		int len;
+		struct operand ops[4] = { 0 };
+		assemble_instruction(output, &len, mnemonic, ops);
+
+		asm_emit_no_newline("\t.byte ");
+		for (int i = 0; i < len; i++) {
+			asm_emit_no_newline("0x%x", output[i]);
+			if (i != len - 1)
+				asm_emit_no_newline(", ", output[i]);
+		}
+		asm_emit_no_newline("\n");
+	} else {
+		asm_emit_no_newline("\t%s\n", mnemonic);
+	}
 }
 
 void asm_ins1(const char *mnemonic, struct operand op1) {
-	asm_emit_no_newline("\t%s ", mnemonic);
+	if (assembler_flags.half_assemble &&
+		op1.type != OPERAND_IMM_LABEL &&
+		op1.type != OPERAND_SSE_REG) {
+		uint8_t output[15];
+		int len;
+		struct operand ops[4] = { op1 };
+		assemble_instruction(output, &len, mnemonic, ops);
 
-	asm_emit_operand(op1);
-	asm_emit_no_newline("\n");
+		asm_emit_no_newline("\t.byte ");
+		for (int i = 0; i < len; i++) {
+			asm_emit_no_newline("0x%x", output[i]);
+			if (i != len - 1)
+				asm_emit_no_newline(", ", output[i]);
+		}
+		asm_emit_no_newline("\n");
+	} else {
+		asm_emit_no_newline("\t%s ", mnemonic);
+
+		asm_emit_operand(op1);
+		asm_emit_no_newline("\n");
+	}
 }
 
 void asm_ins2(const char *mnemonic, struct operand op1, struct operand op2) {
-	asm_emit_no_newline("\t%s ", mnemonic);
+	if (assembler_flags.half_assemble &&
+		op1.type != OPERAND_IMM_LABEL &&
+		op1.type != OPERAND_SSE_REG &&
+		op2.type != OPERAND_IMM_LABEL &&
+		op2.type != OPERAND_SSE_REG) {
+		uint8_t output[15];
+		int len = 0;
+		struct operand ops[4] = { op2, op1 };
+		assemble_instruction(output, &len, mnemonic, ops);
 
-	asm_emit_operand(op1);
-	asm_emit_no_newline(", ");
-	asm_emit_operand(op2);
-	asm_emit_no_newline("\n");
+		asm_emit_no_newline("\t.byte ", len);
+		for (int i = 0; i < len; i++) {
+			asm_emit_no_newline("0x%x", output[i]);
+			if (i != len - 1)
+				asm_emit_no_newline(", ", output[i]);
+		}
+		asm_emit_no_newline("\n");
+	} else {
+		asm_emit_no_newline("\t%s ", mnemonic);
+
+		asm_emit_operand(op1);
+		asm_emit_no_newline(", ");
+		asm_emit_operand(op2);
+		asm_emit_no_newline("\n");
+	}
 }
