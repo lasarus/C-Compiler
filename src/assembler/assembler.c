@@ -112,7 +112,7 @@ void asm_ins0(const char *mnemonic) {
 
 		asm_emit_no_newline("\t.byte ");
 		for (int i = 0; i < len; i++) {
-			asm_emit_no_newline("0x%x", output[i]);
+			asm_emit_no_newline("0x%.2x", output[i]);
 			if (i != len - 1)
 				asm_emit_no_newline(", ", output[i]);
 		}
@@ -124,8 +124,7 @@ void asm_ins0(const char *mnemonic) {
 
 void asm_ins1(const char *mnemonic, struct operand op1) {
 	if (assembler_flags.half_assemble &&
-		op1.type != OPERAND_IMM_LABEL &&
-		op1.type != OPERAND_SSE_REG) {
+		op1.type != OPERAND_IMM_LABEL) {
 		uint8_t output[15];
 		int len;
 		struct operand ops[4] = { op1 };
@@ -133,7 +132,7 @@ void asm_ins1(const char *mnemonic, struct operand op1) {
 
 		asm_emit_no_newline("\t.byte ");
 		for (int i = 0; i < len; i++) {
-			asm_emit_no_newline("0x%x", output[i]);
+			asm_emit_no_newline("0x%.2x", output[i]);
 			if (i != len - 1)
 				asm_emit_no_newline(", ", output[i]);
 		}
@@ -149,9 +148,7 @@ void asm_ins1(const char *mnemonic, struct operand op1) {
 void asm_ins2(const char *mnemonic, struct operand op1, struct operand op2) {
 	if (assembler_flags.half_assemble &&
 		op1.type != OPERAND_IMM_LABEL &&
-		op1.type != OPERAND_SSE_REG &&
-		op2.type != OPERAND_IMM_LABEL &&
-		op2.type != OPERAND_SSE_REG) {
+		op2.type != OPERAND_IMM_LABEL) {
 		uint8_t output[15];
 		int len = 0;
 		struct operand ops[4] = { op2, op1 };
@@ -159,7 +156,7 @@ void asm_ins2(const char *mnemonic, struct operand op1, struct operand op2) {
 
 		asm_emit_no_newline("\t.byte ", len);
 		for (int i = 0; i < len; i++) {
-			asm_emit_no_newline("0x%x", output[i]);
+			asm_emit_no_newline("0x%.2x", output[i]);
 			if (i != len - 1)
 				asm_emit_no_newline(", ", output[i]);
 		}

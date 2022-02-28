@@ -39,7 +39,11 @@ struct operand_accepts {
 		ACC_REL8,
 		ACC_REL16,
 		ACC_REL32,
-		ACC_MODRM
+		ACC_MODRM,
+		ACC_XMM,
+		ACC_XMM_M32,
+		ACC_XMM_M64,
+		ACC_XMM_M128,
 	} type;
 
 	union {
@@ -60,6 +64,10 @@ struct operand_accepts {
 #define A_REL16 {.type = ACC_REL16 }
 #define A_REL32 {.type = ACC_REL32 }
 #define A_REG(SIZE) {.type = ACC_REG, .reg.size = SIZE }
+#define A_XMM { .type = ACC_XMM }
+#define A_XMM_M32 { .type = ACC_XMM_M32 }
+#define A_XMM_M64 { .type = ACC_XMM_M64 }
+#define A_XMM_M128 { .type = ACC_XMM_M128 }
 #define A_MODRM(SIZE) {.type = ACC_MODRM, .reg.size = SIZE }
 #define A_REG_STAR(SIZE) {.type = ACC_REG_STAR, .reg.size = SIZE }
 #define A_RAX(SIZE) {.type = ACC_RAX, .reg.size = SIZE }
@@ -72,7 +80,7 @@ struct encoding {
 	int rex, rexw;
 	int modrm_extension;
 	int slash_r;
-	int op_size_prefix;
+	int op_size_prefix, repne_prefix, repe_prefix;
 	struct operand_encoding operand_encoding[4];
 	struct operand_accepts operand_accepts[4];
 };
@@ -87,6 +95,7 @@ struct encoding encodings[] = {
 	{"addq", 0x05, .rex = 1, .rexw = 1, .operand_encoding = {{OE_NONE, 0}, {OE_IMM32, 0}}, .operand_accepts = {A_RAX(8), A_IMM32_S}},
 	{"addq", 0x04, .operand_encoding = {{OE_NONE, 0}, {OE_IMM8, 0}}, .operand_accepts = {A_REG(4), A_IMM8_S}},
 	{"addq", 0x83, .rex = 1, .rexw = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_IMM8, 0}}, .operand_accepts = {A_REG(8), A_IMM8_S}},
+	{"addq", 0x81, .rexw = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_IMM32, 0}}, .operand_accepts = {A_REG(8), A_IMM32_S}},
 	{"addq", 0x01, .rex = 1, .rexw = 1, .slash_r = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_MODRM_REG, 0}}, .operand_accepts = {A_REG(8), A_REG(8)}},
 	{"addq", 0x03, .rex = 1, .rexw = 1, .slash_r = 1, .operand_encoding = {{OE_MODRM_REG, 0}, {OE_MODRM_RM, 0}}, .operand_accepts = {A_REG(8), A_MODRM(8)}},
 
@@ -148,6 +157,7 @@ struct encoding encodings[] = {
 	{"movb", 0x8a, .slash_r = 1, .operand_encoding = {{OE_MODRM_REG, 0}, {OE_MODRM_RM, 0}}, .operand_accepts = {A_REG(1), A_MODRM(1)}},
 	{"movb", 0x88, .slash_r = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_MODRM_REG, 0}}, .operand_accepts = {A_MODRM(1), A_REG(1)}},
 	{"movb", 0xc6, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_IMM8, 0}}, .operand_accepts = {A_MODRM(1), A_IMM8_S}},
+	{"movb", 0xc6, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_IMM8, 0}}, .operand_accepts = {A_MODRM(1), A_IMM8}},
 	{"movl", 0x8b, .slash_r = 1, .operand_encoding = {{OE_MODRM_REG, 0}, {OE_MODRM_RM, 0}}, .operand_accepts = {A_REG(4), A_MODRM(4)}},
 	{"movq", 0xc7, .rex = 1, .rexw = 1, .slash_r = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_IMM32, 0}}, .operand_accepts = {A_MODRM(8), A_IMM32_S}},
 
@@ -199,6 +209,37 @@ struct encoding encodings[] = {
 	{"testb", 0x84, .slash_r = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_MODRM_REG, 0}}, .operand_accepts = {A_MODRM(1), A_REG(1)}},
 	{"testl", 0x85, .slash_r = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_MODRM_REG, 0}}, .operand_accepts = {A_MODRM(4), A_REG(4)}},
 	{"testq", 0x85, .rexw = 1, .slash_r = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_MODRM_REG, 0}}, .operand_accepts = {A_MODRM(8), A_REG(8)}},
+
+	{"movsd", 0x0f, .op2 = 0x11, .repne_prefix = 1, .slash_r = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_MODRM_REG, 0}}, .operand_accepts = {A_XMM_M64, A_XMM}},
+	{"movsd", 0x0f, .op2 = 0x10, .repne_prefix = 1, .slash_r = 1, .operand_encoding = {{OE_MODRM_REG, 0}, {OE_MODRM_RM, 0}}, .operand_accepts = {A_XMM, A_XMM_M64}},
+
+	{"movss", 0x0f, .op2 = 0x11, .repe_prefix = 1, .slash_r = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_MODRM_REG, 0}}, .operand_accepts = {A_XMM_M32, A_XMM}},
+
+	{"movd", 0x0f, .op2 = 0x7e, .op_size_prefix = 1, .slash_r = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_MODRM_REG, 0}}, .operand_accepts = {A_MODRM(4), A_XMM}},
+	{"movd", 0x0f, .op2 = 0x6e, .op_size_prefix = 1, .slash_r = 1, .operand_encoding = {{OE_MODRM_REG, 0}, {OE_MODRM_RM, 0}}, .operand_accepts = {A_XMM, A_MODRM(4)}},
+
+	{"movd", 0x0f, .op2 = 0x7e, .op_size_prefix = 1, .slash_r = 1, .rexw = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_MODRM_REG, 0}}, .operand_accepts = {A_MODRM(8), A_XMM}},
+	{"movd", 0x0f, .op2 = 0x6e, .op_size_prefix = 1, .slash_r = 1, .rexw = 1, .operand_encoding = {{OE_MODRM_REG, 0}, {OE_MODRM_RM, 0}}, .operand_accepts = {A_XMM, A_MODRM(8)}},
+
+	// TODO: Is `movd %rax, %xmm0` the same as `movq %rax, %xmm0`?
+	{"movq", 0x0f, .op2 = 0x7e, .op_size_prefix = 1, .slash_r = 1, .rexw = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_MODRM_REG, 0}}, .operand_accepts = {A_MODRM(8), A_XMM}},
+	{"movq", 0x0f, .op2 = 0x6e, .op_size_prefix = 1, .slash_r = 1, .rexw = 1, .operand_encoding = {{OE_MODRM_REG, 0}, {OE_MODRM_RM, 0}}, .operand_accepts = {A_XMM, A_MODRM(8)}},
+
+	{"cvtsi2ss", 0x0f, .op2 = 0x2a, .repe_prefix = 1, .slash_r = 1, .rexw = 1, .operand_encoding = {{OE_MODRM_REG, 0}, {OE_MODRM_RM, 0}}, .operand_accepts = {A_XMM, A_MODRM(8)}},
+	{"cvtsi2sd", 0x0f, .op2 = 0x2a, .repne_prefix = 1, .slash_r = 1, .rexw = 1, .operand_encoding = {{OE_MODRM_REG, 0}, {OE_MODRM_RM, 0}}, .operand_accepts = {A_XMM, A_MODRM(8)}},
+
+	{"cvtsd2ss", 0x0f, .op2 = 0x5a, .repne_prefix = 1, .slash_r = 1, .operand_encoding = {{OE_MODRM_REG, 0}, {OE_MODRM_RM, 0}}, .operand_accepts = {A_XMM, A_XMM_M64}},
+	{"cvtss2sd", 0x0f, .op2 = 0x5a, .repe_prefix = 1, .slash_r = 1, .operand_encoding = {{OE_MODRM_REG, 0}, {OE_MODRM_RM, 0}}, .operand_accepts = {A_XMM, A_XMM_M32}},
+
+	{"cvttss2si", 0x0f, .op2 = 0x2c, .repe_prefix = 1, .slash_r = 1, .rexw = 1, .operand_encoding = {{OE_MODRM_REG, 0}, {OE_MODRM_RM, 0}}, .operand_accepts = {A_REG(8), A_XMM_M32}},
+
+	{"cvttsd2si", 0x0f, .op2 = 0x2c, .repne_prefix = 1, .slash_r = 1, .rexw = 1, .operand_encoding = {{OE_MODRM_REG, 0}, {OE_MODRM_RM, 0}}, .operand_accepts = {A_REG(8), A_XMM_M64}},
+
+	{"xorps", 0x0f, .op2 = 0x57, .slash_r = 1, .operand_encoding = {{OE_MODRM_REG, 0}, {OE_MODRM_RM, 0}}, .operand_accepts = {A_XMM, A_XMM_M128}},
+
+	{"subss", 0x0f, .op2 = 0x5c, .repe_prefix = 1, .slash_r = 1, .operand_encoding = {{OE_MODRM_REG, 0}, {OE_MODRM_RM, 0}}, .operand_accepts = {A_XMM, A_XMM_M32}},
+
+	{"subsd", 0x0f, .op2 = 0x5c, .repne_prefix = 1, .slash_r = 1, .operand_encoding = {{OE_MODRM_REG, 0}, {OE_MODRM_RM, 0}}, .operand_accepts = {A_XMM, A_XMM_M64}},
 };
 
 #endif

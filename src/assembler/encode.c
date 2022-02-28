@@ -225,6 +225,14 @@ void assemble_encoding(uint8_t *output, int *len, struct encoding *encoding, str
 					rex_b = (modrm_rm & 0x8) >> 3;
 				break;
 
+			case OPERAND_SSE_REG:
+				modrm_mod = 3;
+
+				modrm_rm = o->sse_reg;
+				if (has_rex)
+					rex_b = (modrm_rm & 0x8) >> 3;
+				break;
+
 			case OPERAND_MEM: {
 				encode_sib(o, &rex_b, &rex_x, &modrm_mod, &modrm_rm,
 						   &disp, &has_disp8, &has_disp32,
@@ -244,6 +252,13 @@ void assemble_encoding(uint8_t *output, int *len, struct encoding *encoding, str
 				modrm_reg = register_index(o->reg.reg);
 				rex_r = (modrm_reg & 0x8) >> 3;
 				break;
+
+			case OPERAND_SSE_REG:
+				assert(encoding->slash_r);
+				modrm_reg = o->sse_reg;
+				rex_r = (modrm_reg & 0x8) >> 3;
+				break;
+
 			default:
 				ICE("Not imp: %d\n", o->type);
 			}
@@ -280,6 +295,12 @@ void assemble_encoding(uint8_t *output, int *len, struct encoding *encoding, str
 
 	if (encoding->op_size_prefix)
 		output[idx++] = 0x66;
+
+	if (encoding->repne_prefix)
+		output[idx++] = 0xf2;
+
+	if (encoding->repe_prefix)
+		output[idx++] = 0xf3;
 
 	if (has_rex) {
 		uint8_t rex_byte = 0x40;
@@ -385,6 +406,11 @@ int does_match(struct operand *o, struct operand_accepts *oa) {
 			return 0;
 		break;
 
+	case ACC_XMM:
+		if (o->type != OPERAND_SSE_REG)
+			return 0;
+		break;
+
 	case ACC_EMPTY:
 		if (o->type != OPERAND_EMPTY)
 			return 1;
@@ -446,6 +472,15 @@ int does_match(struct operand *o, struct operand_accepts *oa) {
 		} else {
 			return 0;
 		}
+		break;
+
+	case ACC_XMM_M128:
+	case ACC_XMM_M64:
+	case ACC_XMM_M32: // TODO: Differentiate M64 and M32?
+		// Either accept SSE register of correct size or SIB.
+		if (!(o->type == OPERAND_SSE_REG ||
+			  o->type == OPERAND_MEM))
+			return 0;
 		break;
 
 	case ACC_IMM64:
