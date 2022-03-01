@@ -293,14 +293,21 @@ void assemble_encoding(uint8_t *output, int *len, struct encoding *encoding, str
 
 	int idx = 0;
 
+#define W(X) output[idx++] = (X)
+#define WRITE_8(X) do { W(X); } while (0)
+#define WRITE_16(X) do { W(X); W(X >> 8); } while (0)
+#define WRITE_32(X) do { W(X); W(X >> 8); W(X >> 16); W(X >> 24); } while (0)
+#define WRITE_64(X) do { W(X); W(X >> 8); W(X >> 16); W(X >> 24);\
+		W(X >> 32); W(X >> 40); W(X >> 48); W(X >> 56);} while (0)
+
 	if (encoding->op_size_prefix)
-		output[idx++] = 0x66;
+		WRITE_8(0x66);
 
 	if (encoding->repne_prefix)
-		output[idx++] = 0xf2;
+		WRITE_8(0xf2);
 
 	if (encoding->repe_prefix)
-		output[idx++] = 0xf3;
+		WRITE_8(0xf3);
 
 	if (has_rex) {
 		uint8_t rex_byte = 0x40;
@@ -311,15 +318,14 @@ void assemble_encoding(uint8_t *output, int *len, struct encoding *encoding, str
 		rex_byte |= rex_b;
 		rex_byte |= rex_r << 2;
 
-		output[idx++] = rex_byte;
+		WRITE_8(rex_byte);
 	}
 
-	output[idx++] = encoding->opcode | op_ext;
+	WRITE_8(encoding->opcode | op_ext);
 	if (encoding->opcode == 0x0f) {
-		output[idx++] = encoding->op2;
-		if (encoding->op2 == 0x38 ||
-			encoding->op2 == 0x3a)
-			output[idx++] = encoding->op3;
+		WRITE_8(encoding->op2);
+		if (encoding->op2 == 0x38 || encoding->op2 == 0x3a)
+			WRITE_8(encoding->op3);
 	}
 
 	if (has_modrm) {
@@ -329,7 +335,7 @@ void assemble_encoding(uint8_t *output, int *len, struct encoding *encoding, str
 		modrm_byte |= (modrm_mod & 0x3) << 6;
 		modrm_byte |= (modrm_rm & 0x7);
 
-		output[idx++] = modrm_byte;
+		WRITE_8(modrm_byte);
 	}
 
 	if (has_sib) {
@@ -339,35 +345,25 @@ void assemble_encoding(uint8_t *output, int *len, struct encoding *encoding, str
 		sib_byte |= (sib_index & 7) << 3;
 		sib_byte |= (sib_base & 7);
 
-		output[idx++] = sib_byte;
+		WRITE_8(sib_byte);
 	}
 
-	if (has_disp8) {
-		output[idx] = (uint8_t)disp;
-		idx++;
-	} else if (has_disp32) {
-		*(uint32_t *)(output + idx) = disp;
-		idx += 4;
-	}
+	if (has_disp8)
+		WRITE_8(disp);
+	else if (has_disp32)
+		WRITE_32(disp);
 
-	if (has_imm8) {
-		output[idx] = (uint8_t)imm;
-		idx++;
-	} else if (has_imm16) {
-		*(uint16_t *)(output + idx) = imm;
-		idx += 2;
-	} else if (has_imm32) {
-		*(uint32_t *)(output + idx) = imm;
-		idx += 4;
-	} else if (has_imm64) {
-		*(uint64_t *)(output + idx) = imm;
-		idx += 8;
-	}
+	if (has_imm8)
+		WRITE_8(imm);
+	else if (has_imm16)
+		WRITE_16(imm);
+	else if (has_imm32)
+		WRITE_32(imm);
+	else if (has_imm64)
+		WRITE_64(imm);
 
-	if (has_rel32) {
-		*(uint32_t *)(output + idx) = rel;
-		idx += 4;
-	}
+	if (has_rel32)
+		WRITE_32(rel);
 
 	*len = idx;
 }
