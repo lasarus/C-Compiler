@@ -16,6 +16,7 @@ block_id new_block() {
 	int id = (int)block_size;
 	ADD_ELEMENT(block_size, block_cap, blocks) = (struct block) {
 		.id = id,
+		.label = register_label(),
 		.exit.type = BLOCK_EXIT_NONE
 	};
 

@@ -3,6 +3,7 @@
 
 #include "variables.h"
 #include "operators.h"
+#include <codegen/rodata.h>
 
 typedef int block_id;
 block_id new_block(void);
@@ -261,6 +262,7 @@ struct block_exit {
 
 struct block {
 	block_id id;
+	label_id label;
 	int size, cap;
 	struct instruction *instructions;
 

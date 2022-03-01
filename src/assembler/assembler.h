@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <string_view.h>
+#include <codegen/rodata.h>
 
 extern struct assembler_flags {
 	int half_assemble;
@@ -37,6 +38,7 @@ struct operand {
 		OPERAND_STAR_REG, // *Register. callq *%rax.
 		OPERAND_IMM, // Immediate.
 		OPERAND_IMM_LABEL, // Immediate of the form $label+offset.
+		OPERAND_IMM_LABEL_ABSOLUTE,
 		OPERAND_MEM // Memory.
 	} type;
 
@@ -58,14 +60,16 @@ struct operand {
 		uint64_t imm;
 
 		struct {
-			const char *label;
+			label_id label_;
+			//const char *label;
 			uint64_t offset;
 		} imm_label;
 	};
 };
 
 #define IMM(X) (struct operand) { .type = OPERAND_IMM, .imm = (X) }
-#define IMML(STR, X) (struct operand) { .type = OPERAND_IMM_LABEL, .imm_label = { (STR), (X) } }
+#define IMML(LABEL_ID, X) (struct operand) { .type = OPERAND_IMM_LABEL, .imm_label = { (LABEL_ID), (X) } }
+#define IMML_ABS(LABEL_ID, X) (struct operand) { .type = OPERAND_IMM_LABEL_ABSOLUTE, .imm_label = { (LABEL_ID), (X) } }
 #define MEM(OFFSET, BASE) (struct operand) { .type = OPERAND_MEM, .mem = { (REG_NONE), BASE, 1, (OFFSET) } }
 #define R8S(REG) (struct operand) { .type = OPERAND_STAR_REG, .reg = { (REG), 0, 8 } }
 #define R8(REG) (struct operand) { .type = OPERAND_REG, .reg = { (REG), 0, 8 } }
@@ -91,7 +95,7 @@ void asm_ins1(const char *mnemonic, struct operand op1);
 void asm_ins2(const char *mnemonic, struct operand op1, struct operand op2);
 void asm_ins3(const char *mnemonic, struct operand op1, struct operand op2, struct operand op3);
 
-void asm_label(int global, const char *fmt, ...);
+void asm_label(int global, label_id label);
 void asm_string(struct string_view str);
 
 #endif

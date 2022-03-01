@@ -46,19 +46,13 @@ label_id rodata_register(struct string_view str) {
 	return label_register(ENTRY_STR, str);
 }
 
-const char *rodata_get_label_string(label_id id) {
-	if (entries[id].type == ENTRY_STR) {
-		static char *buffer = NULL;
-
-		if (!buffer)
-			buffer = malloc(128);
-
-		sprintf(buffer, ".L_rodata%d", id);
-		return buffer;
+void rodata_emit_label(label_id id) {
+	if (id < 0) { // Temporary label.
+		asm_emit_no_newline(".L%d", -id);
+	} else if (entries[id].type == ENTRY_STR) {
+		asm_emit_no_newline(".L_string%d", id);
 	} else if (entries[id].type == ENTRY_LABEL_NAME) {
-		return sv_to_str(entries[id].name);
-	} else {
-		NOTIMP();
+		asm_emit_no_newline("%.*s", entries[id].name.len, entries[id].name.str);
 	}
 }
 
@@ -66,7 +60,8 @@ void rodata_codegen(void) {
 	for (int i = 0; i < entries_size; i++) {
 		if (entries[i].type != ENTRY_STR)
 			continue;
-		asm_label(0, "%s", rodata_get_label_string(entries[i].id));
+
+		asm_label(0, entries[i].id);
 
 		asm_string(entries[i].name);
 	}
@@ -76,8 +71,13 @@ label_id register_label_name(struct string_view str) {
 	return label_register(ENTRY_LABEL_NAME, str);
 }
 
+label_id register_label(void) {
+	static int tmp_label_idx = -1;
+	return tmp_label_idx--;
+}
+
 struct static_var {
-	struct string_view label;
+	label_id label_;
 	struct type *type;
 	struct initializer init;
 	int global;
@@ -88,7 +88,7 @@ static int static_vars_size, static_vars_cap;
 
 void data_register_static_var(struct string_view label, struct type *type, struct initializer init, int global) {
 	ADD_ELEMENT(static_vars_size, static_vars_cap, static_vars) = (struct static_var) {
-		.label = label,
+		.label_ = register_label_name(label),
 		.type = type,
 		.init = init,
 		.global = global
@@ -162,14 +162,10 @@ void codegen_compound_literals(struct expr **expr, int lvalue) {
 	case E_GENERIC_SELECTION:
 	case E_COMPOUND_LITERAL:
 		if (lvalue) {
-			static int counter = 0;
-			char name[256];
-			sprintf(name, ".compundliteral%d", counter++);
-			asm_label(0, "%s", name);
+			label_id label = register_label();//register_label_name(sv_from_str(strdup(name)));
+			asm_label(0, label);
 			codegen_initializer((*expr)->compound_literal.type,
 								&(*expr)->compound_literal.init);
-
-			label_id label = register_label_name(sv_from_str(strdup(name)));
 
 			*expr = expr_new((struct expr) {
 					.type = E_CONSTANT,
@@ -268,11 +264,16 @@ void codegen_initializer(struct type *type,
 
 	for (int i = 0; i < size; i++) {
 		if (is_label[i]) {
-			if (label_offsets[i] == 0)
-				asm_emit(".quad %s", rodata_get_label_string(labels[i]));
-			else
-				asm_emit(".quad %s+%lld", rodata_get_label_string(labels[i]),
-					label_offsets[i]);
+			if (label_offsets[i] == 0) {
+				asm_emit_no_newline(".quad ");
+				rodata_emit_label(labels[i]);
+				asm_emit_no_newline("\n");
+
+			} else {
+				asm_emit_no_newline(".quad ");
+				rodata_emit_label(labels[i]);
+				asm_emit_no_newline("+%lld\n", label_offsets[i]);
+			}
 			i += 7;
 		} else {
 			int how_long = 0;
@@ -300,13 +301,13 @@ void codegen_static_var(struct static_var *static_var) {
 	asm_section(".data");
 
 	if (static_var->init.type == INIT_EMPTY) {
-		asm_label(static_var->global, "%.*s", static_var->label.len, static_var->label.str);
+		asm_label(static_var->global, static_var->label_);
 
 		asm_emit(".zero %d", calculate_size(static_var->type));
 	} else {
 		codegen_pre_initializer(&static_var->init);
 
-		asm_label(static_var->global, "%.*s", static_var->label.len, static_var->label.str);
+		asm_label(static_var->global, static_var->label_);
 
 		codegen_initializer(static_var->type, &static_var->init);
 	}

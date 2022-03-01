@@ -6,9 +6,10 @@
 typedef int label_id;
 
 label_id rodata_register(struct string_view str);
-const char *rodata_get_label_string(label_id id);
-
 label_id register_label_name(struct string_view str);
+label_id register_label(void);
+
+void rodata_emit_label(label_id id);
 
 void rodata_codegen(void);
 

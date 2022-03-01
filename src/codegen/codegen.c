@@ -155,9 +155,9 @@ void codegen_instruction(struct instruction ins, struct function *func) {
 
 		case CONSTANT_LABEL:
 			if (codegen_flags.cmodel == CMODEL_LARGE) {
-				asm_ins2("movabsq", IMML(rodata_get_label_string(c.label.label), c.label.offset), R8(REG_RDI));
+				asm_ins2("movabsq", IMML(c.label.label, c.label.offset), R8(REG_RDI));
 			} else if (codegen_flags.cmodel == CMODEL_SMALL) {
-				asm_ins2("movq", IMML(rodata_get_label_string(c.label.label), c.label.offset), R8(REG_RDI));
+				asm_ins2("movq", IMML(c.label.label, c.label.offset), R8(REG_RDI));
 			}
 			asm_ins2("leaq", MEM(-variable_info[ins.result].stack_location, REG_RBP), R8(REG_RSI));
 			codegen_memcpy(get_variable_size(ins.result));
@@ -165,10 +165,10 @@ void codegen_instruction(struct instruction ins, struct function *func) {
 
 		case CONSTANT_LABEL_POINTER:
 			if (codegen_flags.cmodel == CMODEL_LARGE) {
-				asm_ins2("movabsq", IMML(rodata_get_label_string(c.label.label), c.label.offset), R8(REG_RAX));
+				asm_ins2("movabsq", IMML(c.label.label, c.label.offset), R8(REG_RAX));
 				asm_ins2("movq", R8(REG_RAX), MEM(-variable_info[ins.result].stack_location, REG_RBP));
 			} else if (codegen_flags.cmodel == CMODEL_SMALL) {
-				asm_ins2("movq", IMML(rodata_get_label_string(c.label.label), c.label.offset),
+				asm_ins2("movq", IMML(c.label.label, c.label.offset),
 						 MEM(-variable_info[ins.result].stack_location, REG_RBP));
 			}
 			break;
@@ -367,13 +367,13 @@ void codegen_instruction(struct instruction ins, struct function *func) {
 		}
 		assert(slot);
 
-		static int tmp_label = 0;
+		label_id tmp_label = register_label();
 		asm_ins2("movq", MEM(-variable_info[slot->slot].stack_location, REG_RBP), R8(REG_RAX));
 		asm_ins2("cmpq", IMM(0), R8(REG_RAX));
-		asm_emit("jne .Lvla%d", tmp_label);
+		asm_ins1("jne", IMML_ABS(tmp_label, 0));
 		asm_ins2("movq", R8(REG_RSP), R8(REG_RAX));
 		asm_ins2("movq", R8(REG_RAX), MEM(-variable_info[slot->slot].stack_location, REG_RBP));
-		asm_label(0, ".Lvla%d", tmp_label);
+		asm_label(0, tmp_label);
 		tmp_label++;
 
 		asm_ins2("movq", R8(REG_RAX), R8(REG_RSP));
@@ -424,7 +424,7 @@ void codegen_instruction(struct instruction ins, struct function *func) {
 }
 
 void codegen_block(struct block *block, struct function *func) {
-	asm_label(0, ".LB%d", block->id);
+	asm_label(0, block->label);
 
 	for (int i = 0; i < block->size; i++)
 		codegen_instruction(block->instructions[i], func);
@@ -433,7 +433,7 @@ void codegen_block(struct block *block, struct function *func) {
 	asm_comment("EXIT IS OF TYPE : %d", block_exit->type);
 	switch (block_exit->type) {
 	case BLOCK_EXIT_JUMP:
-		asm_emit("jmp .LB%d", block_exit->jump);
+		asm_ins1("jmp", IMML_ABS(get_block(block_exit->jump)->label, 0));
 		break;
 
 	case BLOCK_EXIT_IF: {
@@ -447,8 +447,8 @@ void codegen_block(struct block *block, struct function *func) {
 		case 8: asm_ins2("testq", R8(REG_RDI), R8(REG_RDI)); break;
 		default: ICE("Invalid argument to if selection.");
 		}
-		asm_emit("je .LB%d", block_exit->if_.block_false);
-		asm_emit("jmp .LB%d", block_exit->if_.block_true);
+		asm_ins1("je", IMML_ABS(get_block(block_exit->if_.block_false)->label, 0));
+		asm_ins1("jmp", IMML_ABS(get_block(block_exit->if_.block_true)->label, 0));
 	} break;
 
 	case BLOCK_EXIT_RETURN:
@@ -468,10 +468,10 @@ void codegen_block(struct block *block, struct function *func) {
 		scalar_to_reg(control, REG_RDI);
 		for (int i = 0; i < block_exit->switch_.labels.size; i++) {
 			asm_ins2("cmpl", IMM(block_exit->switch_.labels.labels[i].value.int_d), R4(REG_RDI));
-			asm_emit("je .LB%d", block_exit->switch_.labels.labels[i].block);
+			asm_ins1("je", IMML_ABS(get_block(block_exit->switch_.labels.labels[i].block)->label, 0));
 		}
 		if (block_exit->switch_.labels.default_) {
-			asm_emit("jmp .LB%d", block_exit->switch_.labels.default_);
+			asm_ins1("jmp", IMML_ABS(get_block(block_exit->switch_.labels.default_)->label, 0));
 		}
 	} break;
 
@@ -529,7 +529,8 @@ void codegen_function(struct function *func) {
 		}
 	}
 
-	asm_label(func->is_global, "%s", func->name);
+	label_id func_label = register_label_name(sv_from_str((char *)func->name));
+	asm_label(func->is_global, func_label);
 	asm_ins1("pushq", R8(REG_RBP));
 	asm_ins2("movq", R8(REG_RSP), R8(REG_RBP));
 

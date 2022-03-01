@@ -60,22 +60,15 @@ void asm_comment(const char *fmt, ...) {
 	va_end(args);
 }
 
-void asm_label(int global, const char *fmt, ...) {
-	va_list args, tmp;
-
-	va_start(args, fmt);
-
+void asm_label(int global, label_id label) {
 	if (global) {
 		fprintf(out, ".global ");
-		va_copy(tmp, args);
-		vfprintf(out, fmt, tmp);
-		asm_emit("\n");
-		va_end(tmp);
+		rodata_emit_label(label);
+		fprintf(out, "\n");
 	}
 
-	vfprintf(out, fmt, args);
+	rodata_emit_label(label);
 	fprintf(out, ":\n");
-	va_end(args);
 }
 
 void asm_string(struct string_view str) {
@@ -118,10 +111,22 @@ static void asm_emit_operand(struct operand op) {
 		asm_emit_no_newline("$%" PRIi64, op.imm);
 		break;
 	case OPERAND_IMM_LABEL:
-		if (op.imm_label.offset)
-			asm_emit_no_newline("$%s+%" PRIi64, op.imm_label.label, op.imm_label.offset);
-		else
-			asm_emit_no_newline("$%s", op.imm_label.label);
+		if (op.imm_label.offset) {
+			asm_emit_no_newline("$");
+			rodata_emit_label(op.imm_label.label_);
+			asm_emit_no_newline("+%" PRIi64, op.imm_label.offset);
+		} else {
+			asm_emit_no_newline("$");
+			rodata_emit_label(op.imm_label.label_);
+		}
+		break;
+	case OPERAND_IMM_LABEL_ABSOLUTE:
+		if (op.imm_label.offset) {
+			rodata_emit_label(op.imm_label.label_);
+			asm_emit_no_newline("$+%" PRIi64, op.imm_label.offset);
+		} else {
+			rodata_emit_label(op.imm_label.label_);
+		}
 		break;
 	case OPERAND_MEM:
 		if (op.mem.offset)
@@ -158,7 +163,8 @@ void asm_ins0(const char *mnemonic) {
 
 void asm_ins1(const char *mnemonic, struct operand op1) {
 	if (assembler_flags.half_assemble &&
-		op1.type != OPERAND_IMM_LABEL) {
+		op1.type != OPERAND_IMM_LABEL &&
+		op1.type != OPERAND_IMM_LABEL_ABSOLUTE) {
 		uint8_t output[15];
 		int len;
 		struct operand ops[4] = { op1 };
@@ -182,7 +188,9 @@ void asm_ins1(const char *mnemonic, struct operand op1) {
 void asm_ins2(const char *mnemonic, struct operand op1, struct operand op2) {
 	if (assembler_flags.half_assemble &&
 		op1.type != OPERAND_IMM_LABEL &&
-		op2.type != OPERAND_IMM_LABEL) {
+		op2.type != OPERAND_IMM_LABEL &&
+		op1.type != OPERAND_IMM_LABEL_ABSOLUTE &&
+		op2.type != OPERAND_IMM_LABEL_ABSOLUTE) {
 		uint8_t output[15];
 		int len = 0;
 		struct operand ops[4] = { op2, op1 };
