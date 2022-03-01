@@ -78,6 +78,26 @@ void asm_label(int global, const char *fmt, ...) {
 	va_end(args);
 }
 
+void asm_string(struct string_view str) {
+	if (assembler_flags.half_assemble) {
+		asm_emit_no_newline("\t.byte ");
+		for (int i = 0; i < str.len; i++) {
+			asm_emit_no_newline("0x%.2x", (uint8_t)str.str[i]);
+			if (i != str.len - 1)
+				asm_emit_no_newline(", ");
+		}
+		asm_emit_no_newline("\n");
+	} else {
+		asm_emit_no_newline("\t.string \"");
+		for (int i = 0; i < str.len; i++) {
+			char buffer[5];
+			character_to_escape_sequence(str.str[i], buffer, 0);
+			asm_emit_no_newline("%s", buffer);
+		}
+		asm_emit_no_newline("\"\n");
+	}
+}
+
 static void asm_emit_operand(struct operand op) {
 	switch (op.type) {
 	case OPERAND_EMPTY: break;

@@ -68,14 +68,7 @@ void rodata_codegen(void) {
 			continue;
 		asm_label(0, "%s", rodata_get_label_string(entries[i].id));
 
-		asm_emit_no_newline("\t.string \"", entries[i].name);
-		struct string_view str = entries[i].name;
-		for (int i = 0; i < str.len; i++) {
-			char buffer[5];
-			character_to_escape_sequence(str.str[i], buffer, 0);
-			asm_emit_no_newline("%s", buffer);
-		}
-		asm_emit_no_newline("\"\n");
+		asm_string(entries[i].name);
 	}
 }
 

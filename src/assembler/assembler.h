@@ -2,6 +2,7 @@
 #define ASSEMBLER_H
 
 #include <stdint.h>
+#include <string_view.h>
 
 extern struct assembler_flags {
 	int half_assemble;
@@ -91,5 +92,6 @@ void asm_ins2(const char *mnemonic, struct operand op1, struct operand op2);
 void asm_ins3(const char *mnemonic, struct operand op1, struct operand op2, struct operand op3);
 
 void asm_label(int global, const char *fmt, ...);
+void asm_string(struct string_view str);
 
 #endif
