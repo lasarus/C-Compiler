@@ -373,7 +373,7 @@ void codegen_instruction(struct instruction ins, struct function *func) {
 		asm_emit("jne .Lvla%d", tmp_label);
 		asm_ins2("movq", R8(REG_RSP), R8(REG_RAX));
 		asm_ins2("movq", R8(REG_RAX), MEM(-variable_info[slot->slot].stack_location, REG_RBP));
-		asm_emit(".Lvla%d:", tmp_label);
+		asm_label(0, ".Lvla%d", tmp_label);
 		tmp_label++;
 
 		asm_ins2("movq", R8(REG_RAX), R8(REG_RSP));
@@ -424,7 +424,7 @@ void codegen_instruction(struct instruction ins, struct function *func) {
 }
 
 void codegen_block(struct block *block, struct function *func) {
-	asm_emit(".LB%d:", block->id);
+	asm_label(0, ".LB%d", block->id);
 
 	for (int i = 0; i < block->size; i++)
 		codegen_instruction(block->instructions[i], func);
@@ -529,9 +529,7 @@ void codegen_function(struct function *func) {
 		}
 	}
 
-	if (func->is_global)
-		asm_emit(".global %s", func->name);
-	asm_emit("%s:", func->name);
+	asm_label(func->is_global, "%s", func->name);
 	asm_ins1("pushq", R8(REG_RBP));
 	asm_ins2("movq", R8(REG_RSP), R8(REG_RBP));
 

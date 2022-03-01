@@ -60,8 +60,22 @@ void asm_comment(const char *fmt, ...) {
 	va_end(args);
 }
 
-void asm_emit_char(char c) {
-	fputc(c, out);
+void asm_label(int global, const char *fmt, ...) {
+	va_list args, tmp;
+
+	va_start(args, fmt);
+
+	if (global) {
+		fprintf(out, ".global ");
+		va_copy(tmp, args);
+		vfprintf(out, fmt, tmp);
+		asm_emit("\n");
+		va_end(tmp);
+	}
+
+	vfprintf(out, fmt, args);
+	fprintf(out, ":\n");
+	va_end(args);
 }
 
 static void asm_emit_operand(struct operand op) {

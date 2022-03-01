@@ -82,7 +82,6 @@ void asm_section(const char *section);
 void asm_emit(const char *fmt, ...);
 void asm_instruction(const char *fmt, ...);
 void asm_emit_no_newline(const char *fmt, ...);
-void asm_emit_char(char c); // Used for string printing.
 
 void asm_comment(const char *fmt, ...);
 
@@ -90,5 +89,7 @@ void asm_ins0(const char *mnemonic);
 void asm_ins1(const char *mnemonic, struct operand op1);
 void asm_ins2(const char *mnemonic, struct operand op1, struct operand op2);
 void asm_ins3(const char *mnemonic, struct operand op1, struct operand op2, struct operand op3);
+
+void asm_label(int global, const char *fmt, ...);
 
 #endif
