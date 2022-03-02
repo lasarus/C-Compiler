@@ -90,6 +90,7 @@ void asm_emit_no_newline(const char *fmt, ...);
 
 void asm_comment(const char *fmt, ...);
 
+void asm_ins(const char *mnemonic, struct operand ops[4]);
 void asm_ins0(const char *mnemonic);
 void asm_ins1(const char *mnemonic, struct operand op1);
 void asm_ins2(const char *mnemonic, struct operand op1, struct operand op2);

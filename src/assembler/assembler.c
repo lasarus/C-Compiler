@@ -142,11 +142,22 @@ static void asm_emit_operand(struct operand op) {
 	}
 }
 
-void asm_ins0(const char *mnemonic) {
+void asm_ins(const char *mnemonic, struct operand ops[4]) {
+	int do_half_assemble = 0;
 	if (assembler_flags.half_assemble) {
+		do_half_assemble = 1;
+		for (int i = 0; i < 4; i++) {
+			if (ops[i].type == OPERAND_IMM_LABEL ||
+				ops[i].type == OPERAND_IMM_LABEL_ABSOLUTE) {
+				do_half_assemble = 0;
+				break;
+			}
+		}
+	}
+		
+	if (do_half_assemble) {
 		uint8_t output[15];
 		int len;
-		struct operand ops[4] = { 0 };
 		assemble_instruction(output, &len, mnemonic, ops);
 
 		asm_emit_no_newline("\t.byte ");
@@ -157,58 +168,30 @@ void asm_ins0(const char *mnemonic) {
 		}
 		asm_emit_no_newline("\n");
 	} else {
-		asm_emit_no_newline("\t%s\n", mnemonic);
+		// We are mixing left to right and right to left
+		// operand ordering. Reverse when printing.
+		asm_emit_no_newline("\t%s ", mnemonic);
+		for (int i = 3; i >= 0; i--) {
+			if (!ops[i].type)
+				continue;
+
+			if (i != 3 && ops[i + 1].type)
+				asm_emit_no_newline(", ");
+
+			asm_emit_operand(ops[i]);
+		}
+		asm_emit_no_newline("\n");
 	}
+}
+
+void asm_ins0(const char *mnemonic) {
+	asm_ins(mnemonic, (struct operand[4]) { 0 });
 }
 
 void asm_ins1(const char *mnemonic, struct operand op1) {
-	if (assembler_flags.half_assemble &&
-		op1.type != OPERAND_IMM_LABEL &&
-		op1.type != OPERAND_IMM_LABEL_ABSOLUTE) {
-		uint8_t output[15];
-		int len;
-		struct operand ops[4] = { op1 };
-		assemble_instruction(output, &len, mnemonic, ops);
-
-		asm_emit_no_newline("\t.byte ");
-		for (int i = 0; i < len; i++) {
-			asm_emit_no_newline("0x%.2x", output[i]);
-			if (i != len - 1)
-				asm_emit_no_newline(", ", output[i]);
-		}
-		asm_emit_no_newline("\n");
-	} else {
-		asm_emit_no_newline("\t%s ", mnemonic);
-
-		asm_emit_operand(op1);
-		asm_emit_no_newline("\n");
-	}
+	asm_ins(mnemonic, (struct operand[4]) { op1 });
 }
 
 void asm_ins2(const char *mnemonic, struct operand op1, struct operand op2) {
-	if (assembler_flags.half_assemble &&
-		op1.type != OPERAND_IMM_LABEL &&
-		op2.type != OPERAND_IMM_LABEL &&
-		op1.type != OPERAND_IMM_LABEL_ABSOLUTE &&
-		op2.type != OPERAND_IMM_LABEL_ABSOLUTE) {
-		uint8_t output[15];
-		int len = 0;
-		struct operand ops[4] = { op2, op1 };
-		assemble_instruction(output, &len, mnemonic, ops);
-
-		asm_emit_no_newline("\t.byte ", len);
-		for (int i = 0; i < len; i++) {
-			asm_emit_no_newline("0x%.2x", output[i]);
-			if (i != len - 1)
-				asm_emit_no_newline(", ", output[i]);
-		}
-		asm_emit_no_newline("\n");
-	} else {
-		asm_emit_no_newline("\t%s ", mnemonic);
-
-		asm_emit_operand(op1);
-		asm_emit_no_newline(", ");
-		asm_emit_operand(op2);
-		asm_emit_no_newline("\n");
-	}
+	asm_ins(mnemonic, (struct operand[4]) { op2, op1 });
 }
