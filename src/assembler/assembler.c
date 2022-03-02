@@ -142,7 +142,7 @@ static void asm_emit_operand(struct operand op) {
 	}
 }
 
-void asm_ins(const char *mnemonic, struct operand ops[4]) {
+void asm_ins_impl(const char *mnemonic, struct operand ops[4]) {
 	int do_half_assemble = 0;
 	if (assembler_flags.half_assemble) {
 		do_half_assemble = 1;
@@ -156,9 +156,19 @@ void asm_ins(const char *mnemonic, struct operand ops[4]) {
 	}
 		
 	if (do_half_assemble) {
+		// Swap order of instructions.
+		struct operand swapped[4] = { 0 };
+		for (int i = 3, j = 0; i >= 0; i--) {
+			if (ops[i].type)
+				swapped[j++] = ops[i];
+		}
+
 		uint8_t output[15];
 		int len;
-		assemble_instruction(output, &len, mnemonic, ops);
+		assemble_instruction(output, &len, mnemonic, swapped);
+
+		if (len == -1)
+			ICE("Could not assemble %s", mnemonic);
 
 		asm_emit_no_newline("\t.byte ");
 		for (int i = 0; i < len; i++) {
@@ -168,14 +178,9 @@ void asm_ins(const char *mnemonic, struct operand ops[4]) {
 		}
 		asm_emit_no_newline("\n");
 	} else {
-		// We are mixing left to right and right to left
-		// operand ordering. Reverse when printing.
 		asm_emit_no_newline("\t%s ", mnemonic);
-		for (int i = 3; i >= 0; i--) {
-			if (!ops[i].type)
-				continue;
-
-			if (i != 3 && ops[i + 1].type)
+		for (int i = 0; i < 4 && ops[i].type; i++) {
+			if (i)
 				asm_emit_no_newline(", ");
 
 			asm_emit_operand(ops[i]);
@@ -184,14 +189,18 @@ void asm_ins(const char *mnemonic, struct operand ops[4]) {
 	}
 }
 
+void asm_ins(struct asm_instruction *ins) {
+	asm_ins_impl(ins->mnemonic, ins->ops);
+}
+
 void asm_ins0(const char *mnemonic) {
-	asm_ins(mnemonic, (struct operand[4]) { 0 });
+	asm_ins_impl(mnemonic, (struct operand[4]) { 0 });
 }
 
 void asm_ins1(const char *mnemonic, struct operand op1) {
-	asm_ins(mnemonic, (struct operand[4]) { op1 });
+	asm_ins_impl(mnemonic, (struct operand[4]) { op1 });
 }
 
 void asm_ins2(const char *mnemonic, struct operand op1, struct operand op2) {
-	asm_ins(mnemonic, (struct operand[4]) { op2, op1 });
+	asm_ins_impl(mnemonic, (struct operand[4]) { op1, op2 });
 }

@@ -67,17 +67,28 @@ struct operand {
 	};
 };
 
-#define IMM(X) (struct operand) { .type = OPERAND_IMM, .imm = (X) }
-#define IMML(LABEL_ID, X) (struct operand) { .type = OPERAND_IMM_LABEL, .imm_label = { (LABEL_ID), (X) } }
-#define IMML_ABS(LABEL_ID, X) (struct operand) { .type = OPERAND_IMM_LABEL_ABSOLUTE, .imm_label = { (LABEL_ID), (X) } }
-#define MEM(OFFSET, BASE) (struct operand) { .type = OPERAND_MEM, .mem = { (REG_NONE), BASE, 1, (OFFSET) } }
-#define R8S(REG) (struct operand) { .type = OPERAND_STAR_REG, .reg = { (REG), 0, 8 } }
-#define R8(REG) (struct operand) { .type = OPERAND_REG, .reg = { (REG), 0, 8 } }
-#define R4(REG) (struct operand) { .type = OPERAND_REG, .reg = { (REG), 0, 4 } }
-#define R2(REG) (struct operand) { .type = OPERAND_REG, .reg = { (REG), 0, 2 } }
-#define R1(REG) (struct operand) { .type = OPERAND_REG, .reg = { (REG), 0, 1 } }
-#define R1U(REG) (struct operand) { .type = OPERAND_REG, .reg = { (REG), 1, 1 } }
-#define XMM(IDX) (struct operand) { .type = OPERAND_SSE_REG, .sse_reg = (IDX) }
+#define IMM_(X) { .type = OPERAND_IMM, .imm = (X) }
+#define IMML_(LABEL_ID, X) { .type = OPERAND_IMM_LABEL, .imm_label = { (LABEL_ID), (X) } }
+#define IMML_ABS_(LABEL_ID, X) { .type = OPERAND_IMM_LABEL_ABSOLUTE, .imm_label = { (LABEL_ID), (X) } }
+#define MEM_(OFFSET, BASE) { .type = OPERAND_MEM, .mem = { (REG_NONE), BASE, 1, (OFFSET) } }
+#define R8S_(REG) { .type = OPERAND_STAR_REG, .reg = { (REG), 0, 8 } }
+#define R8_(REG) { .type = OPERAND_REG, .reg = { (REG), 0, 8 } }
+#define R4_(REG) { .type = OPERAND_REG, .reg = { (REG), 0, 4 } }
+#define R2_(REG) { .type = OPERAND_REG, .reg = { (REG), 0, 2 } }
+#define R1_(REG) { .type = OPERAND_REG, .reg = { (REG), 0, 1 } }
+#define R1U_(REG) { .type = OPERAND_REG, .reg = { (REG), 1, 1 } }
+#define XMM_(IDX) { .type = OPERAND_SSE_REG, .sse_reg = (IDX) }
+#define IMM(X) (struct operand) IMM_(X)
+#define IMML(LABEL_ID, X) (struct operand) IMML_(LABEL_ID, X)
+#define IMML_ABS(LABEL_ID, X) (struct operand) IMML_ABS_(LABEL_ID, X)
+#define MEM(OFFSET, BASE) (struct operand) MEM_(OFFSET, BASE)
+#define R8S(REG) (struct operand) R8S_(REG)
+#define R8(REG) (struct operand) R8_(REG)
+#define R4(REG) (struct operand) R4_(REG)
+#define R2(REG) (struct operand) R2_(REG)
+#define R1(REG) (struct operand) R1_(REG)
+#define R1U(REG) (struct operand) R1U_(REG)
+#define XMM(IDX) (struct operand) XMM_(IDX)
 
 void asm_init_text_out(const char *path);
 void asm_finish(void);
@@ -90,7 +101,12 @@ void asm_emit_no_newline(const char *fmt, ...);
 
 void asm_comment(const char *fmt, ...);
 
-void asm_ins(const char *mnemonic, struct operand ops[4]);
+struct asm_instruction {
+	const char *mnemonic;
+	struct operand ops[4];
+};
+
+void asm_ins(struct asm_instruction *ins);
 void asm_ins0(const char *mnemonic);
 void asm_ins1(const char *mnemonic, struct operand op1);
 void asm_ins2(const char *mnemonic, struct operand op1, struct operand op2);

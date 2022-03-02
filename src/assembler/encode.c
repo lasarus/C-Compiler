@@ -186,7 +186,7 @@ void assemble_encoding(uint8_t *output, int *len, struct encoding *encoding, str
 		struct operand_encoding *oe = encoding->operand_encoding + j;
 
 		if ((o->type == OPERAND_EMPTY) != (oe->type == OE_EMPTY))
-			ICE("Invalid number of arguments to instruction");
+			ICE("Invalid number of arguments to instruction %s", encoding->mnemonic);
 
 		if (o->type == OPERAND_REG &&
 			needs_rex(o->reg.reg, o->reg.upper_byte, o->reg.size))

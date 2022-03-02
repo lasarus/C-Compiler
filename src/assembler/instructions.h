@@ -96,6 +96,7 @@ struct encoding encodings[] = {
 	{"addq", 0x04, .operand_encoding = {{OE_NONE, 0}, {OE_IMM8, 0}}, .operand_accepts = {A_REG(4), A_IMM8_S}},
 	{"addq", 0x83, .rex = 1, .rexw = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_IMM8, 0}}, .operand_accepts = {A_REG(8), A_IMM8_S}},
 	{"addq", 0x81, .rexw = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_IMM32, 0}}, .operand_accepts = {A_REG(8), A_IMM32_S}},
+	{"addl", 0x01, .slash_r = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_MODRM_REG, 0}}, .operand_accepts = {A_REG(4), A_REG(4)}},
 	{"addq", 0x01, .rex = 1, .rexw = 1, .slash_r = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_MODRM_REG, 0}}, .operand_accepts = {A_REG(8), A_REG(8)}},
 	{"addq", 0x03, .rex = 1, .rexw = 1, .slash_r = 1, .operand_encoding = {{OE_MODRM_REG, 0}, {OE_MODRM_RM, 0}}, .operand_accepts = {A_REG(8), A_MODRM(8)}},
 
@@ -240,6 +241,22 @@ struct encoding encodings[] = {
 	{"subss", 0x0f, .op2 = 0x5c, .repe_prefix = 1, .slash_r = 1, .operand_encoding = {{OE_MODRM_REG, 0}, {OE_MODRM_RM, 0}}, .operand_accepts = {A_XMM, A_XMM_M32}},
 
 	{"subsd", 0x0f, .op2 = 0x5c, .repne_prefix = 1, .slash_r = 1, .operand_encoding = {{OE_MODRM_REG, 0}, {OE_MODRM_RM, 0}}, .operand_accepts = {A_XMM, A_XMM_M64}},
+
+	{"addss", 0x0f, .op2 = 0x58, .repe_prefix = 1, .slash_r = 1, .operand_encoding = {{OE_MODRM_REG, 0}, {OE_MODRM_RM, 0}}, .operand_accepts = {A_XMM, A_XMM_M32}},
+
+	{"addsd", 0x0f, .op2 = 0x58, .repne_prefix = 1, .slash_r = 1, .operand_encoding = {{OE_MODRM_REG, 0}, {OE_MODRM_RM, 0}}, .operand_accepts = {A_XMM, A_XMM_M64}},
+
+	{"mulss", 0x0f, .op2 = 0x59, .repe_prefix = 1, .slash_r = 1, .operand_encoding = {{OE_MODRM_REG, 0}, {OE_MODRM_RM, 0}}, .operand_accepts = {A_XMM, A_XMM_M32}},
+
+	{"mulsd", 0x0f, .op2 = 0x59, .repne_prefix = 1, .slash_r = 1, .operand_encoding = {{OE_MODRM_REG, 0}, {OE_MODRM_RM, 0}}, .operand_accepts = {A_XMM, A_XMM_M64}},
+
+	{"divss", 0x0f, .op2 = 0x5e, .repe_prefix = 1, .slash_r = 1, .operand_encoding = {{OE_MODRM_REG, 0}, {OE_MODRM_RM, 0}}, .operand_accepts = {A_XMM, A_XMM_M32}},
+
+	{"divsd", 0x0f, .op2 = 0x5e, .repne_prefix = 1, .slash_r = 1, .operand_encoding = {{OE_MODRM_REG, 0}, {OE_MODRM_RM, 0}}, .operand_accepts = {A_XMM, A_XMM_M64}},
+
+	{"ucomiss", 0x0f, .op2 = 0x2e, .slash_r = 1, .operand_encoding = {{OE_MODRM_REG, 0}, {OE_MODRM_RM, 0}}, .operand_accepts = {A_XMM, A_XMM_M32}},
+
+	{"ucomisd", 0x0f, .op2 = 0x2e, .slash_r = 1, .op_size_prefix = 1, .operand_encoding = {{OE_MODRM_REG, 0}, {OE_MODRM_RM, 0}}, .operand_accepts = {A_XMM, A_XMM_M64}},
 };
 
 #endif

@@ -39,7 +39,14 @@ void codegen_binary_operator(enum ir_binary_operator ibo,
 
 	assert(size == 4 || size == 8);
 
-	asm_emit("%s", binary_operator_outputs[size == 4 ? 0 : 1][ibo]);
+	struct asm_instruction *bin_op = binary_operator_output[size == 4 ? 0 : 1][ibo];
+	if (bin_op->mnemonic) {
+		for (int i = 0; i < 5 && bin_op[i].mnemonic; i++) {
+			asm_ins(bin_op + i);
+		}
+	} else {
+		ICE("Could not codegen operator! size: %d, ibo: %d", size, ibo);
+	}
 
 	reg_to_scalar(REG_RAX, res);
 }
