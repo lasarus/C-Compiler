@@ -28,6 +28,12 @@ void asm_finish(void) {
 }
 
 // Emit.
+static void emit_label(label_id id) {
+	char buffer[64];
+	rodata_get_label(id, sizeof buffer, buffer);
+	asm_emit_no_newline("%s", buffer);
+}
+
 void asm_section(const char *section) {
 	if (strcmp(section, current_section) != 0)
 		asm_emit(".section %s", section);
@@ -63,11 +69,11 @@ void asm_comment(const char *fmt, ...) {
 void asm_label(int global, label_id label) {
 	if (global) {
 		fprintf(out, ".global ");
-		rodata_emit_label(label);
+		emit_label(label);
 		fprintf(out, "\n");
 	}
 
-	rodata_emit_label(label);
+	emit_label(label);
 	fprintf(out, ":\n");
 }
 
@@ -116,19 +122,19 @@ static void asm_emit_operand(struct operand op) {
 	case OPERAND_IMM_LABEL:
 		if (op.imm_label.offset) {
 			asm_emit_no_newline("$");
-			rodata_emit_label(op.imm_label.label_);
+			emit_label(op.imm_label.label_);
 			asm_emit_no_newline("+%" PRIi64, op.imm_label.offset);
 		} else {
 			asm_emit_no_newline("$");
-			rodata_emit_label(op.imm_label.label_);
+			emit_label(op.imm_label.label_);
 		}
 		break;
 	case OPERAND_IMM_LABEL_ABSOLUTE:
 		if (op.imm_label.offset) {
-			rodata_emit_label(op.imm_label.label_);
+			emit_label(op.imm_label.label_);
 			asm_emit_no_newline("+%" PRIi64, op.imm_label.offset);
 		} else {
-			rodata_emit_label(op.imm_label.label_);
+			emit_label(op.imm_label.label_);
 		}
 		break;
 	case OPERAND_MEM:

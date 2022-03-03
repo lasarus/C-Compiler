@@ -9,7 +9,7 @@ label_id rodata_register(struct string_view str);
 label_id register_label_name(struct string_view str);
 label_id register_label(void);
 
-void rodata_emit_label(label_id id);
+void rodata_get_label(label_id id, int n, char buffer[]);
 
 void rodata_codegen(void);
 

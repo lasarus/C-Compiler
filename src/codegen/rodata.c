@@ -46,14 +46,20 @@ label_id rodata_register(struct string_view str) {
 	return label_register(ENTRY_STR, str);
 }
 
-void rodata_emit_label(label_id id) {
+void rodata_get_label(label_id id, int n, char buffer[]) {
+	int res;
 	if (id < 0) { // Temporary label.
-		asm_emit_no_newline(".L%d", -id);
+		res = snprintf(buffer, n, ".L%d", -id);
 	} else if (entries[id].type == ENTRY_STR) {
-		asm_emit_no_newline(".L_string%d", id);
+		res = snprintf(buffer, n, ".L_string%d", id);
 	} else if (entries[id].type == ENTRY_LABEL_NAME) {
-		asm_emit_no_newline("%.*s", entries[id].name.len, entries[id].name.str);
+		res = snprintf(buffer, n, "%.*s", entries[id].name.len, entries[id].name.str);
+	} else {
+		NOTIMP();
 	}
+
+	if (res >= n)
+		ICE("Label name too long");
 }
 
 void rodata_codegen(void) {
