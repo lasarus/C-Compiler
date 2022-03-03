@@ -399,13 +399,14 @@ static void sysv_emit_va_arg(var_id result, var_id va_list, struct type *type) {
 	enum parameter_class classes[4];
 	classify(type, &n_parts, classes);
 
-	static int va_arg_labels = 0;
 	int gp_offset_offset = builtin_va_list->fields[0].offset;
 	int reg_save_area_offset = builtin_va_list->fields[3].offset;
 	int overflow_arg_area_offset = builtin_va_list->fields[2].offset;
-	va_arg_labels++;
 	// 1. Determine whether type may be passed in the registers. If not go to step 7
 	scalar_to_reg(va_list, REG_RDI);
+
+	label_id stack_label = register_label(),
+		fetch_label = register_label();
 	if (classes[0] != CLASS_MEMORY) {
 		// 2. Compute num_gp to hold the number of general purpose registers needed
 		// to pass type and num_fp to hold the number of floating point registers needed.
@@ -427,7 +428,7 @@ static void sysv_emit_va_arg(var_id result, var_id va_list, struct type *type) {
 
 		asm_ins2("movl", MEM(gp_offset_offset, REG_RDI), R4(REG_RAX));
 		asm_ins2("cmpl", IMM(48 - 8 * num_gp), R4(REG_RAX));
-		asm_emit("ja .va_arg_stack%d", va_arg_labels);
+		asm_ins1("ja", IMML_ABS(stack_label, 0));
 
 		// 4. Fetch type from l->reg_save_area with an offset of l->gp_offset
 		// and/or l->fp_offset. This may require copying to a temporary loca-
@@ -443,11 +444,11 @@ static void sysv_emit_va_arg(var_id result, var_id va_list, struct type *type) {
 		asm_ins2("leal", MEM(num_gp * 8, REG_RAX), R4(REG_RDX));
 		asm_ins2("addq", MEM(reg_save_area_offset, REG_RDI), R8(REG_RAX));
 		asm_ins2("movl", R4(REG_RDX), MEM(gp_offset_offset, REG_RDI));
-		asm_emit("jmp .va_arg_fetch%d", va_arg_labels);
+		asm_ins1("jmp", IMML_ABS(fetch_label, 0));
 	}
 	// 7. Align l->overflow_arg_area upwards to a 16 byte boundary if align-
 	//ment needed by type exceeds 8 byte boundary. [This is ignored.]
-	asm_emit(".va_arg_stack%d:", va_arg_labels);
+	asm_label(0, stack_label);
 
 	// 8. Fetch type from l->overflow_arg_area.
 
@@ -460,7 +461,7 @@ static void sysv_emit_va_arg(var_id result, var_id va_list, struct type *type) {
 	asm_ins2("movq", R8(REG_RDX), MEM(overflow_arg_area_offset, REG_RDI));
 
 	// 11. Return the fetched type.
-	asm_emit(".va_arg_fetch%d:", va_arg_labels);
+	asm_label(0, fetch_label);
 
 	// Address is now in %%rax.
 	asm_ins2("movq", R8(REG_RAX), R8(REG_RDI));
