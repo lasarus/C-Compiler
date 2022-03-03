@@ -265,14 +265,9 @@ void codegen_initializer(struct type *type,
 	for (int i = 0; i < size; i++) {
 		if (is_label[i]) {
 			if (label_offsets[i] == 0) {
-				asm_emit_no_newline(".quad ");
-				rodata_emit_label(labels[i]);
-				asm_emit_no_newline("\n");
-
+				asm_quad(IMML_ABS(labels[i], 0));
 			} else {
-				asm_emit_no_newline(".quad ");
-				rodata_emit_label(labels[i]);
-				asm_emit_no_newline("+%lld\n", label_offsets[i]);
+				asm_quad(IMML_ABS(labels[i], label_offsets[i]));
 			}
 			i += 7;
 		} else {
@@ -282,10 +277,10 @@ void codegen_initializer(struct type *type,
 					break;
 			}
 			if (how_long == 8) {
-				asm_emit(".quad %" PRIu64, *(uint64_t *)(buffer + i));
+				asm_quad(IMM_ABS(*(uint64_t *)(buffer + i)));
 				i += how_long - 1;
 			} else {
-				asm_emit(".byte %d", (int)buffer[i]);
+				asm_byte(IMM_ABS(buffer[i]));
 			}
 		}
 	}
@@ -303,7 +298,7 @@ void codegen_static_var(struct static_var *static_var) {
 	if (static_var->init.type == INIT_EMPTY) {
 		asm_label(static_var->global, static_var->label_);
 
-		asm_emit(".zero %d", calculate_size(static_var->type));
+		asm_zero(calculate_size(static_var->type));
 	} else {
 		codegen_pre_initializer(&static_var->init);
 

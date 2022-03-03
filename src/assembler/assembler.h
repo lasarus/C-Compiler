@@ -37,6 +37,7 @@ struct operand {
 		OPERAND_SSE_REG, // SSE Register.
 		OPERAND_STAR_REG, // *Register. callq *%rax.
 		OPERAND_IMM, // Immediate.
+		OPERAND_IMM_ABSOLUTE,
 		OPERAND_IMM_LABEL, // Immediate of the form $label+offset.
 		OPERAND_IMM_LABEL_ABSOLUTE,
 		OPERAND_MEM // Memory.
@@ -70,6 +71,7 @@ struct operand {
 #define IMM_(X) { .type = OPERAND_IMM, .imm = (X) }
 #define IMML_(LABEL_ID, X) { .type = OPERAND_IMM_LABEL, .imm_label = { (LABEL_ID), (X) } }
 #define IMML_ABS_(LABEL_ID, X) { .type = OPERAND_IMM_LABEL_ABSOLUTE, .imm_label = { (LABEL_ID), (X) } }
+#define IMM_ABS_(X) { .type = OPERAND_IMM_ABSOLUTE, .imm = (X) }
 #define MEM_(OFFSET, BASE) { .type = OPERAND_MEM, .mem = { (REG_NONE), BASE, 1, (OFFSET) } }
 #define R8S_(REG) { .type = OPERAND_STAR_REG, .reg = { (REG), 0, 8 } }
 #define R8_(REG) { .type = OPERAND_REG, .reg = { (REG), 0, 8 } }
@@ -79,6 +81,7 @@ struct operand {
 #define R1U_(REG) { .type = OPERAND_REG, .reg = { (REG), 1, 1 } }
 #define XMM_(IDX) { .type = OPERAND_SSE_REG, .sse_reg = (IDX) }
 #define IMM(X) (struct operand) IMM_(X)
+#define IMM_ABS(X) (struct operand) IMM_ABS_(X)
 #define IMML(LABEL_ID, X) (struct operand) IMML_(LABEL_ID, X)
 #define IMML_ABS(LABEL_ID, X) (struct operand) IMML_ABS_(LABEL_ID, X)
 #define MEM(OFFSET, BASE) (struct operand) MEM_(OFFSET, BASE)
@@ -111,6 +114,10 @@ void asm_ins0(const char *mnemonic);
 void asm_ins1(const char *mnemonic, struct operand op1);
 void asm_ins2(const char *mnemonic, struct operand op1, struct operand op2);
 void asm_ins3(const char *mnemonic, struct operand op1, struct operand op2, struct operand op3);
+
+void asm_quad(struct operand op);
+void asm_byte(struct operand op);
+void asm_zero(int len);
 
 void asm_label(int global, label_id label);
 void asm_string(struct string_view str);

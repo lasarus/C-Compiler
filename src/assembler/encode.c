@@ -485,8 +485,9 @@ int does_match(struct operand *o, struct operand_accepts *oa) {
 		break;
 
 	case ACC_REL32:
-		/* if (o->type != OPERAND_IMM_ABSOLUTE) */
-		/* 	return 0; */
+		if (o->type != OPERAND_IMM_ABSOLUTE &&
+			o->type != OPERAND_IMM_LABEL_ABSOLUTE)
+			return 0;
 		break;
 
 	default:

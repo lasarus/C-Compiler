@@ -110,6 +110,9 @@ static void asm_emit_operand(struct operand op) {
 	case OPERAND_IMM:
 		asm_emit_no_newline("$%" PRIi64, op.imm);
 		break;
+	case OPERAND_IMM_ABSOLUTE:
+		asm_emit_no_newline("%" PRIi64, op.imm);
+		break;
 	case OPERAND_IMM_LABEL:
 		if (op.imm_label.offset) {
 			asm_emit_no_newline("$");
@@ -123,7 +126,7 @@ static void asm_emit_operand(struct operand op) {
 	case OPERAND_IMM_LABEL_ABSOLUTE:
 		if (op.imm_label.offset) {
 			rodata_emit_label(op.imm_label.label_);
-			asm_emit_no_newline("$+%" PRIi64, op.imm_label.offset);
+			asm_emit_no_newline("+%" PRIi64, op.imm_label.offset);
 		} else {
 			rodata_emit_label(op.imm_label.label_);
 		}
@@ -203,4 +206,20 @@ void asm_ins1(const char *mnemonic, struct operand op1) {
 
 void asm_ins2(const char *mnemonic, struct operand op1, struct operand op2) {
 	asm_ins_impl(mnemonic, (struct operand[4]) { op1, op2 });
+}
+
+void asm_quad(struct operand op) {
+	asm_emit_no_newline(".quad ");
+	asm_emit_operand(op);
+	asm_emit_no_newline("\n");
+}
+
+void asm_byte(struct operand op) {
+	asm_emit_no_newline(".byte ");
+	asm_emit_operand(op);
+	asm_emit_no_newline("\n");
+}
+
+void asm_zero(int len) {
+	asm_emit_no_newline(".zero %d\n", len);
 }
