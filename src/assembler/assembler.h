@@ -98,10 +98,6 @@ void asm_finish(void);
 
 // Emit.
 void asm_section(const char *section);
-void asm_emit(const char *fmt, ...);
-void asm_instruction(const char *fmt, ...);
-void asm_emit_no_newline(const char *fmt, ...);
-
 void asm_comment(const char *fmt, ...);
 
 struct asm_instruction {

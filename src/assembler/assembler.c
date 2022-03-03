@@ -28,6 +28,23 @@ void asm_finish(void) {
 }
 
 // Emit.
+static void asm_emit(const char *fmt, ...) {
+	va_list args;
+	va_start(args, fmt);
+	if (!str_contains(fmt, ':'))
+		fprintf(out, "\t");
+	vfprintf(out, fmt, args);
+	fprintf(out, "\n");
+	va_end(args);
+}
+
+static void asm_emit_no_newline(const char *fmt, ...) {
+	va_list args;
+	va_start(args, fmt);
+	vfprintf(out, fmt, args);
+	va_end(args);
+}
+
 static void emit_label(label_id id) {
 	char buffer[64];
 	rodata_get_label(id, sizeof buffer, buffer);
@@ -38,23 +55,6 @@ void asm_section(const char *section) {
 	if (strcmp(section, current_section) != 0)
 		asm_emit(".section %s", section);
 	current_section = section;
-}
-
-void asm_emit(const char *fmt, ...) {
-	va_list args;
-	va_start(args, fmt);
-	if (!str_contains(fmt, ':'))
-		fprintf(out, "\t");
-	vfprintf(out, fmt, args);
-	fprintf(out, "\n");
-	va_end(args);
-}
-
-void asm_emit_no_newline(const char *fmt, ...) {
-	va_list args;
-	va_start(args, fmt);
-	vfprintf(out, fmt, args);
-	va_end(args);
 }
 
 void asm_comment(const char *fmt, ...) {
