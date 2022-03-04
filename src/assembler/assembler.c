@@ -28,16 +28,6 @@ void asm_finish(void) {
 }
 
 // Emit.
-static void asm_emit(const char *fmt, ...) {
-	va_list args;
-	va_start(args, fmt);
-	if (!str_contains(fmt, ':'))
-		fprintf(out, "\t");
-	vfprintf(out, fmt, args);
-	fprintf(out, "\n");
-	va_end(args);
-}
-
 static void asm_emit_no_newline(const char *fmt, ...) {
 	va_list args;
 	va_start(args, fmt);
@@ -53,7 +43,7 @@ static void emit_label(label_id id) {
 
 void asm_section(const char *section) {
 	if (strcmp(section, current_section) != 0)
-		asm_emit(".section %s", section);
+		asm_emit_no_newline(".section %s\n", section);
 	current_section = section;
 }
 
