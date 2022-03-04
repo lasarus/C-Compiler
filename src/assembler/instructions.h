@@ -144,6 +144,9 @@ struct encoding encodings[] = {
 	{"cmpl", 0x83, .modrm_extension = 7, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_IMM8, 0}}, .operand_accepts = {A_REG(4), A_IMM8}},
 	{"cmpq", 0x83, .rex = 1, .rexw = 1, .modrm_extension = 7, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_IMM8, 0}}, .operand_accepts = {A_REG(8), A_IMM8}},
 
+	{"cmpl", 0x81, .modrm_extension = 7, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_IMM32, 0}}, .operand_accepts = {A_REG(4), A_IMM32}},
+	{"cmpq", 0x81, .rex = 1, .rexw = 1, .modrm_extension = 7, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_IMM32, 0}}, .operand_accepts = {A_REG(8), A_IMM32_S}},
+
 	{"movl", 0xb8, .modrm_extension = 0, .operand_encoding = {{OE_OPEXT, 0}, {OE_IMM32, 0}}, .operand_accepts = {A_REG(4), A_IMM32}},
 	{"movl", 0xc7, .modrm_extension = 0, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_IMM32, 0}}, .operand_accepts = {A_MODRM(4), A_IMM32}},
 	{"movl", 0xc7, .modrm_extension = 0, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_IMM32, 0}}, .operand_accepts = {A_MODRM(4), A_IMM32_S}},
