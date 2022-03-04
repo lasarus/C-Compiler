@@ -154,9 +154,12 @@ void encode_sib(struct operand *o, int *rex_b, int *rex_x, int *modrm_mod, int *
 	// disp32(%base, %scale, index)
 }
 
-void assemble_encoding(uint8_t *output, int *len, struct encoding *encoding, struct operand ops[4]) {
+void assemble_encoding(uint8_t *output, int *len, struct encoding *encoding, struct operand ops[4],
+					   struct relocation relocations[], int *n_relocations) {
+	*n_relocations = 0;
 	int has_imm8 = 0, has_imm16 = 0, has_imm32 = 0, has_imm64 = 0;
 	uint64_t imm = 0;
+	label_id imm_label = -1;
 
 	int has_rex = encoding->rexw || encoding->rex;
 	int rex_b = 0;
@@ -180,6 +183,7 @@ void assemble_encoding(uint8_t *output, int *len, struct encoding *encoding, str
 
 	int has_rel32 = 0;
 	uint32_t rel = 0;
+	label_id rel_label = -1;
 
 	for (int i = 0, j = 0; i < 4 && j < 4; i++, j++) {
 		struct operand *o = ops + i;
@@ -195,22 +199,42 @@ void assemble_encoding(uint8_t *output, int *len, struct encoding *encoding, str
 		switch (oe->type) {
 		case OE_IMM8:
 			has_imm8 = 1;
-			imm = o->imm;
+			if (o->type == OPERAND_IMM_LABEL) {
+				imm_label = o->imm_label.label_;
+				imm = o->imm_label.offset;
+			} else if (o->type == OPERAND_IMM) {
+				imm = o->imm;
+			}
 			break;
 
 		case OE_IMM16:
 			has_imm16 = 1;
-			imm = o->imm;
+			if (o->type == OPERAND_IMM_LABEL) {
+				imm_label = o->imm_label.label_;
+				imm = o->imm_label.offset;
+			} else if (o->type == OPERAND_IMM) {
+				imm = o->imm;
+			}
 			break;
 
 		case OE_IMM32:
 			has_imm32 = 1;
-			imm = o->imm;
+			if (o->type == OPERAND_IMM_LABEL) {
+				imm_label = o->imm_label.label_;
+				imm = o->imm_label.offset;
+			} else if (o->type == OPERAND_IMM) {
+				imm = o->imm;
+			}
 			break;
 
 		case OE_IMM64:
 			has_imm64 = 1;
-			imm = o->imm;
+			if (o->type == OPERAND_IMM_LABEL) {
+				imm_label = o->imm_label.label_;
+				imm = o->imm_label.offset;
+			} else if (o->type == OPERAND_IMM) {
+				imm = o->imm;
+			}
 			break;
 
 		case OE_MODRM_RM:
@@ -276,7 +300,12 @@ void assemble_encoding(uint8_t *output, int *len, struct encoding *encoding, str
 
 		case OE_REL32:
 			has_rel32 = 1;
-			rel = o->imm;
+			if (o->type == OPERAND_IMM_LABEL) {
+				imm_label = o->imm_label.label_;
+				imm = o->imm_label.offset;
+			} else if (o->type == OPERAND_IMM) {
+				imm = o->imm;
+			}
 			break;
 
 		default:
@@ -348,19 +377,60 @@ void assemble_encoding(uint8_t *output, int *len, struct encoding *encoding, str
 		WRITE_8(sib_byte);
 	}
 
+	if (rel_label != -1) {
+		NOTIMP();
+	}
+
 	if (has_disp8)
 		WRITE_8(disp);
 	else if (has_disp32)
 		WRITE_32(disp);
 
-	if (has_imm8)
+	if (has_imm8) {
+		if (imm_label != -1) {
+			relocations[(*n_relocations)++] = (struct relocation) {
+				.offset = idx,
+				.imm = imm,
+				.size = 1,
+				.label = imm_label
+			};
+		}
+
 		WRITE_8(imm);
-	else if (has_imm16)
+	} else if (has_imm16) {
+		if (imm_label != -1) {
+			relocations[(*n_relocations)++] = (struct relocation) {
+				.offset = idx,
+				.imm = imm,
+				.size = 2,
+				.label = imm_label
+			};
+		}
+
 		WRITE_16(imm);
-	else if (has_imm32)
+	} else if (has_imm32) {
+		if (imm_label != -1) {
+			relocations[(*n_relocations)++] = (struct relocation) {
+				.offset = idx,
+				.imm = imm,
+				.size = 4,
+				.label = imm_label
+			};
+		}
+
 		WRITE_32(imm);
-	else if (has_imm64)
+	} else if (has_imm64) {
+		if (imm_label != -1) {
+			relocations[(*n_relocations)++] = (struct relocation) {
+				.offset = idx,
+				.imm = imm,
+				.size = 8,
+				.label = imm_label
+			};
+		}
+
 		WRITE_64(imm);
+	}
 
 	if (has_rel32)
 		WRITE_32(rel);
@@ -414,7 +484,7 @@ int does_match(struct operand *o, struct operand_accepts *oa) {
 
 	case ACC_IMM8_S: {
 		long s = o->imm;
-		if (o->type != OPERAND_IMM)
+		if (o->type != OPERAND_IMM && o->type != OPERAND_IMM_LABEL)
 			return 0;
 		if (s < INT8_MIN || s > INT8_MAX)
 			return 0;
@@ -422,7 +492,7 @@ int does_match(struct operand *o, struct operand_accepts *oa) {
 
 	case ACC_IMM8_U: {
 		long s = o->imm;
-		if (o->type != OPERAND_IMM)
+		if (o->type != OPERAND_IMM && o->type != OPERAND_IMM_LABEL)
 			return 0;
 		if (s > UINT8_MAX)
 			return 0;
@@ -430,7 +500,7 @@ int does_match(struct operand *o, struct operand_accepts *oa) {
 
 	case ACC_IMM16_S: {
 		long s = o->imm;
-		if (o->type != OPERAND_IMM)
+		if (o->type != OPERAND_IMM && o->type != OPERAND_IMM_LABEL)
 			return 0;
 		if (s < INT16_MIN || s > INT16_MAX)
 			return 0;
@@ -438,7 +508,7 @@ int does_match(struct operand *o, struct operand_accepts *oa) {
 
 	case ACC_IMM16_U: {
 		long s = o->imm;
-		if (o->type != OPERAND_IMM)
+		if (o->type != OPERAND_IMM && o->type != OPERAND_IMM_LABEL)
 			return 0;
 		if (s > UINT16_MAX)
 			return 0;
@@ -446,14 +516,14 @@ int does_match(struct operand *o, struct operand_accepts *oa) {
 
 	case ACC_IMM32_S: {
 		long s = o->imm;
-		if (o->type != OPERAND_IMM)
+		if (o->type != OPERAND_IMM && o->type != OPERAND_IMM_LABEL)
 			return 0;
 		if (s < INT32_MIN || s > INT32_MAX)
 			return 0;
 	} break;
 
 	case ACC_IMM32_U: {
-		if (o->type != OPERAND_IMM)
+		if (o->type != OPERAND_IMM && o->type != OPERAND_IMM_LABEL)
 			return 0;
 		if (o->imm > UINT32_MAX)
 			return 0;
@@ -480,7 +550,7 @@ int does_match(struct operand *o, struct operand_accepts *oa) {
 		break;
 
 	case ACC_IMM64:
-		if (o->type != OPERAND_IMM)
+		if (o->type != OPERAND_IMM && o->type != OPERAND_IMM_LABEL)
 			return 0;
 		break;
 
@@ -497,9 +567,11 @@ int does_match(struct operand *o, struct operand_accepts *oa) {
 	return 1;
 }
 
-void assemble_instruction(uint8_t *output, int *len, const char *mnemonic, struct operand ops[4]) {
+void assemble_instruction(uint8_t *output, int *len, const char *mnemonic, struct operand ops[4],
+						  struct relocation relocations[], int *n_relocations) {
 	int best_len = 16;
 	uint8_t best_output[15] = { 0 };
+
 	// TODO: Just order the instructions in such a way that we can just take the first one that appears.
 	for (unsigned i = 0; i < sizeof encodings / sizeof *encodings; i++) {
 		struct encoding *encoding = encodings + i;
@@ -507,7 +579,6 @@ void assemble_instruction(uint8_t *output, int *len, const char *mnemonic, struc
 		if (strcmp(encoding->mnemonic, mnemonic) != 0)
 			continue;
 
-		(void)encoding;
 		int matches = 1;
 		for (int j = 0; j < 4; j++) {
 			struct operand *o = ops + j;
@@ -521,13 +592,23 @@ void assemble_instruction(uint8_t *output, int *len, const char *mnemonic, struc
 		if (!matches)
 			continue;
 
+		struct relocation current_relocations[4];
+		int current_n_relocations;
+
 		uint8_t current_output[15];
 		int current_len;
-		assemble_encoding(current_output, &current_len, encoding, ops);
+		assemble_encoding(current_output, &current_len, encoding, ops,
+						  current_relocations, &current_n_relocations);
 
 		if (current_len < best_len) {
 			memcpy(best_output, current_output, sizeof (best_output));
 			best_len = current_len;
+
+			for (int i = 0; i < current_n_relocations; i++) {
+				relocations[i] = current_relocations[i];
+			}
+
+			*n_relocations = current_n_relocations;
 		}
 	}
 

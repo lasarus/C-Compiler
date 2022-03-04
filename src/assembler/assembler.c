@@ -156,8 +156,7 @@ void asm_ins_impl(const char *mnemonic, struct operand ops[4]) {
 	if (assembler_flags.half_assemble) {
 		do_half_assemble = 1;
 		for (int i = 0; i < 4; i++) {
-			if (ops[i].type == OPERAND_IMM_LABEL ||
-				ops[i].type == OPERAND_IMM_LABEL_ABSOLUTE) {
+			if (ops[i].type == OPERAND_IMM_LABEL_ABSOLUTE) {
 				do_half_assemble = 0;
 				break;
 			}
@@ -172,18 +171,71 @@ void asm_ins_impl(const char *mnemonic, struct operand ops[4]) {
 				swapped[j++] = ops[i];
 		}
 
+		struct relocation relocations[4];
+		int n_relocations = 0;
 		uint8_t output[15];
 		int len;
-		assemble_instruction(output, &len, mnemonic, swapped);
+		assemble_instruction(output, &len, mnemonic, swapped,
+							 relocations, &n_relocations);
 
-		if (len == -1)
-			ICE("Could not assemble %s", mnemonic);
+		if (len == -1) {
+			ICE("Could not assemble %s %d %lu %d", mnemonic, ops[0].type, ops[0].imm, ops[1].type);
+		}
 
-		asm_emit_no_newline("\t.byte ");
+		if (n_relocations) {
+			asm_emit_no_newline("# Relocation under way on: ");
+			asm_emit_no_newline(" %s ", mnemonic);
+			for (int i = 0; i < 4 && ops[i].type; i++) {
+				if (i)
+					asm_emit_no_newline(", ");
+
+				asm_emit_operand(ops[i]);
+			}
+			asm_emit_no_newline("\n");
+		}
+
+		int next_relocation_idx = 0;
+
+		int first = 1;
 		for (int i = 0; i < len; i++) {
-			asm_emit_no_newline("0x%.2x", output[i]);
-			if (i != len - 1)
+			if (next_relocation_idx < n_relocations &&
+				relocations[next_relocation_idx].offset == i) {
+				struct relocation *rel = relocations + next_relocation_idx++;
+
+				switch (rel->size) {
+				case 8:
+					asm_emit_no_newline("\n", output[i]);
+					asm_emit_no_newline(".quad ");
+					emit_label(rel->label);
+					asm_emit_no_newline("+%" PRIi64, rel->imm);
+					break;
+
+				case 4:
+					asm_emit_no_newline("\n", output[i]);
+					asm_emit_no_newline(".long ");
+					emit_label(rel->label);
+					asm_emit_no_newline("+%" PRIi64, rel->imm);
+					break;
+
+				default:
+					printf("%d %s\n", rel->size, mnemonic);
+					NOTIMP();
+				}
+
+				i += rel->size - 1;
+
+				first = 1;
+				continue;
+			}
+
+			if (first) {
+				asm_emit_no_newline("\t.byte ");
+				first = 0;
+			} else {
 				asm_emit_no_newline(", ", output[i]);
+			}
+
+			asm_emit_no_newline("0x%.2x", output[i]);
 		}
 		asm_emit_no_newline("\n");
 	} else {

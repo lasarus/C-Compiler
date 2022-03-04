@@ -4,7 +4,19 @@
 #include <common.h>
 #include "assembler.h"
 
-void assemble_instruction(uint8_t *output, int *len, const char *mnemonic,
-						  struct operand ops[4]);
+struct relocation {
+	enum {
+		REL_INS,
+	} type;
+
+	int offset;
+	int size;
+
+	label_id label;
+	uint64_t imm;
+};
+
+void assemble_instruction(uint8_t *output, int *len, const char *mnemonic, struct operand ops[4],
+						  struct relocation relocations[], int *n_relocations);
 
 #endif

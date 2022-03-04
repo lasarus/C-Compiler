@@ -78,7 +78,7 @@ label_id register_label_name(struct string_view str) {
 }
 
 label_id register_label(void) {
-	static int tmp_label_idx = -1;
+	static int tmp_label_idx = -2; // -1 is left for null label.
 	return tmp_label_idx--;
 }
 
