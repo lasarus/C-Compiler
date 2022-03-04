@@ -136,7 +136,12 @@ struct encoding encodings[] = {
 	{ "ud2", .opcode = 0x0f, .op2 = 0x0b },
 	
 	{"jmp", 0xe9, .operand_encoding = {{OE_REL32, 0}}, .operand_accepts = {A_REL32}},
+	{"jnae", 0x0f, .op2 = 0x82, .operand_encoding = {{OE_REL32, 0}}, .operand_accepts = {A_REL32}},
+	{"jnb", 0x0f, .op2 = 0x83, .operand_encoding = {{OE_REL32, 0}}, .operand_accepts = {A_REL32}},
 	{"je", 0x0f, .op2 = 0x84, .operand_encoding = {{OE_REL32, 0}}, .operand_accepts = {A_REL32}},
+	{"jne", 0x0f, .op2 = 0x85, .operand_encoding = {{OE_REL32, 0}}, .operand_accepts = {A_REL32}},
+	{"jna", 0x0f, .op2 = 0x86, .operand_encoding = {{OE_REL32, 0}}, .operand_accepts = {A_REL32}},
+	{"ja", 0x0f, .op2 = 0x87, .operand_encoding = {{OE_REL32, 0}}, .operand_accepts = {A_REL32}},
 
 	{"cmpl", 0x39, .slash_r = 1, .operand_encoding = MR, .operand_accepts = {A_REG(4), A_REG(4)}},
 	{"cmpq", 0x39, .rex = 1, .rexw = 1, .slash_r = 1, .operand_encoding = MR, .operand_accepts = {A_MODRM(8), A_REG(8)}},

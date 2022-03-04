@@ -300,11 +300,11 @@ void assemble_encoding(uint8_t *output, int *len, struct encoding *encoding, str
 
 		case OE_REL32:
 			has_rel32 = 1;
-			if (o->type == OPERAND_IMM_LABEL) {
-				imm_label = o->imm_label.label_;
-				imm = o->imm_label.offset;
-			} else if (o->type == OPERAND_IMM) {
-				imm = o->imm;
+			if (o->type == OPERAND_IMM_LABEL_ABSOLUTE) {
+				rel_label = o->imm_label.label_;
+				rel = o->imm_label.offset;
+			} else if (o->type == OPERAND_IMM_ABSOLUTE) {
+				rel = o->imm;
 			}
 			break;
 
@@ -377,10 +377,6 @@ void assemble_encoding(uint8_t *output, int *len, struct encoding *encoding, str
 		WRITE_8(sib_byte);
 	}
 
-	if (rel_label != -1) {
-		NOTIMP();
-	}
-
 	if (has_disp8)
 		WRITE_8(disp);
 	else if (has_disp32)
@@ -432,8 +428,19 @@ void assemble_encoding(uint8_t *output, int *len, struct encoding *encoding, str
 		WRITE_64(imm);
 	}
 
-	if (has_rel32)
+	if (has_rel32) {
+		if (rel_label != -1) {
+			relocations[(*n_relocations)++] = (struct relocation) {
+				.offset = idx,
+				.imm = rel,
+				.size = 4,
+				.label = rel_label,
+				.relative = 1
+			};
+		}
+
 		WRITE_32(rel);
+	}
 
 	*len = idx;
 }

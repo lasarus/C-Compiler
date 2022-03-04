@@ -12,6 +12,8 @@ struct relocation {
 	int offset;
 	int size;
 
+	int relative;
+
 	label_id label;
 	uint64_t imm;
 };

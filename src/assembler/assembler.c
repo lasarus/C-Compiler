@@ -142,18 +142,7 @@ static void asm_emit_operand(struct operand op) {
 }
 
 void asm_ins_impl(const char *mnemonic, struct operand ops[4]) {
-	int do_half_assemble = 0;
 	if (assembler_flags.half_assemble) {
-		do_half_assemble = 1;
-		for (int i = 0; i < 4; i++) {
-			if (ops[i].type == OPERAND_IMM_LABEL_ABSOLUTE) {
-				do_half_assemble = 0;
-				break;
-			}
-		}
-	}
-		
-	if (do_half_assemble) {
 		// Swap order of instructions.
 		struct operand swapped[4] = { 0 };
 		for (int i = 3, j = 0; i >= 0; i--) {
@@ -168,21 +157,8 @@ void asm_ins_impl(const char *mnemonic, struct operand ops[4]) {
 		assemble_instruction(output, &len, mnemonic, swapped,
 							 relocations, &n_relocations);
 
-		if (len == -1) {
-			ICE("Could not assemble %s %d %lu %d", mnemonic, ops[0].type, ops[0].imm, ops[1].type);
-		}
-
-		if (n_relocations) {
-			asm_emit_no_newline("# Relocation under way on: ");
-			asm_emit_no_newline(" %s ", mnemonic);
-			for (int i = 0; i < 4 && ops[i].type; i++) {
-				if (i)
-					asm_emit_no_newline(", ");
-
-				asm_emit_operand(ops[i]);
-			}
-			asm_emit_no_newline("\n");
-		}
+		if (len == -1)
+			ICE("Could not assemble %s %d %d %d %d", mnemonic, ops[0].type, ops[1].type, ops[2].type, ops[3].type);
 
 		int next_relocation_idx = 0;
 
@@ -194,17 +170,28 @@ void asm_ins_impl(const char *mnemonic, struct operand ops[4]) {
 
 				switch (rel->size) {
 				case 8:
-					asm_emit_no_newline("\n", output[i]);
-					asm_emit_no_newline(".quad ");
-					emit_label(rel->label);
-					asm_emit_no_newline("+%" PRIi64, rel->imm);
+					if (rel->relative) {
+						NOTIMP();
+					} else {
+						asm_emit_no_newline("\n", output[i]);
+						asm_emit_no_newline(".quad ");
+						emit_label(rel->label);
+						asm_emit_no_newline("+%" PRIi64, rel->imm);
+					}
 					break;
 
 				case 4:
-					asm_emit_no_newline("\n", output[i]);
-					asm_emit_no_newline(".long ");
-					emit_label(rel->label);
-					asm_emit_no_newline("+%" PRIi64, rel->imm);
+					if (rel->relative) {
+						asm_emit_no_newline("\n", output[i]);
+						asm_emit_no_newline(".long (");
+						emit_label(rel->label);
+						asm_emit_no_newline("- .)+%" PRIi64, rel->imm + -4);
+					} else {
+						asm_emit_no_newline("\n", output[i]);
+						asm_emit_no_newline(".long ");
+						emit_label(rel->label);
+						asm_emit_no_newline("+%" PRIi64, rel->imm);
+					}
 					break;
 
 				default:
