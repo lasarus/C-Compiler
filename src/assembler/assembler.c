@@ -1,5 +1,6 @@
 #include "assembler.h"
 #include "encode.h"
+#include "elf.h"
 
 #include <common.h>
 #include <inttypes.h>
@@ -7,28 +8,44 @@
 
 #include <stdarg.h>
 
+// TODO: Handle short jumps differently.
+// Right now all jumps are treated as 32 bit offsets.
+
 struct assembler_flags assembler_flags = {
-	.half_assemble = 0
+	.half_assemble = 0, .elf = 0
 };
 
 static FILE *out;
 static const char *current_section;
+const char *out_path = NULL;
 
 void asm_init_text_out(const char *path) {
 	current_section = ".text";
 
-	out = fopen(path, "w");
+	if (assembler_flags.elf) {
+		elf_init();
+		out_path = path;
+	} else {
+		out = fopen(path, "w");
 
-	if (!out)
-		ICE("Could not open file %s", path);
+		if (!out)
+			ICE("Could not open file %s", path);
+	}
 }
 
 void asm_finish(void) {
-	fclose(out);
+	if (assembler_flags.elf) {
+		elf_finish(out_path);
+	} else {
+		fclose(out);
+	}
 }
 
 // Emit.
 static void asm_emit_no_newline(const char *fmt, ...) {
+	if (assembler_flags.elf)
+		ICE("Can't emit assembly when writing elf files.");
+
 	va_list args;
 	va_start(args, fmt);
 	vfprintf(out, fmt, args);
@@ -42,12 +59,19 @@ static void emit_label(label_id id) {
 }
 
 void asm_section(const char *section) {
-	if (strcmp(section, current_section) != 0)
-		asm_emit_no_newline(".section %s\n", section);
-	current_section = section;
+	if (assembler_flags.elf) {
+		elf_set_section(section);
+	} else {
+		if (strcmp(section, current_section) != 0)
+			asm_emit_no_newline(".section %s\n", section);
+		current_section = section;
+	}
 }
 
 void asm_comment(const char *fmt, ...) {
+	if (assembler_flags.elf)
+		return;
+
 	va_list args;
 	va_start(args, fmt);
 	fprintf(out, "\t#");
@@ -57,25 +81,31 @@ void asm_comment(const char *fmt, ...) {
 }
 
 void asm_label(int global, label_id label) {
-	if (global) {
-		fprintf(out, ".global ");
-		emit_label(label);
-		fprintf(out, "\n");
-	}
+	if (assembler_flags.elf) {
+		elf_symbol_set(label, global);
+	} else {
+		if (global) {
+			fprintf(out, ".global ");
+			emit_label(label);
+			fprintf(out, "\n");
+		}
 
-	emit_label(label);
-	fprintf(out, ":\n");
+		emit_label(label);
+		fprintf(out, ":\n");
+	}
 }
 
 void asm_string(struct string_view str) {
-	if (assembler_flags.half_assemble) {
+	if (assembler_flags.elf) {
+		elf_write((uint8_t *)str.str, str.len);
+		elf_write_byte(0);
+	} else if (assembler_flags.half_assemble) {
 		asm_emit_no_newline("\t.byte ");
 		for (int i = 0; i < str.len; i++) {
 			asm_emit_no_newline("0x%.2x", (uint8_t)str.str[i]);
-			if (i != str.len - 1)
-				asm_emit_no_newline(", ");
+			asm_emit_no_newline(", ");
 		}
-		asm_emit_no_newline("\n");
+		asm_emit_no_newline("0x0\n");
 	} else {
 		asm_emit_no_newline("\t.string \"");
 		for (int i = 0; i < str.len; i++) {
@@ -142,7 +172,7 @@ static void asm_emit_operand(struct operand op) {
 }
 
 void asm_ins_impl(const char *mnemonic, struct operand ops[4]) {
-	if (assembler_flags.half_assemble) {
+	if (assembler_flags.half_assemble || assembler_flags.elf) {
 		// Swap order of instructions.
 		struct operand swapped[4] = { 0 };
 		for (int i = 3, j = 0; i >= 0; i--) {
@@ -162,59 +192,85 @@ void asm_ins_impl(const char *mnemonic, struct operand ops[4]) {
 
 		int next_relocation_idx = 0;
 
-		int first = 1;
-		for (int i = 0; i < len; i++) {
-			if (next_relocation_idx < n_relocations &&
-				relocations[next_relocation_idx].offset == i) {
-				struct relocation *rel = relocations + next_relocation_idx++;
+		if (assembler_flags.elf) {
+			for (int i = 0; i < n_relocations; i++) {
+				struct relocation *rel = relocations + i;
 
 				switch (rel->size) {
 				case 8:
-					if (rel->relative) {
+					if (rel->relative)
 						NOTIMP();
-					} else {
-						asm_emit_no_newline("\n", output[i]);
-						asm_emit_no_newline(".quad ");
-						emit_label(rel->label);
-						asm_emit_no_newline("+%" PRIi64, rel->imm);
-					}
+					elf_symbol_relocate(rel->label, rel->offset, rel->imm, R_X86_64_64);
 					break;
 
 				case 4:
-					if (rel->relative) {
-						asm_emit_no_newline("\n", output[i]);
-						asm_emit_no_newline(".long (");
-						emit_label(rel->label);
-						asm_emit_no_newline("- .)+%" PRIi64, rel->imm + -4);
-					} else {
-						asm_emit_no_newline("\n", output[i]);
-						asm_emit_no_newline(".long ");
-						emit_label(rel->label);
-						asm_emit_no_newline("+%" PRIi64, rel->imm);
-					}
+					if (rel->relative)
+						elf_symbol_relocate(rel->label, rel->offset, -(len - rel->offset), R_X86_64_PC32);
+					else
+						elf_symbol_relocate(rel->label, rel->offset, rel->imm, R_X86_64_32S);
 					break;
 
 				default:
 					printf("%d %s\n", rel->size, mnemonic);
 					NOTIMP();
 				}
-
-				i += rel->size - 1;
-
-				first = 1;
-				continue;
 			}
+			elf_write(output, len);
+		} else if (assembler_flags.half_assemble) {
+			int first = 1;
+			for (int i = 0; i < len; i++) {
+				if (next_relocation_idx < n_relocations &&
+					relocations[next_relocation_idx].offset == i) {
+					struct relocation *rel = relocations + next_relocation_idx++;
 
-			if (first) {
-				asm_emit_no_newline("\t.byte ");
-				first = 0;
-			} else {
-				asm_emit_no_newline(", ", output[i]);
+					switch (rel->size) {
+					case 8:
+						if (rel->relative) {
+							NOTIMP();
+						} else {
+							asm_emit_no_newline("\n", output[i]);
+							asm_emit_no_newline(".quad ");
+							emit_label(rel->label);
+							asm_emit_no_newline("+%" PRIi64, rel->imm);
+						}
+						break;
+
+					case 4:
+						if (rel->relative) {
+							asm_emit_no_newline("\n", output[i]);
+							asm_emit_no_newline(".long (");
+							emit_label(rel->label);
+							asm_emit_no_newline("- .)+%" PRIi64, rel->imm + -4);
+						} else {
+							asm_emit_no_newline("\n", output[i]);
+							asm_emit_no_newline(".long ");
+							emit_label(rel->label);
+							asm_emit_no_newline("+%" PRIi64, rel->imm);
+						}
+						break;
+
+					default:
+						printf("%d %s\n", rel->size, mnemonic);
+						NOTIMP();
+					}
+
+					i += rel->size - 1;
+
+					first = 1;
+					continue;
+				}
+
+				if (first) {
+					asm_emit_no_newline("\t.byte ");
+					first = 0;
+				} else {
+					asm_emit_no_newline(", ", output[i]);
+				}
+
+				asm_emit_no_newline("0x%.2x", output[i]);
 			}
-
-			asm_emit_no_newline("0x%.2x", output[i]);
+			asm_emit_no_newline("\n");
 		}
-		asm_emit_no_newline("\n");
 	} else {
 		asm_emit_no_newline("\t%s ", mnemonic);
 		for (int i = 0; i < 4 && ops[i].type; i++) {
@@ -244,17 +300,53 @@ void asm_ins2(const char *mnemonic, struct operand op1, struct operand op2) {
 }
 
 void asm_quad(struct operand op) {
-	asm_emit_no_newline(".quad ");
-	asm_emit_operand(op);
-	asm_emit_no_newline("\n");
+	if (assembler_flags.elf) {
+		switch (op.type) {
+		case OPERAND_IMM:
+			NOTIMP();
+			break;
+		case OPERAND_IMM_LABEL:
+			NOTIMP();
+			break;
+
+		case OPERAND_IMM_ABSOLUTE:
+			elf_write_quad(op.imm);
+			break;
+
+		case OPERAND_IMM_LABEL_ABSOLUTE:
+			elf_symbol_relocate(op.imm_label.label_, 0, op.imm_label.offset, R_X86_64_64);
+			elf_write_quad(0);
+			break;
+
+		default: NOTIMP();
+		}
+	} else {
+		asm_emit_no_newline(".quad ");
+		asm_emit_operand(op);
+		asm_emit_no_newline("\n");
+	}
 }
 
 void asm_byte(struct operand op) {
-	asm_emit_no_newline(".byte ");
-	asm_emit_operand(op);
-	asm_emit_no_newline("\n");
+	if (assembler_flags.elf) {
+		switch (op.type) {
+		case OPERAND_IMM_ABSOLUTE:
+			elf_write_byte(op.imm);
+			break;
+
+		default: NOTIMP();
+		}
+	} else {
+		asm_emit_no_newline(".byte ");
+		asm_emit_operand(op);
+		asm_emit_no_newline("\n");
+	}
 }
 
 void asm_zero(int len) {
-	asm_emit_no_newline(".zero %d\n", len);
+	if (assembler_flags.elf) {
+		elf_write_zero(len);
+	} else {
+		asm_emit_no_newline(".zero %d\n", len);
+	}
 }

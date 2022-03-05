@@ -71,6 +71,8 @@ struct arguments parse_arguments(int argc, char **argv) {
 				   argv[i][1] == 'd') {
 			if (strcmp(argv[i] + 2, "half-assemble") == 0) {
 				assembler_flags.half_assemble = 1;
+			} else if (strcmp(argv[i] + 2, "elf") == 0) {
+				assembler_flags.elf = 1;
 			}
 		} else {
 			switch (state) {

@@ -24,12 +24,11 @@ static struct entry *entries = NULL;
 static int entries_size = 0, entries_cap = 0;
 
 label_id label_register(enum entry_type type, struct string_view str) {
-	if (type == ENTRY_STR) {
-			for (int i = 0; i < entries_size; i++) {
-				if (sv_cmp(entries[i].name, str)) {
-					return entries[i].id;
-				}
-			}
+	for (int i = 0; i < entries_size; i++) {
+		if (sv_cmp(entries[i].name, str) &&
+			entries[i].type == type) {
+			return entries[i].id;
+		}
 	}
 
 	int id = entries_size;
