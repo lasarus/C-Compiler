@@ -44,6 +44,7 @@ static struct token next_from_stack() {
 	if (current_file->token_idx == current_file->tokens.size) {
 		if (current_file->parent) {
 			input_free(current_file->input);
+			token_list_free(&current_file->tokens);
 			current_file = current_file->parent;
 			return next_from_stack();
 		}
