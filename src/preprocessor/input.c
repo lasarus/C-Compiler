@@ -130,14 +130,14 @@ FILE *try_open_local_path(struct input *input, const char *path, char *path_buff
 	return try_open_file(path_buffer);
 }
 
-void input_open(struct input **input, const char *path, int system) {
+struct input *input_open(struct input *parent_input, const char *path, int system) {
 	FILE *fp = NULL;
 
 	char path_buffer[BUFFER_SIZE]; // TODO: Remove arbitrary limit.
 
-	if (*input) {
+	if (parent_input) {
 		if (!system)
-			fp = try_open_local_path(*input, path, path_buffer);
+			fp = try_open_local_path(parent_input, path, path_buffer);
 
 		for (unsigned i = 0; !fp && i < paths_size; i++) {
 			assert(snprintf(path_buffer, BUFFER_SIZE, "%s/%s", paths[i], path) < BUFFER_SIZE);
@@ -145,36 +145,34 @@ void input_open(struct input **input, const char *path, int system) {
 		}
 
 		if (!fp && system)
-			fp = try_open_local_path(*input, path, path_buffer);
+			fp = try_open_local_path(parent_input, path, path_buffer);
 	} else {
 		assert(snprintf(path_buffer, BUFFER_SIZE, "%s", path) < BUFFER_SIZE);
 		fp = try_open_file(path_buffer);
 	}
 
 	if (!fp) {
-		ICE("\"%s\" not found in search path, with origin %s", path, *input ? (*input)->filename : (const char *)".");
+		ICE("\"%s\" not found in search path, with origin %s", path, parent_input ? parent_input->filename : (const char *)".");
 	}
 
 	if (string_set_contains(disabled_headers, sv_from_str(path_buffer))) {
 		fclose(fp);
-		return;
+		return NULL;
 	}
 
-	struct input *n_top = malloc(sizeof *n_top);
-	*n_top = input_create(strdup(path_buffer), fp);
-	n_top->next = *input;
-	*input = n_top;
+	struct input *input = malloc(sizeof *input);
+	*input = input_create(strdup(path_buffer), fp);
 
 	fclose(fp);
+
+	return input;
 }
 
-void input_close(struct input **input) {
-	struct input *prev = *input;
-	*input = prev->next;
-	free(prev->contents);
-	free(prev);
+void input_disable_path(const char *path) {
+	string_set_insert(&disabled_headers, strdup(path));
 }
 
-void input_disable_path(const char *filename) {
-	string_set_insert(&disabled_headers, strdup(filename));
+void input_free(struct input *input) {
+	free(input->contents);
+	free(input);
 }

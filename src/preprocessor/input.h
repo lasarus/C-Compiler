@@ -17,7 +17,6 @@ struct input {
 
 	size_t c_ptr, contents_size, contents_cap;
 	char *contents;
-	struct input *next;
 
 	struct position pos[N_BUFF];
 	char c[N_BUFF];
@@ -28,10 +27,11 @@ struct input {
 void input_next(struct input *input);
 
 void input_add_include_path(const char *path);
-void input_open(struct input **input, const char *path, int system);
-void input_close(struct input **input);
-void input_disable_path(const char *filename);
+void input_disable_path(const char *path);
 
+struct input *input_open(struct input *parent_input, const char *path, int system);
 struct input input_open_string(char *str);
+
+void input_free(struct input *input);
 
 #endif

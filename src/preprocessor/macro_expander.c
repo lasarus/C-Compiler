@@ -100,7 +100,7 @@ int get_param(struct define *def, struct token tok) {
 void define_string(char *name, char *value) {
 	struct define def = define_init(sv_from_str(name));
 	struct input input = input_open_string(value);
-	def.def = tokenizer_whole(&input);
+	def.def = tokenize_input(&input);
 	define_map_add(def);
 }
 

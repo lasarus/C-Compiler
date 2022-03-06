@@ -12,6 +12,48 @@
 static int pushed_idx = 0;
 static struct token pushed[2];
 
+struct tokenized_file {
+	struct input *input;
+
+	int token_idx;
+	struct token_list tokens;
+
+	struct tokenized_file *parent;
+};
+
+struct tokenized_file *current_file;
+
+void directiver_push_input(const char *path, int system) {
+	struct input *prev_input = current_file ? current_file->input : NULL;
+	struct input *new_input = input_open(prev_input, path, system);
+
+	if (!new_input)
+		return;
+
+	struct tokenized_file *new_file = malloc(sizeof *new_input);
+
+	new_file->input = new_input;
+	new_file->parent = current_file;
+	new_file->token_idx = 0;
+	new_file->tokens = tokenize_input(new_input);
+
+	current_file = new_file;
+}
+
+static struct token next_from_stack() {
+	if (current_file->token_idx == current_file->tokens.size) {
+		if (current_file->parent) {
+			input_free(current_file->input);
+			current_file = current_file->parent;
+			return next_from_stack();
+		}
+
+		return (struct token ) { .type = T_EOI };
+	}
+
+	return current_file->tokens.list[current_file->token_idx++];
+}
+
 void push(struct token t) {
 	if (pushed_idx > 1)
 		ICE("Pushed too many directive tokens.");
@@ -22,7 +64,7 @@ static const char *new_filename = NULL;
 static int line_diff = 0;
 
 struct token next() {
-	struct token t = pushed_idx ? pushed[--pushed_idx] : tokenizer_next();
+	struct token t = pushed_idx ? pushed[--pushed_idx] : next_from_stack();
 	t.pos.line += line_diff;
 	if (new_filename)
 		t.pos.path = new_filename;
@@ -246,7 +288,7 @@ void directiver_handle_pragma(void) {
 	struct token command = next();
 
 	if (sv_string_cmp(command.str, "once")) {
-		tokenizer_disable_current_path();
+		input_disable_path(current_file->input->filename);
 	} else {
 		WARNING(command.pos, "\"#pragma %s\" not supported", dbg_token(&command));
 		struct token t = next();
@@ -322,7 +364,8 @@ struct token directiver_next(void) {
 				struct string_view path = path_tok.str;
 				path.str++;
 				path.len -= 2;
-				tokenizer_push_input(sv_to_str(path), system);
+
+				directiver_push_input(sv_to_str(path), system);
 			} else if (sv_string_cmp(name, "endif")) {
 				// Do nothing.
 			} else if (sv_string_cmp(name, "pragma")) {

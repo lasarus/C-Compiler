@@ -37,14 +37,6 @@ static const unsigned char char_props[UCHAR_MAX] = {
 
 #define HAS_PROP(C, PROP) (char_props[(unsigned char)(C)] & (PROP))
 
-void tokenizer_push_input(const char *path, int system) {
-	input_open(&input, path, system); // <- TODO: System.
-}
-
-void tokenizer_disable_current_path(void) {
-	input_disable_path(input->filename);
-}
-
 static void flush_whitespace(int *whitespace, int *first_of_line) {
 	for (;;) {
 		if (HAS_PROP(C0, C_SPACE)) {
@@ -335,12 +327,6 @@ struct token tokenizer_next(void) {
 	} else if(parse_pp_number(&next)) {
 	} else if(parse_punctuator(&next)) {
 	} else if(C0 == '\0') {
-		if (input->next) {
-			// Retry on popped source.
-			input_close(&input);
-			return tokenizer_next();
-		}
-
 		next.first_of_line = 1;
 		next.type = T_EOI;
 	} else {
@@ -351,8 +337,7 @@ struct token tokenizer_next(void) {
 	return next;
 }
 
-struct token_list tokenizer_whole(struct input *new_input) {
-	struct input *prev_input = input;
+struct token_list tokenize_input(struct input *new_input) {
 	input = new_input;
 
 	struct token_list tl = { 0 };
@@ -362,8 +347,6 @@ struct token_list tokenizer_whole(struct input *new_input) {
 		token_list_add(&tl, t);
 		t = tokenizer_next();
 	}
-
-	input = prev_input;
 
 	return tl;
 }
