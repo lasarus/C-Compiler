@@ -6,8 +6,6 @@
 #include <string.h>
 #include <limits.h>
 
-static struct input *input;
-
 #define C0 (input->c[0])
 #define C1 (input->c[1])
 #define C2 (input->c[2])
@@ -37,7 +35,7 @@ static const unsigned char char_props[UCHAR_MAX] = {
 
 #define HAS_PROP(C, PROP) (char_props[(unsigned char)(C)] & (PROP))
 
-static void flush_whitespace(int *whitespace, int *first_of_line) {
+static void flush_whitespace(struct input *input, int *whitespace, int *first_of_line) {
 	for (;;) {
 		if (HAS_PROP(C0, C_SPACE)) {
 			if(C0 == '\n')
@@ -66,37 +64,37 @@ static void flush_whitespace(int *whitespace, int *first_of_line) {
 static char *buffer = NULL;
 static size_t buffer_size = 0, buffer_cap = 0;
 
-static void buffer_start(void) {
+static void buffer_start() {
 	buffer_size = 0;
 }
 
-static void buffer_eat() {
+static void buffer_eat(struct input *input) {
 	ADD_ELEMENT(buffer_size, buffer_cap, buffer) = C0;
 	CNEXT();
 }
 
-static struct string_view buffer_get(void) {
+static struct string_view buffer_get() {
 	struct string_view ret = { .len = buffer_size };
 	ret.str = malloc(buffer_size);
 	memcpy(ret.str, buffer, buffer_size);
 	return ret;
 }
 
-static int parse_identifier(struct token *next) {
+static int parse_identifier(struct input *input, struct token *next) {
 	if (!HAS_PROP(C0, C_IDENTIFIER_NONDIGIT))
 		return 0;
 
 	buffer_start();
 
 	while(HAS_PROP(C0, C_IDENTIFIER_NONDIGIT | C_DIGIT))
-		buffer_eat();
+		buffer_eat(input);
 
 	next->type = T_IDENT;
 	next->str = buffer_get();
 	return 1;
 }
 
-static int parse_pp_number(struct token *next) {
+static int parse_pp_number(struct input *input, struct token *next) {
 	if (!(HAS_PROP(C0, C_DIGIT) ||
 		  (C0 == '.' && HAS_PROP(C1, C_DIGIT))))
 		return 0;
@@ -107,10 +105,10 @@ static int parse_pp_number(struct token *next) {
 		if ((C0 == 'e' || C0 == 'E' ||
 			 C0 == 'p' || C0 == 'P') &&
 			(C1 == '+' || C1 == '-')) {
-			buffer_eat();
-			buffer_eat();
+			buffer_eat(input);
+			buffer_eat(input);
 		} else if (HAS_PROP(C0, C_DIGIT | C_IDENTIFIER_NONDIGIT) || C0 == '.') {
-			buffer_eat();
+			buffer_eat(input);
 		} else {
 			break;
 		}
@@ -183,23 +181,23 @@ int parse_escape_sequence(struct string_view *string, uint32_t *character, struc
 	return 1;
 }
 
-static int eat_cs_char(char end_char) {
+static int eat_cs_char(struct input *input, char end_char) {
 	if (C0 == '\n' || C0 == end_char)
 		return 0;
 
 	if (C0 == '\\')
-		buffer_eat();
-	buffer_eat();
+		buffer_eat(input);
+	buffer_eat(input);
 
 	return 1;
 }
 
-struct string_view eat_string_like() {
+struct string_view eat_string_like(struct input *input) {
 	char end_char = C0 == '<' ? '>' : C0;
 
-	buffer_eat();
+	buffer_eat(input);
 
-	while (eat_cs_char(end_char));
+	while (eat_cs_char(input, end_char));
 
 	if (C0 != end_char) {
 		char output[5];
@@ -208,65 +206,65 @@ struct string_view eat_string_like() {
 			  (int)buffer_size, buffer);
 	}
 
-	buffer_eat();
+	buffer_eat(input);
 
 	return buffer_get();
 }
 
-static int parse_string(struct token *next) {
+static int parse_string(struct input *input, struct token *next) {
 	buffer_start();
 	if (C0 == 'u' &&
 		C1 == '8' &&
 		C2 == '"') {
-		buffer_eat();
-		buffer_eat();
+		buffer_eat(input);
+		buffer_eat(input);
 	} else if (C0 == 'u' && C1 == '"') {
-		buffer_eat();
+		buffer_eat(input);
 	} else if (C0 == 'U' && C1 == '"') {
-		buffer_eat();
+		buffer_eat(input);
 	} else if (C0 == 'L' && C1 == '"') {
-		buffer_eat();
+		buffer_eat(input);
 	} else if (C0 != '"') {
 		return 0;
 	}
 
 	next->type = T_STRING;
-	next->str = eat_string_like();
+	next->str = eat_string_like(input);
 
 	return 1;
 }
 
-static int parse_pp_header_name(struct token *next) {
+static int parse_pp_header_name(struct input *input, struct token *next) {
 	buffer_start();
 	if (C0 != '"' && C0 != '<')
 		return 0;
 
 	next->type = C0 == '<' ? PP_HEADER_NAME_H : PP_HEADER_NAME_Q;
-	next->str = eat_string_like();
+	next->str = eat_string_like(input);
 
 	return 1;
 }
 
-static int parse_character_constant(struct token *next) {
+static int parse_character_constant(struct input *input, struct token *next) {
 	// All of these are handled in the same way.
 	buffer_start();
 	if (C0 == 'u' && C1 == '\'') {
-		buffer_eat();
+		buffer_eat(input);
 	} else if (C0 == 'U' && C1 == '\'') {
-		buffer_eat();
+		buffer_eat(input);
 	} else if (C0 == 'L' && C1 == '\'') {
-		buffer_eat();
+		buffer_eat(input);
 	} else if (C0 != '\'') {
 		return 0;
 	}
 
 	next->type = T_CHARACTER_CONSTANT;
-	next->str = eat_string_like();
+	next->str = eat_string_like(input);
 
 	return 1;
 }
 
-static int parse_punctuator(struct token *next) {
+static int parse_punctuator(struct input *input, struct token *next) {
 	int count = 0;
 #define SYM(A, B) else if (						\
 		(sizeof(B) <= 1 || B[0] == C0) &&		\
@@ -286,66 +284,66 @@ static int parse_punctuator(struct token *next) {
 	buffer_start();
 
 	for (int i = 0; i < count; i++)
-		buffer_eat();
+		buffer_eat(input);
 
 	next->str = buffer_get();
 
 	return 1;
 }
 
-static int is_header, is_directive;
-
-struct token tokenizer_next(void) {
+struct token tokenizer_next(struct input *input,
+							int *is_header, int *is_directive) {
 	struct token next = { 0 };
 
-
-	flush_whitespace(&next.whitespace,
+	flush_whitespace(input, &next.whitespace,
 					 &next.first_of_line);
 
 	if (next.first_of_line)
-		is_header = is_directive = 0;
-
-#define IFSTR(S, TOK)	(C0 == S[0] &&						\
-						 (sizeof(S) == 2 || C1 == S[1])) &&	\
-		(next.type = TOK, next.str = sv_from_str(S),		\
-		 CNEXT(), (sizeof(S) == 3) && (CNEXT(), 1), 1)		\
+		*is_header = *is_directive = 0;
 
 	next.pos = input->pos[0];
 
-	if(IFSTR("##", PP_HHASH)) {
-	} else if(next.first_of_line && IFSTR("#", PP_DIRECTIVE)) {
-		is_directive = 1;
-	} else if(IFSTR("#", PP_HASH)) {
-	} else if (is_header && parse_pp_header_name(&next)) {
-	} else if(parse_string(&next)) {
-	} else if(parse_character_constant(&next)) {
-	} else if(parse_identifier(&next)) {
-		if (is_directive) {
-			is_header = sv_string_cmp(next.str, "include");
-			is_directive = 0;
+	if(C0 == '#' && C1 == '#') {
+		next.type = PP_HHASH;
+		CNEXT();
+		CNEXT();
+	} else if (C0 == '#') {
+		if (next.first_of_line) {
+			next.type = PP_DIRECTIVE;
+			*is_directive = 1;
+		} else {
+			next.type = PP_HASH;
 		}
-	} else if(parse_pp_number(&next)) {
-	} else if(parse_punctuator(&next)) {
+		CNEXT();
+	} else if (*is_header && parse_pp_header_name(input, &next)) {
+	} else if(parse_string(input, &next)) {
+	} else if(parse_character_constant(input, &next)) {
+	} else if(parse_identifier(input, &next)) {
+		if (*is_directive) {
+			*is_header = sv_string_cmp(next.str, "include");
+			*is_directive = 0;
+		}
+	} else if(parse_pp_number(input, &next)) {
+	} else if(parse_punctuator(input, &next)) {
 	} else if(C0 == '\0') {
 		next.first_of_line = 1;
 		next.type = T_EOI;
 	} else {
 		ERROR(next.pos, "Unrecognized preprocessing token! Starting with '%c', %d\n", C0, C0);
 	}
-#undef IFSTR
 
 	return next;
 }
 
-struct token_list tokenize_input(struct input *new_input) {
-	input = new_input;
-
+struct token_list tokenize_input(struct input *input) {
 	struct token_list tl = { 0 };
 
-	struct token t = tokenizer_next();
+	int is_header = 0, is_directive = 0;
+
+	struct token t = tokenizer_next(input, &is_header, &is_directive);
 	while (t.type != T_EOI) {
 		token_list_add(&tl, t);
-		t = tokenizer_next();
+		t = tokenizer_next(input, &is_header, &is_directive);
 	}
 
 	return tl;
