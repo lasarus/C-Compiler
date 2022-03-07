@@ -1,9 +1,28 @@
 #include "elf.h"
+#include "object.h"
 #include "common.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+enum {
+	R_X86_64_NONE = 0, /* No reloc */
+	R_X86_64_64 = 1, /* Direct 64 bit  */
+	R_X86_64_PC32 = 2, /* PC relative 32 bit signed */
+	R_X86_64_GOT32 = 3, /* 32 bit GOT entry */
+	R_X86_64_PLT32 = 4, /* 32 bit PLT address */
+	R_X86_64_COPY = 5, /* Copy symbol at runtime */
+	R_X86_64_GLOB_DAT = 6, /* Create GOT entry */
+	R_X86_64_JUMP_SLOT = 7, /* Create PLT entry */
+	R_X86_64_RELATIVE = 8, /* Adjust by program base */
+	R_X86_64_GOTPCREL = 9, /* 32 bit signed PC relative */
+	R_X86_64_32 = 10, /* Direct 32 bit zero extended */
+	R_X86_64_32S = 11, /* Direct 32 bit sign extended */
+	R_X86_64_16 = 12, /* Direct 16 bit zero extended */
+	R_X86_64_PC16 = 13, /* 16 bit sign extended pc relative */
+	R_X86_64_8 = 14, /* Direct 8 bit sign extended  */
+};
 
 enum {
 	SHT_NULL = 0,
@@ -63,7 +82,7 @@ struct rela {
 	uint64_t add;
 };
 
-struct section {
+struct section_ {
 	const char *name;
 	int idx;
 	int sh_idx;
@@ -75,7 +94,7 @@ struct section {
 	struct rela *relas;
 };
 
-struct symbol {
+struct symbol_ {
 	int string_idx; // gotten from register_string()
 	char *name;
 	uint64_t value;
@@ -88,31 +107,27 @@ struct symbol {
 };
 
 size_t symbol_size, symbol_cap;
-struct symbol *symbols;
+struct symbol_ *symbols;
 
-static int find_symbol(label_id label) {
-	char buffer[64];
-
-	rodata_get_label(label, sizeof buffer, buffer);
-
+static int find_symbol(const char *name) {
 	for (unsigned i = 0; i < symbol_size; i++) {
-		if (symbols[i].name && strcmp(symbols[i].name, buffer) == 0)
+		if (symbols[i].name && strcmp(symbols[i].name, name) == 0)
 			return i;
 	}
 
-	return -1;
+	ICE("Should not be here.");
 }
 
-int elf_new_symbol(label_id label) {
-	struct symbol symb = { .section = -1, .global = -1 };
+int elf_new_symbol(char *name) {
+	struct symbol_ symb = { .section = -1, .global = -1 };
 
-	if (label != -1) {
-		char buffer[64];
+	if (name) {
+		/* char buffer[64]; */
 
-		rodata_get_label(label, sizeof buffer, buffer);
+		/* rodata_get_label(label, sizeof buffer, buffer); */
 
-		symb.string_idx = register_string(buffer);
-		symb.name = strdup(buffer);
+		symb.string_idx = register_string(name);
+		symb.name = strdup(name);
 	}
 
 	ADD_ELEMENT(symbol_size, symbol_cap, symbols) = symb;
@@ -121,14 +136,9 @@ int elf_new_symbol(label_id label) {
 }
 
 size_t section_size, section_cap;
-struct section *sections = NULL;
+struct section_ *sections = NULL;
 
-struct section *current_section = NULL;
-
-void elf_init(void) {
-	elf_set_section(".text");
-	register_string("");
-}
+struct section_ *current_section = NULL;
 
 void elf_set_section(const char *section) {
 	for (unsigned i = 0; i < section_size; i++) {
@@ -139,109 +149,109 @@ void elf_set_section(const char *section) {
 	}
 
 	current_section = &ADD_ELEMENT(section_size, section_cap, sections);
-	*current_section = (struct section) {
+	*current_section = (struct section_) {
 		.name = strdup(section),
 		.idx = section_size - 1,
 	};
 
-	int section_symb = elf_new_symbol(-1);
+	int section_symb = elf_new_symbol(NULL);
 	symbols[section_symb].global = 0;
 	symbols[section_symb].section = current_section->idx;
 	symbols[section_symb].value = 0;
 	symbols[section_symb].type = STT_SECTION;
 }
 
-void elf_write(uint8_t *data, int len) {
+void elf_init(void) {
+	elf_set_section(".text");
+	register_string("");
+}
+
+void elf_write_data(uint8_t *data, int len) {
 	memcpy(ADD_ELEMENTS(current_section->size, current_section->cap, current_section->data, len),
 		   data, len);
 }
 
-void elf_write_byte(uint8_t imm) {
-	ADD_ELEMENT(current_section->size, current_section->cap, current_section->data) = imm;
-}
+/* void elf_write_byte(uint8_t imm) { */
+/* 	ADD_ELEMENT(current_section->size, current_section->cap, current_section->data) = imm; */
+/* } */
 
-void elf_write_quad(uint64_t imm) {
-	elf_write_byte(imm);
-	elf_write_byte(imm >> 8);
-	elf_write_byte(imm >> 16);
-	elf_write_byte(imm >> 24);
-	elf_write_byte(imm >> 32);
-	elf_write_byte(imm >> 40);
-	elf_write_byte(imm >> 48);
-	elf_write_byte(imm >> 56);
-}
+/* void elf_write_quad(uint64_t imm) { */
+/* 	elf_write_byte(imm); */
+/* 	elf_write_byte(imm >> 8); */
+/* 	elf_write_byte(imm >> 16); */
+/* 	elf_write_byte(imm >> 24); */
+/* 	elf_write_byte(imm >> 32); */
+/* 	elf_write_byte(imm >> 40); */
+/* 	elf_write_byte(imm >> 48); */
+/* 	elf_write_byte(imm >> 56); */
+/* } */
 
-void elf_write_zero(int len) {
-	memset(ADD_ELEMENTS(current_section->size, current_section->cap, current_section->data, len),
-		   0, len);
-}
+/* void elf_write_zero(int len) { */
+/* 	memset(ADD_ELEMENTS(current_section->size, current_section->cap, current_section->data, len), */
+/* 		   0, len); */
+/* } */
 
-void elf_symbol_relocate(label_id label, int64_t offset, int64_t add, int type) {
-	struct rela *rela = &ADD_ELEMENT(current_section->rela_size,
-									 current_section->rela_cap,
-									 current_section->relas);
+/* void elf_symbol_relocate(label_id label, int64_t offset, int64_t add, int type) { */
+/* 	struct rela *rela = &ADD_ELEMENT(current_section->rela_size, */
+/* 									 current_section->rela_cap, */
+/* 									 current_section->relas); */
 
-	int idx = find_symbol(label);
-	if (idx == -1) {
-		idx = elf_new_symbol(label);
-	}
+/* 	int idx = find_symbol(label); */
+/* 	if (idx == -1) { */
+/* 		idx = elf_new_symbol(label); */
+/* 	} */
 
-	rela->symb_idx = idx;
-	rela->offset = current_section->size + offset;
-	rela->type = type;
-	rela->add = add;
-}
+/* 	rela->symb_idx = idx; */
+/* 	rela->offset = current_section->size + offset; */
+/* 	rela->type = type; */
+/* 	rela->add = add; */
+/* } */
 
-void elf_symbol_set(label_id label, int global) {
-	int idx = find_symbol(label);
-	if (idx == -1)
-		idx = elf_new_symbol(label);
+/* void elf_symbol_set(label_id label, int global) { */
+/* 	int idx = find_symbol(label); */
+/* 	if (idx == -1) */
+/* 		idx = elf_new_symbol(label); */
 
-	symbols[idx].section = current_section->idx;
-	symbols[idx].value = current_section->size;
+/* 	symbols[idx].section = current_section->idx; */
+/* 	symbols[idx].value = current_section->size; */
 
-	symbols[idx].global = global;
-}
+/* 	symbols[idx].global = global; */
+/* } */
 
 static FILE *output = NULL;
-size_t current_pos = 0;
 
-void write(const void *ptr, size_t size) {
-	current_pos += size;
+static void write(const void *ptr, size_t size) {
 	if (fwrite(ptr, size, 1, output) != 1)
 		ICE("Could not write to file");
 }
 
-void write_null(size_t size) {
-	if (size == 0)
-		return;
-
-	if (size > 512)
-		NOTIMP();
-
-	uint8_t zero[512] = { 0 };
-	write(zero, size);
-}
-
-void write_skip(size_t target) {
-	write_null(target - current_pos);
-}
-
-void write_byte(uint8_t byte) {
+static void write_byte(uint8_t byte) {
 	write(&byte, 1);
 }
 
-// TODO: Endianness??
-void write_word(uint16_t word) {
-	write(&word, 2);
+static void write_word(uint16_t word) {
+	write_byte(word);
+	write_byte(word >> 8);
 }
 
-void write_long(uint32_t long_) {
-	write(&long_, 4);
+static void write_long(uint32_t long_) {
+	write_word(long_);
+	write_word(long_ >> 16);
 }
 
-void write_quad(uint64_t quad) {
-	write(&quad, 8);
+static void write_quad(uint64_t quad) {
+	write_long(quad);
+	write_long(quad >> 32);
+}
+
+static void write_zero(size_t size) {
+	for (size_t i = 0; i < size; i++)
+		write_byte(0); // TODO: Make this faster.
+}
+
+static void write_skip(size_t target) {
+	long int current_pos = ftell(output);
+	write_zero(target - current_pos);
 }
 
 #define SH_OFF 128
@@ -274,7 +284,7 @@ static void write_header(int shstrndx) {
 	write_byte(0); // EI_OSABI = System V
 	write_byte(0); // EI_ABIVERSION = 0
 
-	write_null(7); // Padding
+	write_zero(7); // Padding
 
 	write_word(1); // e_type = ET_REL
 	write_word(0x3e); // e_machine = AMD x86-64
@@ -409,7 +419,7 @@ uint8_t *symbol_table_write(int *n_local) {
 	return buffer;
 }
 
-uint8_t *rela_write(struct section *section) {
+uint8_t *rela_write(struct section_ *section) {
 	uint8_t *buffer = calloc(section->rela_size, 24);
 
 	for (unsigned i = 0; i < section->rela_size; i++) {
@@ -431,7 +441,7 @@ void elf_finish(const char *path) {
 	/*int null_section =*/ elf_add_section(register_shstring(""), SHT_NULL);
 
 	for (unsigned i = 0; i < section_size; i++) {
-		struct section *section = sections + i;
+		struct section_ *section = sections + i;
 		int id = elf_add_section(register_shstring(section->name), SHT_PROGBITS);
 
 		elf_sections[id].size = section->size;
@@ -449,7 +459,7 @@ void elf_finish(const char *path) {
 	elf_sections[sym].header.sh_info = n_local_symb;
 
 	for (unsigned i = 0; i < section_size; i++) {
-		struct section *section = sections + i;
+		struct section_ *section = sections + i;
 		if (!section->rela_size)
 			continue;
 
@@ -479,4 +489,65 @@ void elf_finish(const char *path) {
 	write_header(shstrtab_section);
 	write_section_headers();
 	fclose(output);
+}
+
+void elf_write(const char *path, struct object *object) {
+	elf_init();
+
+	for (unsigned i = 0; i < object->section_size; i++) {
+		struct section *section = &object->sections[i];
+		elf_set_section(section->name);
+
+		if (section->size)
+			elf_write_data(section->data, section->size);
+	}
+
+	for (unsigned i = 0; i < object->symbol_size; i++) {
+		struct symbol *symbol = &object->symbols[i];
+		if (symbol->section == -1) {
+			elf_new_symbol(symbol->name);
+			continue;
+		}
+		elf_set_section(object->sections[symbol->section].name);
+
+		int idx = elf_new_symbol(symbol->name);
+		symbols[idx].section = current_section->idx;
+		symbols[idx].value = symbol->value;
+		symbols[idx].global = symbol->global;
+	}
+
+	for (unsigned i = 0; i < object->section_size; i++) {
+		struct section *section = &object->sections[i];
+		elf_set_section(section->name);
+
+		for (unsigned j = 0; j < section->relocation_size; j++) {
+			struct object_relocation *relocation = &section->relocations[j];
+
+			struct rela *rela = &ADD_ELEMENT(current_section->rela_size,
+											 current_section->rela_cap,
+											 current_section->relas);
+
+			int idx = find_symbol(object->symbols[relocation->idx].name);
+
+			rela->symb_idx = idx;
+			rela->offset = relocation->offset;
+			rela->add = relocation->add;
+
+			switch (relocation->type) {
+			case RELOCATE_64:
+				rela->type = R_X86_64_64;
+				break;
+
+			case RELOCATE_32:
+				rela->type = R_X86_64_32S;
+				break;
+
+			case RELOCATE_32_RELATIVE:
+				rela->type = R_X86_64_PC32;
+				break;
+			}
+		}
+	}
+
+	elf_finish(path);
 }

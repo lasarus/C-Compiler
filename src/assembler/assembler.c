@@ -1,5 +1,6 @@
 #include "assembler.h"
 #include "encode.h"
+#include "object.h"
 #include "elf.h"
 
 #include <common.h>
@@ -23,7 +24,7 @@ void asm_init_text_out(const char *path) {
 	current_section = ".text";
 
 	if (assembler_flags.elf) {
-		elf_init();
+		object_start();
 		out_path = path;
 	} else {
 		out = fopen(path, "w");
@@ -35,7 +36,8 @@ void asm_init_text_out(const char *path) {
 
 void asm_finish(void) {
 	if (assembler_flags.elf) {
-		elf_finish(out_path);
+		struct object *object = object_finish();
+		elf_write(out_path, object);
 	} else {
 		fclose(out);
 	}
@@ -60,7 +62,7 @@ static void emit_label(label_id id) {
 
 void asm_section(const char *section) {
 	if (assembler_flags.elf) {
-		elf_set_section(section);
+		object_set_section(section);
 	} else {
 		if (strcmp(section, current_section) != 0)
 			asm_emit_no_newline(".section %s\n", section);
@@ -82,7 +84,7 @@ void asm_comment(const char *fmt, ...) {
 
 void asm_label(int global, label_id label) {
 	if (assembler_flags.elf) {
-		elf_symbol_set(label, global);
+		object_symbol_set(label, global);
 	} else {
 		if (global) {
 			fprintf(out, ".global ");
@@ -97,8 +99,8 @@ void asm_label(int global, label_id label) {
 
 void asm_string(struct string_view str) {
 	if (assembler_flags.elf) {
-		elf_write((uint8_t *)str.str, str.len);
-		elf_write_byte(0);
+		object_write((uint8_t *)str.str, str.len);
+		object_write_byte(0);
 	} else if (assembler_flags.half_assemble) {
 		asm_emit_no_newline("\t.byte ");
 		for (int i = 0; i < str.len; i++) {
@@ -200,14 +202,14 @@ void asm_ins_impl(const char *mnemonic, struct operand ops[4]) {
 				case 8:
 					if (rel->relative)
 						NOTIMP();
-					elf_symbol_relocate(rel->label, rel->offset, rel->imm, R_X86_64_64);
+					object_symbol_relocate(rel->label, rel->offset, rel->imm, RELOCATE_64);
 					break;
 
 				case 4:
 					if (rel->relative)
-						elf_symbol_relocate(rel->label, rel->offset, -(len - rel->offset), R_X86_64_PC32);
+						object_symbol_relocate(rel->label, rel->offset, -(len - rel->offset), RELOCATE_32_RELATIVE);
 					else
-						elf_symbol_relocate(rel->label, rel->offset, rel->imm, R_X86_64_32S);
+						object_symbol_relocate(rel->label, rel->offset, rel->imm, RELOCATE_32);
 					break;
 
 				default:
@@ -215,7 +217,7 @@ void asm_ins_impl(const char *mnemonic, struct operand ops[4]) {
 					NOTIMP();
 				}
 			}
-			elf_write(output, len);
+			object_write(output, len);
 		} else if (assembler_flags.half_assemble) {
 			int first = 1;
 			for (int i = 0; i < len; i++) {
@@ -310,12 +312,12 @@ void asm_quad(struct operand op) {
 			break;
 
 		case OPERAND_IMM_ABSOLUTE:
-			elf_write_quad(op.imm);
+			object_write_quad(op.imm);
 			break;
 
 		case OPERAND_IMM_LABEL_ABSOLUTE:
-			elf_symbol_relocate(op.imm_label.label_, 0, op.imm_label.offset, R_X86_64_64);
-			elf_write_quad(0);
+			object_symbol_relocate(op.imm_label.label_, 0, op.imm_label.offset, RELOCATE_64);
+			object_write_quad(0);
 			break;
 
 		default: NOTIMP();
@@ -331,7 +333,7 @@ void asm_byte(struct operand op) {
 	if (assembler_flags.elf) {
 		switch (op.type) {
 		case OPERAND_IMM_ABSOLUTE:
-			elf_write_byte(op.imm);
+			object_write_byte(op.imm);
 			break;
 
 		default: NOTIMP();
@@ -345,7 +347,7 @@ void asm_byte(struct operand op) {
 
 void asm_zero(int len) {
 	if (assembler_flags.elf) {
-		elf_write_zero(len);
+		object_write_zero(len);
 	} else {
 		asm_emit_no_newline(".zero %d\n", len);
 	}
