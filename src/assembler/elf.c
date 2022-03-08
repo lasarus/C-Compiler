@@ -122,10 +122,6 @@ int elf_new_symbol(char *name) {
 	struct symbol_ symb = { .section = -1, .global = -1 };
 
 	if (name) {
-		/* char buffer[64]; */
-
-		/* rodata_get_label(label, sizeof buffer, buffer); */
-
 		symb.string_idx = register_string(name);
 		symb.name = strdup(name);
 	}
@@ -170,53 +166,6 @@ void elf_write_data(uint8_t *data, int len) {
 	memcpy(ADD_ELEMENTS(current_section->size, current_section->cap, current_section->data, len),
 		   data, len);
 }
-
-/* void elf_write_byte(uint8_t imm) { */
-/* 	ADD_ELEMENT(current_section->size, current_section->cap, current_section->data) = imm; */
-/* } */
-
-/* void elf_write_quad(uint64_t imm) { */
-/* 	elf_write_byte(imm); */
-/* 	elf_write_byte(imm >> 8); */
-/* 	elf_write_byte(imm >> 16); */
-/* 	elf_write_byte(imm >> 24); */
-/* 	elf_write_byte(imm >> 32); */
-/* 	elf_write_byte(imm >> 40); */
-/* 	elf_write_byte(imm >> 48); */
-/* 	elf_write_byte(imm >> 56); */
-/* } */
-
-/* void elf_write_zero(int len) { */
-/* 	memset(ADD_ELEMENTS(current_section->size, current_section->cap, current_section->data, len), */
-/* 		   0, len); */
-/* } */
-
-/* void elf_symbol_relocate(label_id label, int64_t offset, int64_t add, int type) { */
-/* 	struct rela *rela = &ADD_ELEMENT(current_section->rela_size, */
-/* 									 current_section->rela_cap, */
-/* 									 current_section->relas); */
-
-/* 	int idx = find_symbol(label); */
-/* 	if (idx == -1) { */
-/* 		idx = elf_new_symbol(label); */
-/* 	} */
-
-/* 	rela->symb_idx = idx; */
-/* 	rela->offset = current_section->size + offset; */
-/* 	rela->type = type; */
-/* 	rela->add = add; */
-/* } */
-
-/* void elf_symbol_set(label_id label, int global) { */
-/* 	int idx = find_symbol(label); */
-/* 	if (idx == -1) */
-/* 		idx = elf_new_symbol(label); */
-
-/* 	symbols[idx].section = current_section->idx; */
-/* 	symbols[idx].value = current_section->size; */
-
-/* 	symbols[idx].global = global; */
-/* } */
 
 static FILE *output = NULL;
 
