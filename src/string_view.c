@@ -55,3 +55,10 @@ void sv_tail(struct string_view *sv, int n) {
 	sv->len -= n;
 	sv->str += n;
 }
+
+struct string_view sv_slice_string(char *string, int start, int end) {
+	return (struct string_view) {
+		.str = string + start,
+		.len = (end == -1 ? (int)strlen(string) : end) - start
+	};
+}

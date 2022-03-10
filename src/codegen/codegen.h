@@ -23,7 +23,7 @@ struct variable_info {
 
 extern struct variable_info *variable_info;
 
-void codegen(const char *path);
+void codegen(void);
 
 // TODO: Why is rdi not destination?
 // From rdi to rsi address

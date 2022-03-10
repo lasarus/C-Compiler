@@ -558,10 +558,8 @@ void codegen_function(struct function *func) {
 		printf("Function %s has stack consumption: %d\n", func->name, total_stack_usage);
 }
 
-void codegen(const char *path) {
+void codegen(void) {
 	variable_info = malloc(sizeof(*variable_info) * get_n_vars());
-
-	asm_init_text_out(path);
 
 	for (int i = 0; i < ir.size; i++)
 		codegen_function(ir.functions + i);

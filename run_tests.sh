@@ -5,18 +5,18 @@ test_source() {
 
 	if [ "$4" == "true" ]; then
 		if [ "$2" == "true" ]; then
-			$5 $1 $TEST_DIR/$OUT -Imusl -D$3
+			$5 $1 -o $TEST_DIR/$OUT -S -Imusl -D$3
 		else
-			$5 $1 $TEST_DIR/$OUT -I/usr/include -Iinclude/linux -D$3
+			$5 $1 -o $TEST_DIR/$OUT -S -I/usr/include -Iinclude/linux -D$3
 		fi
 
 		musl-gcc $TEST_DIR/$OUT -o test -no-pie -lm -Wall -Werror
 		./test
 	else
 		if [ "$2" == "true" ]; then
-			! $5 $1 $TEST_DIR/$OUT -Imusl -D$3 >/dev/null
+			! $5 $1 -o $TEST_DIR/$OUT -S -Imusl -D$3 >/dev/null
 		else
-			! $5 $1 $TEST_DIR/$OUT -I/usr/include -Iinclude/linux -D$3 >/dev/null
+			! $5 $1 -o $TEST_DIR/$OUT -S -I/usr/include -Iinclude/linux -D$3 >/dev/null
 		fi
 	fi
 }

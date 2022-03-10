@@ -24,9 +24,9 @@ do
 	OUT="$(basename -s .c $SRC).s"
 	if [ "$MUSL" = "true" ]
 	then
-		./cc $SRC asm/$OUT -Isrc -Imusl
+		./cc $SRC -o asm/$OUT -S -Isrc -Imusl
 	else
-		./cc $SRC asm/$OUT -Isrc -I/usr/include/ -Iinclude/
+		./cc $SRC -o asm/$OUT -S -Isrc -I/usr/include/ -Iinclude/
 	fi
 done
 echo -en "\r\033[KDONE!"
@@ -50,9 +50,9 @@ do
 		OUT="$(basename -s .c $SRC).s"
 		if [ "$MUSL" = "true" ]
 		then
-			./cc_self $SRC asm2/$OUT -Isrc -Imusl
+			./cc_self $SRC -o asm2/$OUT -S -Isrc -Imusl
 		else
-			./cc_self $SRC asm2/$OUT -Isrc -I/usr/include/ -Iinclude/
+			./cc_self $SRC -o asm2/$OUT -S -Isrc -I/usr/include/ -Iinclude/
 		fi
 	done
 	echo -en "\r\033[KDONE!"

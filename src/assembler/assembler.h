@@ -5,9 +5,7 @@
 #include <string_view.h>
 #include <codegen/rodata.h>
 
-extern struct assembler_flags {
-	int half_assemble, elf, link;
-} assembler_flags;
+#include "linker/object.h"
 
 enum reg {
 	REG_RAX,
@@ -94,6 +92,8 @@ struct operand {
 #define XMM(IDX) (struct operand) XMM_(IDX)
 
 void asm_init_text_out(const char *path);
+void asm_init_object(struct object *object);
+
 void asm_finish(void);
 
 // Emit.
