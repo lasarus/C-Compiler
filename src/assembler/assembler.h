@@ -6,7 +6,7 @@
 #include <codegen/rodata.h>
 
 extern struct assembler_flags {
-	int half_assemble, elf;
+	int half_assemble, elf, link;
 } assembler_flags;
 
 enum reg {

@@ -1,7 +1,8 @@
 #include "assembler.h"
 #include "encode.h"
-#include "object.h"
-#include "elf.h"
+#include "linker/object.h"
+#include "linker/linker.h"
+#include "linker/elf.h"
 
 #include <common.h>
 #include <inttypes.h>
@@ -13,7 +14,7 @@
 // Right now all jumps are treated as 32 bit offsets.
 
 struct assembler_flags assembler_flags = {
-	.half_assemble = 0, .elf = 0
+	.half_assemble = 0, .elf = 0, .link = 0
 };
 
 static FILE *out;
@@ -37,7 +38,13 @@ void asm_init_text_out(const char *path) {
 void asm_finish(void) {
 	if (assembler_flags.elf) {
 		struct object *object = object_finish();
-		elf_write(out_path, object);
+
+		if (assembler_flags.link) {
+			struct executable *executable = linker_link(1, object);
+			elf_write_executable(out_path, executable);
+		} else {
+			elf_write_object(out_path, object);
+		}
 	} else {
 		fclose(out);
 	}

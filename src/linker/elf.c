@@ -5,6 +5,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
+
+// The handling of elf files is still very much
+// a work in progress. I would like this
+// to actually construct the whole elf file
+// in memory before writing to a file.
+// And for this system to handle both segments
+// and sections simultaneously.
 
 enum {
 	R_X86_64_NONE = 0, /* No reloc */
@@ -200,6 +208,7 @@ static void write_zero(size_t size) {
 
 static void write_skip(size_t target) {
 	long int current_pos = ftell(output);
+	assert(target >= (size_t)current_pos);
 	write_zero(target - current_pos);
 }
 
@@ -216,6 +225,12 @@ struct elf_section {
 	struct elf_section_header header;
 	size_t size;
 	uint8_t *data;
+};
+
+struct elf_program_header {
+	uint32_t p_type, p_flags;
+	uint64_t p_offset, p_vaddr, p_paddr;
+	uint64_t p_filesz, p_memsz, p_align;
 };
 
 static size_t elf_section_size, elf_section_cap;
@@ -440,7 +455,7 @@ void elf_finish(const char *path) {
 	fclose(output);
 }
 
-void elf_write(const char *path, struct object *object) {
+void elf_write_object(const char *path, struct object *object) {
 	elf_init();
 
 	for (unsigned i = 0; i < object->section_size; i++) {
@@ -499,4 +514,115 @@ void elf_write(const char *path, struct object *object) {
 	}
 
 	elf_finish(path);
+}
+
+#define PH_OFF 64
+
+static void write_header_exec(int segment_n, size_t entry) {
+	static uint8_t magic[4] = {0x7f, 0x45, 0x4c, 0x46};
+	write(magic, sizeof magic);
+
+	write_byte(2); // EI_CLASS = 64 bit
+	write_byte(1); // EI_DATA = little endian
+	write_byte(1); // EI_VERSION = 1
+	write_byte(0); // EI_OSABI = System V
+	write_byte(0); // EI_ABIVERSION = 0
+
+	write_zero(7); // Padding
+
+	write_word(2); // e_type = ET_EXEC
+	write_word(0x3e); // e_machine = AMD x86-64
+
+	write_long(1); // e_version = 1
+
+	write_quad(entry); // e_entry = ??
+	write_quad(PH_OFF); // e_phoff = ??
+	write_quad(0); // e_shoff = ??
+
+	write_long(0); // e_flags = 0
+	write_word(64); // e_ehsize = 64
+
+	write_word(7 * 8); // e_phentsize = 0
+	write_word(segment_n); // e_phnum = 0
+	write_word(0); // e_shentsize = 0
+	write_word(0); // e_shnum = 0
+	write_word(0); // e_shstrndx = SHN_UNDEF
+}
+
+static void write_program_header(struct elf_program_header *header) {
+	write_long(header->p_type);
+	write_long(header->p_flags);
+
+	write_quad(header->p_offset);
+	write_quad(header->p_vaddr);
+	write_quad(header->p_paddr);
+	write_quad(header->p_filesz);
+	write_quad(header->p_memsz);
+	write_quad(header->p_align);
+}
+
+enum {
+	PT_NULL = 0,
+	PT_LOAD = 1,
+};
+
+enum {
+	PF_X = 1 << 0,
+	PF_W = 1 << 1,
+	PF_R = 1 << 2
+};
+
+void elf_write_executable(const char *path, struct executable *executable) {
+	output = fopen(path, "wb");
+
+	write_header_exec(executable->segment_size, executable->entry);
+
+	size_t *segment_offsets = malloc(sizeof *segment_offsets * executable->segment_size);
+
+	write_skip(PH_OFF);
+	unsigned long current_file_offset = PH_OFF + 7 * 8 * executable->segment_size;
+	for (unsigned i = 0; i < executable->segment_size; i++) {
+		struct segment *segment = &executable->segments[i];
+
+		struct elf_program_header header = { 0 };
+
+		header.p_align = 0x1000;
+		header.p_type = PT_LOAD;
+
+		if (segment->executable)
+			header.p_flags |= PF_X;
+		if (segment->readable)
+			header.p_flags |= PF_R;
+		if (segment->writable)
+			header.p_flags |= PF_W;
+
+		current_file_offset =
+			round_up_to_nearest(current_file_offset, header.p_align);
+
+		header.p_offset = current_file_offset;
+
+		current_file_offset += segment->size;
+
+		header.p_vaddr = segment->load_address;
+		header.p_paddr = segment->load_address;
+		header.p_filesz = segment->size;
+		header.p_memsz = segment->load_size;
+
+		write_program_header(&header);
+
+		segment_offsets[i] = header.p_offset;
+	}
+
+	current_file_offset = PH_OFF + 7 * 8 * executable->segment_size;
+	assert(ftell(output) == (long)current_file_offset);
+
+	for (unsigned i = 0; i < executable->segment_size; i++) {
+		write_skip(segment_offsets[i]);
+		struct segment *segment = &executable->segments[i];
+		write(segment->data, segment->size);
+	}
+
+	fclose(output);
+
+	free(segment_offsets);
 }
