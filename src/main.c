@@ -96,6 +96,9 @@ static void set_flags(struct arguments *arguments) {
 	}
 }
 
+static size_t object_size, object_cap;
+static struct object *objects;
+
 static void compile_file(const char *path,
 						 struct arguments *arguments) {
 	struct string_view basename = get_basename(path);
@@ -153,8 +156,7 @@ static void compile_file(const char *path,
 		elf_write_object(outfile, &out_object);
 	} else if (arguments->flag_S) {
 	} else {
-		struct executable *executable = linker_link(1, &out_object);
-		elf_write_executable(outfile, executable);
+		ADD_ELEMENT(object_size, object_cap, objects) = out_object;
 	}
 
 	// TODO: The compiler currently relies too heavily on global state.
@@ -171,8 +173,6 @@ int main(int argc, char **argv) {
 		NOTIMP();
 
 	if (!(arguments.flag_S || arguments.flag_c)) {
-		if (arguments.n_operand != 1)
-			NOTIMP();
 		printf("Warning! Emitting executables is still work in progress.\n");
 	}
 
@@ -186,6 +186,11 @@ int main(int argc, char **argv) {
 
 	for (int i = 0; i < arguments.n_operand; i++) {
 		compile_file(arguments.operands[i], &arguments);
+	}
+
+	if (object_size) {
+		struct executable *executable = linker_link(object_size, objects);
+		elf_write_executable(arguments.outfile ? arguments.outfile : "a.out", executable);
 	}
 
 	arguments_free(&arguments);
