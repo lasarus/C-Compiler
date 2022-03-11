@@ -15,6 +15,7 @@
 void symbols_push_scope(void);
 void symbols_pop_scope(void);
 void symbols_init(void);
+void symbols_reset(void);
 
 struct symbol_identifier {
 	enum {

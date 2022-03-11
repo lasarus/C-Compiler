@@ -20,6 +20,13 @@ static const char *current_section;
 
 static struct object *out_object;
 
+void asm_reset(void) {
+	assemble_to_text = 0;
+	out = NULL;
+	current_section = NULL;
+	out_object = NULL;
+}
+
 void asm_init_text_out(const char *path) {
 	assemble_to_text = 1;
 	current_section = ".text";

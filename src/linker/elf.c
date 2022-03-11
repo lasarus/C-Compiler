@@ -61,8 +61,53 @@ enum {
 	STT_SECTION = 3
 };
 
+// TODO: Remove global state.
 static size_t shstring_size, shstring_cap;
 static char *shstrings = NULL;
+
+static size_t string_size, string_cap;
+static char *strings = NULL;
+
+static size_t symbol_size, symbol_cap;
+struct symbol_ *symbols;
+
+static FILE *output = NULL;
+
+static size_t elf_section_size, elf_section_cap;
+static struct elf_section *elf_sections = NULL;
+
+static uint64_t sh_address = 0;
+
+static size_t section_size, section_cap;
+struct section_ *sections = NULL;
+
+struct section_ *current_section = NULL;
+
+static void elf_reset(void) {
+	shstring_size = shstring_cap = 0;
+	free(shstrings);
+	shstrings = NULL;
+
+	string_size = string_cap = 0;
+	free(strings);
+	strings = NULL;
+
+	symbol_size = symbol_cap = 0;
+	free(symbols);
+	symbols = NULL;
+
+	elf_section_size = elf_section_cap = 0;
+	free(elf_sections);
+	elf_sections = NULL;
+
+	section_size = section_cap = 0;
+	free(sections);
+	sections = NULL;
+
+	output = NULL;
+	sh_address = 0;
+	current_section = NULL;
+}
 
 static int register_shstring(const char *str) {
 	char *space = ADD_ELEMENTS(shstring_size, shstring_cap, shstrings, strlen(str) + 1);
@@ -71,9 +116,6 @@ static int register_shstring(const char *str) {
 
 	return space - shstrings;
 }
-
-static size_t string_size, string_cap;
-static char *strings = NULL;
 
 static int register_string(const char *str) {
 	char *space = ADD_ELEMENTS(string_size, string_cap, strings, strlen(str) + 1);
@@ -114,9 +156,6 @@ struct symbol_ {
 	int type;
 };
 
-size_t symbol_size, symbol_cap;
-struct symbol_ *symbols;
-
 static int find_symbol(const char *name) {
 	for (unsigned i = 0; i < symbol_size; i++) {
 		if (symbols[i].name && strcmp(symbols[i].name, name) == 0)
@@ -138,11 +177,6 @@ int elf_new_symbol(char *name) {
 
 	return symbol_size - 1;
 }
-
-size_t section_size, section_cap;
-struct section_ *sections = NULL;
-
-struct section_ *current_section = NULL;
 
 void elf_set_section(const char *section) {
 	for (unsigned i = 0; i < section_size; i++) {
@@ -174,8 +208,6 @@ void elf_write_data(uint8_t *data, int len) {
 	memcpy(ADD_ELEMENTS(current_section->size, current_section->cap, current_section->data, len),
 		   data, len);
 }
-
-static FILE *output = NULL;
 
 static void write(const void *ptr, size_t size) {
 	if (fwrite(ptr, size, 1, output) != 1)
@@ -232,11 +264,6 @@ struct elf_program_header {
 	uint64_t p_offset, p_vaddr, p_paddr;
 	uint64_t p_filesz, p_memsz, p_align;
 };
-
-static size_t elf_section_size, elf_section_cap;
-static struct elf_section *elf_sections = NULL;
-
-uint64_t sh_address = 0;
 
 static void write_header(int shstrndx) {
 	static uint8_t magic[4] = {0x7f, 0x45, 0x4c, 0x46};
@@ -456,6 +483,7 @@ void elf_finish(const char *path) {
 }
 
 void elf_write_object(const char *path, struct object *object) {
+	elf_reset();
 	elf_init();
 
 	for (unsigned i = 0; i < object->section_size; i++) {
@@ -573,6 +601,8 @@ enum {
 };
 
 void elf_write_executable(const char *path, struct executable *executable) {
+	elf_reset();
+
 	output = fopen(path, "wb");
 
 	write_header_exec(executable->segment_size, executable->entry);

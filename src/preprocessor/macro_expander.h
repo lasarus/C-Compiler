@@ -26,4 +26,6 @@ struct token expander_next(void);
 
 void expand_token_list(struct token_list *ts);
 
+void macro_expander_reset(void);
+
 #endif

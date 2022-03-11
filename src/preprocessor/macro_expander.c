@@ -7,16 +7,20 @@
 
 #include <assert.h>
 
-void expand_buffer(int input, int return_output, struct token *t);
-
-#define NEXT() directiver_next();
-
 #define MAP_SIZE 1024
 struct define_map {
 	struct define **entries;
 };
 
 static struct define_map *define_map = NULL;
+
+void macro_expander_reset(void) {
+	free(define_map->entries);
+	free(define_map);
+	define_map = NULL;
+}
+
+void expand_buffer(int input, int return_output, struct token *t);
 
 void define_map_init(void) {
 	define_map = malloc(sizeof *define_map);
@@ -222,7 +226,7 @@ struct token input_buffer_take(int input) {
 		return input_buffer.tokens[--input_buffer.size];
 
 	if (input) {
-		return NEXT();
+		return directiver_next();
 	} else {
 		ICE("Reached end of input buffer.");
 	}
@@ -233,7 +237,7 @@ struct token *input_buffer_top(int input) {
 		return &input_buffer.tokens[input_buffer.size - 1];
 
 	if (input) {
-		struct token t = NEXT();
+		struct token t = directiver_next();
 		input_buffer_push(&t);
 		return input_buffer_top(input);
 	} else {

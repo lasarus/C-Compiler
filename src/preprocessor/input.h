@@ -34,4 +34,6 @@ struct input input_open_string(char *str);
 
 void input_free(struct input *input);
 
+void input_reset(void);
+
 #endif

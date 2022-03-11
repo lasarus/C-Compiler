@@ -2,11 +2,12 @@
 #include "directives.h"
 #include "tokenizer.h"
 #include "string_concat.h"
+#include "macro_expander.h"
 
 #include <common.h>
 #include <assert.h>
 
-struct token_stream {
+static struct token_stream {
 	struct token buffer[3], pushed;
 } ts;
 
@@ -36,4 +37,10 @@ void preprocessor_init(const char *path) {
 struct token *t_peek(int n) {
 	assert(n <= 2);
 	return &ts.buffer[n];
+}
+
+void preprocessor_reset(void) {
+	directiver_reset();
+	input_reset();
+	macro_expander_reset();
 }

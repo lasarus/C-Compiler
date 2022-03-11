@@ -53,5 +53,6 @@ void t_push(struct token t);
 struct token *t_peek(int n);
 
 void preprocessor_init(const char *path);
+void preprocessor_reset(void);
 
 #endif

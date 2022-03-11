@@ -18,7 +18,7 @@ struct jump_blocks {
 	struct case_labels *case_labels;
 };
 
-struct function_scope {
+static struct function_scope {
 	int size, cap;
 
 	struct function_scope_label {

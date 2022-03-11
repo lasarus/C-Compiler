@@ -20,4 +20,6 @@ int get_variable_stack_bucket(var_id variable);
 void change_variable_size(var_id variable, int size);
 void variable_set_stack_bucket(var_id variable, int stack_bucket);
 
+void variables_reset(void);
+
 #endif

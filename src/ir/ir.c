@@ -12,6 +12,18 @@
 static size_t block_size, block_cap;
 static struct block *blocks;
 
+struct ir ir;
+
+void ir_reset(void) {
+	block_size = block_cap = 0;
+	free(blocks);
+	blocks = NULL;
+
+	ir = (struct ir) { 0 };
+
+	variables_reset();
+}
+
 block_id new_block() {
 	int id = (int)block_size;
 	ADD_ELEMENT(block_size, block_cap, blocks) = (struct block) {
@@ -26,8 +38,6 @@ block_id new_block() {
 struct block *get_block(block_id id) {
 	return blocks + id;
 }
-
-struct ir ir;
 
 struct function *get_current_function(void) {
 	return &ir.functions[ir.size - 1];

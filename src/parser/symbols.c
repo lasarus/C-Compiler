@@ -241,3 +241,13 @@ void symbols_init(void) {
 	for (int i = 0; i < hash_table.size; i++)
 		hash_table.entries[i] = -1;
 }
+
+void symbols_reset(void) {
+	free(hash_table.entries);
+	hash_table = (struct hash_table) { 0 };
+
+	free(table.entries);
+	table = (struct table) { 0 };
+
+	current_block = 0;
+}

@@ -14,6 +14,11 @@ struct variable_data {
 
 static int variables_size, variables_cap = 0;
 
+void variables_reset(void) {
+	variables_size = variables_cap = 0;
+	free(variables);
+	variables = NULL;
+}
 
 var_id new_variable(struct type *type, int allocate, int stack_bucket) {
 	return new_variable_sz(calculate_size(type), allocate, stack_bucket);

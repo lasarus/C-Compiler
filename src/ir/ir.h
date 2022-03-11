@@ -282,8 +282,9 @@ void ir_get_offset(var_id member_address, var_id base_address, var_id offset_var
 void ir_set_bits(var_id result, var_id field, var_id value, int offset, int length);
 void ir_get_bits(var_id result, var_id field, int offset, int length, int sign_extend);
 
-
 struct function *get_current_function(void);
 struct block *get_current_block(void);
+
+void ir_reset(void);
 
 #endif

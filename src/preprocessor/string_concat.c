@@ -23,7 +23,7 @@ enum string_type {
 
 static char *buffer = NULL;
 static size_t buffer_size = 0, buffer_cap = 0;
-enum string_type buffer_type = STRING_DEFAULT;
+static enum string_type buffer_type = STRING_DEFAULT;
 
 static void buffer_start(void) {
 	buffer_size = 0;

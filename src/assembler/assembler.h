@@ -118,4 +118,6 @@ void asm_zero(int len);
 void asm_label(int global, label_id label);
 void asm_string(struct string_view str);
 
+void asm_reset(void);
+
 #endif

@@ -156,6 +156,12 @@ static void compile_file(const char *path,
 		struct executable *executable = linker_link(1, &out_object);
 		elf_write_executable(outfile, executable);
 	}
+
+	// TODO: The compiler currently relies too heavily on global state.
+	preprocessor_reset();
+	ir_reset();
+	asm_reset();
+	parser_reset();
 }
 
 int main(int argc, char **argv) {
@@ -165,11 +171,15 @@ int main(int argc, char **argv) {
 		NOTIMP();
 
 	if (!(arguments.flag_S || arguments.flag_c)) {
+		if (arguments.n_operand != 1)
+			NOTIMP();
 		printf("Warning! Emitting executables is still work in progress.\n");
 	}
 
-	if (arguments.n_operand != 1)
-		NOTIMP();
+	if (arguments.n_operand != 1 && arguments.outfile &&
+		(arguments.flag_S || arguments.flag_c)) {
+		ARG_ERROR(0, "Can't have multiple input files with -o.");
+	}
 
 	init_source_character_set();
 	set_flags(&arguments);

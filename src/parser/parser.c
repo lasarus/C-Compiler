@@ -9,7 +9,11 @@
 #include <string.h>
 #include <assert.h>
 
-void parse_into_ir() {
+void parser_reset(void) {
+	symbols_reset();
+}
+
+void parse_into_ir(void) {
 	init_variables();
 
 	while (parse_declaration(1) || TACCEPT(T_SEMI_COLON));

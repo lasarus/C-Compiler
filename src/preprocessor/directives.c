@@ -21,7 +21,18 @@ struct tokenized_file {
 	struct tokenized_file *parent;
 };
 
-struct tokenized_file *current_file;
+static struct tokenized_file *current_file;
+
+static const char *new_filename = NULL;
+static int line_diff = 0;
+
+// Resets all global state. Not very elegant.
+void directiver_reset(void) {
+	new_filename = NULL;
+	line_diff = 0;
+	pushed_idx = 0;
+	current_file = NULL;
+}
 
 void directiver_push_input(const char *path, int system) {
 	struct input *prev_input = current_file ? current_file->input : NULL;
@@ -60,9 +71,6 @@ void push(struct token t) {
 		ICE("Pushed too many directive tokens.");
 	pushed[pushed_idx++] = t;
 }
-
-static const char *new_filename = NULL;
-static int line_diff = 0;
 
 struct token next() {
 	struct token t = pushed_idx ? pushed[--pushed_idx] : next_from_stack();

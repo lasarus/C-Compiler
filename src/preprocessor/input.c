@@ -5,6 +5,19 @@
 #include <errno.h>
 #include <assert.h>
 
+static size_t paths_size = 0, paths_cap;
+static const char **paths = NULL;
+
+// Used for #pragma once.
+static struct string_set disabled_headers;
+
+void input_reset(void) {
+	paths_size = paths_cap = 0;
+	free(paths);
+	paths = 0;
+	disabled_headers = (struct string_set) { 0 };
+}
+
 void read_contents(struct input *input, FILE *fp) {
 	int c;
 	while ((c = fgetc(fp)) != EOF) {
@@ -90,12 +103,6 @@ void input_next(struct input *input) {
 		input->filename, input->iline, input->icol
 	};
 }
-
-static size_t paths_size = 0, paths_cap;
-static const char **paths = NULL;
-
-// Used for #pragma once.
-static struct string_set disabled_headers;
 
 void input_add_include_path(const char *path) {
 	ADD_ELEMENT(paths_size, paths_cap, paths) = path;
