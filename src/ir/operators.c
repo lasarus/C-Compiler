@@ -145,15 +145,6 @@ int operators_constant(enum operator_type op,
 	return 1;
 }
 
-int uop_integer(enum unary_operator_type op, int rhs) {
-	switch (op) {
-	case UOP_PLUS: return +rhs;
-	case UOP_NEG: return -rhs;
-	case UOP_BNOT: return ~rhs;
-	default: NOTIMP();
-	}
-}
-
 int operators_constant_unary(enum unary_operator_type op,
 							 struct constant rhs, struct constant *result) {
 	if (rhs.type != CONSTANT_TYPE)

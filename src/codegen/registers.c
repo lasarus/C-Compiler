@@ -34,16 +34,6 @@ int size_to_idx(int size) {
 	}
 }
 
-char size_to_suffix(int size) {
-	switch (size) {
-	case 8: return 'q';
-	case 4: return 'l';
-	case 2: return 'w';
-	case 1: return 'b';
-	default: ICE("Invalid register size %d", size);
-	}
-}
-
 const char *get_reg_name(int id, int size) {
 	return registers[id][size_to_idx(size)];
 }
@@ -92,43 +82,5 @@ void reg_to_scalar(int reg, var_id scalar) {
 		}
 
 		i += msize;
-	}
-}
-
-void load_address(struct type *type, var_id result) {
-	if (type_is_pointer(type)) {
-		asm_ins2("movq", MEM(0, REG_RDI), R8(REG_RAX));
-		reg_to_scalar(REG_RAX, result);
-	} else if (type->type == TY_SIMPLE) {
-		switch (type->simple) {
-		case ST_INT:
-			asm_ins2("movl", MEM(0, REG_RDI), R4(REG_RAX));
-			reg_to_scalar(REG_RAX, result);
-			break;
-
-		default:
-			NOTIMP();
-		}
-	} else {
-		ICE("Can't load type %s", dbg_type(type));
-	}
-}
-
-void store_address(struct type *type, var_id result) {
-	if (type_is_pointer(type)) {
-		scalar_to_reg(result, REG_RAX);
-		asm_ins2("movq", R8(REG_RAX), MEM(0, REG_RDI));
-	} else if (type->type == TY_SIMPLE) {
-		switch (type->simple) {
-		case ST_INT:
-			scalar_to_reg(result, REG_RAX);
-			asm_ins2("movl", R4(REG_RAX), MEM(0, REG_RDI));
-			break;
-
-		default:
-			NOTIMP();
-		}
-	} else {
-		NOTIMP();
 	}
 }

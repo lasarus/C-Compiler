@@ -43,14 +43,6 @@ uint32_t sv_hash(struct string_view sv) {
 	return hash;
 }
 
-struct string_view sv_concat(struct string_view a, struct string_view b) {
-	struct string_view ret = { .len = a.len + b.len };
-	ret.str = malloc(ret.len);
-	memcpy(ret.str, a.str, a.len);
-	memcpy(ret.str + a.len, b.str, b.len);
-	return ret;
-}
-
 void sv_tail(struct string_view *sv, int n) {
 	sv->len -= n;
 	sv->str += n;

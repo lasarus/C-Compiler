@@ -10,10 +10,6 @@ void token_list_add(struct token_list *list, struct token t) {
 	ADD_ELEMENT(list->size, list->cap, list->list) = t;
 }
 
-void token_list_pop(struct token_list *list) {
-	list->size--;
-}
-
 int token_list_index_of(struct token_list *list, struct token t) {
 	for (int i = 0; i < list->size; i++) {
 		if (sv_cmp(list->list[i].str, t.str)) return i;

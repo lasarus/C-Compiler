@@ -169,7 +169,6 @@ int evaluate_constant_expression(struct expr *expr, struct constant *constant);
 var_id expression_to_ir(struct expr *expr);
 var_id expression_to_ir_clear_temp(struct expr *expr);
 
-int expression_is_zero(struct expr *expr);
 int constant_is_zero(struct constant *c);
 
 #endif

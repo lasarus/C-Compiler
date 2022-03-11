@@ -149,7 +149,6 @@ int type_search_member(struct type *type, struct string_view name,
 struct type *type_select(struct type *type, int index);
 void type_get_offsets(struct type *type, int index, int *offset, int *bit_offset, int *bit_size);
 
-int type_is_real(struct type *type);
 int type_is_arithmetic(struct type *type);
 int type_is_floating(struct type *type);
 int type_is_integer(struct type *type);

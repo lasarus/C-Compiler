@@ -1501,9 +1501,3 @@ int constant_is_zero(struct constant *c) {
 
 	return 0;
 }
-
-int expression_is_zero(struct expr *expr) {
-	struct constant *c = expression_to_constant(expr);
-
-	return c && constant_is_zero(c);
-}

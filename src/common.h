@@ -26,8 +26,6 @@ uint32_t hash32(uint32_t a);
 //uint32_t hash_str(const char *str);
 char *allocate_printf(const char *fmt, ...);
 
-int str_contains(const char *str, char c);
-
 int round_up_to_nearest(int num, int div);
 
 char *strdup(const char *s);

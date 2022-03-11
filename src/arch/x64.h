@@ -70,7 +70,6 @@ struct constant {
 
 struct constant constant_simple_signed(enum simple_type type, constant_int value);
 struct constant constant_simple_unsigned(enum simple_type type, constant_uint value);
-struct constant constant_simple_float(enum simple_type type, double f);
 
 struct constant constant_increment(struct constant a);
 struct constant constant_from_string(struct string_view str);

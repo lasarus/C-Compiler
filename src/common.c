@@ -35,11 +35,6 @@ char *allocate_printf(const char *fmt, ...) {
 	return str;
 }
 
-int str_contains(const char *str, char c) {
-	for (; *str && (*str != c); str++);
-	return *str ? 1 : 0;
-}
-
 int round_up_to_nearest(int num, int div) {
 	int r = num % div;
 	if (r)

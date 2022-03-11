@@ -293,18 +293,6 @@ int type_is_arithmetic(struct type *type) {
 		type_is_floating(type);
 }
 
-int type_is_real(struct type *type) {
-	if (type->type != TY_SIMPLE)
-		return 0;
-
-	if (type->simple == ST_FLOAT_COMPLEX ||
-		type->simple == ST_DOUBLE_COMPLEX ||
-		type->simple == ST_LDOUBLE_COMPLEX)
-		return 0;
-	return type_is_integer(type) ||
-		type_is_floating(type);
-}
-
 int type_is_pointer(struct type *type) {
 	return type->type == TY_POINTER;
 }

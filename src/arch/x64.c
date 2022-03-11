@@ -646,8 +646,3 @@ struct constant constant_simple_unsigned(enum simple_type type, constant_uint va
 		.uint_d = value
 	};
 }
-
-struct constant constant_simple_float(enum simple_type type, double f) {
-	(void)type, (void)f;
-	NOTIMP();
-}
