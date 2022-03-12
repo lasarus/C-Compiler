@@ -122,3 +122,22 @@ uint64_t gen_mask(unsigned char left_pad, unsigned char right_pad) {
 
     return ~start;
 }
+
+void write_8(uint8_t *data, uint64_t value) {
+	data[0] = value;
+}
+
+void write_16(uint8_t *data, uint64_t value) {
+	data[0] = value;
+	data[1] = value >> 8;
+}
+
+void write_32(uint8_t *data, uint64_t value) {
+	write_16(data, value);
+	write_16(data + 2, value >> 16);
+}
+
+void write_64(uint8_t *data, uint64_t value) {
+	write_32(data, value);
+	write_32(data + 4, value >> 32);
+}

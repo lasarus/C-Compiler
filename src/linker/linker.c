@@ -26,21 +26,6 @@ struct combined_symbol {
 	int object_idx, section_idx;
 };
 
-static void write_16(uint8_t *data, uint64_t value) {
-	data[0] = value;
-	data[1] = value >> 8;
-}
-
-static void write_32(uint8_t *data, uint64_t value) {
-	write_16(data, value);
-	write_16(data + 2, value >> 16);
-}
-
-static void write_64(uint8_t *data, uint64_t value) {
-	write_32(data, value);
-	write_32(data + 4, value >> 32);
-}
-
 // This also modifies the values inside each object file.
 static struct object *combine_objects(int n_objects, struct object *objects) {
 	struct object object = { 0 };

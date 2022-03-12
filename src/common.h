@@ -37,6 +37,11 @@ void character_to_escape_sequence(char character, char *output, int allow_compil
 
 void init_source_character_set(void);
 
+void write_8(uint8_t *data, uint64_t value);
+void write_16(uint8_t *data, uint64_t value);
+void write_32(uint8_t *data, uint64_t value);
+void write_64(uint8_t *data, uint64_t value);
+
 #include <debug.h>
 
 #endif
