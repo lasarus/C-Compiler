@@ -217,6 +217,7 @@ struct encoding encodings[] = {
 
 	{"testb", 0x84, .slash_r = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_MODRM_REG, 0}}, .operand_accepts = {A_MODRM(1), A_REG(1)}},
 	{"testl", 0x85, .slash_r = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_MODRM_REG, 0}}, .operand_accepts = {A_MODRM(4), A_REG(4)}},
+	{"testw", 0x85, .op_size_prefix = 1, .slash_r = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_MODRM_REG, 0}}, .operand_accepts = {A_MODRM(2), A_REG(2)}},
 	{"testq", 0x85, .rexw = 1, .slash_r = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_MODRM_REG, 0}}, .operand_accepts = {A_MODRM(8), A_REG(8)}},
 
 	{"movsd", 0x0f, .op2 = 0x11, .repne_prefix = 1, .slash_r = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_MODRM_REG, 0}}, .operand_accepts = {A_XMM_M64, A_XMM}},
