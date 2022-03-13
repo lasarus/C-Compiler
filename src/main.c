@@ -12,6 +12,7 @@
 #include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <assert.h>
 
 static void add_implementation_defs(void) {
 	define_string("NULL", "(void*)0");
@@ -42,9 +43,9 @@ struct string_view get_basename(const char *path) {
 	return sv_slice_string((char *)path, last_slash + 1, -1);
 }
 
-static int is_c_file(struct string_view view) {
+static int is_ext_file(struct string_view view, char ext) {
 	return view.str[view.len - 2] == '.' &&
-		view.str[view.len - 1] == 'c';
+		view.str[view.len - 1] == ext;
 }
 
 static void add_definition(const char *str) {
@@ -102,9 +103,6 @@ static struct object *objects;
 static void compile_file(const char *path,
 						 struct arguments *arguments) {
 	struct string_view basename = get_basename(path);
-
-	if (!is_c_file(basename))
-		NOTIMP();
 
 	symbols_init();
 
@@ -185,7 +183,16 @@ int main(int argc, char **argv) {
 	set_flags(&arguments);
 
 	for (int i = 0; i < arguments.n_operand; i++) {
-		compile_file(arguments.operands[i], &arguments);
+		struct string_view basename = get_basename(arguments.operands[i]);
+		if (is_ext_file(basename, 'c')) {
+			compile_file(arguments.operands[i], &arguments);
+		} else if (is_ext_file(basename, 'o')) {
+			assert(!(arguments.flag_S || arguments.flag_c));
+			struct object *object = elf_read_object(arguments.operands[i]);
+			ADD_ELEMENT(object_size, object_cap, objects) = *object;
+		} else {
+			NOTIMP();
+		}
 	}
 
 	if (object_size) {

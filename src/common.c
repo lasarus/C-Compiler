@@ -141,3 +141,19 @@ void write_64(uint8_t *data, uint64_t value) {
 	write_32(data, value);
 	write_32(data + 4, value >> 32);
 }
+
+uint8_t read_8(uint8_t *data) {
+	return data[0];
+}
+
+uint16_t read_16(uint8_t *data) {
+	return read_8(data) | ((uint16_t)read_8(data + 1) << 8);
+}
+
+uint32_t read_32(uint8_t *data) {
+	return read_16(data) | ((uint32_t)read_16(data + 2) << 16);
+}
+
+uint64_t read_64(uint8_t *data) {
+	return read_32(data) | ((uint64_t)read_32(data + 4) << 32);
+}

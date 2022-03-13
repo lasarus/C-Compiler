@@ -195,6 +195,118 @@ static void elf_allocate_sections(struct elf_file *elf) {
 	}
 }
 
+static struct object *object_from_elf(struct elf_file *elf) {
+	struct object object = { 0 };
+
+	int *section_mapping = malloc(sizeof *section_mapping * elf->section_size);
+	for (unsigned i = 0; i < elf->section_size; i++)
+		section_mapping[i] = -1;
+
+	// Add progbits sections.
+	for (unsigned i = 0; i < elf->section_size; i++) {
+		struct elf_section *elf_section = &elf->sections[i];
+		if (elf_section->header.sh_type != SHT_PROGBITS)
+			continue;
+
+		struct section *section =
+			&ADD_ELEMENT(object.section_size, object.section_cap, object.sections);
+
+		section_mapping[i] = section - object.sections;
+
+		*section = (struct section) {
+			.size = elf_section->size,
+			.cap = elf_section->size,
+			.data = elf_section->data,
+		};
+
+		if (elf_section->header.sh_name)
+			section->name = strdup(elf->shstrings + elf_section->header.sh_name);
+	}
+
+	int *symbol_mapping = NULL;
+
+	for (unsigned i = 0; i < elf->section_size; i++) {
+		struct elf_section *symtab_section = &elf->sections[i];
+		if (symtab_section->header.sh_type != SHT_SYMTAB)
+			continue;
+
+		size_t ent_size = symtab_section->header.sh_entsize;
+		size_t ent_count = symtab_section->header.sh_size / ent_size;
+
+		symbol_mapping = malloc(sizeof *symbol_mapping * ent_count);
+
+		for (unsigned j = 1; j < ent_count; j++) {
+			uint8_t *symbol_data = symtab_section->data + j * ent_size;
+
+			uint32_t st_name = read_32(symbol_data + 0);
+			uint8_t st_info = read_8(symbol_data + 4);
+			/*uint8_t st_other =*/ read_8(symbol_data + 5);
+			uint16_t st_shndx = read_16(symbol_data + 6);
+			uint64_t st_value = read_64(symbol_data + 8);
+			uint64_t st_size = read_64(symbol_data + 16);
+
+			if ((st_info & 0xf) != STT_NOTYPE)
+				continue;
+
+			struct symbol *symbol = &ADD_ELEMENT(object.symbol_size, object.symbol_cap, object.symbols);
+
+			*symbol = (struct symbol) {
+				.global = st_info & (STB_GLOBAL << 4),
+				.name = st_name ? strdup(elf->strings + st_name) : NULL,
+				.section = section_mapping[st_shndx],
+				.size = st_size,
+				.value = st_value,
+			};
+
+			symbol_mapping[j] = symbol - object.symbols;
+		}
+	}
+
+	for (unsigned i = 0; i < elf->section_size; i++) {
+		struct elf_section *elf_section = &elf->sections[i];
+		if (elf_section->header.sh_type != SHT_RELA)
+			continue;
+
+		struct section *target_section = &object.sections[section_mapping[elf_section->header.sh_info]];
+
+		size_t ent_size = elf_section->header.sh_entsize;
+		size_t ent_count = elf_section->header.sh_size / ent_size;
+
+		for (unsigned j = 0; j < ent_count; j++) {
+			uint8_t *rela_data = elf_section->data + ent_size * j;
+
+			uint64_t r_offset = read_64(rela_data);
+			uint64_t r_info = read_64(rela_data + 8);
+			uint64_t r_addend = read_64(rela_data + 16);
+
+			int type = 0;
+			switch (r_info & 0xffff) {
+			case R_X86_64_64: type = RELOCATE_64; break;
+			case R_X86_64_32S: type = RELOCATE_32; break;
+			case R_X86_64_PC32: type = RELOCATE_32_RELATIVE; break;
+			default: NOTIMP();
+			}
+
+			struct object_relocation *relocation =
+				&ADD_ELEMENT(target_section->relocation_size, target_section->relocation_cap, target_section->relocations);
+
+			*relocation = (struct object_relocation) {
+				.add = r_addend,
+				.offset = r_offset,
+				.idx = symbol_mapping[(r_info >> 32) & 0xffff],
+				.type = type,
+			};
+		}
+	}
+
+	free(section_mapping);
+	free(symbol_mapping);
+
+	struct object *ret = malloc(sizeof *ret);
+	*ret = object;
+	return ret;
+}
+
 static struct elf_file *elf_from_object(struct object *object) {
 	struct elf_file elf = { 0 };
 
@@ -438,8 +550,83 @@ static void write_skip(FILE *fp, size_t target) {
 	write_zero(fp, target - current_pos);
 }
 
+static void read(FILE *fp, void *ptr, size_t size) {
+	if (fread(ptr, size, 1, fp) != 1)
+		ICE("Could not read from file");
+}
+
+static uint8_t read_byte(FILE *fp) {
+	uint8_t byte;
+	read(fp, &byte, 1);
+	return byte;
+}
+
+static uint16_t read_word(FILE *fp) {
+	return read_byte(fp) | ((uint16_t)read_byte(fp) << 8);
+}
+
+static uint32_t read_long(FILE *fp) {
+	return read_word(fp) | ((uint32_t)read_word(fp) << 16);
+}
+
+static uint64_t read_quad(FILE *fp) {
+	return read_long(fp) | ((uint64_t)read_long(fp) << 32);
+}
+
+static void read_zero(FILE *fp, size_t size) {
+	for (size_t i = 0; i < size; i++)
+		read_byte(fp); // TODO: Make this faster.
+}
+
+static void read_skip(FILE *fp, unsigned long pos) {
+	fseek(fp, pos, SEEK_SET);
+}
+
+static const uint8_t magic[4] = {0x7f, 0x45, 0x4c, 0x46};
+
+static void read_header(FILE *fp, struct elf_file *elf) {
+	static uint8_t magic_buffer[4];
+	read(fp, magic_buffer, sizeof magic_buffer);
+
+	for (unsigned i = 0; i < sizeof magic_buffer; i++)
+		if (magic_buffer[i] != magic[i])
+			ICE("Not an elf-file.");
+
+	assert(read_byte(fp) == 2); // EI_CLASS = 64 bit
+	assert(read_byte(fp) == 1); // EI_DATA = little endian
+	assert(read_byte(fp) == 1); // EI_VARSION = 1
+	assert(read_byte(fp) == 0); // EI_OSABI = System V
+	assert(read_byte(fp) == 0); // EI_ABIVERSION = 0
+
+	read_zero(fp, 7);
+
+	elf->header.e_type = read_word(fp);
+	assert(read_word(fp) == 0x3e); // e_machine = AMD x86-64
+
+	assert(read_long(fp) == 1); // e_version = 1
+
+	elf->header.e_entry = read_quad(fp); // e_entry
+	elf->header.e_phoff = read_quad(fp); // e_phoff
+	elf->header.e_shoff = read_quad(fp); // e_shoff
+
+	assert(read_long(fp) == 0); // e_flags = 0
+	assert(read_word(fp) == 64); // e_ehsize = 64
+
+	uint16_t e_phentsize = read_word(fp); // e_phentsize
+	elf->segment_size = read_word(fp); // e_phnum
+
+	assert(elf->segment_size == 0 || e_phentsize == 7 * 8);
+
+	uint16_t e_shentsize = read_word(fp); // e_shentsize
+	elf->section_size = read_word(fp); // e_shnum
+
+	assert(elf->segment_size == 0 || e_phentsize == 7 * 8);
+	assert(elf->section_size == 0 || e_shentsize == 8 * 8);
+
+	elf->header.e_shstrndx = read_word(fp); // e_shstrndx
+}
+
 static void write_header(FILE *fp, struct elf_file *elf) {
-	static uint8_t magic[4] = {0x7f, 0x45, 0x4c, 0x46};
 	write(fp, magic, sizeof magic);
 
 	write_byte(fp, 2); // EI_CLASS = 64 bit
@@ -469,6 +656,22 @@ static void write_header(FILE *fp, struct elf_file *elf) {
 	write_word(fp, elf->header.e_shstrndx); // e_shstrndx
 }
 
+static void read_section_header(FILE *fp, struct elf_section_header *header, size_t *size) {
+	header->sh_name = read_long(fp);
+	header->sh_type = read_long(fp);
+
+	header->sh_flags = read_quad(fp);
+	header->sh_addr = read_quad(fp);
+	header->sh_offset = read_quad(fp);
+	header->sh_size = *size = read_quad(fp);
+
+	header->sh_link = read_long(fp);
+	header->sh_info = read_long(fp);
+
+	header->sh_addralign = read_quad(fp);
+	header->sh_entsize = read_quad(fp);
+}
+
 static void write_section_header(FILE *fp, struct elf_section_header *header, size_t size) {
 	write_long(fp, header->sh_name);
 	write_long(fp, header->sh_type);
@@ -483,6 +686,33 @@ static void write_section_header(FILE *fp, struct elf_section_header *header, si
 
 	write_quad(fp, header->sh_addralign);
 	write_quad(fp, header->sh_entsize);
+}
+
+static void read_sections(FILE *fp, struct elf_file *elf) {
+	if (!elf->section_size)
+		return;
+
+	read_skip(fp, elf->header.e_shoff);
+
+	elf->section_cap = elf->section_size;
+	elf->sections = malloc(sizeof *elf->sections * elf->section_cap);
+	for (unsigned i = 0; i < elf->section_size; i++) {
+		struct elf_section *section = &elf->sections[i];
+
+		read_section_header(fp, &section->header, &section->size);
+	}
+
+	for (unsigned i = 0; i < elf->section_size; i++) {
+		struct elf_section *section = &elf->sections[i];
+
+		if (section->size == 0)
+			continue;
+
+		read_skip(fp, section->header.sh_offset);
+
+		section->data = malloc(section->size);
+		read(fp, section->data, section->size);
+	}
 }
 
 static void write_sections(FILE *fp, struct elf_file *elf) {
@@ -554,6 +784,48 @@ static void elf_write(const char *path, struct elf_file *elf) {
 	fclose(fp);
 }
 
+struct elf_file *elf_read(const char *path) {
+	FILE *fp = fopen(path, "rb");
+	struct elf_file elf = { 0 };
+
+	read_header(fp, &elf);
+
+	if (elf.segment_size)
+		NOTIMP();
+
+	read_sections(fp, &elf);
+
+	// Add strtab and shstrtab if they exist.
+	if (elf.header.e_shstrndx) {
+		struct elf_section *shstrtab_section = &elf.sections[elf.header.e_shstrndx];
+		assert(shstrtab_section->header.sh_type == SHT_STRTAB);
+
+		elf.shstring_cap = elf.shstring_size = shstrtab_section->size;
+		elf.shstrings = (char *)shstrtab_section->data;
+	}
+
+	for (unsigned i = 0; i < elf.section_size; i++) {
+		struct elf_section *symtab_section = &elf.sections[i];
+		if (symtab_section->header.sh_type != SHT_SYMTAB)
+			continue;
+
+		if (elf.strings)
+			ICE("Multiple .strtab not supported");
+
+		struct elf_section *strtab_section = &elf.sections[symtab_section->header.sh_link];
+		assert(strtab_section->header.sh_type == SHT_STRTAB);
+
+		elf.string_cap = elf.string_size = strtab_section->size;
+		elf.strings = (char *)strtab_section->data;
+	}
+
+	fclose(fp);
+
+	struct elf_file *ret = malloc(sizeof *ret);
+	*ret = elf;
+	return ret;
+}
+
 void elf_write_object(const char *path, struct object *object) {
 	struct elf_file *elf = elf_from_object(object);
 	elf_write(path, elf);
@@ -566,4 +838,8 @@ void elf_write_executable(const char *path, struct executable *executable) {
 	elf_write(path, elf);
 	elf_free(elf);
 	free(elf);
+}
+
+struct object *elf_read_object(const char *path) {
+	return object_from_elf(elf_read(path));
 }

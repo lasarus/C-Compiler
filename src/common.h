@@ -42,6 +42,11 @@ void write_16(uint8_t *data, uint64_t value);
 void write_32(uint8_t *data, uint64_t value);
 void write_64(uint8_t *data, uint64_t value);
 
+uint8_t read_8(uint8_t *data);
+uint16_t read_16(uint8_t *data);
+uint32_t read_32(uint8_t *data);
+uint64_t read_64(uint8_t *data);
+
 #include <debug.h>
 
 #endif
