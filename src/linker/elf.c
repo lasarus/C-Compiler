@@ -81,6 +81,7 @@ struct elf_header {
 	uint16_t e_type;
 	uint64_t e_entry;
 	uint64_t e_shoff;
+	uint64_t e_phoff;
 
 	uint16_t e_shstrndx;
 };
@@ -95,6 +96,12 @@ struct elf_program_header {
 	uint32_t p_type, p_flags;
 	uint64_t p_offset, p_vaddr, p_paddr;
 	uint64_t p_filesz, p_memsz, p_align;
+};
+
+struct elf_segment {
+	struct elf_program_header header;
+	size_t size;
+	uint8_t *data;
 };
 
 struct rela {
@@ -115,6 +122,9 @@ struct elf_file {
 
 	size_t section_size, section_cap;
 	struct elf_section *sections;
+
+	size_t segment_size, segment_cap;
+	struct elf_segment *segments;
 };
 
 static int elf_register_shstring(struct elf_file *elf, const char *str) {
@@ -144,15 +154,44 @@ static int elf_add_section(struct elf_file *elf, uint32_t name, uint32_t type) {
 	return section - elf->sections;
 }
 
-static void elf_allocate_sections(struct elf_file *elf) {
-	uint64_t address = 128;
-	elf->header.e_shoff = address;
-	address += 64 * elf->section_size;
-	for (unsigned i = 1; i < elf->section_size; i++) {
-		struct elf_section *section = elf->sections + i;
+static int elf_add_segment(struct elf_file *elf, uint32_t type) {
+	struct elf_segment *segment =
+		&ADD_ELEMENT(elf->segment_size, elf->segment_cap, elf->segments);
 
-		section->header.sh_offset = address;
-		address += section->size;
+	segment->header = (struct elf_program_header) { .p_type = type };
+	segment->size = 0;
+	segment->data = NULL;
+
+	return segment - elf->segments;
+}
+
+static void elf_allocate_sections(struct elf_file *elf) {
+	uint64_t address = 0;
+
+	address += 64; // e_hsize.
+
+	if (elf->section_size) {
+		elf->header.e_shoff = address;
+		address += 64 * elf->section_size;
+		for (unsigned i = 1; i < elf->section_size; i++) {
+			struct elf_section *section = &elf->sections[i];
+
+			section->header.sh_offset = address;
+			address += section->size;
+		}
+	}
+
+	if (elf->segment_size) {
+		elf->header.e_phoff = address;
+		address += (7 * 8) * elf->segment_size;
+		for (unsigned i = 0; i < elf->segment_size; i++) {
+			struct elf_segment *segment = &elf->segments[i];
+
+			address = round_up_to_nearest(address, segment->header.p_align);
+
+			segment->header.p_offset = address;
+			address += segment->size;
+		}
 	}
 }
 
@@ -321,6 +360,43 @@ static struct elf_file *elf_from_object(struct object *object) {
 	return ret;
 }
 
+static struct elf_file *elf_from_executable(struct executable *executable) {
+	struct elf_file elf = { 0 };
+
+	elf.header.e_type = ET_EXEC;
+	elf.header.e_entry = executable->entry; // No entry for relocatable object.
+
+	for (unsigned i = 0; i < executable->segment_size; i++) {
+		struct segment *segment = &executable->segments[i];
+
+		int segment_idx = elf_add_segment(&elf, PT_LOAD);
+		struct elf_segment *elf_segment = &elf.segments[segment_idx];
+
+		elf_segment->data = segment->data;
+		elf_segment->size = segment->size;
+
+		elf_segment->header.p_align = 0x1000;
+
+		if (segment->executable)
+			elf_segment->header.p_flags |= PF_X;
+		if (segment->readable)
+			elf_segment->header.p_flags |= PF_R;
+		if (segment->writable)
+			elf_segment->header.p_flags |= PF_W;
+
+		elf_segment->header.p_vaddr = segment->load_address;
+		elf_segment->header.p_paddr = segment->load_address;
+		elf_segment->header.p_filesz = segment->size;
+		elf_segment->header.p_memsz = segment->load_size;
+	}
+
+	elf_allocate_sections(&elf);
+
+	struct elf_file *ret = malloc(sizeof *ret);
+	*ret = elf;
+	return ret;
+}
+
 static void elf_free(struct elf_file *elf) {
 	free(elf->shstrings);
 	free(elf->strings);
@@ -374,23 +450,23 @@ static void write_header(FILE *fp, struct elf_file *elf) {
 
 	write_zero(fp, 7); // Padding
 
-	write_word(fp, elf->header.e_type); // e_type = ET_REL
+	write_word(fp, elf->header.e_type); // e_type
 	write_word(fp, 0x3e); // e_machine = AMD x86-64
 
 	write_long(fp, 1); // e_version = 1
 
-	write_quad(fp, elf->header.e_entry); // e_entry = ??
-	write_quad(fp, 0); // e_phoff = ??
-	write_quad(fp, elf->header.e_shoff); // e_shoff = ??
+	write_quad(fp, elf->header.e_entry); // e_entry
+	write_quad(fp, elf->header.e_phoff); // e_phoff
+	write_quad(fp, elf->header.e_shoff); // e_shoff
 
 	write_long(fp, 0); // e_flags = 0
 	write_word(fp, 64); // e_ehsize = 64
 
-	write_word(fp, 0); // e_phentsize = 0
-	write_word(fp, 0); // e_phnum = 0
-	write_word(fp, 64); // e_shentsize = 0
-	write_word(fp, elf->section_size); // e_shnum = 0
-	write_word(fp, elf->header.e_shstrndx); // e_shstrndx = 0
+	write_word(fp, elf->segment_size ? 7 * 8 : 0); // e_phentsize
+	write_word(fp, elf->segment_size); // e_phnum
+	write_word(fp, elf->section_size ? 64 : 0); // e_shentsize
+	write_word(fp, elf->section_size); // e_shnum
+	write_word(fp, elf->header.e_shstrndx); // e_shstrndx
 }
 
 static void write_section_header(FILE *fp, struct elf_section_header *header, size_t size) {
@@ -410,10 +486,13 @@ static void write_section_header(FILE *fp, struct elf_section_header *header, si
 }
 
 static void write_sections(FILE *fp, struct elf_file *elf) {
+	if (!elf->section_size)
+		return;
+
 	write_skip(fp, elf->header.e_shoff);
 
 	for (unsigned i = 0; i < elf->section_size; i++) {
-		struct elf_section *section = elf->sections + i;
+		struct elf_section *section = &elf->sections[i];
 
 		write_section_header(fp, &section->header, section->size);
 	}
@@ -429,11 +508,48 @@ static void write_sections(FILE *fp, struct elf_file *elf) {
 	}
 }
 
-void elf_write(const char *path, struct elf_file *elf) {
+static void write_program_header(FILE *fp, struct elf_program_header *header, size_t size) {
+	write_long(fp, header->p_type);
+	write_long(fp, header->p_flags);
+
+	write_quad(fp, header->p_offset);
+	write_quad(fp, header->p_vaddr);
+	write_quad(fp, header->p_paddr);
+
+	write_quad(fp, size);
+	write_quad(fp, header->p_memsz);
+	write_quad(fp, header->p_align);
+}
+
+static void write_segments(FILE *fp, struct elf_file *elf) {
+	if (!elf->segment_size)
+		return;
+
+	write_skip(fp, elf->header.e_phoff);
+
+	for (unsigned i = 0; i < elf->segment_size; i++) {
+		struct elf_segment *segment = &elf->segments[i];
+
+		write_program_header(fp, &segment->header, segment->size);
+	}
+
+	for (unsigned i = 0; i < elf->segment_size; i++) {
+		struct elf_segment *segment = &elf->segments[i];
+
+		if (segment->size == 0)
+			continue;
+
+		write_skip(fp, segment->header.p_offset);
+		write(fp, segment->data, segment->size);
+	}
+}
+
+static void elf_write(const char *path, struct elf_file *elf) {
 	FILE *fp = fopen(path, "wb");
 
 	write_header(fp, elf);
 	write_sections(fp, elf);
+	write_segments(fp, elf);
 
 	fclose(fp);
 }
@@ -445,102 +561,9 @@ void elf_write_object(const char *path, struct object *object) {
 	free(elf);
 }
 
-#define PH_OFF 64
-
-static void write_header_exec(FILE *fp, int segment_n, size_t entry) {
-	static uint8_t magic[4] = {0x7f, 0x45, 0x4c, 0x46};
-	write(fp, magic, sizeof magic);
-
-	write_byte(fp, 2); // EI_CLASS = 64 bit
-	write_byte(fp, 1); // EI_DATA = little endian
-	write_byte(fp, 1); // EI_VERSION = 1
-	write_byte(fp, 0); // EI_OSABI = System V
-	write_byte(fp, 0); // EI_ABIVERSION = 0
-
-	write_zero(fp, 7); // Padding
-
-	write_word(fp, 2); // e_type = ET_EXEC
-	write_word(fp, 0x3e); // e_machine = AMD x86-64
-
-	write_long(fp, 1); // e_version = 1
-
-	write_quad(fp, entry); // e_entry = ??
-	write_quad(fp, PH_OFF); // e_phoff = ??
-	write_quad(fp, 0); // e_shoff = ??
-
-	write_long(fp, 0); // e_flags = 0
-	write_word(fp, 64); // e_ehsize = 64
-
-	write_word(fp, 7 * 8); // e_phentsize = 0
-	write_word(fp, segment_n); // e_phnum = 0
-	write_word(fp, 0); // e_shentsize = 0
-	write_word(fp, 0); // e_shnum = 0
-	write_word(fp, 0); // e_shstrndx = SHN_UNDEF
-}
-
-static void write_program_header(FILE *fp, struct elf_program_header *header) {
-	write_long(fp, header->p_type);
-	write_long(fp, header->p_flags);
-
-	write_quad(fp, header->p_offset);
-	write_quad(fp, header->p_vaddr);
-	write_quad(fp, header->p_paddr);
-	write_quad(fp, header->p_filesz);
-	write_quad(fp, header->p_memsz);
-	write_quad(fp, header->p_align);
-}
-
 void elf_write_executable(const char *path, struct executable *executable) {
-	FILE *fp = fopen(path, "wb");
-
-	write_header_exec(fp, executable->segment_size, executable->entry);
-
-	size_t *segment_offsets = malloc(sizeof *segment_offsets * executable->segment_size);
-
-	write_skip(fp, PH_OFF);
-	unsigned long current_file_offset = PH_OFF + 7 * 8 * executable->segment_size;
-	for (unsigned i = 0; i < executable->segment_size; i++) {
-		struct segment *segment = &executable->segments[i];
-
-		struct elf_program_header header = { 0 };
-
-		header.p_align = 0x1000;
-		header.p_type = PT_LOAD;
-
-		if (segment->executable)
-			header.p_flags |= PF_X;
-		if (segment->readable)
-			header.p_flags |= PF_R;
-		if (segment->writable)
-			header.p_flags |= PF_W;
-
-		current_file_offset =
-			round_up_to_nearest(current_file_offset, header.p_align);
-
-		header.p_offset = current_file_offset;
-
-		current_file_offset += segment->size;
-
-		header.p_vaddr = segment->load_address;
-		header.p_paddr = segment->load_address;
-		header.p_filesz = segment->size;
-		header.p_memsz = segment->load_size;
-
-		write_program_header(fp, &header);
-
-		segment_offsets[i] = header.p_offset;
-	}
-
-	current_file_offset = PH_OFF + 7 * 8 * executable->segment_size;
-	assert(ftell(fp) == (long)current_file_offset);
-
-	for (unsigned i = 0; i < executable->segment_size; i++) {
-		write_skip(fp, segment_offsets[i]);
-		struct segment *segment = &executable->segments[i];
-		write(fp, segment->data, segment->size);
-	}
-
-	fclose(fp);
-
-	free(segment_offsets);
+	struct elf_file *elf = elf_from_executable(executable);
+	elf_write(path, elf);
+	elf_free(elf);
+	free(elf);
 }
