@@ -390,6 +390,7 @@ void assemble_encoding(uint8_t *output, int *len, struct encoding *encoding, str
 				.size = 1,
 				.label = imm_label
 			};
+			imm = 0;
 		}
 
 		WRITE_8(imm);
@@ -401,6 +402,7 @@ void assemble_encoding(uint8_t *output, int *len, struct encoding *encoding, str
 				.size = 2,
 				.label = imm_label
 			};
+			imm = 0;
 		}
 
 		WRITE_16(imm);
@@ -412,6 +414,7 @@ void assemble_encoding(uint8_t *output, int *len, struct encoding *encoding, str
 				.size = 4,
 				.label = imm_label
 			};
+			imm = 0;
 		}
 
 		WRITE_32(imm);
@@ -423,6 +426,7 @@ void assemble_encoding(uint8_t *output, int *len, struct encoding *encoding, str
 				.size = 8,
 				.label = imm_label
 			};
+			imm = 0;
 		}
 
 		WRITE_64(imm);
