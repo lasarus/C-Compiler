@@ -62,6 +62,7 @@ void rodata_get_label(label_id id, int n, char buffer[]) {
 }
 
 void rodata_codegen(void) {
+	asm_section(".rodata");
 	for (int i = 0; i < entries_size; i++) {
 		if (entries[i].type != ENTRY_STR)
 			continue;
