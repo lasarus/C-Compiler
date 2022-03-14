@@ -189,8 +189,15 @@ void asm_ins_impl(const char *mnemonic, struct operand ops[4]) {
 		assemble_instruction(output, &len, mnemonic, swapped,
 							 relocations, &n_relocations);
 
-		if (len == -1)
-			ICE("Could not assemble %s %d %d %d %d", mnemonic, ops[0].type, ops[1].type, ops[2].type, ops[3].type);
+		if (len == -1) {
+			printf("Could not assemble instruction: \n");
+			out = stdout;
+			assemble_to_text = 1;
+			asm_ins_impl(mnemonic, ops);
+			assemble_to_text = 0;
+			out = NULL;
+			ICE("Assembler error.");
+		}
 
 		for (int i = 0; i < n_relocations; i++) {
 			struct relocation *rel = relocations + i;
