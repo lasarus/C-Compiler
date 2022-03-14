@@ -185,6 +185,8 @@ int operators_constant_unary(enum unary_operator_type op,
 		case UOP_BNOT: res.uint_d = ~rhs.uint_d; break;
 		default: NOTIMP();
 		}
+
+		constant_normalize(&res);
 	} else {
 		NOTIMP();
 	}
