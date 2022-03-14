@@ -55,13 +55,15 @@ struct arguments arguments_parse(int argc, char **argv) {
 			if (*arg == '-') {
 				arg++;
 
-				int cont = 1;
+				int cont = 1, ignore = 0;
 				switch (*arg) {
 				case 'c': ret.flag_c = 1; cont = 0; break;
 				case 'g': ret.flag_g = 1; cont = 0; break;
 				case 's': ret.flag_s = 1; cont = 0; break;
 				case 'E': ret.flag_E = 1; cont = 0; break;
 				case 'S': ret.flag_S = 1; cont = 0; break;
+
+				case 'W': ignore = 1; cont = 0; break;
 
 				case 'o': next_state = S_OUTFILE; break;
 				case 'O': next_state = S_OPTLEVEL; break;
@@ -77,7 +79,7 @@ struct arguments arguments_parse(int argc, char **argv) {
 				if (*arg) {
 					if (cont) {
 						next_arg = arg;
-					} else {
+					} else if (!ignore) {
 						ARG_ERROR(i, "Unrecognized flag: \"%s\"", argv[i]);
 					}
 				}
