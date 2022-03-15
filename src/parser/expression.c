@@ -1319,12 +1319,12 @@ int evaluate_constant_expression(struct expr *expr,
 		if (!evaluate_constant_expression(expr->args[1], &rhs))
 			return 0;
 
-		if (lhs.type == CONSTANT_LABEL) {
+		if (lhs.type == CONSTANT_LABEL)
 			return 0;
-		}
 
 		if (lhs.type == CONSTANT_LABEL_POINTER &&
-			type_is_simple(rhs.data_type, ST_INT)) {
+			type_is_simple(rhs.data_type, ST_INT) &&
+			rhs.type == CONSTANT_TYPE) {
 			*constant = lhs;
 			int size = calculate_size(type_deref(lhs.data_type));
 
