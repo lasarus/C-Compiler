@@ -22,6 +22,9 @@ struct arguments {
 	int n_library;
 	const char **libraries;
 
+	int n_library_dir;
+	const char **library_dirs;
+
 	int n_flag;
 	const char **flags;
 };

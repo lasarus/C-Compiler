@@ -100,6 +100,10 @@ static void set_flags(struct arguments *arguments) {
 static size_t object_size, object_cap;
 static struct object *objects;
 
+const char *default_include[] = {
+	NULL
+};
+
 static void compile_file(const char *path,
 						 struct arguments *arguments) {
 	struct string_view basename = get_basename(path);
@@ -116,6 +120,9 @@ static void compile_file(const char *path,
 	}
 
 	add_implementation_defs();
+
+	for (unsigned i = 0; default_include[i]; i++)
+		input_add_include_path(default_include[i]);
 
 	for (int i = 0; i < arguments->n_include; i++)
 		input_add_include_path(arguments->includes[i]);
@@ -167,12 +174,14 @@ static void compile_file(const char *path,
 int main(int argc, char **argv) {
 	struct arguments arguments = arguments_parse(argc, argv);
 
-	if (arguments.flag_E || arguments.flag_g || arguments.flag_s)
-		NOTIMP();
+	int will_link = !(arguments.flag_S || arguments.flag_c);
 
-	if (!(arguments.flag_S || arguments.flag_c)) {
+	if (will_link) {
 		printf("Warning! Emitting executables is still work in progress.\n");
 	}
+
+	if (arguments.flag_E || arguments.flag_g || arguments.flag_s)
+		NOTIMP();
 
 	if (arguments.n_operand != 1 && arguments.outfile &&
 		(arguments.flag_S || arguments.flag_c)) {
@@ -195,7 +204,7 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	if (object_size) {
+	if (will_link) {
 		struct executable *executable = linker_link(object_size, objects);
 		elf_write_executable(arguments.outfile ? arguments.outfile : "a.out", executable);
 	}

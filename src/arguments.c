@@ -20,6 +20,9 @@ struct arguments arguments_parse(int argc, char **argv) {
 	size_t library_size = 0, library_cap = 0;
 	const char **libraries = NULL;
 
+	size_t library_dir_size = 0, library_dir_cap = 0;
+	const char **library_dirs = NULL;
+
 	size_t flag_size = 0, flag_cap = 0;
 	const char **flags = NULL;
 
@@ -30,6 +33,7 @@ struct arguments arguments_parse(int argc, char **argv) {
 		S_DEFINE,
 		S_UNDEFINE,
 		S_INCLUDE,
+		S_LIBRARY_DIR,
 		S_LIBRARY,
 		S_FLAG,
 		S_OUTFILE,
@@ -70,7 +74,8 @@ struct arguments arguments_parse(int argc, char **argv) {
 				case 'D': next_state = S_DEFINE; break;
 				case 'U': next_state = S_UNDEFINE; break;
 				case 'I': next_state = S_INCLUDE; break;
-				case 'L': next_state = S_LIBRARY; break;
+				case 'L': next_state = S_LIBRARY_DIR; break;
+				case 'l': next_state = S_LIBRARY; break;
 				case 'f': next_state = S_FLAG; break;
 				}
 
@@ -94,6 +99,8 @@ struct arguments arguments_parse(int argc, char **argv) {
 			ADD_ELEMENT(include_size, include_cap, includes) = arg;
 		} else if (state == S_LIBRARY) {
 			ADD_ELEMENT(library_size, library_cap, libraries) = arg;
+		} else if (state == S_LIBRARY_DIR) {
+			ADD_ELEMENT(library_dir_size, library_dir_cap, library_dirs) = arg;
 		} else if (state == S_FLAG) {
 			ADD_ELEMENT(flag_size, flag_cap, flags) = arg;
 		} else if (state == S_OUTFILE) {
@@ -116,6 +123,9 @@ struct arguments arguments_parse(int argc, char **argv) {
 
 	ret.n_include = include_size;
 	ret.includes = includes;
+
+	ret.n_library_dir = library_dir_size;
+	ret.library_dirs = library_dirs;
 
 	ret.n_library = library_size;
 	ret.libraries = libraries;
