@@ -160,8 +160,11 @@ uint64_t read_64(uint8_t *data) {
 }
 
 void file_write(FILE *fp, const void *ptr, size_t size) {
+	if (size == 0)
+		return;
+
 	if (fwrite(ptr, size, 1, fp) != 1)
-		ICE("Could not write to file");
+		ICE("Could not write %zu bytes to file.", size);
 }
 
 void file_write_byte(FILE *fp, uint8_t byte) {
