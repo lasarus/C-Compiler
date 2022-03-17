@@ -6,6 +6,7 @@
 #include "assembler/assembler.h"
 #include "parser/symbols.h"
 #include "linker/elf.h"
+#include "linker/coff.h"
 #include "abi/abi.h"
 #include "arguments.h"
 
@@ -158,7 +159,10 @@ static void compile_file(const char *path,
 	codegen();
 
 	if (arguments->flag_c) {
-		elf_write_object(outfile, &out_object);
+		switch (abi) {
+		case ABI_SYSV: elf_write_object(outfile, &out_object); break;
+		case ABI_MICROSOFT: coff_write_object(outfile, &out_object); break;
+		}
 	} else if (arguments->flag_S) {
 	} else {
 		ADD_ELEMENT(object_size, object_cap, objects) = out_object;

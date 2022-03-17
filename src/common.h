@@ -47,6 +47,14 @@ uint16_t read_16(uint8_t *data);
 uint32_t read_32(uint8_t *data);
 uint64_t read_64(uint8_t *data);
 
+void file_write(FILE *fp, const void *ptr, size_t size);
+void file_write_byte(FILE *fp, uint8_t byte);
+void file_write_word(FILE *fp, uint16_t word);
+void file_write_long(FILE *fp, uint32_t long_);
+void file_write_quad(FILE *fp, uint64_t quad);
+void file_write_zero(FILE *fp, size_t size);
+void file_write_skip(FILE *fp, size_t target);
+
 #include <debug.h>
 
 #endif

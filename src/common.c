@@ -2,6 +2,7 @@
 
 #include <stdarg.h>
 #include <limits.h>
+#include <assert.h>
 
 uint32_t hash32(uint32_t a) {
 	a = (a ^ 61) ^ (a >> 16);
@@ -156,4 +157,39 @@ uint32_t read_32(uint8_t *data) {
 
 uint64_t read_64(uint8_t *data) {
 	return read_32(data) | ((uint64_t)read_32(data + 4) << 32);
+}
+
+void file_write(FILE *fp, const void *ptr, size_t size) {
+	if (fwrite(ptr, size, 1, fp) != 1)
+		ICE("Could not write to file");
+}
+
+void file_write_byte(FILE *fp, uint8_t byte) {
+	file_write(fp, &byte, 1);
+}
+
+void file_write_word(FILE *fp, uint16_t word) {
+	file_write_byte(fp, word);
+	file_write_byte(fp, word >> 8);
+}
+
+void file_write_long(FILE *fp, uint32_t long_) {
+	file_write_word(fp, long_);
+	file_write_word(fp, long_ >> 16);
+}
+
+void file_write_quad(FILE *fp, uint64_t quad) {
+	file_write_long(fp, quad);
+	file_write_long(fp, quad >> 32);
+}
+
+void file_write_zero(FILE *fp, size_t size) {
+	for (size_t i = 0; i < size; i++)
+		file_write_byte(fp, 0); // TODO: Make this faster.
+}
+
+void file_write_skip(FILE *fp, size_t target) {
+	long int current_pos = ftell(fp);
+	assert(target >= (size_t)current_pos);
+	file_write_zero(fp, target - current_pos);
 }

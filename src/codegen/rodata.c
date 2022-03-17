@@ -50,7 +50,7 @@ void rodata_get_label(label_id id, int n, char buffer[]) {
 	if (id < 0) { // Temporary label.
 		res = snprintf(buffer, n, ".L%d", -id);
 	} else if (entries[id].type == ENTRY_STR) {
-		res = snprintf(buffer, n, ".L_string%d", id);
+		res = snprintf(buffer, n, ".Ls%d", id);
 	} else if (entries[id].type == ENTRY_LABEL_NAME) {
 		res = snprintf(buffer, n, "%.*s", entries[id].name.len, entries[id].name.str);
 	} else {
