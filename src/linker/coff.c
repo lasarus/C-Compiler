@@ -154,10 +154,23 @@ struct coff_file {
 
 	struct coff_section *sections; // Length determined by header.
 	struct coff_symbol *symbols; // -||-
+
+	size_t string_size, string_cap;
+	char *strings;
 };
 
+static int coff_register_string(struct coff_file *coff, const char *str) {
+	char *space = ADD_ELEMENTS(coff->string_size, coff->string_cap, coff->strings, strlen(str) + 1);
+
+	strcpy(space, str);
+
+	return space - coff->strings;
+}
+
 struct coff_file *coff_from_object(struct object *object) {
-	struct coff_file file;
+	struct coff_file file = { 0 };
+
+	coff_register_string(&file, "");
 
 	file.header = (struct coff_file_header) {
 		.machine = 0x8664,
@@ -192,11 +205,13 @@ struct coff_file *coff_from_object(struct object *object) {
 		};
 
 		if (section->name) {
-			if (strlen(section->name) > 8)
-				NOTIMP();
-				/* printf("Warning: section name \"%s\" truncated to \"%.8s\".\n", */
-				/* 	   section->name, section->name); */
-			strncpy((char *)coff_section->header.name, section->name, 8);
+			if (strlen(section->name) > 8) {
+				int idx = coff_register_string(&file, section->name);
+				// This is just stupid:
+				sprintf((char *)coff_section->header.name, "/%d", idx);
+			} else {
+				strncpy((char *)coff_section->header.name, section->name, 8);
+			}
 		}
 
 		coff_section->relocations = malloc(sizeof *coff_section->relocations *
@@ -269,10 +284,11 @@ struct coff_file *coff_from_object(struct object *object) {
 
 		if (symbol->name) {
 			if (strlen(symbol->name) > 8) {
-				printf("%s\n", symbol->name);
-				NOTIMP();
+				int idx = coff_register_string(&file, symbol->name);
+				write_32(coff_symbol->name + 4, idx + 4);
+			} else {
+				strncpy((char *)coff_symbol->name, symbol->name, 8);
 			}
-			strncpy((char *)coff_symbol->name, symbol->name, 8);
 		}
 	}
 
@@ -289,6 +305,7 @@ void coff_allocate(struct coff_file *coff) {
 	coff->header.pointer_to_symbol_table = address;
 
 	address += (8 + 4 + 2 + 2 + 1 + 1) * coff->header.number_of_symbols;
+	address += 4 + coff->string_size; // String table allocation.
 
 	for (unsigned i = 0; i < coff->header.number_of_sections; i++) {
 		struct coff_section *section = &coff->sections[i];
@@ -305,12 +322,14 @@ void coff_write(const char *path, struct coff_file *coff) {
 
 	for (unsigned i = 0; i < coff->header.number_of_sections; i++) {
 		struct coff_section *section = &coff->sections[i];
-		printf("Wrote section %.8s\n", section->header.name);
 		coff_write_section_header(fp, &section->header);
 	}
 
 	for (unsigned i = 0; i < coff->header.number_of_symbols; i++)
 		coff_write_symbol(fp, &coff->symbols[i]);
+
+	file_write_long(fp, coff->string_size + 4);
+	file_write(fp, coff->strings, coff->string_size);
 
 	for (unsigned i = 0; i < coff->header.number_of_sections; i++) {
 		struct coff_section *section = &coff->sections[i];
@@ -324,15 +343,7 @@ void coff_write(const char *path, struct coff_file *coff) {
 }
 
 void coff_write_object(const char *path, struct object *object) {
-	(void)object;
-
 	struct coff_file *coff = coff_from_object(object);
 	coff_allocate(coff);
 	coff_write(path, coff);
-
-	/* coff_write_header(fp, &(struct coff_file_header) { */
-	/* 		.machine = 0x8664, */
-	/* 		.characteristics = IMAGE_FILE_LINE_NUMS_STRIPPED | IMAGE_FILE_LARGE_ADDRESS_AWARE // | IMAGE_FILE_DEBUG_STRIPPED */
-	/* 	}); */
-
 }
