@@ -122,11 +122,11 @@ static void compile_file(const char *path,
 
 	add_implementation_defs();
 
-	for (unsigned i = 0; default_include[i]; i++)
-		input_add_include_path(default_include[i]);
-
 	for (int i = 0; i < arguments->n_include; i++)
 		input_add_include_path(arguments->includes[i]);
+
+	for (unsigned i = 0; default_include[i]; i++)
+		input_add_include_path(default_include[i]);
 
 	for (int i = 0; i < arguments->n_define; i++)
 		add_definition(arguments->defines[i]);
