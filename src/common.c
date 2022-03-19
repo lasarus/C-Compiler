@@ -29,7 +29,7 @@ char *allocate_printf(const char *fmt, ...) {
 	va_start(args1, fmt);
 	va_copy(args2, args1);
 	int len = vsnprintf(NULL, 0, fmt, args1);
-	char *str = malloc(len + 1);
+	char *str = cc_malloc(len + 1);
 	vsprintf(str, fmt, args2);
 	va_end(args1);
 	va_end(args2);
@@ -195,4 +195,24 @@ void file_write_skip(FILE *fp, size_t target) {
 	long int current_pos = ftell(fp);
 	assert(target >= (size_t)current_pos);
 	file_write_zero(fp, target - current_pos);
+}
+
+void *cc_malloc(size_t size) {
+#undef malloc
+	void *ret = malloc(size);
+
+	if (!ret)
+		ICE("Allocation error! Probably out of memory.\n");
+
+	return ret;
+}
+
+void *cc_realloc(void *ptr, size_t size) {
+#undef realloc
+	void *ret = realloc(ptr, size);
+
+	if (!ret)
+		ICE("Allocation error! Probably out of memory.\n");
+
+	return ret;
 }

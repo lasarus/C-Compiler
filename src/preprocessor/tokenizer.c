@@ -75,7 +75,7 @@ static void buffer_eat(struct input *input) {
 
 static struct string_view buffer_get() {
 	struct string_view ret = { .len = buffer_size };
-	ret.str = malloc(buffer_size);
+	ret.str = cc_malloc(buffer_size);
 	memcpy(ret.str, buffer, buffer_size);
 	return ret;
 }

@@ -35,8 +35,8 @@ static struct object *combine_objects(int n_objects, struct object *objects) {
 		object.symbol_size += objects[i].symbol_size;
 	}
 
-	object.sections = malloc(sizeof *object.sections * object.section_size);
-	object.symbols = malloc(sizeof *object.symbols * object.symbol_size);
+	object.sections = cc_malloc(sizeof *object.sections * object.section_size);
+	object.symbols = cc_malloc(sizeof *object.symbols * object.symbol_size);
 
 	size_t current_symbol_offset = 0, current_section_offset = 0;
 	for (int i = 0; i < n_objects; i++) {
@@ -55,7 +55,8 @@ static struct object *combine_objects(int n_objects, struct object *objects) {
 		for (unsigned j = 0; j < objects[i].symbol_size; j++) {
 			struct symbol symbol = objects[i].symbols[j];
 
-			symbol.section += current_section_offset;
+			if (symbol.section != -1)
+				symbol.section += current_section_offset;
 
 			object.symbols[current_symbol_offset + j] = symbol;
 		}
@@ -74,7 +75,7 @@ static struct object *combine_objects(int n_objects, struct object *objects) {
 			}
 			int found_section = -1;
 			for (unsigned j = 0; j < object.symbol_size; j++) {
-				if (object.symbols[j].name) {
+				if (object.symbols[j].name && object.symbols[j].global && object.symbols[j].section != -1) {
 					if (strcmp(object.symbols[j].name, symbol->name) == 0) {
 						if (object.symbols[j].section != -1)
 							found_section = object.symbols[j].section;
@@ -86,16 +87,16 @@ static struct object *combine_objects(int n_objects, struct object *objects) {
 		}
 	}
 
-	struct object *ret = malloc(sizeof *ret);
+	struct object *ret = cc_malloc(sizeof *ret);
 	*ret = object;
 
 	return ret;
 }
 
-struct executable *linker_link(int n_objects, struct object *objects) {
+struct executable *linker_link(int n_objects, struct object *_objects) {
 	struct executable executable = { 0 };
 
-	struct object *object = n_objects == 1 ? objects : combine_objects(n_objects, objects);
+	struct object *object = n_objects == 1 ? _objects : combine_objects(n_objects, _objects);
 
 	// To begin with we put everything into one large segment.
 	// This will be executable, writable, and readable.
@@ -113,13 +114,16 @@ struct executable *linker_link(int n_objects, struct object *objects) {
 		int segment_idx;
 	};
 
-	struct section_info *section_infos = malloc(sizeof(*section_infos) * objects->section_size);
+	struct section_info *section_infos = cc_malloc(sizeof(*section_infos) * object->section_size);
 
 	// Move sections into segment.
 	for (unsigned i = 0; i < object->section_size; i++) {
 		struct section *section = &object->sections[i];
-		uint8_t *dest = ADD_ELEMENTS(segment->size, segment->cap, segment->data, section->size);
-		memcpy(dest, section->data, section->size);
+		uint8_t *dest = segment->data;
+		if (section->size) {
+			dest = ADD_ELEMENTS(segment->size, segment->cap, segment->data, section->size);
+			memcpy(dest, section->data, section->size);
+		}
 
 		size_t offset = dest - segment->data;
 
@@ -181,7 +185,7 @@ struct executable *linker_link(int n_objects, struct object *objects) {
 
 	segment->load_size = segment->size;
 
-	struct executable *ret = malloc(sizeof *ret);
+	struct executable *ret = cc_malloc(sizeof *ret);
 	*ret = executable;
 	return ret;
 }

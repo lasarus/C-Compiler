@@ -23,9 +23,9 @@ void macro_expander_reset(void) {
 void expand_buffer(int input, int return_output, struct token *t);
 
 void define_map_init(void) {
-	define_map = malloc(sizeof *define_map);
+	define_map = cc_malloc(sizeof *define_map);
 
-	define_map->entries = malloc(sizeof *define_map->entries * MAP_SIZE);
+	define_map->entries = cc_malloc(sizeof *define_map->entries * MAP_SIZE);
 	for (size_t i = 0; i < MAP_SIZE; i++) {
 		define_map->entries[i] = NULL;
 	}
@@ -54,7 +54,7 @@ void define_map_add(struct define define) {
 		**elem = define;
 	} else {
 		define.next = NULL;
-		*elem = malloc(sizeof define);
+		*elem = cc_malloc(sizeof define);
 		**elem = define;
 	}
 }
@@ -170,7 +170,7 @@ static struct string_view stringify_end() {
 	ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = '\"';
 	
 	struct string_view ret = { .len = stringify_size };
-	ret.str = malloc(stringify_size);
+	ret.str = cc_malloc(stringify_size);
 	memcpy(ret.str, stringify_buffer, stringify_size);
 	return ret;
 }
@@ -307,7 +307,7 @@ void expand_argument(struct token_list tl, int *concat_with_prev, int concat, in
 
 void subs_buffer(struct define *def, struct string_set *hs, struct position new_pos, int input) {
 	int n_args = def->par.size;
-	struct token_list *arguments = malloc(sizeof *arguments * n_args);
+	struct token_list *arguments = cc_malloc(sizeof *arguments * n_args);
 
 	struct token_list vararg = {0};
 	int vararg_included = 0;

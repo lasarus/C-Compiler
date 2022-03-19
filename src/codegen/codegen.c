@@ -559,7 +559,7 @@ void codegen_function(struct function *func) {
 }
 
 void codegen(void) {
-	variable_info = malloc(sizeof(*variable_info) * get_n_vars());
+	variable_info = cc_malloc(sizeof(*variable_info) * get_n_vars());
 
 	for (int i = 0; i < ir.size; i++)
 		codegen_function(ir.functions + i);

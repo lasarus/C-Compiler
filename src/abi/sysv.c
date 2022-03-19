@@ -333,7 +333,7 @@ static void sysv_ir_function_new(struct type *type, var_id *args, const char *na
 		IR_PUSH_STORE(c.regs[i].variable, address);
 	}
 
-	func->abi_data = malloc(sizeof (struct sysv_data));
+	func->abi_data = cc_malloc(sizeof (struct sysv_data));
 	*(struct sysv_data *)func->abi_data = abi_data;
 }
 
@@ -510,7 +510,7 @@ void abi_init_sysv(void) {
 	struct type *uint = type_simple(ST_UINT);
 	struct type *vptr = type_pointer(type_simple(ST_VOID));
 
-	struct field *fields = malloc(sizeof *fields * 4);
+	struct field *fields = cc_malloc(sizeof *fields * 4);
 	for (int i = 0; i < 4; i++)
 		fields[i].bitfield = -1;
 	fields[0].type = uint;

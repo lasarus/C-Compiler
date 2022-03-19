@@ -110,7 +110,7 @@ struct type *type_create(struct type *params, struct type **children) {
 
 	if (hashtable_size == 0) {
 		hashtable_size = 1024;
-		hashtable = malloc(hashtable_size * sizeof(*hashtable));
+		hashtable = cc_malloc(hashtable_size * sizeof(*hashtable));
 		for (int i = 0; i < hashtable_size; i++) {
 			hashtable[i] = NULL;
 		}
@@ -126,7 +126,7 @@ struct type *type_create(struct type *params, struct type **children) {
 	if (first)
 		return first;
 
-	struct type *new = malloc(sizeof(*params) + sizeof(*children) * params->n);
+	struct type *new = cc_malloc(sizeof(*params) + sizeof(*children) * params->n);
 	*new = *params;
 	if (params->n)
 		memcpy(new->children, children, sizeof(*children) * params->n);
@@ -175,11 +175,11 @@ struct type *type_remove_qualifications(struct type *type) {
 
 // TODO: make this better.
 struct struct_data *register_struct(void) {
-	return malloc(sizeof (struct struct_data));
+	return cc_malloc(sizeof (struct struct_data));
 }
 
 struct enum_data *register_enum(void) {
-	return malloc(sizeof (struct enum_data));
+	return cc_malloc(sizeof (struct enum_data));
 }
 
 int type_search_member(struct type *type, struct string_view name,

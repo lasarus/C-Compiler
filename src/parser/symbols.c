@@ -237,7 +237,7 @@ struct symbol_typedef *symbols_get_typedef(struct string_view name) {
 // Init everything. Called from main.
 void symbols_init(void) {
 	hash_table.size = 1024;
-	hash_table.entries = malloc(sizeof *hash_table.entries * hash_table.size);
+	hash_table.entries = cc_malloc(sizeof *hash_table.entries * hash_table.size);
 	for (int i = 0; i < hash_table.size; i++)
 		hash_table.entries[i] = -1;
 }

@@ -523,7 +523,7 @@ void ast_get_parameters(struct type_ast *ast,
 }
 
 struct type_ast *type_ast_new(struct type_ast ast) {
-	struct type_ast *ret = malloc(sizeof (struct type_ast));
+	struct type_ast *ret = cc_malloc(sizeof (struct type_ast));
 	*ret = ast;
 	return ret;
 }
@@ -710,14 +710,14 @@ struct parameter_list parse_parameter_list(void) {
 		}
 
 		ret.n++;
-		ret.types = realloc(ret.types, ret.n * sizeof(*ret.types));
+		ret.types = cc_realloc(ret.types, ret.n * sizeof(*ret.types));
 		struct string_view name = { 0 };
 		struct type *type = ast_to_type(&s.ts, &s.tq, ast, &name, 1);
 		type = type_adjust_parameter(type);
 		ret.types[ret.n - 1] = type;
 
 		if (!was_abstract) {
-			ret.arguments = realloc(ret.arguments, ret.n * sizeof(*ret.arguments));
+			ret.arguments = cc_realloc(ret.arguments, ret.n * sizeof(*ret.arguments));
 			struct symbol_identifier *ident = symbols_add_identifier(name);
 			ident->type = IDENT_VARIABLE;
 			ident->variable.type = type;

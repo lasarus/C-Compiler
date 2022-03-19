@@ -180,7 +180,7 @@ struct coff_file *coff_from_object(struct object *object) {
 		.number_of_symbols = object->symbol_size
 	};
 
-	file.sections = malloc(sizeof *file.sections * file.header.number_of_sections);
+	file.sections = cc_malloc(sizeof *file.sections * file.header.number_of_sections);
 	for (unsigned i = 0; i < file.header.number_of_sections; i++) {
 		struct section *section = &object->sections[i];
 		struct coff_section *coff_section = &file.sections[i];
@@ -214,8 +214,8 @@ struct coff_file *coff_from_object(struct object *object) {
 			}
 		}
 
-		coff_section->relocations = malloc(sizeof *coff_section->relocations *
-										   coff_section->header.number_of_relocations);
+		coff_section->relocations = cc_malloc(sizeof *coff_section->relocations *
+											  coff_section->header.number_of_relocations);
 		for (unsigned j = 0; j < coff_section->header.number_of_relocations; j++) {
 			struct object_relocation *relocation = &section->relocations[j];
 			struct coff_relocation *coff_relocation = &coff_section->relocations[j];
@@ -260,7 +260,7 @@ struct coff_file *coff_from_object(struct object *object) {
 		}
 	}
 
-	file.symbols = malloc(sizeof *file.symbols * file.header.number_of_symbols);
+	file.symbols = cc_malloc(sizeof *file.symbols * file.header.number_of_symbols);
 	for (unsigned i = 0; i < file.header.number_of_symbols; i++) {
 		struct symbol *symbol = &object->symbols[i];
 		struct coff_symbol *coff_symbol = &file.symbols[i];
@@ -292,7 +292,7 @@ struct coff_file *coff_from_object(struct object *object) {
 		}
 	}
 
-	struct coff_file *ret = malloc(sizeof *ret);
+	struct coff_file *ret = cc_malloc(sizeof *ret);
 	*ret = file;
 	return ret;
 }

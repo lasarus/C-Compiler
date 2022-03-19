@@ -198,7 +198,7 @@ static void elf_allocate_sections(struct elf_file *elf) {
 static struct object *object_from_elf(struct elf_file *elf) {
 	struct object object = { 0 };
 
-	int *section_mapping = malloc(sizeof *section_mapping * elf->section_size);
+	int *section_mapping = cc_malloc(sizeof *section_mapping * elf->section_size);
 	for (unsigned i = 0; i < elf->section_size; i++)
 		section_mapping[i] = -1;
 
@@ -233,7 +233,7 @@ static struct object *object_from_elf(struct elf_file *elf) {
 		size_t ent_size = symtab_section->header.sh_entsize;
 		size_t ent_count = symtab_section->header.sh_size / ent_size;
 
-		symbol_mapping = malloc(sizeof *symbol_mapping * ent_count);
+		symbol_mapping = cc_malloc(sizeof *symbol_mapping * ent_count);
 
 		for (unsigned j = 1; j < ent_count; j++) {
 			uint8_t *symbol_data = symtab_section->data + j * ent_size;
@@ -303,7 +303,7 @@ static struct object *object_from_elf(struct elf_file *elf) {
 	free(section_mapping);
 	free(symbol_mapping);
 
-	struct object *ret = malloc(sizeof *ret);
+	struct object *ret = cc_malloc(sizeof *ret);
 	*ret = object;
 	return ret;
 }
@@ -327,7 +327,7 @@ static struct elf_file *elf_from_object(struct object *object) {
 
 		elf_section->size = section->size;
 		if (elf_section->size) {
-			elf_section->data = malloc(elf_section->size);
+			elf_section->data = cc_malloc(elf_section->size);
 			memcpy(elf_section->data, section->data, elf_section->size);
 		}
 
@@ -335,13 +335,13 @@ static struct elf_file *elf_from_object(struct object *object) {
 	}
 
 	// Write symbol section.
-	int *symbol_mapping = malloc(sizeof *symbol_mapping * object->symbol_size);
+	int *symbol_mapping = cc_malloc(sizeof *symbol_mapping * object->symbol_size);
 
 	int sym_idx = elf_add_section(&elf, elf_register_shstring(&elf, ".symtab"), SHT_SYMTAB);
 	struct elf_section *sym_section = &elf.sections[sym_idx];
 	sym_section->header.sh_entsize = 24;
 	sym_section->size = (object->section_size + object->symbol_size + 1) * sym_section->header.sh_entsize;
-	sym_section->data = malloc(sym_section->size);
+	sym_section->data = cc_malloc(sym_section->size);
 	int n_local_symb = 1;
 
 	for (unsigned i = 0; i < object->symbol_size; i++) {
@@ -425,7 +425,7 @@ static struct elf_file *elf_from_object(struct object *object) {
 
 		elf_section->header.sh_entsize = 24;
 		elf_section->size = elf_section->header.sh_entsize * section->relocation_size;
-		elf_section->data = malloc(elf_section->size);
+		elf_section->data = cc_malloc(elf_section->size);
 		elf_section->header.sh_link = sym_idx;
 		elf_section->header.sh_info = i + 1;
 		elf_section->header.sh_flags = SHF_INFO_LINK;
@@ -442,6 +442,7 @@ static struct elf_file *elf_from_object(struct object *object) {
 			case RELOCATE_64: type = R_X86_64_64; break;
 			case RELOCATE_32: type = R_X86_64_32S; break;
 			case RELOCATE_32_RELATIVE: type = R_X86_64_PC32; break;
+			default: NOTIMP(); break;
 			}
 
 			write_64(rela_data, relocation->offset);
@@ -468,7 +469,7 @@ static struct elf_file *elf_from_object(struct object *object) {
 
 	elf_allocate_sections(&elf);
 
-	struct elf_file *ret = malloc(sizeof *ret);
+	struct elf_file *ret = cc_malloc(sizeof *ret);
 	*ret = elf;
 	return ret;
 }
@@ -505,7 +506,7 @@ static struct elf_file *elf_from_executable(struct executable *executable) {
 
 	elf_allocate_sections(&elf);
 
-	struct elf_file *ret = malloc(sizeof *ret);
+	struct elf_file *ret = cc_malloc(sizeof *ret);
 	*ret = elf;
 	return ret;
 }
@@ -661,7 +662,7 @@ static void read_sections(FILE *fp, struct elf_file *elf) {
 	read_skip(fp, elf->header.e_shoff);
 
 	elf->section_cap = elf->section_size;
-	elf->sections = malloc(sizeof *elf->sections * elf->section_cap);
+	elf->sections = cc_malloc(sizeof *elf->sections * elf->section_cap);
 	for (unsigned i = 0; i < elf->section_size; i++) {
 		struct elf_section *section = &elf->sections[i];
 
@@ -676,7 +677,7 @@ static void read_sections(FILE *fp, struct elf_file *elf) {
 
 		read_skip(fp, section->header.sh_offset);
 
-		section->data = malloc(section->size);
+		section->data = cc_malloc(section->size);
 		read(fp, section->data, section->size);
 	}
 }
@@ -787,7 +788,7 @@ struct elf_file *elf_read(const char *path) {
 
 	fclose(fp);
 
-	struct elf_file *ret = malloc(sizeof *ret);
+	struct elf_file *ret = cc_malloc(sizeof *ret);
 	*ret = elf;
 	return ret;
 }

@@ -35,7 +35,7 @@ const char *simple_to_str(enum simple_type st) {
 		int req_size = print_size + 1 + curr_pos; \
 		if (req_size > char_buffer_size) {								\
 			char_buffer_size = req_size;								\
-			buffer = realloc(buffer, char_buffer_size);					\
+			buffer = cc_realloc(buffer, char_buffer_size);					\
 			snprintf(buffer + curr_pos, char_buffer_size - 1 - curr_pos, STR, ##__VA_ARGS__); \
 		}																\
 		curr_pos += print_size;\
@@ -46,7 +46,7 @@ const char *dbg_type(struct type *type) {
 	static char *buffer = NULL;
 
 	if (!buffer) {
-		buffer = malloc(char_buffer_size);
+		buffer = cc_malloc(char_buffer_size);
 	}
 
 	int curr_pos = 0;
@@ -96,7 +96,7 @@ const char *dbg_instruction(struct instruction ins) {
 	static char *buffer = NULL;
 
 	if (!buffer) {
-		buffer = malloc(char_buffer_size);
+		buffer = cc_malloc(char_buffer_size);
 	}
 
 	int curr_pos = 0;
@@ -223,7 +223,7 @@ const char *dbg_token(struct token *t) {
 	static char *buffer = NULL;
 
 	if (!buffer) {
-		buffer = malloc(char_buffer_size);
+		buffer = cc_malloc(char_buffer_size);
 	}
 
 	int curr_pos = 0;

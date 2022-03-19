@@ -167,7 +167,7 @@ struct input *input_open(struct input *parent_input, const char *path, int syste
 		return NULL;
 	}
 
-	struct input *input = malloc(sizeof *input);
+	struct input *input = cc_malloc(sizeof *input);
 	*input = input_create(strdup(path_buffer), fp);
 
 	fclose(fp);

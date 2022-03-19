@@ -1,5 +1,7 @@
 #include "string_view.h"
 
+#include "common.h"
+
 #include <string.h>
 #include <stdlib.h>
 
@@ -27,7 +29,7 @@ struct string_view sv_from_str(char *string) {
 char *sv_to_str(struct string_view sv) {
 	if (sv.len == 0)
 		return NULL;
-	char *buffer = malloc(sv.len + 1);
+	char *buffer = cc_malloc(sv.len + 1);
 	memcpy(buffer, sv.str, sv.len);
 	buffer[sv.len] = '\0';
 	return buffer;

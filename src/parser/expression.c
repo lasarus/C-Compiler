@@ -446,7 +446,7 @@ struct expr *expr_new(struct expr expr) {
 
 	check_const_correctness(&expr);
 
-	struct expr *ret = malloc(sizeof *ret);
+	struct expr *ret = cc_malloc(sizeof *ret);
 	*ret = expr;
 
 	return ret;
@@ -679,8 +679,8 @@ var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		assert(type_is_pointer(callee->data_type));
 		struct type *signature = type_deref(callee->data_type);
 
-		var_id *args = malloc(sizeof *args * expr->call.n_args);
-		struct type **arg_types = malloc(sizeof *arg_types * expr->call.n_args);
+		var_id *args = cc_malloc(sizeof *args * expr->call.n_args);
+		struct type **arg_types = cc_malloc(sizeof *arg_types * expr->call.n_args);
 		for (int i = 0; i < expr->call.n_args; i++) {
 			if (i + 1 < signature->n) {
 				args[i] = expression_to_ir(expression_cast(expr->call.args[i],
@@ -944,7 +944,7 @@ void parse_call_parameters(struct expr ***args, int *n_args) {
 
 	*args = NULL;
 	if (pos) {
-		*args = malloc(sizeof **args * pos);
+		*args = cc_malloc(sizeof **args * pos);
 		memcpy(*args, buffer, sizeof **args * pos);
 	}
 

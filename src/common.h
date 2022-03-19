@@ -18,8 +18,8 @@
 
 // Add element to a dynamic array, with size and capacity.
 // Doubling is better than 1.5, or any other factor.
-#define ADD_ELEMENT(SIZE, CAP, PTR) (*((void)((SIZE) >= CAP ? (CAP = MAX(CAP * 2, 1)) : 0, PTR = realloc(PTR, sizeof *PTR * CAP)), PTR + (SIZE)++))
-#define ADD_ELEMENTS(SIZE, CAP, PTR, N) ((void)((SIZE + (N)) > CAP && (CAP = MAX(CAP * 2, (SIZE) + (N)), PTR = realloc(PTR, sizeof *PTR * CAP))), (SIZE) += (N), PTR + (SIZE) - (N))
+#define ADD_ELEMENT(SIZE, CAP, PTR) (*((void)((SIZE) >= CAP ? (CAP = MAX(CAP * 2, 1)) : 0, PTR = cc_realloc(PTR, sizeof *PTR * CAP)), PTR + (SIZE)++))
+#define ADD_ELEMENTS(SIZE, CAP, PTR, N) ((void)((SIZE + (N)) > CAP && (CAP = MAX(CAP * 2, (SIZE) + (N)), PTR = cc_realloc(PTR, sizeof *PTR * CAP))), (SIZE) += (N), PTR + (SIZE) - (N))
 
 uint32_t hash32(uint32_t a);
 
@@ -54,6 +54,12 @@ void file_write_long(FILE *fp, uint32_t long_);
 void file_write_quad(FILE *fp, uint64_t quad);
 void file_write_zero(FILE *fp, size_t size);
 void file_write_skip(FILE *fp, size_t target);
+
+#define malloc(...) _Static_assert(0, "Use cc_malloc instead.")
+#define realloc(...) _Static_assert(0, "Use cc_realloc instead.")
+
+void *cc_malloc(size_t size);
+void *cc_realloc(void *ptr, size_t size);
 
 #include <debug.h>
 

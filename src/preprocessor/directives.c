@@ -41,7 +41,7 @@ void directiver_push_input(const char *path, int system) {
 	if (!new_input)
 		return;
 
-	struct tokenized_file *new_file = malloc(sizeof *new_input);
+	struct tokenized_file *new_file = cc_malloc(sizeof *new_input);
 
 	new_file->input = new_input;
 	new_file->parent = current_file;

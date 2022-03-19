@@ -43,7 +43,7 @@ void object_start() {
 }
 
 struct object *object_finish() {
-	struct object *object = malloc(sizeof *object);
+	struct object *object = cc_malloc(sizeof *object);
 
 	*object = current_object;
 

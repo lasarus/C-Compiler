@@ -254,10 +254,10 @@ void codegen_initializer(struct type *type,
 	}
 	assert(size != -1);
 
-	uint8_t *buffer = malloc(sizeof *buffer * size);
-	label_id *labels = malloc(sizeof *labels * size);
-	int64_t *label_offsets = malloc(sizeof *label_offsets * size);
-	int *is_label = malloc(sizeof *is_label * size);
+	uint8_t *buffer = cc_malloc(sizeof *buffer * size);
+	label_id *labels = cc_malloc(sizeof *labels * size);
+	int64_t *label_offsets = cc_malloc(sizeof *label_offsets * size);
+	int *is_label = cc_malloc(sizeof *is_label * size);
 
 	for (int i = 0; i < size; i++) {
 		buffer[i] = 0;
