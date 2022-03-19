@@ -202,6 +202,8 @@ int main(int argc, char **argv) {
 		} else if (is_ext_file(basename, 'o')) {
 			assert(!(arguments.flag_S || arguments.flag_c));
 			struct object *object = elf_read_object(arguments.operands[i]);
+			if (!object)
+				NOTIMP();
 			ADD_ELEMENT(object_size, object_cap, objects) = *object;
 		} else {
 			NOTIMP();

@@ -554,13 +554,13 @@ static void read_skip(FILE *fp, unsigned long pos) {
 
 static const uint8_t magic[4] = {0x7f, 0x45, 0x4c, 0x46};
 
-static void read_header(FILE *fp, struct elf_file *elf) {
+static int read_header(FILE *fp, struct elf_file *elf) {
 	static uint8_t magic_buffer[4];
-	read(fp, magic_buffer, sizeof magic_buffer);
+	read(fp, magic_buffer, 4);
 
-	for (unsigned i = 0; i < sizeof magic_buffer; i++)
+	for (unsigned i = 0; i < 4; i++)
 		if (magic_buffer[i] != magic[i])
-			ICE("Not an elf-file.");
+			return 1;
 
 	assert(read_byte(fp) == 2); // EI_CLASS = 64 bit
 	assert(read_byte(fp) == 1); // EI_DATA = little endian
@@ -594,6 +594,8 @@ static void read_header(FILE *fp, struct elf_file *elf) {
 	assert(elf->section_size == 0 || e_shentsize == 8 * 8);
 
 	elf->header.e_shstrndx = read_word(fp); // e_shstrndx
+
+	return 0;
 }
 
 static void write_header(FILE *fp, struct elf_file *elf) {
@@ -758,7 +760,12 @@ struct elf_file *elf_read(const char *path) {
 	FILE *fp = fopen(path, "rb");
 	struct elf_file elf = { 0 };
 
-	read_header(fp, &elf);
+	int not_elf = read_header(fp, &elf);
+
+	if (not_elf) {
+		fclose(fp);
+		return NULL;
+	}
 
 	if (elf.segment_size)
 		NOTIMP();
@@ -811,5 +818,6 @@ void elf_write_executable(const char *path, struct executable *executable) {
 }
 
 struct object *elf_read_object(const char *path) {
-	return object_from_elf(elf_read(path));
+	struct elf_file *elf = elf_read(path);
+	return elf ? object_from_elf(elf) : NULL;
 }
