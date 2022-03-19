@@ -184,7 +184,10 @@ int main(int argc, char **argv) {
 		printf("Warning! Emitting executables is still work in progress.\n");
 	}
 
-	if (arguments.flag_E || arguments.flag_g || arguments.flag_s)
+	if (arguments.flag_g)
+		printf("Warning: -g flag is ignored.");
+
+	if (arguments.flag_E || arguments.flag_s)
 		NOTIMP();
 
 	if (arguments.n_operand != 1 && arguments.outfile &&
