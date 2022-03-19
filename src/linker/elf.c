@@ -529,15 +529,18 @@ static uint8_t read_byte(FILE *fp) {
 }
 
 static uint16_t read_word(FILE *fp) {
-	return read_byte(fp) | ((uint16_t)read_byte(fp) << 8);
+	uint8_t a = read_byte(fp), b = read_byte(fp);
+	return a | ((uint16_t)b << 8);
 }
 
 static uint32_t read_long(FILE *fp) {
-	return read_word(fp) | ((uint32_t)read_word(fp) << 16);
+	uint16_t a = read_word(fp), b = read_word(fp);
+	return a | ((uint32_t)b << 16);
 }
 
 static uint64_t read_quad(FILE *fp) {
-	return read_long(fp) | ((uint64_t)read_long(fp) << 32);
+	uint32_t a = read_long(fp), b = read_long(fp);
+	return a | ((uint64_t)b << 32);
 }
 
 static void read_zero(FILE *fp, size_t size) {
