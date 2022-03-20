@@ -362,7 +362,11 @@ struct token directiver_next(void) {
 			} else if (sv_string_cmp(name, "undef")) {
 				define_map_remove(next().str);
 			} else if (sv_string_cmp(name, "error")) {
-				ERROR(directive.pos, "#error directive was invoked.");
+				struct token msg = next();
+				if (msg.type == T_STRING)
+					ERROR(directive.pos, "#error directive was invoked with message: \"%.*s\".", msg.str.len, msg.str.str);
+				else
+					ERROR(directive.pos, "#error directive was invoked.");
 			} else if (sv_string_cmp(name, "include")) {
 				// There is an issue with just resetting after include. But
 				// I'm interpreting the standard liberally to allow for this.
