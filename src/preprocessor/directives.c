@@ -9,14 +9,14 @@
 
 #include <assert.h>
 
-static int pushed_idx = 0;
-static struct token pushed[2];
-
 struct tokenized_file {
 	struct input *input;
 
 	int token_idx;
 	struct token_list tokens;
+
+	int pushed_idx;
+	struct token pushed[2];
 
 	struct tokenized_file *parent;
 };
@@ -30,7 +30,6 @@ static int line_diff = 0;
 void directiver_reset(void) {
 	new_filename = NULL;
 	line_diff = 0;
-	pushed_idx = 0;
 	current_file = NULL;
 }
 
@@ -41,15 +40,18 @@ void directiver_push_input(const char *path, int system) {
 	if (!new_input)
 		return;
 
-	struct tokenized_file *new_file = cc_malloc(sizeof *new_input);
-
-	new_file->input = new_input;
-	new_file->parent = current_file;
-	new_file->token_idx = 0;
-	new_file->tokens = tokenize_input(new_input);
+	struct tokenized_file *new_file = cc_malloc(sizeof *new_file);
+	*new_file = (struct tokenized_file) {
+		.input = new_input,
+		.parent = current_file,
+		.token_idx = 0,
+		.tokens = tokenize_input(new_input),
+	};
 
 	current_file = new_file;
 }
+
+static struct token next();
 
 static struct token next_from_stack() {
 	if (current_file->token_idx == current_file->tokens.size) {
@@ -57,7 +59,7 @@ static struct token next_from_stack() {
 			input_free(current_file->input);
 			token_list_free(&current_file->tokens);
 			current_file = current_file->parent;
-			return next_from_stack();
+			return next();
 		}
 
 		return (struct token ) { .type = T_EOI };
@@ -67,13 +69,19 @@ static struct token next_from_stack() {
 }
 
 void push(struct token t) {
-	if (pushed_idx > 1)
+	if (current_file->pushed_idx > 1)
 		ICE("Pushed too many directive tokens.");
-	pushed[pushed_idx++] = t;
+	current_file->pushed[current_file->pushed_idx++] = t;
 }
 
-struct token next() {
-	struct token t = pushed_idx ? pushed[--pushed_idx] : next_from_stack();
+static struct token next() {
+	struct token t;
+	if (current_file->pushed_idx) {
+		current_file->pushed_idx--;
+		t = current_file->pushed[current_file->pushed_idx];
+	} else {
+		t = next_from_stack();
+	}
 	t.pos.line += line_diff;
 	if (new_filename)
 		t.pos.path = new_filename;
@@ -278,6 +286,29 @@ intmax_t evaluate_until_newline() {
 	return result;
 }
 
+static struct string_view get_include_path(struct token dir, struct token t, int *system) {
+	buffer.size = 0;
+	while (!t.first_of_line) {
+		token_list_add(&buffer, t);
+		t = next();
+	}
+	push(t);
+
+	expand_token_list(&buffer);
+
+	if (buffer.size != 1 || buffer.list[0].type != T_STRING)
+		ERROR(dir.pos, "Invalidly formatted path to #include directive.");
+
+	*system = 0;
+
+	struct string_view path = buffer.list[0].str;
+	path.len -= 2;
+	path.str++;
+
+	buffer_pos = 0;
+	return path;
+}
+
 int directiver_evaluate_conditional(struct token dir) {
 	if (sv_string_cmp(dir.str, "ifdef")) {
 		return (define_map_get(next().str) != NULL);
@@ -372,11 +403,18 @@ struct token directiver_next(void) {
 				// I'm interpreting the standard liberally to allow for this.
 				new_filename = NULL;
 				line_diff = 0;
+				struct string_view path;
 				struct token path_tok = next();
-				int system = path_tok.type == PP_HEADER_NAME_H;
-				struct string_view path = path_tok.str;
-				path.str++;
-				path.len -= 2;
+				int system;
+				if (path_tok.type == PP_HEADER_NAME_H ||
+					path_tok.type == PP_HEADER_NAME_Q) {
+					path = path_tok.str;
+					system = path_tok.type == PP_HEADER_NAME_H;
+					path.len -= 2;
+					path.str++;
+				} else {
+					path = get_include_path(directive, path_tok, &system);
+				}
 
 				directiver_push_input(sv_to_str(path), system);
 			} else if (sv_string_cmp(name, "endif")) {
