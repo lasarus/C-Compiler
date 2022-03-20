@@ -1,3 +1,9 @@
+#include <string.h>
+
+const void *f(const void *a, char *b) {
+	return a ? a : b;
+}
+
 int main() {
 	char *str1 = "Hello";
 	const char *str2 = "Hello";

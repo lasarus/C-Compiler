@@ -234,9 +234,9 @@ void cast_conditional(struct expr *expr) {
 
 	if (type_is_pointer(a) && type_is_pointer(b)) {
 		struct type *composite;
-		if (type_deref(a) == type_simple(ST_VOID))
+		if (type_remove_qualifications(type_deref(a)) == type_simple(ST_VOID))
 			expr->args[1] = expression_cast(expr->args[1], b);
-		else if (type_deref(b) == type_simple(ST_VOID))
+		else if (type_remove_qualifications(type_deref(b)) == type_simple(ST_VOID))
 			expr->args[2] = expression_cast(expr->args[2], a);
 		else if ((composite = type_make_composite(type_remove_qualifications(type_deref(a)),
 												  type_remove_qualifications(type_deref(b))))) {
@@ -244,9 +244,9 @@ void cast_conditional(struct expr *expr) {
 			expr->args[2] = expression_cast(expr->args[2], composite);
 			expr->args[1] = expression_cast(expr->args[1], composite);
 		} else {
-			ICE("Invalid combination of data types:\n%s and %s\n",
-				strdup(dbg_type(a)),
-				strdup(dbg_type(b)));
+			ERROR(T0->pos, "Invalid combination of data types:\n%s and %s\n",
+				  strdup(dbg_type(a)),
+				  strdup(dbg_type(b)));
 		}
 	} else if (type_is_pointer(a) && is_null_pointer_constant(expr->args[2])) {
 		expr->args[2] = expression_cast(expr->args[2], a);
