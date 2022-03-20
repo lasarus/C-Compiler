@@ -157,6 +157,8 @@ struct expr {
 	struct expr *args[3];
 
 	struct type *data_type;
+
+	struct position pos;
 };
 
 struct expr *parse_assignment_expression();

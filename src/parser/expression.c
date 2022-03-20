@@ -449,6 +449,9 @@ struct expr *expr_new(struct expr expr) {
 	struct expr *ret = cc_malloc(sizeof *ret);
 	*ret = expr;
 
+	if (!ret->pos.path)
+		ret->pos = T0->pos; // If no position is supplied, at least take something close to it.
+
 	return ret;
 }
 
@@ -468,8 +471,6 @@ int try_expression_to_address(struct expr *expr, var_id *var) {
 
 	case E_VARIABLE: {
 		var_id address = new_variable(type_pointer(expr->data_type), 1, 1);
-		if (expr->variable.is_register)
-			ICE("Taking address of register is not allowed.");
 		IR_PUSH_ADDRESS_OF(address, expr->variable.id);
 		*var = address;
 		return 1;
@@ -994,7 +995,11 @@ struct expr *parse_prefix() {
 	} else if (TACCEPT(T_BNOT)) {
 		return EXPR_UNARY_OP(UOP_BNOT, parse_pratt(PREFIX_PREC));
 	} else if (TACCEPT(T_AMP)) {
- 		return EXPR_ARGS(E_ADDRESS_OF, parse_pratt(PREFIX_PREC));
+		struct position pos = T0->pos;
+		struct expr *rhs = parse_pratt(PREFIX_PREC);
+		if (rhs->type == E_VARIABLE && rhs->variable.is_register)
+			ERROR(pos, "Taking address of register variable is not allowed.");
+		return EXPR_ARGS(E_ADDRESS_OF, rhs);
 	} else if (TACCEPT(T_KSIZEOF)) {
 		struct type *type = NULL;
 		struct token t = *T0;
