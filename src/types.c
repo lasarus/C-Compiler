@@ -315,16 +315,16 @@ void type_get_offsets(struct type *type, int index, int *offset, int *bit_offset
 	switch (type->type) {
 	case TY_STRUCT: {
 		struct field f = type->struct_data->fields[index];
-		*bit_offset = f.bit_offset;
-		*bit_size = f.bitfield;
-		*offset = f.offset;
+		if (bit_offset) *bit_offset = f.bit_offset;
+		if (bit_size) *bit_size = f.bitfield;
+		if (offset) *offset = f.offset;
 	} break;
 
 	case TY_ARRAY:
 	case TY_INCOMPLETE_ARRAY:
-		*bit_offset = 0;
-		*bit_size = -1;
-		*offset = calculate_offset(type, index);
+		if (bit_offset) *bit_offset = 0;
+		if (bit_size) *bit_size = -1;
+		if (offset) *offset = calculate_offset(type, index);
 		break;
 
 	default:

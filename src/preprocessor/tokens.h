@@ -76,6 +76,7 @@ KEY(T_KVA_START, "__builtin_va_start")
 KEY(T_KVA_END, "__builtin_va_end")
 KEY(T_KVA_ARG, "__builtin_va_arg")
 KEY(T_KVA_COPY, "__builtin_va_copy")
+KEY(T_KOFFSETOF, "__builtin_offsetof")
 KEY(T_KFUNC, "__func__")
 KEY(T_KATTRIBUTE, "__attribute__")
 

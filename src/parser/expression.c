@@ -1165,6 +1165,32 @@ struct expr *parse_prefix() {
 				.type = E_BUILTIN_VA_ARG,
 				.va_arg_ = {v, t}
 			});
+	} else if (TACCEPT(T_KOFFSETOF)) {
+		TEXPECT(T_LPAR);
+		struct type *type = parse_type_name();
+		if (!type)
+			ERROR(T0->pos, "Expectected type-name.");
+		TEXPECT(T_COMMA);
+
+		struct token member = *T0;
+		TEXPECT(T_IDENT);
+		TEXPECT(T_RPAR);
+
+		int n = 0, *indices;
+		if (!type_search_member(type, member.str, &n, &indices))
+			ERROR(T0->pos, "Could not find %.*s in type %s\n", member.str.len, member.str.str, dbg_type(type));
+
+		int total_offset = 0;
+		for (int i = n - 1; i >= 0; i--) {
+			int offset;
+
+			type_get_offsets(type, indices[i], &offset, NULL, NULL);
+			type = type_select(type, indices[i]);
+
+			total_offset += offset;
+		}
+
+		return EXPR_INT(total_offset);
 	} else if (TACCEPT(T_KFUNC)) {
  		return EXPR_STR(get_current_function_name(), ST_CHAR);
 	}
