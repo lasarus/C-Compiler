@@ -170,11 +170,11 @@ struct instruction {
 			int register_index, is_ssa;
 			var_id variable;
 		} set_reg;
-#define IR_PUSH_SET_REG(VARIABLE, REGISTER_INDEX, IS_SSA) IR_PUSH(.type = IR_SET_REG, .set_reg = {(REGISTER_INDEX), (IS_SSA), (VARIABLE)})
+#define IR_PUSH_SET_REG(VARIABLE, REGISTER_INDEX, IS_SSE) IR_PUSH(.type = IR_SET_REG, .set_reg = {(REGISTER_INDEX), (IS_SSE), (VARIABLE)})
 		struct {
 			int register_index, is_ssa;
 		} get_reg;
-#define IR_PUSH_GET_REG(RESULT, REGISTER_INDEX, IS_SSA) IR_PUSH(.type = IR_GET_REG, .result = (RESULT), .get_reg = {(REGISTER_INDEX), (IS_SSA)})
+#define IR_PUSH_GET_REG(RESULT, REGISTER_INDEX, IS_SSE) IR_PUSH(.type = IR_GET_REG, .result = (RESULT), .get_reg = {(REGISTER_INDEX), (IS_SSE)})
 
 		struct {
 			int change;

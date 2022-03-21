@@ -186,6 +186,7 @@ struct encoding encodings[] = {
 	{"movzbl", 0x0f, .op2 = 0xb6, .slash_r = 1, .operand_encoding = {{OE_MODRM_REG, 0}, {OE_MODRM_RM, 0}}, .operand_accepts = {A_REG(4), A_MODRM(1)}},
 
 	{"pushq", 0x50, .operand_encoding = {{OE_OPEXT, 0}}, .operand_accepts = {A_REG(8)}},
+	{"popq", 0x58, .operand_encoding = {{OE_OPEXT, 0}}, .operand_accepts = {A_REG(8)}},
 
 	{"notl", 0xf7, .modrm_extension = 2, .operand_encoding = {{OE_MODRM_RM, 0}}, .operand_accepts = {A_MODRM(4)}},
 	{"notq", 0xf7, .rex = 1, .rexw = 1, .modrm_extension = 2, .operand_encoding = {{OE_MODRM_RM, 0}}, .operand_accepts = {A_MODRM(8)}},

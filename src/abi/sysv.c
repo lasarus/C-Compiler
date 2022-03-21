@@ -22,6 +22,8 @@ struct sysv_data {
 
 	int returns_address;
 	var_id ret_address;
+
+	var_id rbx_store;
 };
 
 
@@ -311,6 +313,9 @@ static void sysv_ir_function_new(struct type *type, var_id *args, const char *na
 		abi_data.overflow_position = total_mem_needed + 16;
 	}
 
+	abi_data.rbx_store = new_variable_sz(8, 1, 0);
+	IR_PUSH_GET_REG(abi_data.rbx_store, REG_RBX, 0);
+
 	for (int i = 0; i < c.regs_size; i++)
 		IR_PUSH_GET_REG(c.regs[i].variable, c.regs[i].register_idx, c.regs[i].is_sse);
 
@@ -338,11 +343,12 @@ static void sysv_ir_function_new(struct type *type, var_id *args, const char *na
 }
 
 static void sysv_ir_function_return(struct function *func, var_id value, struct type *type) {
-	if (type == type_simple(ST_VOID))
-		return;
 	enum parameter_class classes[4];
 	struct sysv_data *abi_data = func->abi_data;
 	int n_parts = 0;
+
+	if (type == type_simple(ST_VOID))
+		goto unclobber;
 
 	classify(type, &n_parts, classes);
 
@@ -361,6 +367,9 @@ static void sysv_ir_function_return(struct function *func, var_id value, struct 
 	} else {
 		NOTIMP();
 	}
+
+unclobber:
+	IR_PUSH_SET_REG(abi_data->rbx_store, REG_RBX, 0);
 }
 
 static void sysv_emit_function_preamble(struct function *func) {
