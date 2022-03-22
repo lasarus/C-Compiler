@@ -147,7 +147,6 @@ static void ms_ir_function_new(struct type *type, var_id *args, const char *name
 }
 
 static void ms_ir_function_return(struct function *func, var_id value, struct type *type) {
-	(void)func, (void)value;
 	if (type == type_simple(ST_VOID))
 		return;
 

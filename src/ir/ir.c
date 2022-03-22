@@ -110,6 +110,8 @@ void ir_return_void(void) {
 	block->exit.type = BLOCK_EXIT_RETURN;
 	block->exit.return_.type = type_simple(ST_VOID);
 	block->exit.return_.value = 0;
+
+	abi_ir_function_return(get_current_function(), VOID_VAR, type_simple(ST_VOID));
 }
 
 void ir_get_offset(var_id member_address, var_id base_address, var_id offset_var, int offset) {

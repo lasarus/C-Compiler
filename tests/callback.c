@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <assert.h>
 #include <string.h>
 
@@ -6,11 +7,17 @@
 // Because codegen didn't take into account that
 // the rbx register is callee saved.
 
+void atexit_func(void) {
+    printf("");
+}
+
 int compare_strings(const void *p, const void *q) {
     return strcmp(*(const char **)p, *(const char **)q);
 }
 
 int main() {
+    atexit(atexit_func);
+
 	const char *strings[] = {
 		"Tok",
 		"oAj",
