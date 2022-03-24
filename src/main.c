@@ -10,6 +10,8 @@
 #include "abi/abi.h"
 #include "arguments.h"
 
+#include "../config.def.h"
+
 #include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -67,13 +69,6 @@ static void add_definition(const char *str) {
 	free(buffer);
 }
 
-static enum {
-	ABI_SYSV,
-	ABI_MICROSOFT
-} abi = ABI_SYSV;
-
-static int mingw_workarounds = 0;
-
 static void set_flags(struct arguments *arguments) {
 	for (int i = 0; i < arguments->n_flag; i++) {
 		const char *flag = arguments->flags[i];
@@ -100,10 +95,6 @@ static void set_flags(struct arguments *arguments) {
 
 static size_t object_size, object_cap;
 static struct object *objects;
-
-const char *default_include[] = {
-	NULL
-};
 
 static void compile_file(const char *path,
 						 struct arguments *arguments) {
