@@ -10,7 +10,7 @@
 #include "abi/abi.h"
 #include "arguments.h"
 
-#include "../config.def.h"
+#include "../config.h"
 
 #include <time.h>
 #include <stdio.h>
