@@ -75,91 +75,56 @@ struct instruction {
 		IR_TYPE_COUNT
 	} type;
 
-	var_id result;
+	var_id operands[3];
 
 	union {
 		struct {
 			enum ir_binary_operator type;
-			var_id lhs, rhs;
 		} binary_operator;
-#define IR_PUSH_BINARY_OPERATOR(TYPE, LHS, RHS, RESULT) IR_PUSH(.type = IR_BINARY_OPERATOR, .result = (RESULT), .binary_operator = {(TYPE), (LHS), (RHS)})
-		struct {
-			var_id operand;
-		} binary_not;
-#define IR_PUSH_BINARY_NOT(RESULT, OPERAND) IR_PUSH(.type = IR_BINARY_NOT, .result = (RESULT), .binary_not = { (OPERAND)})
-		struct {
-			var_id operand;
-		} negate_int;
-#define IR_PUSH_NEGATE_INT(RESULT, OPERAND) IR_PUSH(.type = IR_NEGATE_INT, .result = (RESULT), .negate_int = { (OPERAND)})
-		struct {
-			var_id operand;
-		} negate_float;
-#define IR_PUSH_NEGATE_FLOAT(RESULT, OPERAND) IR_PUSH(.type = IR_NEGATE_FLOAT, .result = (RESULT), .negate_float = { (OPERAND)})
-		struct {
-			var_id pointer;
-		} load;
-#define IR_PUSH_LOAD(RESULT, POINTER) IR_PUSH(.type = IR_LOAD, .result = (RESULT), .load = {(POINTER)})
-		struct {
-			var_id source;
-		} copy;
-#define IR_PUSH_COPY(RESULT, SOURCE) IR_PUSH(.type = IR_COPY, .result=(RESULT), .copy = {(SOURCE)})
-		struct {
-			var_id value, pointer;
-		} store;
-#define IR_PUSH_STORE(VALUE, POINTER) IR_PUSH(.type = IR_STORE, .store = {(VALUE), (POINTER)})
-		struct {
-			var_id variable;
-		} address_of;
-#define IR_PUSH_ADDRESS_OF(RESULT, VARIABLE) IR_PUSH(.type = IR_ADDRESS_OF, .result=(RESULT), .address_of = {(VARIABLE)})
-#define IR_PUSH_SET_ZERO(RESULT) IR_PUSH(.type = IR_SET_ZERO, .result = (RESULT))
+#define IR_PUSH_BINARY_OPERATOR(TYPE, LHS, RHS, RESULT) IR_PUSH(.type = IR_BINARY_OPERATOR, .operands = {(RESULT), (LHS), (RHS)}, .binary_operator = {(TYPE)})
+#define IR_PUSH_BINARY_NOT(RESULT, OPERAND) IR_PUSH(.type = IR_BINARY_NOT, .operands = {(RESULT), (OPERAND)})
+#define IR_PUSH_NEGATE_INT(RESULT, OPERAND) IR_PUSH(.type = IR_NEGATE_INT, .operands = {(RESULT), (OPERAND)})
+#define IR_PUSH_NEGATE_FLOAT(RESULT, OPERAND) IR_PUSH(.type = IR_NEGATE_FLOAT, .operands = {(RESULT), (OPERAND)})
+#define IR_PUSH_LOAD(RESULT, POINTER) IR_PUSH(.type = IR_LOAD, .operands = {(RESULT), (POINTER)})
+#define IR_PUSH_COPY(RESULT, SOURCE) IR_PUSH(.type = IR_COPY, .operands = {(RESULT), (SOURCE)})
+#define IR_PUSH_STORE(VALUE, POINTER) IR_PUSH(.type = IR_STORE, .operands = {(VALUE), (POINTER)})
+#define IR_PUSH_ADDRESS_OF(RESULT, VARIABLE) IR_PUSH(.type = IR_ADDRESS_OF, .operands = {(RESULT), (VARIABLE)})
+#define IR_PUSH_SET_ZERO(RESULT) IR_PUSH(.type = IR_SET_ZERO, .operands = {(RESULT)})
 		struct {
 			struct constant constant;
 		} constant;
-#define IR_PUSH_CONSTANT(CONSTANT, RESULT) IR_PUSH(.type = IR_CONSTANT, .result=(RESULT), .constant = {(CONSTANT)})
+#define IR_PUSH_CONSTANT(CONSTANT, RESULT) IR_PUSH(.type = IR_CONSTANT, .operands={(RESULT)}, .constant = {(CONSTANT)})
 		struct {
-			var_id function;
 			int non_clobbered_register;
 		} call;
-//#define IR_PUSH_CALL_VARIABLE(VARIABLE, RETURN_TYPE, ARGUMENT_TYPES, N_ARGS, ARGS, RESULT) IR_PUSH(.type = IR_CALL_VARIABLE, .result = (RESULT), .call_variable = {(VARIABLE), (RETURN_TYPE), (ARGUMENT_TYPES), (N_ARGS), (ARGS)})
-#define IR_PUSH_CALL(VARIABLE, NON_CLOBBERED_REGISTER) IR_PUSH(.type = IR_CALL, .call = {(VARIABLE), (NON_CLOBBERED_REGISTER)})
+#define IR_PUSH_CALL(VARIABLE, NON_CLOBBERED_REGISTER) IR_PUSH(.type = IR_CALL, .operands = {(VARIABLE)}, .call = {(NON_CLOBBERED_REGISTER)})
 
 		struct {
-			var_id rhs;
 			int sign_extend;
 		} int_cast;
-#define IR_PUSH_INT_CAST(RESULT, RHS, SIGN_EXTEND) IR_PUSH(.type = IR_INT_CAST, .result = (RESULT), .int_cast = {(RHS), (SIGN_EXTEND)})
+#define IR_PUSH_INT_CAST(RESULT, RHS, SIGN_EXTEND) IR_PUSH(.type = IR_INT_CAST, .operands = {(RESULT), (RHS)}, .int_cast = {(SIGN_EXTEND)})
+#define IR_PUSH_BOOL_CAST(RESULT, RHS) IR_PUSH(.type = IR_BOOL_CAST, .operands = {(RESULT), (RHS)})
+#define IR_PUSH_FLOAT_CAST(RESULT, RHS) IR_PUSH(.type = IR_FLOAT_CAST, .operands = {(RESULT), (RHS)})
 
 		struct {
-			var_id rhs;
-		} bool_cast;
-#define IR_PUSH_BOOL_CAST(RESULT, RHS) IR_PUSH(.type = IR_BOOL_CAST, .result = (RESULT), .bool_cast = {(RHS)})
-
-		struct {
-			var_id rhs;
-		} float_cast;
-#define IR_PUSH_FLOAT_CAST(RESULT, RHS) IR_PUSH(.type = IR_FLOAT_CAST, .result = (RESULT), .float_cast = {(RHS)})
-
-		struct {
-			var_id rhs;
 			int from_float, sign;
 		} int_float_cast;
-#define IR_PUSH_INT_FLOAT_CAST(RESULT, RHS, FROM_FLOAT, SIGN) IR_PUSH(.type = IR_INT_FLOAT_CAST, .result = (RESULT), .int_float_cast = {(RHS), (FROM_FLOAT), (SIGN)})
+#define IR_PUSH_INT_FLOAT_CAST(RESULT, RHS, FROM_FLOAT, SIGN) IR_PUSH(.type = IR_INT_FLOAT_CAST, .operands = {(RESULT), (RHS)}, .int_float_cast = {(FROM_FLOAT), (SIGN)})
 
-#define IR_PUSH_VA_START(RESULT) IR_PUSH(.type = IR_VA_START, .result = (RESULT))
+#define IR_PUSH_VA_START(RESULT) IR_PUSH(.type = IR_VA_START, .operands = {(RESULT)})
 
 		struct {
 			var_id array;
 			struct type *type;
 		} va_arg_;
-#define IR_PUSH_VA_ARG(ARRAY, RESULT, TYPE) IR_PUSH(.type = IR_VA_ARG, .result = (RESULT), .va_arg_ = {(ARRAY), (TYPE)})
+#define IR_PUSH_VA_ARG(ARRAY, RESULT, TYPE) IR_PUSH(.type = IR_VA_ARG, .operands = {(RESULT)}, .va_arg_ = {(ARRAY), (TYPE)})
 
 		struct {
-			var_id length, slot;
 			int dominance;
 		} stack_alloc;
-#define IR_PUSH_STACK_ALLOC(RESULT, LENGTH, SLOT, DOMINANCE) IR_PUSH(.type = IR_STACK_ALLOC, .result = (RESULT), .stack_alloc = {(LENGTH), (SLOT), (DOMINANCE)})
+#define IR_PUSH_STACK_ALLOC(RESULT, LENGTH, SLOT, DOMINANCE) IR_PUSH(.type = IR_STACK_ALLOC, .operands = {(RESULT), (LENGTH), (SLOT)}, .stack_alloc = {(DOMINANCE)})
 
-#define IR_PUSH_ADD_TEMPORARY(RESULT) IR_PUSH(.type = IR_ADD_TEMPORARY, .result = (RESULT))
+#define IR_PUSH_ADD_TEMPORARY(RESULT) IR_PUSH(.type = IR_ADD_TEMPORARY, .operands = {(RESULT)})
 
 		struct {
 			int stack_bucket;
@@ -167,14 +132,13 @@ struct instruction {
 #define IR_PUSH_CLEAR_STACK_BUCKET(STACK_BUCKET) IR_PUSH(.type = IR_CLEAR_STACK_BUCKET, .clear_stack_bucket = {(STACK_BUCKET)})
 
 		struct {
-			int register_index, is_ssa;
-			var_id variable;
+			int register_index, is_sse;
 		} set_reg;
-#define IR_PUSH_SET_REG(VARIABLE, REGISTER_INDEX, IS_SSE) IR_PUSH(.type = IR_SET_REG, .set_reg = {(REGISTER_INDEX), (IS_SSE), (VARIABLE)})
+#define IR_PUSH_SET_REG(VARIABLE, REGISTER_INDEX, IS_SSE) IR_PUSH(.type = IR_SET_REG, .operands = {(VARIABLE)}, .set_reg = {(REGISTER_INDEX), (IS_SSE)})
 		struct {
-			int register_index, is_ssa;
+			int register_index, is_sse;
 		} get_reg;
-#define IR_PUSH_GET_REG(RESULT, REGISTER_INDEX, IS_SSE) IR_PUSH(.type = IR_GET_REG, .result = (RESULT), .get_reg = {(REGISTER_INDEX), (IS_SSE)})
+#define IR_PUSH_GET_REG(RESULT, REGISTER_INDEX, IS_SSE) IR_PUSH(.type = IR_GET_REG, .operands = {(RESULT)}, .get_reg = {(REGISTER_INDEX), (IS_SSE)})
 
 		struct {
 			int change;
@@ -182,13 +146,12 @@ struct instruction {
 #define IR_PUSH_MODIFY_STACK_POINTER(CHANGE) IR_PUSH(.type = IR_MODIFY_STACK_POINTER, .modify_stack_pointer = {(CHANGE)})
 		struct {
 			int offset;
-			var_id variable;
 		} store_stack_relative;
-#define IR_PUSH_STORE_STACK_RELATIVE(OFFSET, VARIABLE) IR_PUSH(.type = IR_STORE_STACK_RELATIVE, .store_stack_relative = {(OFFSET), (VARIABLE)})
+#define IR_PUSH_STORE_STACK_RELATIVE(OFFSET, VARIABLE) IR_PUSH(.type = IR_STORE_STACK_RELATIVE, .operands = {(VARIABLE)}, .store_stack_relative = {(OFFSET)})
 		struct {
 			int offset;
 		} load_base_relative;
-#define IR_PUSH_LOAD_BASE_RELATIVE(RESULT, OFFSET) IR_PUSH(.type = IR_LOAD_BASE_RELATIVE, .result = (RESULT), .load_base_relative = {(OFFSET)})
+#define IR_PUSH_LOAD_BASE_RELATIVE(RESULT, OFFSET) IR_PUSH(.type = IR_LOAD_BASE_RELATIVE, .operands = {(RESULT)}, .load_base_relative = {(OFFSET)})
 	};
 };
 
