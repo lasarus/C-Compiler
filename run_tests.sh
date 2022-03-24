@@ -3,21 +3,13 @@
 test_source() {
 	OUT="$(basename -s .c $1).s"
 
-	if [ "$4" == "true" ]; then
-		if [ "$2" == "true" ]; then
-			$5 $1 -o $TEST_DIR/$OUT -S -Imusl -D$3
-		else
-			$5 $1 -o $TEST_DIR/$OUT -S -I/usr/include -Iinclude/linux -D$3
-		fi
+	if [ "$3" == "true" ]; then
+		$4 $1 -o $TEST_DIR/$OUT -S -D$2
 
 		musl-gcc $TEST_DIR/$OUT -o test -no-pie -lm -Wall -Werror
 		./test
 	else
-		if [ "$2" == "true" ]; then
-			! $5 $1 -o $TEST_DIR/$OUT -S -Imusl -D$3 >/dev/null
-		else
-			! $5 $1 -o $TEST_DIR/$OUT -S -I/usr/include -Iinclude/linux -D$3 >/dev/null
-		fi
+		! $4 $1 -o $TEST_DIR/$OUT -S -D$2 >/dev/null
 	fi
 }
 
@@ -30,27 +22,20 @@ run_tests() {
 			found=0
 			for D in $(sed -n -e 's/\/\/ DEFS //p' <$SRC); do
 				found=1
-				test_source $SRC $MUSL $D false $1
+				test_source $SRC $D false $1
 			done
 			[ $found -eq 0 ] && test_source $SRC $MUSL AAA false $1
 		else
 			found=0
 			for D in $(sed -n -e 's/\/\/ DEFS //p' <$SRC); do
-				test_source $SRC $MUSL $D true $1
+				test_source $SRC $D true $1
 			done
-			[ $found -eq 0 ] && test_source $SRC $MUSL AAA true $1
+			[ $found -eq 0 ] && test_source $SRC AAA true $1
 		fi
 	done
 }
 
 TEST_DIR=test_asm
-MUSL=true
-
-if [ ! -d "musl" ] 
-then
-	echo "Musl headers not provided, trying /usr/include instead"
-	MUSL=false
-fi
 
 mkdir -p $TEST_DIR
 

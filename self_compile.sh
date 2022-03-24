@@ -5,14 +5,6 @@
 mkdir -p asm
 mkdir -p asm2
 
-MUSL=true
-
-if [ ! -d "musl" ] 
-then
-	echo "Musl headers not provided, trying /usr/include instead"
-	MUSL=false
-fi
-
 echo "COMPILING FIRST GENERATION..."
 SOURCES=$(find src -name '*.c')
 
@@ -22,12 +14,7 @@ for SRC in $SOURCES
 do
 	echo -en "\r\033[KCOMPILING $SRC"
 	OUT="$(basename -s .c $SRC).s"
-	if [ "$MUSL" = "true" ]
-	then
-		./cc $SRC -o asm/$OUT -S -Isrc -Imusl
-	else
-		./cc $SRC -o asm/$OUT -S -Isrc -I/usr/include/ -Iinclude/
-	fi
+	./cc $SRC -o asm/$OUT -S -Isrc
 done
 echo -en "\r\033[KDONE!"
 echo
@@ -48,12 +35,7 @@ do
 	do
 		echo -en "\r\033[KCOMPILING $SRC"
 		OUT="$(basename -s .c $SRC).s"
-		if [ "$MUSL" = "true" ]
-		then
-			./cc_self $SRC -o asm2/$OUT -S -Isrc -Imusl
-		else
-			./cc_self $SRC -o asm2/$OUT -S -Isrc -I/usr/include/ -Iinclude/
-		fi
+		./cc_self $SRC -o asm2/$OUT -S -Isrc
 	done
 	echo -en "\r\033[KDONE!"
 	echo
