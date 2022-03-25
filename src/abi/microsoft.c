@@ -18,6 +18,8 @@ struct ms_data {
 
 	int returns_address;
 	var_id ret_address;
+
+	var_id rbx_store;
 };
 
 static int fits_into_reg(struct type *type) {
@@ -107,6 +109,9 @@ static void ms_ir_function_new(struct type *type, var_id *args, const char *name
 		abi_data.n_args = n_args;
 	}
 
+	abi_data.rbx_store = new_variable_sz(8, 1, 0);
+	IR_PUSH_GET_REG(abi_data.rbx_store, REG_RBX, 0);
+
 	static int loads_cap = 0;
 	struct load_pair {
 		var_id from, to;
@@ -147,16 +152,19 @@ static void ms_ir_function_new(struct type *type, var_id *args, const char *name
 }
 
 static void ms_ir_function_return(struct function *func, var_id value, struct type *type) {
-	if (type == type_simple(ST_VOID))
-		return;
-
 	struct ms_data *abi_data = func->abi_data;
+
+	if (type == type_simple(ST_VOID))
+		goto unclobber;
 
 	if (abi_data->returns_address) {
 		IR_PUSH_STORE(value, abi_data->ret_address);
 	} else {
 		IR_PUSH_SET_REG(value, 0, type_is_floating(type));
 	}
+
+unclobber:
+	IR_PUSH_SET_REG(abi_data->rbx_store, REG_RBX, 0);
 }
 
 static void ms_emit_function_preamble(struct function *func) {
