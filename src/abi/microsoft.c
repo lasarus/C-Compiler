@@ -113,8 +113,8 @@ static void ms_ir_function_new(struct type *type, var_id *args, const char *name
 	abi_data.rdi_store = new_variable_sz(8, 1, 0);
 	abi_data.rsi_store = new_variable_sz(8, 1, 0);
 	IR_PUSH_GET_REG(abi_data.rbx_store, REG_RBX, 0);
-	IR_PUSH_GET_REG(abi_data.rbx_store, REG_RDI, 0);
-	IR_PUSH_GET_REG(abi_data.rbx_store, REG_RSI, 0);
+	IR_PUSH_GET_REG(abi_data.rdi_store, REG_RDI, 0);
+	IR_PUSH_GET_REG(abi_data.rsi_store, REG_RSI, 0);
 
 	static int loads_cap = 0;
 	struct load_pair {
