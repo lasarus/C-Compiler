@@ -101,7 +101,7 @@ static void ms_ir_function_new(struct type *type, var_id *args, const char *name
 		abi_data.returns_address = 1;
 		abi_data.ret_address = new_variable_sz(8, 1, 0);
 
-		register_idx++;
+		IR_PUSH_GET_REG(abi_data.ret_address, calling_convention[register_idx++], 0);
 	}
 
 	if (type->function.is_variadic) {
