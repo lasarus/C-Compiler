@@ -20,6 +20,7 @@
 // Doubling is better than 1.5, or any other factor.
 #define ADD_ELEMENT(SIZE, CAP, PTR) (*((void)((SIZE) >= CAP ? (CAP = MAX(CAP * 2, 1)) : 0, PTR = cc_realloc(PTR, sizeof *PTR * CAP)), PTR + (SIZE)++))
 #define ADD_ELEMENTS(SIZE, CAP, PTR, N) ((void)((SIZE + (N)) > CAP && (CAP = MAX(CAP * 2, (SIZE) + (N)), PTR = cc_realloc(PTR, sizeof *PTR * CAP))), (SIZE) += (N), PTR + (SIZE) - (N))
+#define REMOVE_ELEMENT(SIZE, PTR, IDX) (memmove(PTR + (IDX), PTR + (IDX) + 1, ((SIZE) - (IDX) - 1) * sizeof *(PTR)), (SIZE)--)
 
 uint32_t hash32(uint32_t a);
 

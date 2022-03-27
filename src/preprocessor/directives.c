@@ -26,11 +26,23 @@ static struct tokenized_file *current_file;
 static const char *new_filename = NULL;
 static int line_diff = 0;
 
+struct macro_stack {
+	size_t size, cap;
+	struct define *defines;
+};
+
+static size_t macro_stack_size, macro_stack_cap;
+static struct macro_stack *macro_stacks;
+
 // Resets all global state. Not very elegant.
 void directiver_reset(void) {
 	new_filename = NULL;
 	line_diff = 0;
 	current_file = NULL;
+
+	macro_stack_size = macro_stack_cap = 0;
+	free(macro_stacks);
+	macro_stacks = NULL;
 }
 
 void directiver_push_input(const char *path, int system) {
@@ -309,7 +321,7 @@ static struct string_view get_include_path(struct token dir, struct token t, int
 	return path;
 }
 
-int directiver_evaluate_conditional(struct token dir) {
+static int directiver_evaluate_conditional(struct token dir) {
 	if (sv_string_cmp(dir.str, "ifdef")) {
 		return (define_map_get(next().str) != NULL);
 	} else if (sv_string_cmp(dir.str, "ifndef")) {
@@ -324,11 +336,80 @@ int directiver_evaluate_conditional(struct token dir) {
 	ERROR(dir.pos, "Invalid conditional directive");
 }
 
-void directiver_handle_pragma(void) {
+static void push_macro(struct string_view name) {
+	struct macro_stack *stack = NULL;
+	for (unsigned i = 0; i < macro_stack_size; i++) {
+		if (macro_stacks[i].size &&
+			sv_cmp(macro_stacks[i].defines[0].name, name)) {
+			stack = &macro_stacks[i];
+		}
+	}
+
+	if (!stack) {
+		stack = &ADD_ELEMENT(macro_stack_size, macro_stack_cap, macro_stacks);
+		*stack = (struct macro_stack) { 0 };
+	}
+
+	struct define *current_define = define_map_get(name);
+	if (current_define)
+		ADD_ELEMENT(stack->size, stack->cap, stack->defines) = *current_define;
+}
+
+static void pop_macro(struct string_view name) {
+	struct macro_stack *stack = NULL;
+	for (unsigned i = 0; i < macro_stack_size; i++) {
+		if (macro_stacks[i].size &&
+			sv_cmp(macro_stacks[i].defines[0].name, name)) {
+			stack = &macro_stacks[i];
+		}
+	}
+
+	if (!stack)
+		return;
+
+	define_map_add(stack->defines[--stack->size]);
+
+	if (!stack->size)
+		REMOVE_ELEMENT(macro_stack_size, macro_stacks, stack - macro_stacks);
+}
+
+static void directiver_handle_pragma(void) {
 	struct token command = next();
 
 	if (sv_string_cmp(command.str, "once")) {
 		input_disable_path(current_file->input->filename);
+	} else if (sv_string_cmp(command.str, "push_macro")) {
+		struct token lpar = next();
+		if (lpar.type != T_LPAR)
+			ERROR(lpar.pos, "Expected (, got %s", dbg_token_type(lpar.type));
+		struct token name_token = next();
+		if (name_token.type != T_STRING)
+			ERROR(name_token.pos, "Expected string got %s", dbg_token_type(lpar.type));
+		struct token rpar = next();
+		if (rpar.type != T_RPAR)
+			ERROR(rpar.pos, "Expected ), got %s", dbg_token_type(lpar.type));
+
+		struct string_view name = name_token.str;
+		name.str++;
+		name.len -= 2;
+
+		push_macro(name);
+	} else if (sv_string_cmp(command.str, "pop_macro")) {
+		struct token lpar = next();
+		if (lpar.type != T_LPAR)
+			ERROR(lpar.pos, "Expected (, got %s", dbg_token_type(lpar.type));
+		struct token name_token = next();
+		if (name_token.type != T_STRING)
+			ERROR(name_token.pos, "Expected string got %s", dbg_token_type(lpar.type));
+		struct token rpar = next();
+		if (rpar.type != T_RPAR)
+			ERROR(rpar.pos, "Expected ), got %s", dbg_token_type(lpar.type));
+
+		struct string_view name = name_token.str;
+		name.str++;
+		name.len -= 2;
+
+		pop_macro(name);
 	} else {
 		WARNING(command.pos, "\"#pragma %s\" not supported", dbg_token(&command));
 		struct token t = next();
