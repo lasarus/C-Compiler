@@ -31,7 +31,7 @@ static void ms_ir_function_call(var_id result, var_id func_var, struct type *typ
 	struct type *return_type = type->children[0];
 
 	var_id registers[4];
-	int is_floating[4];
+	int is_floating[4] = { 0 };
 	int register_idx = 0;
 	int ret_in_register = 0;
 
