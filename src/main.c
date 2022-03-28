@@ -119,6 +119,9 @@ static void compile_file(const char *path,
 	for (unsigned i = 0; default_include[i]; i++)
 		input_add_include_path(default_include[i]);
 
+	for (int i = 0; default_defs[i]; i++)
+		add_definition(default_defs[i]);
+
 	for (int i = 0; i < arguments->n_define; i++)
 		add_definition(arguments->defines[i]);
 
