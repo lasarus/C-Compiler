@@ -37,7 +37,9 @@ struct arguments arguments_parse(int argc, char **argv) {
 		S_LIBRARY,
 		S_FLAG,
 		S_OUTFILE,
-		S_OPTLEVEL
+		S_OPTLEVEL,
+
+		S_MT, S_MF
 	} state = S_OPERAND;
 
 	int i = 1;
@@ -56,7 +58,31 @@ struct arguments arguments_parse(int argc, char **argv) {
 		enum state next_state = S_OPERAND;
 
 		if (state == S_OPERAND) {
-			if (*arg == '-') {
+			if (arg[0] == '-' && arg[1] == 'M') {
+				arg += 2;
+
+				if (!*arg)
+					NOTIMP();
+
+				int cont = 1, ignore = 0;
+				switch (*arg) {
+				case 'D': ret.flag_MD = 1; cont = 0; break;
+				case 'T': next_state = S_MT; break;
+				case 'F': next_state = S_MF; break;
+				}
+
+				arg++;
+
+				if (*arg) {
+					if (cont) {
+						next_arg = arg;
+					} else if (!ignore) {
+						ARG_ERROR(i, "Unrecognized flag: \"%s\"", argv[i]);
+					}
+				}
+			} else if (arg[0] == '-' && arg[1] == 's' && arg[2] == 't' && arg[3] == 'd') {
+				// Quietly ignored.
+			} else if (*arg == '-') {
 				arg++;
 
 				int cont = 1, ignore = 0;
@@ -105,6 +131,10 @@ struct arguments arguments_parse(int argc, char **argv) {
 			ADD_ELEMENT(flag_size, flag_cap, flags) = arg;
 		} else if (state == S_OUTFILE) {
 			ret.outfile = arg;
+		} else if (state == S_MT) {
+			ret.mt_path = arg;
+		} else if (state == S_MF) {
+			ret.mf_path = arg;
 		} else if (state == S_OPTLEVEL) {
 			ret.optlevel = atoi(arg);
 		}

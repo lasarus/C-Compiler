@@ -34,6 +34,27 @@ struct macro_stack {
 static size_t macro_stack_size, macro_stack_cap;
 static struct macro_stack *macro_stacks;
 
+static int write_dependencies = 0;
+static size_t dep_size, dep_cap;
+static char **deps;
+
+void directiver_write_dependencies(void) {
+	write_dependencies = 1;
+}
+
+void directiver_finish_writing_dependencies(const char *mt, const char *mf) {
+	write_dependencies = 1;
+
+	FILE *fp = fopen(mf, "w");
+
+	fprintf(fp, "%s:", mt);
+	for (unsigned i = 0; i < dep_size; i++)
+		fprintf(fp, " %s", deps[i]);
+	fprintf(fp, "\n");
+
+	fclose(fp);
+}
+
 // Resets all global state. Not very elegant.
 void directiver_reset(void) {
 	new_filename = NULL;
@@ -43,11 +64,20 @@ void directiver_reset(void) {
 	macro_stack_size = macro_stack_cap = 0;
 	free(macro_stacks);
 	macro_stacks = NULL;
+
+	for (unsigned i = 0; i < dep_size; i++)
+		free(deps[i]);
+	free(deps);
+	dep_size = dep_cap = 0;
+	deps = NULL;
 }
 
 void directiver_push_input(const char *path, int system) {
 	struct input *prev_input = current_file ? current_file->input : NULL;
 	struct input *new_input = input_open(prev_input, path, system);
+
+	if (write_dependencies)
+		ADD_ELEMENT(dep_size, dep_cap, deps) = strdup(new_input->filename);
 
 	if (!new_input)
 		return;

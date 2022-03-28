@@ -2,7 +2,7 @@
 #define ARGUMENTS_H
 
 struct arguments {
-	int flag_c, flag_g, flag_s, flag_E, flag_S;
+	int flag_c, flag_g, flag_s, flag_E, flag_S, flag_MD;
 	int optlevel;
 
 	const char *outfile;
@@ -27,6 +27,8 @@ struct arguments {
 
 	int n_flag;
 	const char **flags;
+
+	const char *mt_path, *mf_path;
 };
 
 struct arguments arguments_parse(int argc, char **argv);

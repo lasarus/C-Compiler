@@ -1,10 +1,11 @@
 #include "preprocessor/preprocessor.h"
+#include "preprocessor/macro_expander.h"
+#include "preprocessor/directives.h"
 #include "parser/parser.h"
+#include "parser/symbols.h"
 #include "codegen/codegen.h"
 #include "common.h"
-#include "preprocessor/macro_expander.h"
 #include "assembler/assembler.h"
-#include "parser/symbols.h"
 #include "linker/elf.h"
 #include "linker/coff.h"
 #include "abi/abi.h"
@@ -128,6 +129,9 @@ static void compile_file(const char *path,
 	for (int i = 0; i < arguments->n_undefine; i++)
 		NOTIMP();
 
+	if (arguments->flag_MD)
+		directiver_write_dependencies();
+
 	preprocessor_init(path);
 	parse_into_ir();
 
@@ -160,6 +164,13 @@ static void compile_file(const char *path,
 	} else if (arguments->flag_S) {
 	} else {
 		ADD_ELEMENT(object_size, object_cap, objects) = out_object;
+	}
+
+	if (arguments->flag_MD) {
+		if (!arguments->mt_path || !arguments->mf_path)
+			NOTIMP();
+
+		directiver_finish_writing_dependencies(arguments->mt_path, arguments->mf_path);
 	}
 
 	// TODO: The compiler currently relies too heavily on global state.
