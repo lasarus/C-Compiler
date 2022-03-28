@@ -71,12 +71,28 @@ struct input input_open_string(char *str) {
 }
 
 static char next_char(struct input *input) {
-	while (input->c_ptr < input->contents_size - 1 &&
-		input->contents[input->c_ptr] == '\\' &&
-		input->contents[input->c_ptr + 1] == '\n') {
-		input->c_ptr += 2;
-		input->iline++;
-		input->icol = 0;
+	// Replace "\\\n" with "", "\\\r\n" with "", and "\r\n" with "\n".
+	for (;;) {
+		if (input->c_ptr < input->contents_size - 1 &&
+			   input->contents[input->c_ptr] == '\\' &&
+			   input->contents[input->c_ptr + 1] == '\n') {
+			input->c_ptr += 2;
+			input->iline++;
+			input->icol = 0;
+		} else if (input->c_ptr < input->contents_size - 2 &&
+			   input->contents[input->c_ptr] == '\\' &&
+			   input->contents[input->c_ptr + 1] == '\r' &&
+			   input->contents[input->c_ptr + 2] == '\n') {
+			input->c_ptr += 3;
+			input->iline++;
+			input->icol = 0;
+		} else if (input->c_ptr < input->contents_size - 1 &&
+			   input->contents[input->c_ptr] == '\r' &&
+			   input->contents[input->c_ptr + 1] == '\n') {
+			input->c_ptr += 1;
+		} else {
+			break;
+		}
 	}
 
 	if (input->c_ptr >= input->contents_size)
