@@ -93,4 +93,14 @@ int main() {
 
 		assert(t.a > -1);
 	}
+
+	{
+		struct {
+			unsigned short a : 11;
+			unsigned char b : 4;
+			unsigned char c : 3;
+		} t;
+
+		assert(sizeof t == 4);
+	}
 }

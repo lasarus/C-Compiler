@@ -233,10 +233,12 @@ void calculate_offsets(struct struct_data *data) {
 				data->fields[i].offset = data->fields[i - 1].offset;
 
 			int fits = 0;
+			struct type *fit_type = NULL;
 			for (int j = i; j >= 0; j--) {
 				if (last_bit_offset != 0 && data->fields[j].offset == data->fields[i - 1].offset &&
 					last_bit_offset + data->fields[i].bitfield <= 8 * calculate_size(data->fields[j].type)) {
 					fits = 1;
+					fit_type = data->fields[j].type;
 					break;
 				}
 			}
@@ -244,7 +246,10 @@ void calculate_offsets(struct struct_data *data) {
 			if (fits) {
 				current_offset = data->fields[i].offset;
 				data->fields[i].bit_offset = last_bit_offset;
+				data->fields[i].type = fit_type;
 			} else {
+				if (!data->is_union)
+					current_offset = max_offset;
 				data->fields[i].offset = current_offset;
 				last_bit_offset = 0;
 			}
@@ -269,7 +274,8 @@ void calculate_offsets(struct struct_data *data) {
 			alignment = calculate_alignment(field);
 		if (!data->is_union) {
 			current_offset += new_size;
-			max_offset = current_offset;
+			if (current_offset > max_offset)
+				max_offset = current_offset;
 		} else {
 			if (new_size > max_offset)
 				max_offset = new_size;
