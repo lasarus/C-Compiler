@@ -248,8 +248,12 @@ void calculate_offsets(struct struct_data *data) {
 				data->fields[i].bit_offset = last_bit_offset;
 				data->fields[i].type = fit_type;
 			} else {
-				if (!data->is_union)
+				if (!data->is_union) {
 					current_offset = max_offset;
+
+					if (!data->is_packed)
+						current_offset = round_up_to_nearest(current_offset, calculate_alignment(field));
+				}
 				data->fields[i].offset = current_offset;
 				last_bit_offset = 0;
 			}

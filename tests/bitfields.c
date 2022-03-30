@@ -103,4 +103,18 @@ int main() {
 
 		assert(sizeof t == 4);
 	}
+
+	{
+		struct {
+			unsigned short a : 11;
+			unsigned char b : 4;
+			unsigned char c : 3;
+
+			unsigned short d : 15;
+
+			unsigned char padding[8];
+		} t = { 1, 1, 1, 1, {0} };
+
+		assert(*(uint64_t *)&t == 0x100010801);
+	}
 }
