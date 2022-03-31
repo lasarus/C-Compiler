@@ -535,7 +535,7 @@ struct constant simple_cast(struct constant from, enum simple_type target) {
 		else
 			from.uint_d = from.double_d;
 		constant_normalize(&from);
-	} else if (to_int && to_float && from_type == ST_FLOAT) {
+	} else if (to_int && from_float && from_type == ST_FLOAT) {
 		if (is_signed(target))
 			from.int_d = from.float_d;
 		else

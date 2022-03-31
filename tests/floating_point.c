@@ -53,5 +53,7 @@ int main() {
 
 	assert(!fcmp(0.0, 1.0));
 
+	int a = (float)3.14;
+
 	return 0;
 }
