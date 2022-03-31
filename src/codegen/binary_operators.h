@@ -25,6 +25,7 @@
 #define BINARY_COMP_FLT(MNEMONIC) {				\
 		{"movd", {R4_(REG_RDI), XMM_(0)}},		\
 		{"movd", {R4_(REG_RSI), XMM_(1)}},		\
+		{"xorq", {R8_(REG_RAX), R8_(REG_RAX)}},	\
 		{"ucomiss", {XMM_(1), XMM_(0)}},		\
 		{MNEMONIC, {R1_(REG_RAX)}},				\
 	}
@@ -50,6 +51,7 @@
 #define BINARY_COMP_FLT_64(MNEMONIC) {				\
 		{"movq", {R8_(REG_RDI), XMM_(0)}},		\
 		{"movq", {R8_(REG_RSI), XMM_(1)}},		\
+		{"xorq", {R8_(REG_RAX), R8_(REG_RAX)}},	\
 		{"ucomisd", {XMM_(1), XMM_(0)}},		\
 		{MNEMONIC, {R1_(REG_RAX)}},				\
 	}

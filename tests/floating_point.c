@@ -1,8 +1,13 @@
 #include <stdio.h>
 #include <assert.h>
+#include <stdbool.h>
 
 double add(double a, double b) {
 	return a + b;
+}
+
+bool fcmp(float a, float b) {
+	return a == b;
 }
 
 int main() {
@@ -45,6 +50,8 @@ int main() {
 	}
 
 	float f2 = 3.14;
+
+	assert(!fcmp(0.0, 1.0));
 
 	return 0;
 }
