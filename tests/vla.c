@@ -18,6 +18,11 @@ void func3(int func3) {
 	assert(func3 == 10);
 }
 
+size_t global_size = 10;
+void func4(char arr[][global_size]) {
+	assert(sizeof *arr == global_size);
+}
+
 int main() {
 	int a = 10 * 10;
 	int arr[a];

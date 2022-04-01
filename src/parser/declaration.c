@@ -639,8 +639,7 @@ struct type *ast_to_type(const struct type_specifiers *ts, const struct type_qua
 			case ARR_EXPRESSION: {
 				struct constant *length;
 				struct expr *length_expr = expression_cast(ast->array.expr, type_simple(abi_info.size_type));
-				if ((length = expression_to_constant(length_expr))) {
-					assert(length->type == CONSTANT_TYPE);
+				if ((length = expression_to_constant(length_expr)) && length->type == CONSTANT_TYPE) {
 					struct type params = {
 						.type = TY_ARRAY,
 						.array.length = length->uint_d,
