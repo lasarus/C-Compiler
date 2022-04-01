@@ -81,6 +81,7 @@ struct type_ast {
 		} function;
 	};
 
+	struct position pos;
 	struct type_ast *parent;
 };
 
@@ -525,6 +526,7 @@ void ast_get_parameters(struct type_ast *ast,
 struct type_ast *type_ast_new(struct type_ast ast) {
 	struct type_ast *ret = cc_malloc(sizeof (struct type_ast));
 	*ret = ast;
+	ret->pos = T0->pos;
 	return ret;
 }
 
@@ -637,7 +639,18 @@ struct type *ast_to_type(const struct type_specifiers *ts, const struct type_qua
 				type = type_create(&params, &type);
 			} break;
 			case ARR_EXPRESSION: {
+				struct constant *unconverted_length;
+				if ((unconverted_length = expression_to_constant(ast->array.expr)) &&
+					unconverted_length->type == CONSTANT_TYPE) {
+					if (unconverted_length->data_type->type == TY_SIMPLE &&
+						is_signed(unconverted_length->data_type->simple) &&
+						unconverted_length->int_d <= 0) {
+						ERROR(ast->pos, "Invalid size of array\n");
+					}
+				}
+
 				struct constant *length;
+
 				struct expr *length_expr = expression_cast(ast->array.expr, type_simple(abi_info.size_type));
 				if ((length = expression_to_constant(length_expr)) && length->type == CONSTANT_TYPE) {
 					struct type params = {
