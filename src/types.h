@@ -101,8 +101,8 @@ struct struct_data {
 	struct string_view name;
 
 	int is_complete,
-		is_union,
-		is_packed;
+		is_union;
+	int packing; // 0 if default packing.
 
 	int n;
 	struct field {

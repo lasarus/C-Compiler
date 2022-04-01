@@ -443,12 +443,15 @@ int parse_struct(struct type_specifiers *ts) {
 			.n = fields_size,
 			.is_complete = 1,
 			.is_union = is_union,
-			.is_packed = is_packed,
+			.packing = get_current_packing(),
 
 			.fields = fields,
 
 			.name = name
 		};
+
+		if (is_packed)
+			data->packing = 1;
 
 		calculate_offsets(data);
 		type_remove_unnamed(data);

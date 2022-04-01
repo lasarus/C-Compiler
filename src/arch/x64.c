@@ -215,6 +215,15 @@ int calculate_offset(struct type *type, int index) {
 	}
 }
 
+static int calculate_alignment_with_max(struct type *type, int packing) {
+	int alignment = calculate_alignment(type);
+	if (packing == 0)
+		return alignment;
+	if (alignment > packing)
+		return packing;
+	return alignment;
+}
+
 void calculate_offsets(struct struct_data *data) {
 	int current_offset = 0;
 	int max_offset = 0;
@@ -223,8 +232,8 @@ void calculate_offsets(struct struct_data *data) {
 	int last_bit_offset = 0;
 	for (int i = 0; i < data->n; i++) {
 		struct type *field = data->fields[i].type;
-		if (!data->is_packed)
-			current_offset = round_up_to_nearest(current_offset, calculate_alignment(field));
+		current_offset = round_up_to_nearest(current_offset, calculate_alignment_with_max(field, data->packing));
+
 		data->fields[i].offset = current_offset;
 		data->fields[i].bit_offset = 0;
 
@@ -251,8 +260,7 @@ void calculate_offsets(struct struct_data *data) {
 				if (!data->is_union) {
 					current_offset = max_offset;
 
-					if (!data->is_packed)
-						current_offset = round_up_to_nearest(current_offset, calculate_alignment(field));
+					current_offset = round_up_to_nearest(current_offset, calculate_alignment_with_max(field, data->packing));
 				}
 				data->fields[i].offset = current_offset;
 				last_bit_offset = 0;
@@ -274,8 +282,9 @@ void calculate_offsets(struct struct_data *data) {
 				ICE("%s has invalid size", dbg_type(field));
 		}
 
-		if (calculate_alignment(field) > alignment)
-			alignment = calculate_alignment(field);
+		int new_alignment = calculate_alignment_with_max(field, data->packing);
+		if (new_alignment > alignment)
+			alignment = new_alignment;
 		if (!data->is_union) {
 			current_offset += new_size;
 			if (current_offset > max_offset)
@@ -286,8 +295,8 @@ void calculate_offsets(struct struct_data *data) {
 		}
 	}
 
-	if (data->is_packed)
-		alignment = 1;
+	if (data->packing > 0 && alignment > data->packing)
+		alignment = data->packing;
 
 	data->size = round_up_to_nearest(max_offset, alignment);
 	data->alignment = alignment;

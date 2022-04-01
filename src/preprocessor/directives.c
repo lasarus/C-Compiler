@@ -16,7 +16,7 @@ struct tokenized_file {
 	struct token_list tokens;
 
 	int pushed_idx;
-	struct token pushed[2];
+	struct token pushed[3];
 
 	struct tokenized_file *parent;
 };
@@ -111,7 +111,7 @@ static struct token next_from_stack() {
 }
 
 void push(struct token t) {
-	if (current_file->pushed_idx > 1)
+	if (current_file->pushed_idx > 2)
 		ICE("Pushed too many directive tokens.");
 	current_file->pushed[current_file->pushed_idx++] = t;
 }
@@ -403,7 +403,7 @@ static void pop_macro(struct string_view name) {
 		REMOVE_ELEMENT(macro_stack_size, macro_stacks, stack - macro_stacks);
 }
 
-static void directiver_handle_pragma(void) {
+static int directiver_handle_pragma(void) {
 	struct token command = next();
 
 	if (sv_string_cmp(command.str, "once")) {
@@ -441,12 +441,11 @@ static void directiver_handle_pragma(void) {
 
 		pop_macro(name);
 	} else {
-		WARNING(command.pos, "\"#pragma %s\" not supported", dbg_token(&command));
-		struct token t = next();
-		while (!t.first_of_line)
-			t = next();
-		push(t);
+		push(command);
+		return 1;
 	}
+
+	return 0;
 }
 
 struct token directiver_next(void) {
@@ -457,7 +456,9 @@ struct token directiver_next(void) {
 		ADD_ELEMENT(cond_stack_n, cond_stack_cap, cond_stack) = 1;
 
 	struct token t = next();
-	while (t.type == PP_DIRECTIVE || cond_stack[cond_stack_n - 1] != 1) {
+	int pass_directive = 0;
+	while ((t.type == PP_DIRECTIVE || cond_stack[cond_stack_n - 1] != 1) &&
+		!pass_directive) {
 		if (t.type != PP_DIRECTIVE) {
 			t = next();
 			continue;
@@ -531,7 +532,12 @@ struct token directiver_next(void) {
 			} else if (sv_string_cmp(name, "endif")) {
 				// Do nothing.
 			} else if (sv_string_cmp(name, "pragma")) {
-				directiver_handle_pragma();
+				if (directiver_handle_pragma()) {
+					push(directive);
+					push(t);
+
+					pass_directive = 1;
+				}
 			} else if (sv_string_cmp(name, "line")) {
 				// 6.10.4
 				struct token digit_seq = next(), s_char_seq;
