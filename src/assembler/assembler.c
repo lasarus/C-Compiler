@@ -112,7 +112,7 @@ void asm_string(struct string_view str) {
 		asm_emit_no_newline("\t.string \"");
 		for (int i = 0; i < str.len; i++) {
 			char buffer[5];
-			character_to_escape_sequence(str.str[i], buffer, 0);
+			character_to_escape_sequence(str.str[i], buffer, 0, 1);
 			asm_emit_no_newline("%s", buffer);
 		}
 		asm_emit_no_newline("\"\n");

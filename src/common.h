@@ -34,7 +34,7 @@ char *strdup(const char *s);
 uint64_t gen_mask(unsigned char left_pad, unsigned char right_pad);
 
 int character_constant_to_int(struct string_view str);
-void character_to_escape_sequence(char character, char *output, int allow_compilcated_escape);
+void character_to_escape_sequence(char character, char *output, int allow_compilcated_escape, int string);
 
 void init_source_character_set(void);
 

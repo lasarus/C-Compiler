@@ -182,7 +182,7 @@ static void stringify_add(struct token *t, int start) {
 	case T_STRING:
 		for (int i = 0; i < t->str.len; i++) {
 			char escape_seq[5];
-			character_to_escape_sequence(t->str.str[i], escape_seq, 1);
+			character_to_escape_sequence(t->str.str[i], escape_seq, 1, 1);
 			for (int j = 0; escape_seq[j]; j++)
 				ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = escape_seq[j];
 		}

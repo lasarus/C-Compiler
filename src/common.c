@@ -81,10 +81,28 @@ void init_source_character_set(void) {
 	has_complicated_escape['\v'] = 'v';
 }
 
-void character_to_escape_sequence(char character, char *output, int allow_complicated_escape) {
+void character_to_escape_sequence(char character, char *output, int allow_complicated_escape, int string) {
 	int octal[3] = { 0 };
 
-	if ((int)character >= 0 && needs_no_escape[(int)character]) {
+	if (character == '"') {
+		if (string) {
+			output[0] = '\\';
+			output[1] = '"';
+			output[2] = '\0';
+		} else {
+			output[0] = '"';
+			output[1] = '\0';
+		}
+	} else if (character == '\'') {
+		if (!string) {
+			output[0] = '\\';
+			output[1] = '\'';
+			output[2] = '\0';
+		} else {
+			output[0] = '\'';
+			output[1] = '\0';
+		}
+	} else if ((int)character >= 0 && needs_no_escape[(int)character]) {
 		output[0] = character;
 		output[1] = '\0';
 		return;

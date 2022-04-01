@@ -201,7 +201,7 @@ struct string_view eat_string_like(struct input *input) {
 
 	if (C0 != end_char) {
 		char output[5];
-		character_to_escape_sequence(C0, output, 1);
+		character_to_escape_sequence(C0, output, 1, 1);
 		ERROR(input->pos[0], "Expected '%c', got '%s', while parsing \"%.*s\"", end_char, output,
 			  (int)buffer_size, buffer);
 	}
