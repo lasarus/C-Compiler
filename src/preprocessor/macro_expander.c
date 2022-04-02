@@ -340,25 +340,13 @@ static void subs_buffer(struct define *def, struct string_set *hs, struct positi
 	for(int i = def->def.size - 1; i >= 0; i--) {
 		struct token t = def->def.list[i];
 
-		int concat = 0;
-		int stringify = 0;
-
-		if (i != 0) {
-			concat = (def->def.list[i - 1].type == PP_HHASH);
-			stringify = (def->def.list[i - 1].type == PP_HASH);
-		}
+		const int concat = (i != 0) && def->def.list[i - 1].type == PP_HHASH;
+		const int stringify = (i != 0) && def->def.list[i - 1].type == PP_HASH;
 
 		if (t.type == PP_HHASH)
 			ERROR(t.pos, "Concat token at edge of macro expansion.");
 
-		int idx;
-
-		int is_va_args = sv_string_cmp(t.str, "__VA_ARGS__");
-
-		if (!is_va_args)
-			idx = get_param(def, t);
-
-		if (is_va_args) {
+		if (sv_string_cmp(t.str, "__VA_ARGS__")) {
 			if (concat && i - 2 >= 0 &&
 				def->def.list[i - 2].type == T_COMMA &&
 				!vararg_included) {
@@ -366,38 +354,41 @@ static void subs_buffer(struct define *def, struct string_set *hs, struct positi
 			} else if (vararg_included) {
 				expand_argument(vararg, &concat_with_prev, concat, stringify, input);
 			}
-		} else if (idx >= 0 && stringify) {
-			struct token_list tl = arguments[idx];
-			stringify_start();
-
-			for(int i = 0; i < tl.size; i++)
-				stringify_add(tl.list + i, i == 0);
-
-			ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = '\"';
-
-			struct token t_new = t;
-			t_new.type = T_STRING;
-			t_new.str = stringify_end();
-			input_buffer_push(&t_new);
-		} else if(idx >= 0) {
-			expand_argument(arguments[idx], &concat_with_prev, concat, stringify, input);
-
-			if (arguments[idx].size)
-				concat_with_prev = concat;
 		} else {
-			if (concat_with_prev) {
-				struct token *end = input_buffer_top(input);
-				*end = glue(*end, t);
-				concat_with_prev = 0;
-			} else if (stringify) {
-				ERROR(t.pos, "# Should be followed by macro parameter");
-			} else {
-				t.pos = new_pos;
-				input_buffer_push(&t);
-			}
+			const int idx = get_param(def, t);
+			if (idx >= 0 && stringify) {
+				struct token_list tl = arguments[idx];
+				stringify_start();
 
-			if (concat)
-				concat_with_prev = 1;
+				for(int i = 0; i < tl.size; i++)
+					stringify_add(tl.list + i, i == 0);
+
+				ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = '\"';
+
+				struct token t_new = t;
+				t_new.type = T_STRING;
+				t_new.str = stringify_end();
+				input_buffer_push(&t_new);
+			} else if(idx >= 0) {
+				expand_argument(arguments[idx], &concat_with_prev, concat, stringify, input);
+
+				if (arguments[idx].size)
+					concat_with_prev = concat;
+			} else {
+				if (concat_with_prev) {
+					struct token *end = input_buffer_top(input);
+					*end = glue(*end, t);
+					concat_with_prev = 0;
+				} else if (stringify) {
+					ERROR(t.pos, "# Should be followed by macro parameter");
+				} else {
+					t.pos = new_pos;
+					input_buffer_push(&t);
+				}
+
+				if (concat)
+					concat_with_prev = 1;
+			}
 		}
 
 		if (concat || stringify)

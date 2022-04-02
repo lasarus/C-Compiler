@@ -218,7 +218,7 @@ static void sysv_ir_function_call(var_id result, var_id func_var, struct type *f
 		IR_PUSH_ADDRESS_OF(c.ret_address, result);
 	}
 
-	var_id rax_constant;
+	var_id rax_constant = VOID_VAR;
 	if (c.rax != -1) {
 		rax_constant = new_variable_sz(8, 1, 1);
 		IR_PUSH_CONSTANT(constant_simple_unsigned(abi_info.size_type, c.rax), rax_constant);
