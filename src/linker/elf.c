@@ -288,6 +288,9 @@ static struct object *object_from_elf(struct elf_file *elf) {
 				ICE("Relocation %lu not implemented.", r_info & 0xffff);
 			}
 
+			if (!symbol_mapping)
+				ICE("Invalid elf-file");
+
 			struct object_relocation *relocation =
 				&ADD_ELEMENT(target_section->relocation_size, target_section->relocation_cap, target_section->relocations);
 
@@ -370,7 +373,7 @@ static struct elf_file *elf_from_object(struct object *object) {
 		n_local_symb++;
 	}
 
-	unsigned current_local_symbol = current_local_symbol = 1 + object->section_size,
+	unsigned current_local_symbol = 1 + object->section_size,
 		current_global_symbol = n_local_symb;
 
 	sym_section->header.sh_info = n_local_symb;

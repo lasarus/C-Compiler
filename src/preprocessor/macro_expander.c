@@ -328,7 +328,6 @@ static void subs_buffer(struct define *def, struct string_set *hs, struct positi
 		
 		struct token rpar = input_buffer_take(input);
 		EXPECT(&rpar, T_RPAR);
-		finished = 1;
 
 		*hs = string_set_intersection(*hs, rpar.hs);
 	}

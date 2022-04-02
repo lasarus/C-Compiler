@@ -72,12 +72,7 @@ static struct call_info get_calling_convention(struct type *function_type, int n
 	var_id ret_address = 0;
 
 	int gp_offset = 0;
-
-	int rax = -1;
-
 	int shadow_space = 0;
-
-	rax = 0;
 
 	int current_gp_reg = 0, current_sse_reg = 0;
 	const int max_gp_reg = 6, max_sse_reg = 8;
@@ -124,12 +119,10 @@ static struct call_info get_calling_convention(struct type *function_type, int n
 		int argument_size = get_variable_size(args[i]);
 		classify(type, &n_parts, classes);
 
-		int is_memory = 0;
-
 		int n_gp_regs = 0, n_sse_regs = 0;
 		for (int j = 0; j < n_parts; j++) {
 			if (classes[j] == CLASS_MEMORY)
-				is_memory = 1;
+				break;
 			else if (classes[j] == CLASS_SSE || classes[j] == CLASS_SSEUP)
 				n_sse_regs++;
 			else if (classes[j] == CLASS_INTEGER)
@@ -138,7 +131,7 @@ static struct call_info get_calling_convention(struct type *function_type, int n
 				NOTIMP();
 		}
 
-		is_memory = classes[0] == CLASS_MEMORY ||
+		const int is_memory = classes[0] == CLASS_MEMORY ||
 			current_gp_reg + n_gp_regs > max_gp_reg ||
 			current_sse_reg + n_sse_regs > max_sse_reg;
 		if (is_memory) {
@@ -174,7 +167,6 @@ static struct call_info get_calling_convention(struct type *function_type, int n
 	}
 
 	gp_offset = current_gp_reg * 8;
-	rax = current_sse_reg;
 
 	return (struct call_info) {
 		.regs_size = regs_size,
@@ -191,7 +183,7 @@ static struct call_info get_calling_convention(struct type *function_type, int n
 
 		.gp_offset = gp_offset,
 
-		.rax = rax,
+		.rax = current_sse_reg,
 
 		.shadow_space = shadow_space
 	};
