@@ -756,7 +756,7 @@ static void elf_write(const char *path, struct elf_file *elf) {
 	fclose(fp);
 }
 
-struct elf_file *elf_read(const char *path) {
+static struct elf_file *elf_read(const char *path) {
 	FILE *fp = fopen(path, "rb");
 	struct elf_file elf = { 0 };
 

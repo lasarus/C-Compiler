@@ -38,7 +38,7 @@ static void add_implementation_defs(void) {
 	define_string("__x86_64__", "1");
 }
 
-struct string_view get_basename(const char *path) {
+static struct string_view get_basename(const char *path) {
 	int last_slash = -1;
 	for (int i = 0; path[i]; i++)
 		if (path[i] == '/')

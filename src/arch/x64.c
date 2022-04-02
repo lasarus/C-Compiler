@@ -49,7 +49,7 @@ struct range {
 	int min, max;
 };
 
-struct range get_range(enum simple_type type, int bitfield) {
+static struct range get_range(enum simple_type type, int bitfield) {
 	int n_bits = bitfield == -1 ? abi_sizeof_simple(type) * 8 : bitfield;
 
 	if (is_signed(type))
@@ -134,7 +134,7 @@ int is_scalar(struct type *type) {
 
 static int calculate_alignment(struct type *type);
 
-int alignof_struct(struct struct_data *struct_data) {
+static int alignof_struct(struct struct_data *struct_data) {
 	int max_align = 0;
 
 	if (!struct_data->is_complete)
@@ -313,7 +313,7 @@ struct constant constant_increment(struct constant a) {
 
 // Basically if string is not of the format (0b|0B)?[0-9]+[ulUL]?
 // or (0x|0X)[0-9a-fA-F]+[ulUL]?
-int is_float(struct string_view str) {
+static int is_float(struct string_view str) {
 	int i = 0;
 	int is_hex = 0;
 	if (str.len > 1 && str.str[0] == '0' && (str.str[1] == 'x' || str.str[1] == 'X')) {
@@ -497,7 +497,7 @@ void constant_normalize(struct constant *c) {
 		c->uint_d = conv_uu(c->int_d, range_max);
 }
 
-struct constant simple_cast(struct constant from, enum simple_type target) {
+static struct constant simple_cast(struct constant from, enum simple_type target) {
 	assert(from.type == CONSTANT_TYPE);
 	assert(from.data_type->type == TY_SIMPLE);
 	enum simple_type from_type = from.data_type->simple;

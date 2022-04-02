@@ -197,7 +197,7 @@ static struct call_info get_calling_convention(struct type *function_type, int n
 	};
 }
 
-void split_variable(var_id variable, int n_parts, var_id *parts) {
+static void split_variable(var_id variable, int n_parts, var_id *parts) {
 	var_id address = new_variable_sz(8, 1, 1);
 	var_id offset_constant = new_variable_sz(8, 1, 1);
 	IR_PUSH_ADDRESS_OF(address, variable);
@@ -479,7 +479,7 @@ static void sysv_emit_va_arg(var_id result, var_id va_list, struct type *type) {
 	codegen_memcpy(calculate_size(type));
 }
 
-int sysv_sizeof_simple(enum simple_type type) {
+static int sysv_sizeof_simple(enum simple_type type) {
 	static const int sizes[ST_COUNT] = {
 		[ST_BOOL] = 1,
 		[ST_CHAR] = 1, [ST_SCHAR] = 1, [ST_UCHAR] = 1,

@@ -47,9 +47,9 @@ static int register_index(enum reg reg) {
 	return reg_idxs[(int)reg];
 }
 
-void encode_sib(struct operand *o, int *rex_b, int *rex_x, int *modrm_mod, int *modrm_rm,
-				uint64_t *disp, int *has_disp8, int *has_disp32,
-				int *has_sib, int *sib_scale, int *sib_index, int *sib_base) {
+static void encode_sib(struct operand *o, int *rex_b, int *rex_x, int *modrm_mod, int *modrm_rm,
+					   uint64_t *disp, int *has_disp8, int *has_disp32,
+					   int *has_sib, int *sib_scale, int *sib_index, int *sib_base) {
 	(void)sib_scale;
 	int disp_size = get_disp_size(o->mem.offset);
 
@@ -154,8 +154,8 @@ void encode_sib(struct operand *o, int *rex_b, int *rex_x, int *modrm_mod, int *
 	// disp32(%base, %scale, index)
 }
 
-void assemble_encoding(uint8_t *output, int *len, struct encoding *encoding, struct operand ops[4],
-					   struct relocation relocations[], int *n_relocations) {
+static void assemble_encoding(uint8_t *output, int *len, struct encoding *encoding, struct operand ops[4],
+							  struct relocation relocations[], int *n_relocations) {
 	*n_relocations = 0;
 	int has_imm8 = 0, has_imm16 = 0, has_imm32 = 0, has_imm64 = 0;
 	uint64_t imm = 0;
@@ -449,7 +449,7 @@ void assemble_encoding(uint8_t *output, int *len, struct encoding *encoding, str
 	*len = idx;
 }
 
-int does_match(struct operand *o, struct operand_accepts *oa) {
+static int does_match(struct operand *o, struct operand_accepts *oa) {
 	switch (oa->type) {
 	case ACC_RAX:
 		if (o->type != OPERAND_REG)

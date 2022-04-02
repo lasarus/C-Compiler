@@ -104,7 +104,7 @@ enum {
 	IMAGE_SYM_CLASS_LABEL = 6
 };
 
-void coff_write_header(FILE *fp, struct coff_file_header *header) {
+static void coff_write_header(FILE *fp, struct coff_file_header *header) {
 	file_write_word(fp, header->machine);
 	file_write_word(fp, header->number_of_sections);
 	file_write_long(fp, header->time_date_stamp);
@@ -114,7 +114,7 @@ void coff_write_header(FILE *fp, struct coff_file_header *header) {
 	file_write_word(fp, header->characteristics);
 }
 
-void coff_write_section_header(FILE *fp, struct coff_section_header *header) {
+static void coff_write_section_header(FILE *fp, struct coff_section_header *header) {
 	file_write(fp, header->name, 8);
 	file_write_long(fp, header->virtual_size);
 	file_write_long(fp, header->virtual_address);
@@ -127,7 +127,7 @@ void coff_write_section_header(FILE *fp, struct coff_section_header *header) {
 	file_write_long(fp, header->characteristics);
 }
 
-void coff_write_symbol(FILE *fp, struct coff_symbol *symbol) {
+static void coff_write_symbol(FILE *fp, struct coff_symbol *symbol) {
 	file_write(fp, symbol->name, 8);
 	file_write_long(fp, symbol->value);
 	file_write_word(fp, symbol->section_number);
@@ -136,7 +136,7 @@ void coff_write_symbol(FILE *fp, struct coff_symbol *symbol) {
 	file_write_byte(fp, symbol->number_of_aux_symbols);
 }
 
-void coff_write_relocation(FILE *fp, struct coff_relocation *relocation) {
+static void coff_write_relocation(FILE *fp, struct coff_relocation *relocation) {
 	file_write_long(fp, relocation->virtual_address);
 	file_write_long(fp, relocation->symbol_table_index);
 	file_write_word(fp, relocation->type);
@@ -167,7 +167,7 @@ static int coff_register_string(struct coff_file *coff, const char *str) {
 	return space - coff->strings;
 }
 
-struct coff_file *coff_from_object(struct object *object) {
+static struct coff_file *coff_from_object(struct object *object) {
 	struct coff_file file = { 0 };
 
 	coff_register_string(&file, "");
@@ -297,7 +297,7 @@ struct coff_file *coff_from_object(struct object *object) {
 	return ret;
 }
 
-void coff_allocate(struct coff_file *coff) {
+static void coff_allocate(struct coff_file *coff) {
 	uint32_t address = 0;
 	address += 5 * 4; // Size of COFF file header.
 	address += (8 + 8 * 4) * coff->header.number_of_sections; // Size of section header.
@@ -316,7 +316,7 @@ void coff_allocate(struct coff_file *coff) {
 	}
 }
 
-void coff_write(const char *path, struct coff_file *coff) {
+static void coff_write(const char *path, struct coff_file *coff) {
 	FILE *fp = fopen(path, "wb");
 	coff_write_header(fp, &coff->header);
 

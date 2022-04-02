@@ -192,7 +192,7 @@ static int eat_cs_char(struct input *input, char end_char) {
 	return 1;
 }
 
-struct string_view eat_string_like(struct input *input) {
+static struct string_view eat_string_like(struct input *input) {
 	char end_char = C0 == '<' ? '>' : C0;
 
 	buffer_eat(input);
@@ -291,8 +291,8 @@ static int parse_punctuator(struct input *input, struct token *next) {
 	return 1;
 }
 
-struct token tokenizer_next(struct input *input,
-							int *is_header, int *is_directive) {
+static struct token tokenizer_next(struct input *input,
+								   int *is_header, int *is_directive) {
 	struct token next = { 0 };
 
 	flush_whitespace(input, &next.whitespace,

@@ -24,7 +24,7 @@ const char *registers[][4] = {
 	{"%r14", "%r14d", "%r14w", "%r14b"}, // 14 1
 	{"%r15", "%r15d", "%r15w", "%r15b"}}; // 15 1
 
-int size_to_idx(int size) {
+static int size_to_idx(int size) {
 	switch (size) {
 	case 8: return 0;
 	case 4: return 1;

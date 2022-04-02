@@ -23,7 +23,7 @@ struct entry {
 static struct entry *entries = NULL;
 static int entries_size = 0, entries_cap = 0;
 
-label_id label_register(enum entry_type type, struct string_view str) {
+static label_id label_register(enum entry_type type, struct string_view str) {
 	for (int i = 0; i < entries_size; i++) {
 		if (sv_cmp(entries[i].name, str) &&
 			entries[i].type == type) {
@@ -101,7 +101,7 @@ void data_register_static_var(struct string_view label, struct type *type, struc
 	};
 }
 
-void codegen_initializer_recursive(struct initializer *init, struct type *type,
+static void codegen_initializer_recursive(struct initializer *init, struct type *type,
 								   int bit_size, int bit_offset,
 								   uint8_t *buffer, label_id *labels,
 								   int64_t *label_offsets, int *is_label) {
@@ -156,7 +156,7 @@ void codegen_initializer_recursive(struct initializer *init, struct type *type,
 
 void codegen_initializer(struct type *type, struct initializer *init);
 
-void codegen_compound_literals(struct expr **expr, int lvalue) {
+static void codegen_compound_literals(struct expr **expr, int lvalue) {
 	switch ((*expr)->type) {
 	case E_DOT_OPERATOR:
 		if (lvalue) {
@@ -229,7 +229,7 @@ void codegen_compound_literals(struct expr **expr, int lvalue) {
 	}
 }
 
-void codegen_pre_initializer(struct initializer *init) {
+static void codegen_pre_initializer(struct initializer *init) {
 	// Iterate through all child expressions and find uninitialized compound literals.
 	switch (init->type) {
 	case INIT_BRACE:
@@ -297,7 +297,7 @@ void codegen_initializer(struct type *type,
 	free(is_label);
 }
 
-void codegen_static_var(struct static_var *static_var) {
+static void codegen_static_var(struct static_var *static_var) {
 	(void)static_var;
 	asm_section(".data");
 

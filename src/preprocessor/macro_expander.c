@@ -22,7 +22,7 @@ void macro_expander_reset(void) {
 
 void expand_buffer(int input, int return_output, struct token *t);
 
-void define_map_init(void) {
+static void define_map_init(void) {
 	define_map = cc_malloc(sizeof *define_map);
 
 	define_map->entries = cc_malloc(sizeof *define_map->entries * MAP_SIZE);
@@ -31,7 +31,7 @@ void define_map_init(void) {
 	}
 }
 
-struct define **define_map_find(struct string_view name) {
+static struct define **define_map_find(struct string_view name) {
 	if (!define_map)
 		define_map_init();
 
@@ -79,12 +79,6 @@ struct define define_init(struct string_view name) {
 	};
 }
 
-void define_free(struct define *d) {
-	token_list_free(&d->def);
-	token_list_free(&d->par);
-	d->func = 0;
-}
-
 void define_add_def(struct define *d, struct token t) {
 	token_list_add(&d->def, t);
 }
@@ -94,7 +88,7 @@ void define_add_par(struct define *d, struct token t) {
 	token_list_add(&d->par, t);
 }
 
-int get_param(struct define *def, struct token tok) {
+static int get_param(struct define *def, struct token tok) {
 	if (!def->func || tok.type != T_IDENT)
 		return -1;
 
@@ -143,7 +137,7 @@ enum ttype paste_table[][3] = {
 	{T_AMP, T_AMP, T_AND},
 };
 
-struct token glue(struct token a, struct token b) {
+static struct token glue(struct token a, struct token b) {
 	struct token ret = { 0 };
 	for (unsigned i = 0; i < sizeof paste_table / sizeof *paste_table; i++)
 		if (paste_table[i][1] == a.type && paste_table[i][0] == b.type)
@@ -194,7 +188,7 @@ static void stringify_add(struct token *t, int start) {
 	}
 }
 
-int builtin_macros(struct token *t) {
+static int builtin_macros(struct token *t) {
 	// These are only single tokens.
 	if (sv_string_cmp(t->str, "__LINE__")) {
 		*t = (struct token) { .type = T_NUM, .str = sv_from_str(allocate_printf("%d", t->pos.line)), .pos = t->pos };
@@ -215,13 +209,13 @@ static struct {
 	struct token *tokens;
 } output_buffer;
 
-void input_buffer_push(struct token *t) {
+static void input_buffer_push(struct token *t) {
 	struct token n_token = *t;
 	n_token.hs = string_set_dup(n_token.hs);
 	ADD_ELEMENT(input_buffer.size, input_buffer.cap, input_buffer.tokens) = n_token;
 }
 
-struct token input_buffer_take(int input) {
+static struct token input_buffer_take(int input) {
 	if (input_buffer.size)
 		return input_buffer.tokens[--input_buffer.size];
 
@@ -232,7 +226,7 @@ struct token input_buffer_take(int input) {
 	}
 }
 
-struct token *input_buffer_top(int input) {
+static struct token *input_buffer_top(int input) {
 	if (input_buffer.size)
 		return &input_buffer.tokens[input_buffer.size - 1];
 
@@ -246,7 +240,7 @@ struct token *input_buffer_top(int input) {
 }
 
 // Returns true if done.
-int input_buffer_parse_argument(struct token_list *tl, int ignore_comma, int input) {
+static int input_buffer_parse_argument(struct token_list *tl, int ignore_comma, int input) {
 	int depth = 1;
 	*tl = (struct token_list) {0};
 	struct token t;
@@ -273,7 +267,7 @@ int input_buffer_parse_argument(struct token_list *tl, int ignore_comma, int inp
 	return t.type == T_RPAR;
 }
 
-void expand_argument(struct token_list tl, int *concat_with_prev, int concat, int stringify, int input) {
+static void expand_argument(struct token_list tl, int *concat_with_prev, int concat, int stringify, int input) {
 	int start_it = tl.size - 1;
 
 	if (*concat_with_prev && tl.size) {
@@ -305,7 +299,7 @@ void expand_argument(struct token_list tl, int *concat_with_prev, int concat, in
 	}
 }
 
-void subs_buffer(struct define *def, struct string_set *hs, struct position new_pos, int input) {
+static void subs_buffer(struct define *def, struct string_set *hs, struct position new_pos, int input) {
 	int n_args = def->par.size;
 	struct token_list *arguments = cc_malloc(sizeof *arguments * n_args);
 

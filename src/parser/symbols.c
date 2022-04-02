@@ -42,11 +42,11 @@ static struct table {
 
 static int current_block = 0;
 
-uint32_t hash_entry(struct entry_id id) {
+static uint32_t hash_entry(struct entry_id id) {
 	return hash32(id.type) ^ sv_hash(id.name);
 }
 
-int compare_entry(struct entry_id a, struct entry_id b) {
+static int compare_entry(struct entry_id a, struct entry_id b) {
 	return a.type == b.type && sv_cmp(a.name, b.name);
 }
 
@@ -68,7 +68,7 @@ void symbols_pop_scope(void) {
 	}
 }
 
-struct table_entry *get_entry(struct entry_id id, int global) {
+static struct table_entry *get_entry(struct entry_id id, int global) {
 	uint32_t hash = hash_entry(id) % hash_table.size;
 	int current_idx = hash_table.entries[hash];
 
@@ -84,7 +84,7 @@ struct table_entry *get_entry(struct entry_id id, int global) {
 	return NULL;
 }
 
-struct table_entry *add_entry_with_block(struct entry_id id, int block) {
+static struct table_entry *add_entry_with_block(struct entry_id id, int block) {
 	// Move entire table one step down for entry->block > block.
 	(void)ADD_ELEMENT(table.size, table.cap, table.entries);
 
@@ -127,7 +127,7 @@ struct table_entry *add_entry_with_block(struct entry_id id, int block) {
 	return table.entries + i;
 }
 
-struct table_entry *add_entry(struct entry_id id) {
+static struct table_entry *add_entry(struct entry_id id) {
 	uint32_t hash = hash_entry(id) % hash_table.size;
 
 	struct table_entry *new_entry = &ADD_ELEMENT(table.size, table.cap, table.entries);
@@ -145,7 +145,7 @@ struct table_entry *add_entry(struct entry_id id) {
 }
 
 // table_entry querying.
-struct table_entry *symbols_add(enum entry_type type, struct string_view name) {
+static struct table_entry *symbols_add(enum entry_type type, struct string_view name) {
 	struct table_entry *entry = get_entry((struct entry_id) { type, name }, 0);
 
 	if (entry && entry->block == current_block)
@@ -154,11 +154,11 @@ struct table_entry *symbols_add(enum entry_type type, struct string_view name) {
 	return add_entry((struct entry_id) { type, name });
 }
 
-struct table_entry *symbols_get(enum entry_type type, struct string_view name) {
+static struct table_entry *symbols_get(enum entry_type type, struct string_view name) {
 	return get_entry((struct entry_id) { type, name }, 0);
 }
 
-struct table_entry *symbols_get_in_current_scope(enum entry_type type, struct string_view name) {
+static struct table_entry *symbols_get_in_current_scope(enum entry_type type, struct string_view name) {
 	struct table_entry *entry = get_entry((struct entry_id) { type, name }, 0);
 
 	return (entry && entry->block == current_block) ? entry : NULL;

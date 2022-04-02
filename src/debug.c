@@ -5,7 +5,7 @@
 
 #include <stdlib.h>
 
-const char *simple_to_str(enum simple_type st) {
+static const char *simple_to_str(enum simple_type st) {
 	switch (st) {
 	case ST_VOID: return "ST_VOID";
 	case ST_CHAR: return "ST_CHAR";

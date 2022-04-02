@@ -11,8 +11,8 @@
 #include <assert.h>
 
 // Type conversions
-enum simple_type get_arithmetic_type(enum simple_type a, int bitfield_a,
-									 enum simple_type b, int bitfield_b) {
+static enum simple_type get_arithmetic_type(enum simple_type a, int bitfield_a,
+											enum simple_type b, int bitfield_b) {
 	if (a == ST_LDOUBLE || b == ST_LDOUBLE)
 		return ST_LDOUBLE;
     else if (a == ST_DOUBLE || b == ST_DOUBLE)
@@ -49,7 +49,7 @@ enum simple_type get_arithmetic_type(enum simple_type a, int bitfield_a,
 	}
 }
 
-int get_expression_bitfield(struct expr *expr) {
+static int get_expression_bitfield(struct expr *expr) {
 	if (expr->type == E_DOT_OPERATOR) {
 		assert(expr->member.lhs->data_type->type == TY_STRUCT);
 		struct struct_data *data = expr->member.lhs->data_type->struct_data;
@@ -59,7 +59,7 @@ int get_expression_bitfield(struct expr *expr) {
 	return -1;
 }
 
-void convert_arithmetic(struct expr **a,
+static void convert_arithmetic(struct expr **a,
 						struct expr **b) {
 	struct type *a_type = (*a)->data_type,
 		*b_type = (*b)->data_type;
@@ -78,7 +78,7 @@ void convert_arithmetic(struct expr **a,
 	*b = expression_cast(*b, type_simple(target_type));
 }
 
-void decay_array(struct expr **expr) {
+static void decay_array(struct expr **expr) {
 	struct type *type = (*expr)->data_type;
 	if (type->type == TY_ARRAY ||
 		type->type == TY_INCOMPLETE_ARRAY ||
@@ -92,7 +92,7 @@ void decay_array(struct expr **expr) {
 		*expr = EXPR_ARGS(E_CONST_REMOVE, *expr);
 }
 
-void do_integer_promotion(struct expr **expr) {
+static void do_integer_promotion(struct expr **expr) {
 	struct type *current_type = (*expr)->data_type;
 	int bitfield = get_expression_bitfield(*expr);
 
@@ -103,14 +103,14 @@ void do_integer_promotion(struct expr **expr) {
 	}
 }
 
-void do_default_argument_promotion(struct expr **expr) {
+static void do_default_argument_promotion(struct expr **expr) {
 	do_integer_promotion(expr);
 
 	if (type_is_simple((*expr)->data_type, ST_FLOAT))
 		*expr = expression_cast(*expr, type_simple(ST_DOUBLE));
 }
 
-struct type *calculate_type(struct expr *expr) {
+static struct type *calculate_type(struct expr *expr) {
 	switch (expr->type) {
 	case E_CONSTANT:
 		return expr->constant.data_type;
@@ -216,13 +216,13 @@ static const int does_integer_conversion[E_NUM_TYPES] = {
 	[E_CONDITIONAL] = 1,
 };
 
-int is_null_pointer_constant(struct expr *expr) {
+static int is_null_pointer_constant(struct expr *expr) {
 	struct constant *c = expression_to_constant(expr);
 
 	return c && c->type == CONSTANT_TYPE && constant_is_zero(c);
 }
 
-void cast_conditional(struct expr *expr) {
+static void cast_conditional(struct expr *expr) {
 	if (expr->type != E_CONDITIONAL)
 		return;
 
@@ -263,7 +263,7 @@ void cast_conditional(struct expr *expr) {
 }
 
 // This applies all the necessary transformations to binary operators
-void fix_binary_operator(struct expr *expr) {
+static void fix_binary_operator(struct expr *expr) {
 	if (expr->type != E_BINARY_OP)
 		return;
 
@@ -336,7 +336,7 @@ void fix_binary_operator(struct expr *expr) {
 	}
 }
 
-void fix_assignment_operators(struct expr *expr) {
+static void fix_assignment_operators(struct expr *expr) {
 	if (expr->type != E_ASSIGNMENT_OP)
 		return;
 
@@ -361,7 +361,7 @@ void fix_assignment_operators(struct expr *expr) {
 int evaluate_constant_expression(struct expr *expr,
  								 struct constant *constant);
 
-void check_const_correctness(struct expr *expr) {
+static void check_const_correctness(struct expr *expr) {
 	switch (expr->type) {
 	case E_ASSIGNMENT:
 	case E_ASSIGNMENT_OP:
@@ -455,7 +455,7 @@ struct expr *expr_new(struct expr expr) {
 	return ret;
 }
 
-void pointer_increment(var_id result, var_id pointer, struct expr *index, int decrement, struct type *type) {
+static void pointer_increment(var_id result, var_id pointer, struct expr *index, int decrement, struct type *type) {
 	var_id size = expression_to_ir(type_sizeof(type_deref(type)));
 	var_id index_var = expression_to_ir(expression_cast(index, type_simple(abi_info.pointer_type)));
 	IR_PUSH_BINARY_OPERATOR(IBO_MUL, index_var, size, index_var);
@@ -463,7 +463,7 @@ void pointer_increment(var_id result, var_id pointer, struct expr *index, int de
 }
 
 // Loads pointer into return value.
-int try_expression_to_address(struct expr *expr, var_id *var) {
+static int try_expression_to_address(struct expr *expr, var_id *var) {
 	switch (expr->type) {
 	case E_INDIRECTION:
 		*var = expression_to_ir(expr->args[0]);
@@ -532,7 +532,7 @@ int try_expression_to_address(struct expr *expr, var_id *var) {
 	}
 }
 
-var_id expression_to_address(struct expr *expr) {
+static var_id expression_to_address(struct expr *expr) {
 	var_id res;
 	if (!try_expression_to_address(expr, &res))
 		ICE("Can't take expression as lvalue");
@@ -544,7 +544,7 @@ struct bitfield_address {
 	int bitfield, offset, sign_extend;
 };
 
-struct bitfield_address expression_to_bitfield_address(struct expr *expr) {
+static struct bitfield_address expression_to_bitfield_address(struct expr *expr) {
 	struct bitfield_address out = { .bitfield = -1 };
 	if (expr->type != E_DOT_OPERATOR) {
 		out.address = expression_to_address(expr);
@@ -573,7 +573,7 @@ struct bitfield_address expression_to_bitfield_address(struct expr *expr) {
 	return out;
 }
 
-var_id address_load(var_id address, struct type *type) {
+static var_id address_load(var_id address, struct type *type) {
 	var_id ret = new_variable(type, 1, 1);
 
 	IR_PUSH_LOAD(ret, address);
@@ -581,11 +581,11 @@ var_id address_load(var_id address, struct type *type) {
 	return ret;
 }
 
-void address_store(var_id address, var_id value) {
+static void address_store(var_id address, var_id value) {
 	IR_PUSH_STORE(value, address);
 }
 
-var_id bitfield_load(struct bitfield_address address, struct type *type) {
+static var_id bitfield_load(struct bitfield_address address, struct type *type) {
 	var_id ret = new_variable(type, 1, 1);
 	if (address.bitfield == -1) {
 		IR_PUSH_LOAD(ret, address.address);
@@ -597,7 +597,7 @@ var_id bitfield_load(struct bitfield_address address, struct type *type) {
 	}
 }
 
-void bitfield_store(struct bitfield_address address, var_id value) {
+static void bitfield_store(struct bitfield_address address, var_id value) {
 	if (address.bitfield == -1) {
 		IR_PUSH_STORE(value, address.address);
 	} else {
@@ -610,7 +610,7 @@ void bitfield_store(struct bitfield_address address, var_id value) {
 	}
 }
 
-var_id ir_cast(var_id res, struct type *result_type, var_id rhs, struct type *rhs_type) {
+static var_id ir_cast(var_id res, struct type *result_type, var_id rhs, struct type *rhs_type) {
 	if (type_is_simple(result_type, ST_VOID)) {
 	} else if (type_is_simple(result_type, ST_BOOL)) {
 		IR_PUSH_BOOL_CAST(res, rhs);
@@ -632,7 +632,7 @@ var_id ir_cast(var_id res, struct type *result_type, var_id rhs, struct type *rh
 	return res;
 }
 
-var_id unary_op(var_id res, var_id operand, struct type *type, enum unary_operator_type uop) {
+static var_id unary_op(var_id res, var_id operand, struct type *type, enum unary_operator_type uop) {
 	if (uop == UOP_PLUS)
 		return operand;
 	if (type_is_integer(type)) {
@@ -655,7 +655,7 @@ var_id unary_op(var_id res, var_id operand, struct type *type, enum unary_operat
 	return res;
 }
 
-var_id expression_to_ir_result(struct expr *expr, var_id res) {
+static var_id expression_to_ir_result(struct expr *expr, var_id res) {
 	if (!res)
 		res = new_variable(expr->data_type, 1, 1);
 
@@ -919,7 +919,7 @@ var_id expression_to_ir_clear_temp(struct expr *expr) {
 
 // Parsing.
 
-void parse_call_parameters(struct expr ***args, int *n_args) {
+static void parse_call_parameters(struct expr ***args, int *n_args) {
 	#define MAX_ARGUMENTS 128
 	struct expr *buffer[MAX_ARGUMENTS];
 
@@ -954,7 +954,7 @@ void parse_call_parameters(struct expr ***args, int *n_args) {
 
 struct expr *parse_pratt(int precedence);
 
-struct expr *parse_prefix() {
+static struct expr *parse_prefix() {
 	if (TACCEPT(T_LPAR)) {
 		struct type *cast_type = parse_type_name();
 
@@ -1314,11 +1314,11 @@ struct expr *parse_pratt(int precedence) {
 	return lhs;
 }
 
-struct expr *parse_assignment_expression() {
+struct expr *parse_assignment_expression(void) {
 	return parse_pratt(ASSIGNMENT_PREC);
 }
 
-struct expr *parse_expression() {
+struct expr *parse_expression(void) {
 	return parse_pratt(0);
 }
 

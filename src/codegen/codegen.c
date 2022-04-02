@@ -26,8 +26,8 @@ struct vla_info {
 	} *slots;
 } vla_info;
 
-void codegen_binary_operator(enum ir_binary_operator ibo,
-							 var_id lhs, var_id rhs, var_id res) {
+static void codegen_binary_operator(enum ir_binary_operator ibo,
+									var_id lhs, var_id rhs, var_id res) {
 	scalar_to_reg(lhs, REG_RDI);
 	scalar_to_reg(rhs, REG_RSI);
 
@@ -51,13 +51,13 @@ void codegen_binary_operator(enum ir_binary_operator ibo,
 	reg_to_scalar(REG_RAX, res);
 }
 
-void codegen_call(var_id variable, int non_clobbered_register) {
+static void codegen_call(var_id variable, int non_clobbered_register) {
 	scalar_to_reg(variable, non_clobbered_register);
 	asm_ins1("callq", R8S(non_clobbered_register));
 }
 
 // Address in rdi.
-void codegen_memzero(int len) {
+static void codegen_memzero(int len) {
 	for (int i = 0; i < len;) {
 		if (i + 8 <= len) {
 			asm_ins2("movq", IMM(0), MEM(i, REG_RDI));
@@ -99,7 +99,7 @@ void codegen_memcpy(int len) {
 	}
 }
 
-void codegen_stackcpy(int dest, int source, int len) {
+static void codegen_stackcpy(int dest, int source, int len) {
 	for (int i = 0; i < len;) {
 		if (i + 8 <= len) {
 			asm_ins2("movq", MEM(source + i, REG_RBP), R8(REG_RAX));
@@ -122,7 +122,7 @@ void codegen_stackcpy(int dest, int source, int len) {
 	}
 }
 
-void codegen_instruction(struct instruction ins, struct function *func) {
+static void codegen_instruction(struct instruction ins, struct function *func) {
 	const char *ins_str = dbg_instruction(ins);
 	asm_comment("instruction start \"%s\":", ins_str);
 	switch (ins.type) {
@@ -430,7 +430,7 @@ void codegen_instruction(struct instruction ins, struct function *func) {
 	}
 }
 
-void codegen_block(struct block *block, struct function *func) {
+static void codegen_block(struct block *block, struct function *func) {
 	asm_label(0, block->label);
 
 	for (int i = 0; i < block->size; i++)
@@ -488,7 +488,7 @@ void codegen_block(struct block *block, struct function *func) {
 	}
 }
 
-void codegen_function(struct function *func) {
+static void codegen_function(struct function *func) {
 	int temp_stack_count = 0, perm_stack_count = 0;
 	int max_temp_stack = 0;
 

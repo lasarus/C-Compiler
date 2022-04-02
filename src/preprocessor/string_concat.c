@@ -117,7 +117,7 @@ static int escape_char_to_buffer(struct string_view *input,
 	return 1;
 }
 
-enum string_type take_string_prefix(struct string_view *input) {
+static enum string_type take_string_prefix(struct string_view *input) {
 	if (input->len > 1 && input->str[0] == 'u' &&
 		input->str[1] == '8') {
 		sv_tail(input, 2);

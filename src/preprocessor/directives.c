@@ -110,7 +110,7 @@ static struct token next_from_stack() {
 	return current_file->tokens.list[current_file->token_idx++];
 }
 
-void push(struct token t) {
+static void push(struct token t) {
 	if (current_file->pushed_idx > 2)
 		ICE("Pushed too many directive tokens.");
 	current_file->pushed[current_file->pushed_idx++] = t;
@@ -130,7 +130,7 @@ static struct token next() {
 	return t;
 }
 
-void directiver_define(void) {
+static void directiver_define(void) {
 	struct token name = next();
 
 	struct define def = define_init(name.str);
@@ -175,17 +175,10 @@ void directiver_define(void) {
 	define_map_add(def);
 }
 
-void directiver_undef(void) {
-	struct token name = next();
-
-	EXPECT(&name, T_IDENT);
-	define_map_remove(name.str);
-}
-
 static struct token_list buffer;
 static int buffer_pos;
 
-struct token buffer_next() {
+static struct token buffer_next() {
 	if (buffer_pos >= buffer.size)
 		return (struct token) { .type = T_EOI, .str = { 0 } };
 	struct token *t = buffer.list + buffer_pos;
@@ -197,7 +190,7 @@ struct token buffer_next() {
 	}
 }
 
-intmax_t evaluate_expression(int prec, int evaluate) {
+static intmax_t evaluate_expression(int prec, int evaluate) {
 	intmax_t expr = 0;
 	struct token t = buffer_next();
 
@@ -291,7 +284,7 @@ intmax_t evaluate_expression(int prec, int evaluate) {
 	return expr;
 }
 
-intmax_t evaluate_until_newline() {
+static intmax_t evaluate_until_newline() {
 	buffer.size = 0;
 	struct token t = next();
 	while (!t.first_of_line) {

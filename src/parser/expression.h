@@ -161,8 +161,8 @@ struct expr {
 	struct position pos;
 };
 
-struct expr *parse_assignment_expression();
-struct expr *parse_expression();
+struct expr *parse_assignment_expression(void);
+struct expr *parse_expression(void);
 struct expr *expression_cast(struct expr *expr, struct type *type);
 
 struct constant *expression_to_constant(struct expr *expr);

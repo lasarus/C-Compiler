@@ -18,7 +18,7 @@ void input_reset(void) {
 	disabled_headers = (struct string_set) { 0 };
 }
 
-void read_contents(struct input *input, FILE *fp) {
+static void read_contents(struct input *input, FILE *fp) {
 	int c;
 	while ((c = fgetc(fp)) != EOF) {
 		ADD_ELEMENT(input->contents_size, input->contents_cap, input->contents) = c;
@@ -26,7 +26,7 @@ void read_contents(struct input *input, FILE *fp) {
 	ADD_ELEMENT(input->contents_size, input->contents_cap, input->contents) = '\0';
 }
 
-struct input input_create(const char *filename, FILE *fp) {
+static struct input input_create(const char *filename, FILE *fp) {
 	struct input input = {
 		.filename = filename,
 		.iline = 1, .icol = 1,
@@ -144,7 +144,7 @@ static FILE *try_open_file(const char *path) {
 
 #define BUFFER_SIZE 256
 
-FILE *try_open_local_path(struct input *input, const char *path, char *path_buffer) {
+static FILE *try_open_local_path(struct input *input, const char *path, char *path_buffer) {
 	int last_slash = last_slash_pos(input->filename);
 	if (last_slash && path[0] != '/')
 		assert(snprintf(path_buffer, BUFFER_SIZE, "%.*s/%s", last_slash, input->filename, path) < BUFFER_SIZE);

@@ -28,7 +28,7 @@ static struct function_scope {
 	} *labels;
 } function_scope;
 
-void add_function_scope_label(struct string_view label, block_id id, int used) {
+static void add_function_scope_label(struct string_view label, block_id id, int used) {
 	ADD_ELEMENT(function_scope.size, function_scope.cap, function_scope.labels) =
 		(struct function_scope_label) { label, id, used };
 }
@@ -130,7 +130,7 @@ int parse_expression_statement(void) {
 	return 1;
 }
 
-int parse_switch(struct jump_blocks jump_blocks) {
+static int parse_switch(struct jump_blocks jump_blocks) {
 	if (!TACCEPT(T_KSWITCH))
 		return 0;
 
@@ -206,7 +206,7 @@ int parse_selection_statement(struct jump_blocks jump_blocks) {
 	}
 }
 
-int parse_do_while_statement(struct jump_blocks jump_blocks) {
+static int parse_do_while_statement(struct jump_blocks jump_blocks) {
 	if (!TACCEPT(T_KDO))
 		return 0;
 
@@ -244,7 +244,7 @@ int parse_do_while_statement(struct jump_blocks jump_blocks) {
 	return 1;
 }
 
-int parse_while_statement(struct jump_blocks jump_blocks) {
+static int parse_while_statement(struct jump_blocks jump_blocks) {
 	if (!TACCEPT(T_KWHILE))
 		return 0;
 
@@ -288,7 +288,7 @@ int parse_while_statement(struct jump_blocks jump_blocks) {
 	return 1;
 }
 
-int parse_for_statement(struct jump_blocks jump_blocks) {
+static int parse_for_statement(struct jump_blocks jump_blocks) {
 	if (!TACCEPT(T_KFOR))
 		return 0;
 

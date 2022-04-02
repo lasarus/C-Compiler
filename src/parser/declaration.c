@@ -11,7 +11,7 @@
 #include <assert.h>
 
 // Returns previous state of the bit.
-int set_sbit(struct type_specifiers *ts, int bit_n) {
+static int set_sbit(struct type_specifiers *ts, int bit_n) {
 	int prev = (ts->specifiers & bit_n) ? 1 : 0;
 
 	if (prev)
@@ -21,7 +21,7 @@ int set_sbit(struct type_specifiers *ts, int bit_n) {
 	return 0;
 }
 
-void accept_attribute(int *is_packed) {
+static void accept_attribute(int *is_packed) {
 	if (!TACCEPT(T_KATTRIBUTE))
 		return;
 
@@ -91,12 +91,12 @@ struct type *ast_to_type(const struct type_specifiers *ts, const struct type_qua
 int parse_struct(struct type_specifiers *ts);
 int parse_enum(struct type_specifiers *ts);
 
-int parse_specifier(struct type_specifiers *ts,
-					struct storage_class_specifiers *scs,
-					struct type_qualifiers *tq,
-					struct function_specifiers *fs,
-					struct alignment_specifiers *as,
-					int *got_ts) {
+static int parse_specifier(struct type_specifiers *ts,
+						   struct storage_class_specifiers *scs,
+						   struct type_qualifiers *tq,
+						   struct function_specifiers *fs,
+						   struct alignment_specifiers *as,
+						   int *got_ts) {
 #define ACCEPT_INCREMENT_TS(TOKEN, VARIABLE)		\
 	if (TACCEPT(TOKEN)) {						\
 		(VARIABLE)++;							\
@@ -196,11 +196,11 @@ int parse_specifier(struct type_specifiers *ts,
 	return 0;
 }
 
-int parse_specifiers(struct type_specifiers *ts,
-					 struct storage_class_specifiers *scs,
-					 struct type_qualifiers *tq,
-					 struct function_specifiers *fs,
-					 struct alignment_specifiers *as) {
+static int parse_specifiers(struct type_specifiers *ts,
+							struct storage_class_specifiers *scs,
+							struct type_qualifiers *tq,
+							struct function_specifiers *fs,
+							struct alignment_specifiers *as) {
 
 	if (ts) *ts = (struct type_specifiers){ 0 };
 	if (scs) *scs = (struct storage_class_specifiers){ 0 };
@@ -218,7 +218,7 @@ int parse_specifiers(struct type_specifiers *ts,
 	return matched;
 }
 
-int parse_enumerator(struct constant *prev, int first) {
+static int parse_enumerator(struct constant *prev, int first) {
 	if (T0->type != T_IDENT)
 		return 0;
 
@@ -497,8 +497,8 @@ int parse_struct(struct type_specifiers *ts) {
 	return 1;
 }
 
-void ast_get_parameters(struct type_ast *ast,
-						int *n, var_id **arguments) {
+static void ast_get_parameters(struct type_ast *ast,
+							   int *n, var_id **arguments) {
 	while (ast->type != TAST_TERMINAL) {
 		switch (ast->type) {
 		case TAST_POINTER:
@@ -526,7 +526,7 @@ void ast_get_parameters(struct type_ast *ast,
 	ICE("Did not find parameter names");
 }
 
-struct type_ast *type_ast_new(struct type_ast ast) {
+static struct type_ast *type_ast_new(struct type_ast ast) {
 	struct type_ast *ret = cc_malloc(sizeof (struct type_ast));
 	*ret = ast;
 	ret->pos = T0->pos;
@@ -586,14 +586,14 @@ static struct type *specifiers_to_type(const struct type_specifiers *ts) {
 	ERROR(ts->pos, "Invalid type %X", ts->specifiers);
 }
 
-int null_type_qualifier(struct type_qualifiers *tq) {
+static int null_type_qualifier(struct type_qualifiers *tq) {
 	return tq->atomic_n == 0 &&
 		tq->const_n == 0 &&
 		tq->restrict_n == 0 &&
 		tq->volatile_n == 0;
 }
 
-struct type *apply_tq(struct type *type, const struct type_qualifiers *tq) {
+static struct type *apply_tq(struct type *type, const struct type_qualifiers *tq) {
 	if (tq->const_n == 1)
 		type = type_make_const(type, 1);
 	return type;
@@ -709,7 +709,7 @@ struct parameter_list {
 	var_id *arguments;
 };
 
-struct parameter_list parse_parameter_list(void) {
+static struct parameter_list parse_parameter_list(void) {
 	struct parameter_list ret = { 0 };
 	symbols_push_scope();
 
@@ -757,7 +757,7 @@ struct parameter_list parse_parameter_list(void) {
 	return ret;
 }
 
-struct type_ast *parse_function_parameters(struct type_ast *parent, int *has_symbols) {
+static struct type_ast *parse_function_parameters(struct type_ast *parent, int *has_symbols) {
 	if (TACCEPT(T_RPAR)) {
 		return type_ast_new((struct type_ast){
 				.type = TAST_FUNCTION,
@@ -896,7 +896,7 @@ struct type_ast *parse_declarator(int *was_abstract, int *has_symbols) {
 	return ast;
 }
 
-struct initializer *initializer_add_entry(struct initializer *init, int index) {
+static struct initializer *initializer_add_entry(struct initializer *init, int index) {
 	assert(init->type == INIT_BRACE);
 
 	while (init->brace.size <= index)
@@ -905,13 +905,13 @@ struct initializer *initializer_add_entry(struct initializer *init, int index) {
 	return init->brace.entries + index;
 }
 
-int is_string_type(enum ttype token_type) {
+static int is_string_type(enum ttype token_type) {
 	return token_type == T_STRING || token_type == T_STRING_WCHAR ||
 		token_type == T_STRING_CHAR16 || token_type == T_STRING_CHAR32;
 }
 
-int match_specific_string(struct type **type, struct initializer *init, struct token string_token,
-						  enum simple_type char_type, enum ttype token_type) {
+static int match_specific_string(struct type **type, struct initializer *init, struct token string_token,
+								 enum simple_type char_type, enum ttype token_type) {
 	if (string_token.type != token_type)
 		return 0;
 
@@ -955,8 +955,8 @@ static int match_string(struct type **type, struct initializer *init, struct tok
 void parse_initializer_recursive(struct type **type, struct initializer *init, struct expr *expr,
 								 int inside_brace, int n, int *indices);
 
-void parse_brace_initializer(struct type **type, struct initializer *init, int idx, int inside_brace,
-							 struct expr *expr) {
+static void parse_brace_initializer(struct type **type, struct initializer *init, int idx,
+									int inside_brace, struct expr *expr) {
 	if (init->type == INIT_EMPTY)
 		*init = (struct initializer) { .type = INIT_BRACE };
 
@@ -1191,7 +1191,7 @@ struct {
 	struct string_view *names;
 } potentially_tentative;
 
-int parse_init_declarator(struct specifiers s, int external, int *was_func) {
+static int parse_init_declarator(struct specifiers s, int external, int *was_func) {
 	*was_func = 0;
 	int was_abstract = 1, has_symbols = 0;
 	struct type_ast *ast = parse_declarator(&was_abstract, &has_symbols);

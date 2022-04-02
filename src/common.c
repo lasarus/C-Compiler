@@ -13,17 +13,6 @@ uint32_t hash32(uint32_t a) {
 	return a;
 }	
 
-// djb2 hash: http://www.cse.yorku.ca/~oz/hash.html
-uint32_t hash_str(const char *str) {
-	uint32_t hash = 5381;
-	int c;
-	
-	while ((c = *str++))
-		hash = ((hash << 5) + hash) + c;
-
-	return hash;
-}
-
 char *allocate_printf(const char *fmt, ...) {
 	va_list args1, args2;
 	va_start(args1, fmt);

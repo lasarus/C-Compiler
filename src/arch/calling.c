@@ -2,7 +2,7 @@
 
 #include <common.h>
 
-int classify_non_recursive(struct type *type, enum parameter_class *class) {
+static int classify_non_recursive(struct type *type, enum parameter_class *class) {
 	if (type_is_pointer(type)) {
 		*class = CLASS_INTEGER;
 	} else if (type->type == TY_SIMPLE) {
@@ -28,7 +28,7 @@ int classify_non_recursive(struct type *type, enum parameter_class *class) {
 	return 1;
 }
 
-enum parameter_class combine_class(enum parameter_class a, enum parameter_class b) {
+static enum parameter_class combine_class(enum parameter_class a, enum parameter_class b) {
 	if (a == b)
 		return a;
 	if (a == CLASS_NO_CLASS)
@@ -46,8 +46,8 @@ enum parameter_class combine_class(enum parameter_class a, enum parameter_class 
 	return CLASS_SSE;
 }
 
-void classify_recursively(enum parameter_class *current,
-						  struct type *type, int lower, int upper) {
+static void classify_recursively(enum parameter_class *current,
+								 struct type *type, int lower, int upper) {
 	switch (type->type) {
 	case TY_STRUCT: {
 		struct struct_data *data = type->struct_data;

@@ -210,7 +210,7 @@ static void ms_emit_va_arg(var_id result, var_id va_list, struct type *type) {
 	}
 }
 
-int ms_sizeof_simple(enum simple_type type) {
+static int ms_sizeof_simple(enum simple_type type) {
 	static const int sizes[ST_COUNT] = {
 		[ST_BOOL] = 1,
 		[ST_CHAR] = 1, [ST_SCHAR] = 1, [ST_UCHAR] = 1,

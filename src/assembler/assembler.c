@@ -173,7 +173,7 @@ static void asm_emit_operand(struct operand op) {
 	}
 }
 
-void asm_ins_impl(const char *mnemonic, struct operand ops[4]) {
+static void asm_ins_impl(const char *mnemonic, struct operand ops[4]) {
 	if (!assemble_to_text) {
 		// Swap order of instructions.
 		struct operand swapped[4] = { 0 };
