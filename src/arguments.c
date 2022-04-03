@@ -77,7 +77,7 @@ struct arguments arguments_parse(int argc, char **argv) {
 					if (cont) {
 						next_arg = arg;
 					} else if (!ignore) {
-						ARG_ERROR(i, "Unrecognized flag: \"%s\"", argv[i]);
+						ERROR_NO_POS("Unrecognized flag: \"%s\"", argv[i]);
 					}
 				}
 			} else if (arg[0] == '-' && arg[1] == 's' && arg[2] == 't' && arg[3] == 'd') {
@@ -111,7 +111,7 @@ struct arguments arguments_parse(int argc, char **argv) {
 					if (cont) {
 						next_arg = arg;
 					} else if (!ignore) {
-						ARG_ERROR(i, "Unrecognized flag: \"%s\"", argv[i]);
+						ERROR_NO_POS("Unrecognized flag: \"%s\"", argv[i]);
 					}
 				}
 			} else {

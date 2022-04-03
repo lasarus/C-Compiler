@@ -30,13 +30,13 @@ static const char *simple_to_str(enum simple_type st) {
 	}
 }
 	
-#define DBG_PRINT(STR, ...) do {											\
-		int print_size = snprintf(buffer + curr_pos, char_buffer_size - 1 - curr_pos, STR, ##__VA_ARGS__); \
+#define DBG_PRINT(...) do {											\
+		int print_size = snprintf(buffer + curr_pos, char_buffer_size - 1 - curr_pos, __VA_ARGS__); \
 		int req_size = print_size + 1 + curr_pos; \
 		if (req_size > char_buffer_size) {								\
 			char_buffer_size = req_size;								\
 			buffer = cc_realloc(buffer, char_buffer_size);					\
-			snprintf(buffer + curr_pos, char_buffer_size - 1 - curr_pos, STR, ##__VA_ARGS__); \
+			snprintf(buffer + curr_pos, char_buffer_size - 1 - curr_pos, __VA_ARGS__); \
 		}																\
 		curr_pos += print_size;\
 	} while (0)

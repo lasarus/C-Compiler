@@ -39,7 +39,7 @@ struct expr *expr_new(struct expr expr);
 			.constant = {												\
 				.type = CONSTANT_LABEL,									\
 				.data_type = type_array(type_simple(CHAR_TYPE), (STR).len / calculate_size(type_simple(CHAR_TYPE))), \
-				.label = {rodata_register(STR)}							\
+				.label = {rodata_register(STR), .offset = 0}			\
 			}})
 
 #define EXPR_INT(I) expr_new((struct expr) {							\

@@ -197,7 +197,7 @@ int main(int argc, char **argv) {
 
 	if (arguments.n_operand != 1 && arguments.outfile &&
 		(arguments.flag_S || arguments.flag_c)) {
-		ARG_ERROR(0, "Can't have multiple input files with -o.");
+		ERROR_NO_POS("Can't have multiple input files with -o.");
 	}
 
 	init_source_character_set();

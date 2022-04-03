@@ -223,3 +223,54 @@ void *cc_realloc(void *ptr, size_t size) {
 
 	return ret;
 }
+
+_Noreturn void impl_error_ice(const char *file, int line, const char *fmt, ...) {
+	va_list args1;
+	va_start(args1, fmt);
+	printf("\nInternal compiler error, %s:%d of compiler source: \n\t", file, line);
+	vprintf(fmt, args1);
+	printf("\n");
+
+	va_end(args1);
+	exit(EXIT_FAILURE);
+}
+
+_Noreturn void impl_error(struct position pos, const char *file, int line, const char *fmt, ...) {
+	va_list va;
+	va_start(va, fmt);
+	printf("\nError: %s:%d:%d: ", pos.path, pos.line, pos.column);
+	vprintf(fmt, va);
+	printf("\n");
+	printf("Compiler source: %s:%d\n", file, line);
+
+	va_end(va);
+	exit(EXIT_FAILURE);
+}
+
+_Noreturn void impl_error_no_pos(const char *file, int line, const char *fmt, ...) {
+	va_list va;
+	va_start(va, fmt);
+	printf("\nError: ");
+	vprintf(fmt, va);
+	printf("\n");
+	printf("Compiler source: %s:%d\n", file, line);
+
+	va_end(va);
+	exit(EXIT_FAILURE);
+}
+
+_Noreturn void impl_error_notimp(const char *file, int line) {
+	printf("Not implemented: %s:%d\n", file, line);
+	exit(EXIT_FAILURE);
+}
+
+void impl_warning(struct position pos, const char *fmt, ...) {
+	va_list va;
+	va_start(va, fmt);
+
+	printf("\nWarning, %s:%d:%d: ", pos.path, pos.line, pos.column);
+	vprintf(fmt, va);
+	printf("\n");
+
+	va_end(va);
+}
