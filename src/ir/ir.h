@@ -46,21 +46,18 @@ struct instruction {
 		IR_STORE,
 		IR_ADDRESS_OF,
 		IR_CONSTANT,
-		IR_SWITCH_SELECTION,
 		IR_CALL,
 		IR_COPY,
 		IR_BOOL_CAST,
 		IR_INT_CAST,
 		IR_FLOAT_CAST,
 		IR_INT_FLOAT_CAST,
-		IR_FROM_FLOAT,
 		IR_SET_ZERO,
 		IR_VA_START,
 		IR_VA_ARG, //IR_VA_COPY,
 		IR_STACK_ALLOC,
 		IR_ADD_TEMPORARY,
 		IR_CLEAR_STACK_BUCKET,
-		IR_RESIZE,
 
 		// You should be careful with these instructions.
 		// They are here to allow for easier implementation
@@ -71,8 +68,6 @@ struct instruction {
 		IR_MODIFY_STACK_POINTER,
 		IR_STORE_STACK_RELATIVE,
 		IR_LOAD_BASE_RELATIVE,
-
-		IR_TYPE_COUNT
 	} type;
 
 	var_id operands[3];
