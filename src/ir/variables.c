@@ -51,7 +51,7 @@ var_id new_variable_sz(int size, int allocate, int stack_bucket) {
 		allocate_var(id);
 
 	if (stack_bucket) {
-		IR_PUSH_ADD_TEMPORARY(id);
+		ir_push1(IR_ADD_TEMPORARY, id);
 	}
 
 	return id;

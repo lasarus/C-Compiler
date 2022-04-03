@@ -48,10 +48,27 @@ struct block *get_current_block(void) {
 	return get_block(func->blocks[func->size - 1]);
 }
 
-void push_ir(struct instruction instruction) {
+void ir_push(struct instruction instruction) {
 	struct block *block = get_current_block();
 
 	ADD_ELEMENT(block->size, block->cap, block->instructions) = instruction;
+}
+
+void ir_push3(int type, var_id op1, var_id op2, var_id op3) {
+	struct block *block = get_current_block();
+
+	ADD_ELEMENT(block->size, block->cap, block->instructions) = (struct instruction) {
+		.type = type,
+		.operands = { op1, op2, op3 }
+	};
+}
+
+void ir_push2(int type, var_id op1, var_id op2) {
+	ir_push3(type, op1, op2, VOID_VAR);
+}
+
+void ir_push1(int type, var_id op1) {
+	ir_push3(type, op1, VOID_VAR, VOID_VAR);
 }
 
 void ir_block_start(block_id id) {
@@ -136,7 +153,7 @@ void ir_set_bits(var_id result, var_id field, var_id value, int offset, int leng
 	IR_PUSH_CONSTANT(constant_simple_unsigned(abi_info.size_type, offset), shift_var);
 	IR_PUSH_CONSTANT(constant_simple_unsigned(abi_info.size_type, mask), mask_var);
 	IR_PUSH_BINARY_OPERATOR(IBO_BAND, mask_var, field_large, result_large);
-	IR_PUSH_BINARY_NOT(mask_var, mask_var);
+	ir_push2(IR_BINARY_NOT, mask_var, mask_var);
 	IR_PUSH_BINARY_OPERATOR(IBO_LSHIFT, value_large, shift_var, value_large);
 	IR_PUSH_BINARY_OPERATOR(IBO_BAND, mask_var, value_large, mask_var);
 	IR_PUSH_BINARY_OPERATOR(IBO_BOR, mask_var, result_large, result_large);
@@ -189,15 +206,15 @@ static void ir_init_var_recursive(struct initializer *init, struct type *type, v
 
 	case INIT_EXPRESSION:
 		if (bit_size == -1) {
-			IR_PUSH_STORE(expression_to_ir(init->expr), offset);
+			ir_push2(IR_STORE, expression_to_ir(init->expr), offset);
 		} else {
 			var_id value = expression_to_ir(init->expr);
 			var_id prev = new_variable_sz(get_variable_size(value), 1, 1);
-			IR_PUSH_LOAD(prev, offset);
+			ir_push2(IR_LOAD, prev, offset);
 
 			ir_set_bits(prev, prev, value, bit_offset, bit_size);
 
-			IR_PUSH_STORE(prev, offset);
+			ir_push2(IR_STORE, prev, offset);
 		}
 		break;
 
@@ -209,7 +226,7 @@ static void ir_init_var_recursive(struct initializer *init, struct type *type, v
 			IR_PUSH_CONSTANT(constant_simple_unsigned(abi_info.size_type, j), offset_var);
 			IR_PUSH_BINARY_OPERATOR(IBO_ADD, offset, offset_var, offset_var);
 
-			IR_PUSH_STORE(char_var, offset_var);
+			ir_push2(IR_STORE, char_var, offset_var);
 		}
 	} break;
 		
@@ -218,9 +235,9 @@ static void ir_init_var_recursive(struct initializer *init, struct type *type, v
 }
 
 void ir_init_var(struct initializer *init, struct type *type, var_id result) {
-	IR_PUSH_SET_ZERO(result);
+	ir_push1(IR_SET_ZERO, result);
 	var_id base_address = new_variable(type_pointer(type_simple(ST_VOID)), 1, 1);
-	IR_PUSH_ADDRESS_OF(base_address, result);
+	ir_push2(IR_ADDRESS_OF, base_address, result);
 
 	ir_init_var_recursive(init, type, base_address, -1, -1);
 }

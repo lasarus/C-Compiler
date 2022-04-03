@@ -40,7 +40,7 @@ static void ms_ir_function_call(var_id result, var_id func_var, struct type *typ
 			ret_in_register = 1;
 		} else {
 			registers[0] = new_variable_sz(8, 1, 0);
-			IR_PUSH_ADDRESS_OF(registers[0], result);
+			ir_push2(IR_ADDRESS_OF, registers[0], result);
 
 			register_idx++;
 		}
@@ -55,7 +55,7 @@ static void ms_ir_function_call(var_id result, var_id func_var, struct type *typ
 
 		if (!fits_into_reg(argument_types[i])) {
 			reg_to_push = new_variable_sz(8, 1, 1);
-			IR_PUSH_ADDRESS_OF(reg_to_push, args[i]);
+			ir_push2(IR_ADDRESS_OF, reg_to_push, args[i]);
 		}
 
 		if (register_idx < 4) {
@@ -148,7 +148,7 @@ static void ms_ir_function_new(struct type *type, var_id *args, const char *name
 	}
 
 	for (int i = 0; i < loads_size; i++) {
-		IR_PUSH_LOAD(loads[i].to, loads[i].from);
+		ir_push2(IR_LOAD, loads[i].to, loads[i].from);
 	}
 
 	func->abi_data = cc_malloc(sizeof (struct ms_data));
@@ -162,7 +162,7 @@ static void ms_ir_function_return(struct function *func, var_id value, struct ty
 		goto unclobber;
 
 	if (abi_data->returns_address) {
-		IR_PUSH_STORE(value, abi_data->ret_address);
+		ir_push2(IR_STORE, value, abi_data->ret_address);
 	} else {
 		IR_PUSH_SET_REG(value, 0, type_is_floating(type));
 	}
