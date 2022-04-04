@@ -11,7 +11,7 @@ static struct token_stream {
 	struct token buffer[3], pushed;
 } ts;
 
-void t_next() {
+void t_next(void) {
 	ts.buffer[0] = ts.buffer[1];
 	ts.buffer[1] = ts.buffer[2];
 	ts.buffer[2] = ts.pushed.type ? ts.pushed : string_concat_next();

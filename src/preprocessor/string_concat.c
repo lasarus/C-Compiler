@@ -34,7 +34,7 @@ static void buffer_write(char c) {
 	ADD_ELEMENT(buffer_size, buffer_cap, buffer) = c;
 }
 
-static struct string_view buffer_get() {
+static struct string_view buffer_get(void) {
 	struct string_view ret = { .len = buffer_size };
 	ret.str = cc_malloc(buffer_size);
 	memcpy(ret.str, buffer, buffer_size);

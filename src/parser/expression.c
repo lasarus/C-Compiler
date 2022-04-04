@@ -954,7 +954,7 @@ static void parse_call_parameters(struct expr ***args, int *n_args) {
 
 struct expr *parse_pratt(int precedence);
 
-static struct expr *parse_prefix() {
+static struct expr *parse_prefix(void) {
 	if (TACCEPT(T_LPAR)) {
 		struct type *cast_type = parse_type_name();
 

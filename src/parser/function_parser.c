@@ -434,7 +434,7 @@ int parse_statement(struct jump_blocks jump_blocks) {
 
 static struct string_view current_function = { 0 };
 
-struct string_view get_current_function_name() {
+struct string_view get_current_function_name(void) {
 	return current_function;
 }
 

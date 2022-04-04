@@ -64,7 +64,7 @@ static void flush_whitespace(struct input *input, int *whitespace, int *first_of
 static char *buffer = NULL;
 static size_t buffer_size = 0, buffer_cap = 0;
 
-static void buffer_start() {
+static void buffer_start(void) {
 	buffer_size = 0;
 }
 
@@ -73,7 +73,7 @@ static void buffer_eat(struct input *input) {
 	CNEXT();
 }
 
-static struct string_view buffer_get() {
+static struct string_view buffer_get(void) {
 	struct string_view ret = { .len = buffer_size };
 	ret.str = cc_malloc(buffer_size);
 	memcpy(ret.str, buffer, buffer_size);

@@ -155,12 +155,12 @@ static struct token glue(struct token a, struct token b) {
 static size_t stringify_size, stringify_cap;
 static char *stringify_buffer;
 
-static void stringify_start() {
+static void stringify_start(void) {
 	stringify_size = 0;
 	ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = '\"';
 }
 
-static struct string_view stringify_end() {
+static struct string_view stringify_end(void) {
 	ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = '\"';
 	
 	struct string_view ret = { .len = stringify_size };

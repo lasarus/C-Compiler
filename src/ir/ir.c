@@ -24,7 +24,7 @@ void ir_reset(void) {
 	variables_reset();
 }
 
-block_id new_block() {
+block_id new_block(void) {
 	int id = (int)block_size;
 	ADD_ELEMENT(block_size, block_cap, blocks) = (struct block) {
 		.id = id,

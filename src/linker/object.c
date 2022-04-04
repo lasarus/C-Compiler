@@ -36,13 +36,13 @@ static int get_symbol(label_id label) {
 	return current_object.symbol_size - 1;
 }
 
-void object_start() {
+void object_start(void) {
 	current_object = (struct object) { 0 };
 
 	object_set_section(".text");
 }
 
-struct object *object_finish() {
+struct object *object_finish(void) {
 	struct object *object = cc_malloc(sizeof *object);
 
 	*object = current_object;

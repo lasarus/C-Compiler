@@ -93,9 +93,9 @@ void directiver_push_input(const char *path, int system) {
 	current_file = new_file;
 }
 
-static struct token next();
+static struct token next(void);
 
-static struct token next_from_stack() {
+static struct token next_from_stack(void) {
 	if (current_file->token_idx == current_file->tokens.size) {
 		if (current_file->parent) {
 			input_free(current_file->input);
@@ -116,7 +116,7 @@ static void push(struct token t) {
 	current_file->pushed[current_file->pushed_idx++] = t;
 }
 
-static struct token next() {
+static struct token next(void) {
 	struct token t;
 	if (current_file->pushed_idx) {
 		current_file->pushed_idx--;
@@ -178,7 +178,7 @@ static void directiver_define(void) {
 static struct token_list buffer;
 static int buffer_pos;
 
-static struct token buffer_next() {
+static struct token buffer_next(void) {
 	if (buffer_pos >= buffer.size)
 		return (struct token) { .type = T_EOI, .str = { 0 } };
 	struct token *t = buffer.list + buffer_pos;
@@ -284,7 +284,7 @@ static intmax_t evaluate_expression(int prec, int evaluate) {
 	return expr;
 }
 
-static intmax_t evaluate_until_newline() {
+static intmax_t evaluate_until_newline(void) {
 	buffer.size = 0;
 	struct token t = next();
 	while (!t.first_of_line) {
