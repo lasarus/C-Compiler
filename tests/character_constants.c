@@ -10,4 +10,7 @@ int main() {
 	assert("\a"[0] == 7);
 
 	assert(strcmp("str\12345", "strS45") == 0);
+
+#define STR(x) #x
+	assert(strcmp(STR(L'\x123'), "L'\\x123'") == 0);
 }

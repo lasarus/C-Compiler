@@ -174,6 +174,7 @@ static void stringify_add(struct token *t, int start) {
 		ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = ' ';
 	switch (t->type) {
 	case T_STRING:
+	case T_CHARACTER_CONSTANT:
 		for (int i = 0; i < t->str.len; i++) {
 			char escape_seq[5];
 			character_to_escape_sequence(t->str.str[i], escape_seq, 1, 1);
