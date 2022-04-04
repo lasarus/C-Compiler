@@ -46,6 +46,12 @@ struct expr *expr_new(struct expr expr);
 			.type = E_CONSTANT,											\
 			.constant = constant_simple_signed(ST_INT, I)				\
 		})
+
+#define EXPR_INTEGER(TYPE, I) expr_new((struct expr) {					\
+			.type = E_CONSTANT,											\
+			.constant = constant_simple_signed((TYPE), I)				\
+		})
+
 #define EXPR_VAR(V, TYPE, IS_REG) expr_new((struct expr) {	\
 			.type = E_VARIABLE,								\
 			.variable = {(V), (TYPE), (IS_REG)}				\

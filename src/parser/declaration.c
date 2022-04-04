@@ -163,10 +163,6 @@ static int parse_specifier(struct type_specifiers *ts,
 				return 1;
 			}
 		}
-			
-		if (TACCEPT(T_TYPEDEF_NAME)) {
-			ERROR(T0->pos, "Not implemented");
-		}
 	}
 	if (scs) {
 		ACCEPT_INCREMENT(T_KTYPEDEF, scs->typedef_n);

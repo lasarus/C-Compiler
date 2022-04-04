@@ -32,15 +32,47 @@ int round_up_to_nearest(int num, int div) {
 	return num;
 }
 
-int character_constant_to_int(struct string_view str) {
-	int constant = 0;
+intmax_t character_constant_to_int(struct string_view str) {
+	intmax_t constant = 0;
 
 	for (int i = 0; i < str.len; i++) {
 		constant <<= 8; // TODO: UB on overflow?
-		constant += str.str[i];
+		constant |= str.str[i];
 	}
 
 	return constant;
+}
+
+intmax_t character_constant_wchar_to_int(struct string_view str) {
+	assert(str.len % 4 == 0);
+	intmax_t constant = 0;
+
+	for (int i = 0; i < str.len; i += 4) {
+		constant <<= 32; // TODO: UB on overflow?
+		constant |= (str.str[i] & 0xff) |
+			((str.str[i + 1] & 0xff) << 8) |
+			((str.str[i + 2] & 0xff) << 16) |
+			((str.str[i + 3] & 0xff) << 24);
+	}
+
+	return constant;
+}
+
+intmax_t character_constant_char16_to_int(struct string_view str) {
+	assert(str.len % 2 == 0);
+	intmax_t constant = 0;
+
+	for (int i = 0; i < str.len; i += 2) {
+		constant <<= 16; // TODO: UB on overflow?
+		constant |= (str.str[i] & 0xff) |
+			((str.str[i + 1] & 0xff) << 8);
+	}
+
+	return constant;
+}
+
+intmax_t character_constant_char32_to_int(struct string_view str) {
+	return character_constant_wchar_to_int(str);
 }
 
 unsigned char needs_no_escape[CHAR_MAX];

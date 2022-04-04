@@ -1086,8 +1086,18 @@ static struct expr *parse_prefix(void) {
 		struct string_view str = T0->str;
 		TNEXT();
 		return EXPR_INT(character_constant_to_int(str));
-	} else if (TACCEPT(T_CHAR)) {
-		NOTIMP();
+	} else if (T0->type == T_CHARACTER_CONSTANT_WCHAR) {
+		struct string_view str = T0->str;
+		TNEXT();
+		return EXPR_INTEGER(abi_info.wchar_type, character_constant_wchar_to_int(str));
+	} else if (T0->type == T_CHARACTER_CONSTANT_CHAR16) {
+		struct string_view str = T0->str;
+		TNEXT();
+		return EXPR_INTEGER(CHAR16_TYPE, character_constant_char16_to_int(str));
+	} else if (T0->type == T_CHARACTER_CONSTANT_CHAR32) {
+		struct string_view str = T0->str;
+		TNEXT();
+		return EXPR_INTEGER(CHAR32_TYPE, character_constant_char32_to_int(str));
 	} else if (TACCEPT(T_KGENERIC)) {
 		TEXPECT(T_LPAR);
 		struct expr *expr = parse_assignment_expression();

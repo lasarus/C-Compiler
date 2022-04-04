@@ -31,5 +31,7 @@ int main() {
 
 	assert((L"" "\355\300\300")[0] == 0355);
 
+	assert(L'Ａ' == 0xff21);
+
 	return L'\0';
 }

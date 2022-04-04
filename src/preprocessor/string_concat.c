@@ -229,9 +229,29 @@ struct token string_concat_next(void) {
 		t.type = get_ident(t.str);
 	} else if (t.type == T_CHARACTER_CONSTANT) {
 		enum string_type type = take_string_prefix(&t.str);
+
+		if (type == STRING_U8)
+			ERROR(t.pos, "Can't have character constant with u8 prefix.");
+
 		buffer_start();
 		escape_string_to_buffer(t.str, type, t.pos);
 		t.str = buffer_get();
+
+		switch (type) {
+		case STRING_DEFAULT:
+			t.type = T_CHARACTER_CONSTANT;
+			break;
+		case STRING_U_LARGE:
+			t.type = T_CHARACTER_CONSTANT_CHAR32;
+			break;
+		case STRING_U_SMALL:
+			t.type = T_CHARACTER_CONSTANT_CHAR16;
+			break;
+		case STRING_L:
+			t.type = T_CHARACTER_CONSTANT_WCHAR;
+			break;
+		default: NOTIMP();
+		}
 	}
 
 	return t;
