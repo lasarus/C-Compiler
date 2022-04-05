@@ -353,6 +353,8 @@ static void subs_buffer(struct define *def, struct string_set *hs, struct positi
 				i--; // There is an additional i-- at the end of the loop.
 			} else if (vararg_included) {
 				expand_argument(vararg, &concat_with_prev, concat, stringify, input);
+				
+				concat_with_prev = concat;
 			}
 		} else {
 			const int idx = get_param(def, t);
