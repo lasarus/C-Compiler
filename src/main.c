@@ -180,10 +180,59 @@ static void compile_file(const char *path,
 	parser_reset();
 }
 
+// This function is only called when -E flag is passed.
+// That is: preprocess, but don't compile.
+static void preprocess_file(const char *path, struct arguments *arguments) {
+	symbols_init();
+
+	if (mingw_workarounds) {
+		abi_init_mingw_workarounds();
+	}
+
+	switch (abi) {
+	case ABI_SYSV: abi_init_sysv(); break;
+	case ABI_MICROSOFT: abi_init_microsoft(); break;
+	}
+
+	add_implementation_defs();
+
+	for (int i = 0; i < arguments->n_include; i++)
+		input_add_include_path(arguments->includes[i]);
+
+	for (unsigned i = 0; default_include[i]; i++)
+		input_add_include_path(default_include[i]);
+
+	for (int i = 0; default_defs[i]; i++)
+		add_definition(default_defs[i]);
+
+	for (int i = 0; i < arguments->n_define; i++)
+		add_definition(arguments->defines[i]);
+
+	for (int i = 0; i < arguments->n_undefine; i++)
+		NOTIMP();
+
+	if (arguments->flag_MD)
+		directiver_write_dependencies();
+
+	preprocessor_init(path);
+
+	while (T0->type != T_EOI) {
+		if (T0->first_of_line)
+			printf("\n");
+		printf("%s ", dbg_token(T0));
+		t_next();
+	}
+
+	preprocessor_reset();
+	ir_reset();
+	asm_reset();
+	parser_reset();
+}
+
 int main(int argc, char **argv) {
 	struct arguments arguments = arguments_parse(argc, argv);
 
-	int will_link = !(arguments.flag_S || arguments.flag_c);
+	int will_link = !(arguments.flag_S || arguments.flag_c || arguments.flag_E);
 
 	if (will_link) {
 		printf("Warning! Emitting executables is still work in progress.\n");
@@ -192,7 +241,7 @@ int main(int argc, char **argv) {
 	if (arguments.flag_g)
 		printf("Warning: -g flag is ignored.");
 
-	if (arguments.flag_E || arguments.flag_s)
+	if (arguments.flag_s)
 		NOTIMP();
 
 	if (arguments.n_operand != 1 && arguments.outfile &&
@@ -205,6 +254,16 @@ int main(int argc, char **argv) {
 
 	for (int i = 0; i < arguments.n_operand; i++) {
 		struct string_view basename = get_basename(arguments.operands[i]);
+
+		if (arguments.flag_E) {
+			if (is_ext_file(basename, 'c')) {
+				preprocess_file(arguments.operands[i], &arguments);
+			} else {
+				ERROR_NO_POS("Can't preprocess %s.", arguments.operands[i]);
+			}
+			continue;
+		}
+
 		if (is_ext_file(basename, 'c')) {
 			compile_file(arguments.operands[i], &arguments);
 		} else if (is_ext_file(basename, 'o')) {
