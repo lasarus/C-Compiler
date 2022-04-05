@@ -3,7 +3,7 @@
 
 #include <stdlib.h>
 
-#define N_BUFF 3
+#define N_BUFF 4
 
 struct position {
 	const char *path;

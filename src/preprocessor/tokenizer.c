@@ -9,6 +9,7 @@
 #define C0 (input->c[0])
 #define C1 (input->c[1])
 #define C2 (input->c[2])
+#define C3 (input->c[3])
 #define CNEXT() input_next(input)
 
 enum {
@@ -73,6 +74,11 @@ static void buffer_eat(struct input *input) {
 	CNEXT();
 }
 
+static void buffer_eat_len(struct input *input, int len) {
+	for (int i = 0; i < len; i++)
+		buffer_eat(input);
+}
+
 static struct string_view buffer_get(void) {
 	struct string_view ret = { .len = buffer_size };
 	ret.str = cc_malloc(buffer_size);
@@ -80,14 +86,128 @@ static struct string_view buffer_get(void) {
 	return ret;
 }
 
+static int eat_universal_character_name(struct input *input) {
+	// The source character set is considered to be utf-8 encoded.
+	// So just convert these into that source set as well.
+	if (!(C0 == '\\' && (C1 == 'u' || C1 == 'U')))
+		return 0;
+	CNEXT();
+
+	int long_name = C0 == 'U';
+	CNEXT();
+
+	uintmax_t codepoint = 0;
+
+	for (int i = 0; i < (long_name ? 8 : 4); i++) {
+		codepoint <<= 4;
+		int hex = C0 - '0';
+		if (C0 >= '0' && C0 <= '9')
+			hex = C0 - '0';
+		else if (C0 >= 'a' && C0 <= 'f')
+			hex = C0 - 'a' + 10;
+		else if (C0 >= 'A' && C0 <= 'F')
+			hex = C0 - 'A' + 10;
+		else
+			ERROR(input->pos[0], "Invalid universal character name '%c'.", C0);
+		codepoint |= hex;
+		CNEXT();
+	}
+
+	// Read https://en.wikipedia.org/wiki/UTF-8 for information
+	// on how to encode utf-8.
+	if (codepoint <= 0x7f) {
+		ADD_ELEMENT(buffer_size, buffer_cap, buffer) = codepoint & 0xff;
+	} else if (codepoint <= 0x7ff) {
+		ADD_ELEMENT(buffer_size, buffer_cap, buffer) = (codepoint >> 6) | 0xc0;
+		ADD_ELEMENT(buffer_size, buffer_cap, buffer) = (codepoint & 0x3f) | 0x80;
+	} else if (codepoint <= 0xffff) {
+		ADD_ELEMENT(buffer_size, buffer_cap, buffer) = (codepoint >> 12) | 0xe0;
+		ADD_ELEMENT(buffer_size, buffer_cap, buffer) = ((codepoint >> 6) & 0x3f) | 0x80;
+		ADD_ELEMENT(buffer_size, buffer_cap, buffer) = (codepoint & 0x3f) | 0x80;
+	} else if (codepoint <= 0x10ffff) {
+		ADD_ELEMENT(buffer_size, buffer_cap, buffer) = (codepoint >> 18) | 0xf0;
+		ADD_ELEMENT(buffer_size, buffer_cap, buffer) = ((codepoint >> 12) & 0x3f) | 0x80;
+		ADD_ELEMENT(buffer_size, buffer_cap, buffer) = ((codepoint >> 6) & 0x3f) | 0x80;
+		ADD_ELEMENT(buffer_size, buffer_cap, buffer) = (codepoint & 0x3f) | 0x80;
+	} else {
+		ERROR(input->pos[0], "Cant encode codepoint %ju.", codepoint);
+	}
+
+	return 1;
+}
+
+// Returns number of codepoints that are valid unicode identifiers.
+static int num_valid_unicode_identifiers(struct input *input) {
+	unsigned char c0 = C0;
+
+	int len = 0;
+	uintmax_t codepoint = 0;
+
+	if ((c0 >> 7) == 0) {
+		return 0; // This is just ASCII.
+		/* len = 1; */
+		/* codepoint |= c0 & 0x7f; */
+	} else if ((c0 >> 5) == 0x6) {
+		len = 2;
+		codepoint |= c0 & 0x1f;
+	} else if ((c0 >> 4) == 0xe) {
+		len = 3;
+		codepoint |= c0 & 0xf;
+	} else if ((c0 >> 3) == 0x1e) {
+		len = 4;
+		codepoint |= c0 & 0x7;
+	}
+
+	for (int i = 1; i < len; i++) {
+		codepoint <<= 6;
+		codepoint |= c0 & 0x37;
+	}
+
+#define A(A) if (codepoint == 0x ## A) return len;
+#define R(A, B) if (codepoint >= 0x ## A && codepoint <= 0x ## B) return len;
+
+	// Annex D.1
+	// 1
+	A(00A8) A(00AA) A(00AD) A(00AF) R(00B2,00B5) R(00B7,00BA) R(00BC,00BE) R(00C0,00D6) R(00D8,00F6) R(00F8,00FF)
+		// 2
+		R(0100,167F) R(1681,180D) R(180F,1FFF)
+		// 3
+		R(3200B,200D) R(202A,202E) R(203F,2040) A(2054) R(2060,206F)
+		// 4
+		R(42070,218F) R(2460,24FF) R(2776,2793) R(2C00,2DFF) R(2E80,2FFF)
+		// 5
+		R(3004,3007) R(3021,302F) R(3031,303F)
+		// 6
+		R(3040,D7FF)
+		// 7
+		R(F900,FD3D) R(FD40,FDCF) R(FDF0,FE44) R(FE47,FFFD)
+		// 8
+		R(10000,1FFFD) R(20000,2FFFD) R(30000,3FFFD) R(40000,4FFFD) R(50000,5FFFD) R(60000,6FFFD) R(70000,7FFFD) R(80000,8FFFD) R(90000,9FFFD) R(A0000,AFFFD) R(B0000,BFFFD) R(C0000,CFFFD) R(D0000,DFFFD) R(E0000,EFFFD)
+		// D.2 (I assume these are meant to be allowed?)
+		R(0300,036F) R(1DC0,1DFF) R(20D0,20FF) R(FE20,FE2F)
+#undef A
+#undef R
+
+	return 0;
+}
+
 static int parse_identifier(struct input *input, struct token *next) {
-	if (!HAS_PROP(C0, C_IDENTIFIER_NONDIGIT))
+	int unicode_len = num_valid_unicode_identifiers(input);
+	if (!HAS_PROP(C0, C_IDENTIFIER_NONDIGIT) && unicode_len == 0)
 		return 0;
 
 	buffer_start();
+	buffer_eat_len(input, unicode_len);
 
-	while(HAS_PROP(C0, C_IDENTIFIER_NONDIGIT | C_DIGIT))
-		buffer_eat(input);
+	for (;;) {
+		if (HAS_PROP(C0, C_IDENTIFIER_NONDIGIT | C_DIGIT)) {
+			buffer_eat(input);
+		} else if ((unicode_len = num_valid_unicode_identifiers(input))) {
+			buffer_eat_len(input, unicode_len);
+		} else if (!eat_universal_character_name(input)) {
+			break;
+		}
+	}
 
 	next->type = T_IDENT;
 	next->str = buffer_get();
@@ -182,11 +302,15 @@ int parse_escape_sequence(struct string_view *string, uint32_t *character, struc
 }
 
 static int eat_cs_char(struct input *input, char end_char) {
+	if (eat_universal_character_name(input))
+		return 1;
+
 	if (C0 == '\n' || C0 == end_char)
 		return 0;
 
 	if (C0 == '\\')
 		buffer_eat(input);
+
 	buffer_eat(input);
 
 	return 1;
