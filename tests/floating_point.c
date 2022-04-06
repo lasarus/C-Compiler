@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <stdbool.h>
+#include <float.h>
 
 double add(double a, double b) {
 	return a + b;
