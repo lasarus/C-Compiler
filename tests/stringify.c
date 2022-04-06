@@ -4,6 +4,9 @@
 
 #define STR(X) #X
 #define GLUE(X, Y) X ## Y
+
+#define VA_STR(...) VA_XSTR(__VA_ARGS__)
+#define VA_XSTR(...) #__VA_ARGS__
 int main() {
 	// Testing strcmp first, just to be sure.
 	assert(strcmp("Hello", "Hello") == 0);
@@ -16,4 +19,7 @@ int main() {
 
 	// Bug with stringify overwriting previous stringification.
 	assert(strcmp(STR(A) STR(70), "A70") == 0);
+
+	assert(strcmp(VA_STR(A, B), "A, B") == 0);
+	assert(strcmp(VA_STR(), "") == 0);
 }
