@@ -11,6 +11,10 @@ bool fcmp(float a, float b) {
 	return a == b;
 }
 
+double conv(int i) {
+	return i;
+}
+
 int main() {
 	assert(add(2.3, 4.5) < 6.9);
 	assert(add(2.3, 4.5) > 6.7);
@@ -55,6 +59,8 @@ int main() {
 	assert(!fcmp(0.0, 1.0));
 
 	int a = (float)3.14;
+
+	assert(conv(-1) == (double)-1);
 
 	return 0;
 }

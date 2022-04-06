@@ -330,6 +330,8 @@ static void codegen_instruction(struct instruction ins, struct function *func) {
 				asm_ins2("movswl", R2(REG_RAX), R4(REG_RAX));
 			} else if (!sign && size_rhs == 2) {
 				asm_ins2("movzwl", R2(REG_RAX), R4(REG_RAX));
+			} else if (sign && size_rhs == 4) {
+				asm_ins2("movslq", R4(REG_RAX), R8(REG_RAX));
 			}
 
 			if (size_result == 4) {
