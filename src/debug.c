@@ -228,6 +228,8 @@ const char *dbg_token(struct token *t) {
 		DBG_PRINT("%.*s", t->str.len, t->str.str);
 	} else if (t->type == T_NUM) {
 		DBG_PRINT("%.*s", t->str.len, t->str.str);
+	} else if (t->type == T_STRING) {
+		DBG_PRINT("\"%.*s\"", t->str.len, t->str.str);
 	} else {
 		DBG_PRINT("%s", dbg_token_type(t->type));
 	}

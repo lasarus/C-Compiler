@@ -49,6 +49,11 @@ static struct define **define_map_find(struct string_view name) {
 void define_map_add(struct define define) {
 	struct define **elem = define_map_find(define.name);
 
+	if (define.def.size) { // Initial and ending whitespace of definition is ignored.
+		define.def.list[0].whitespace = 0;
+		define.def.list[define.def.size - 1].whitespace_after = 0;
+	}
+
 	if (*elem) {
 		define.next = (*elem)->next;
 		**elem = define;
@@ -138,7 +143,10 @@ enum ttype paste_table[][3] = {
 };
 
 static struct token glue(struct token a, struct token b) {
-	struct token ret = { 0 };
+	struct token ret = {
+		.whitespace = b.whitespace, .first_of_line = b.first_of_line,
+		.whitespace_after = a.whitespace_after, .first_of_line_after = a.first_of_line_after
+	};
 	for (unsigned i = 0; i < sizeof paste_table / sizeof *paste_table; i++)
 		if (paste_table[i][1] == a.type && paste_table[i][0] == b.type)
 			ret.type = paste_table[i][2];
@@ -154,9 +162,11 @@ static struct token glue(struct token a, struct token b) {
 
 static size_t stringify_size, stringify_cap;
 static char *stringify_buffer;
+static int stringify_whitespace;
 
 static void stringify_start(void) {
 	stringify_size = 0;
+	stringify_whitespace = 0;
 	ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = '\"';
 }
 
@@ -170,8 +180,9 @@ static struct string_view stringify_end(void) {
 }
 
 static void stringify_add(struct token *t, int start) {
-	if (!start && t->whitespace)
+	if (!start && (t->whitespace || stringify_whitespace))
 		ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = ' ';
+	stringify_whitespace = t->whitespace_after;
 	switch (t->type) {
 	case T_STRING:
 	case T_CHARACTER_CONSTANT:
@@ -191,12 +202,17 @@ static void stringify_add(struct token *t, int start) {
 
 static int builtin_macros(struct token *t) {
 	// These are only single tokens.
+	// Remember to keep whitespace.
+	int whitespace = t->whitespace, whitespace_after = t->whitespace_after;
 	if (sv_string_cmp(t->str, "__LINE__")) {
 		*t = (struct token) { .type = T_NUM, .str = sv_from_str(allocate_printf("%d", t->pos.line)), .pos = t->pos };
 	} else if (sv_string_cmp(t->str, "__FILE__")) {
 		*t = (struct token) { .type = T_STRING, .str = sv_from_str(allocate_printf("\"%s\"", t->pos.path)), .pos = t->pos };
 	} else
 		return 0;
+
+	t->whitespace = whitespace;
+	t->whitespace_after = whitespace_after;
 	return 1;
 }
 
@@ -265,10 +281,16 @@ static int input_buffer_parse_argument(struct token_list *tl, int ignore_comma, 
 
 	if (t.type == T_RPAR)
 		input_buffer_push(&t);
+
+	if (tl->size) {
+		tl->list[0].whitespace = 0;
+		tl->list[tl->size - 1].whitespace_after = 0;
+	}
+
 	return t.type == T_RPAR;
 }
 
-static void expand_argument(struct token_list tl, int *concat_with_prev, int concat, int stringify, int input) {
+static void expand_argument(struct token origin, struct token_list tl, int *concat_with_prev, int concat, int stringify, int input) {
 	int start_it = tl.size - 1;
 
 	if (*concat_with_prev && tl.size) {
@@ -285,6 +307,10 @@ static void expand_argument(struct token_list tl, int *concat_with_prev, int con
 
 	for(int i = start_it; i >= 0; i--) {
 		struct token t = tl.list[i];
+		if (i == 0)
+			t.whitespace = t.whitespace || origin.whitespace;
+		if (i == start_it)
+			t.whitespace_after = t.whitespace_after || origin.whitespace_after;
 		input_buffer_push(&t);
 	}
 
@@ -300,12 +326,15 @@ static void expand_argument(struct token_list tl, int *concat_with_prev, int con
 	}
 }
 
-static void subs_buffer(struct define *def, struct string_set *hs, struct position new_pos, int input) {
+static void subs_buffer(struct token origin, struct define *def, struct string_set *hs, struct position new_pos, int input) {
 	int n_args = def->par.size;
 	struct token_list *arguments = cc_malloc(sizeof *arguments * n_args);
 
 	struct token_list vararg = {0};
 	int vararg_included = 0;
+
+	int whitespace_after = origin.whitespace_after; // This can change if function macro.
+
 	if(def->func) {
 		struct token lpar = input_buffer_take(input);
 		EXPECT(&lpar, T_LPAR);
@@ -329,6 +358,8 @@ static void subs_buffer(struct define *def, struct string_set *hs, struct positi
 		
 		struct token rpar = input_buffer_take(input);
 		EXPECT(&rpar, T_RPAR);
+
+		whitespace_after = rpar.whitespace_after;
 
 		*hs = string_set_intersection(*hs, rpar.hs);
 	}
@@ -365,7 +396,7 @@ static void subs_buffer(struct define *def, struct string_set *hs, struct positi
 				t_new.str = stringify_end();
 				input_buffer_push(&t_new);
 			} else if (vararg_included) {
-				expand_argument(vararg, &concat_with_prev, concat, stringify, input);
+				expand_argument(t, vararg, &concat_with_prev, concat, stringify, input);
 				
 				concat_with_prev = concat;
 			}
@@ -385,7 +416,7 @@ static void subs_buffer(struct define *def, struct string_set *hs, struct positi
 				t_new.str = stringify_end();
 				input_buffer_push(&t_new);
 			} else if(idx >= 0) {
-				expand_argument(arguments[idx], &concat_with_prev, concat, stringify, input);
+				expand_argument(t, arguments[idx], &concat_with_prev, concat, stringify, input);
 
 				if (arguments[idx].size)
 					concat_with_prev = concat;
@@ -415,8 +446,13 @@ static void subs_buffer(struct define *def, struct string_set *hs, struct positi
 	}
 
 	for(unsigned i = input_start; i < input_buffer.size; i++) {
-		struct token *tok = input_buffer.tokens + i;
+		struct token *tok = &input_buffer.tokens[i];
 		tok->hs = string_set_union(*hs, tok->hs);
+
+		if (i == input_start)
+			tok->whitespace_after = tok->whitespace_after || whitespace_after;
+		if (i == input_buffer.size - 1)
+			tok->whitespace = tok->whitespace || origin.whitespace;
 	}
 
 	free(arguments);
@@ -445,7 +481,7 @@ void expand_buffer(int input, int return_output, struct token *t) {
 
 		if ((def->func && (input || input_buffer.size) && input_buffer_top(input)->type == T_LPAR) ||
 			!def->func) {
-			subs_buffer(def, &top.hs, top.pos, input);
+			subs_buffer(top, def, &top.hs, top.pos, input);
 		} else {
 			if (return_output) {
 				*t = top;

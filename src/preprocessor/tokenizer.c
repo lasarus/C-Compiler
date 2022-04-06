@@ -416,9 +416,14 @@ static int parse_punctuator(struct input *input, struct token *next) {
 }
 
 static struct token tokenizer_next(struct input *input,
+								   int *whitespace_after, int *first_of_line_after,
 								   int *is_header, int *is_directive) {
-	struct token next = { 0 };
+	struct token next = {
+		.whitespace = *whitespace_after,
+		.first_of_line = *first_of_line_after
+	};
 
+	// Should only be necessary on first token?
 	flush_whitespace(input, &next.whitespace,
 					 &next.first_of_line);
 
@@ -456,6 +461,12 @@ static struct token tokenizer_next(struct input *input,
 		ERROR(next.pos, "Unrecognized preprocessing token! Starting with '%c', %d\n", C0, C0);
 	}
 
+	*whitespace_after = *first_of_line_after = 0;
+
+	flush_whitespace(input, whitespace_after, first_of_line_after);
+	next.whitespace_after = *whitespace_after;
+	next.first_of_line_after = *first_of_line_after;
+
 	return next;
 }
 
@@ -463,11 +474,12 @@ struct token_list tokenize_input(struct input *input) {
 	struct token_list tl = { 0 };
 
 	int is_header = 0, is_directive = 0;
+	int whitespace_after = 0, first_of_line_after = 0;
 
-	struct token t = tokenizer_next(input, &is_header, &is_directive);
+	struct token t = tokenizer_next(input, &whitespace_after, &first_of_line_after, &is_header, &is_directive);
 	while (t.type != T_EOI) {
 		token_list_add(&tl, t);
-		t = tokenizer_next(input, &is_header, &is_directive);
+		t = tokenizer_next(input, &whitespace_after, &first_of_line_after, &is_header, &is_directive);
 	}
 
 	return tl;

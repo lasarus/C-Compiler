@@ -22,4 +22,27 @@ int main() {
 
 	assert(strcmp(VA_STR(A, B), "A, B") == 0);
 	assert(strcmp(VA_STR(), "") == 0);
+
+	assert(strcmp(VA_STR(, GLUE(A, B)), ", AB") == 0);
+	assert(strcmp(VA_STR(,/**/GLUE(A, B)), ", AB") == 0);
+	assert(strcmp(VA_STR(,GLUE(A, B)), ",AB") == 0);
+
+#define F2(A) A __LINE__
+	assert(strcmp(VA_STR(F2(A)), "A 31") == 0);
+#define MACROB B
+#define F(A) A MACROB
+	assert(strcmp(VA_STR(F(A)), "A B") == 0);
+
+	#define F3 XXX YYY
+	assert(strcmp(VA_STR(F3 F3), "XXX YYY XXX YYY") == 0);
+
+#define F4(A) (A)
+	assert(strcmp(VA_STR(F4( M)), "(M)") == 0);
+	assert(strcmp(VA_STR(F4(M )), "(M)") == 0);
+	assert(strcmp(VA_STR(F4( M .)), "(M .)") == 0);
+	assert(strcmp(VA_STR(F4( M.)), "(M.)") == 0);
+
+#define F5(X) X
+	assert(strcmp(VA_STR(F5 (f).), "f.") == 0);
+	assert(strcmp(VA_STR(F5(f) .), "f .") == 0);
 }

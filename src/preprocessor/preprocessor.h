@@ -26,8 +26,8 @@ struct token {
 
 	struct string_view str;
 
-    int first_of_line;
-    int whitespace;
+    int first_of_line, first_of_line_after;
+    int whitespace, whitespace_after;
 
 	struct position pos;
 
