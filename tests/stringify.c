@@ -45,4 +45,8 @@ int main() {
 #define F5(X) X
 	assert(strcmp(VA_STR(F5 (f).), "f.") == 0);
 	assert(strcmp(VA_STR(F5(f) .), "f .") == 0);
+
+	// Not technically testing stringification:
+#define hash_glue # ## #
+	assert(strcmp(VA_STR(x hash_glue y), "x ## y") == 0);
 }

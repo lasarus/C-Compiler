@@ -434,8 +434,10 @@ static struct token tokenizer_next(struct input *input,
 
 	if(C0 == '#' && C1 == '#') {
 		next.type = PP_HHASH;
-		CNEXT();
-		CNEXT();
+		buffer_start();
+		buffer_eat(input);
+		buffer_eat(input);
+		next.str = buffer_get();
 	} else if (C0 == '#') {
 		if (next.first_of_line) {
 			next.type = PP_DIRECTIVE;
@@ -443,7 +445,9 @@ static struct token tokenizer_next(struct input *input,
 		} else {
 			next.type = PP_HASH;
 		}
-		CNEXT();
+		buffer_start();
+		buffer_eat(input);
+		next.str = buffer_get();
 	} else if (*is_header && parse_pp_header_name(input, &next)) {
 	} else if(parse_string(input, &next)) {
 	} else if(parse_character_constant(input, &next)) {

@@ -140,6 +140,7 @@ enum ttype paste_table[][3] = {
 	{T_STAR, T_A, T_MULA},
 	{T_AMP, T_A, T_BANDA},
 	{T_AMP, T_AMP, T_AND},
+	{PP_HASH, PP_HASH, PP_HHASH}, // This is just stupid...
 };
 
 static struct token glue(struct token a, struct token b) {
