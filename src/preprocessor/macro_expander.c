@@ -379,9 +379,10 @@ static void subs_buffer(struct token origin, struct define *def, struct string_s
 			ERROR(t.pos, "Concat token at edge of macro expansion.");
 
 		if (sv_string_cmp(t.str, "__VA_ARGS__")) {
-			if (concat && i - 2 >= 0 &&
-				def->def.list[i - 2].type == T_COMMA &&
-				!vararg_included) {
+			const int va_args_paste = concat && i - 2 >= 0 &&
+				def->def.list[i - 2].type == T_COMMA;
+
+			if (va_args_paste && !vararg_included) {
 				i--; // There is an additional i-- at the end of the loop.
 			} else if (stringify) {
 				struct token_list tl = vararg;
@@ -399,7 +400,7 @@ static void subs_buffer(struct token origin, struct define *def, struct string_s
 			} else if (vararg_included) {
 				expand_argument(t, vararg, &concat_with_prev, concat, stringify, input);
 				
-				concat_with_prev = concat;
+				concat_with_prev = !va_args_paste && concat;
 			}
 		} else {
 			const int idx = get_param(def, t);
