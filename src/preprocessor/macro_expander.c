@@ -400,7 +400,8 @@ static void subs_buffer(struct token origin, struct define *def, struct string_s
 			} else if (vararg_included) {
 				expand_argument(t, vararg, &concat_with_prev, concat, stringify, input);
 				
-				concat_with_prev = !va_args_paste && concat;
+				if (vararg.size)
+					concat_with_prev = !va_args_paste && concat;
 			}
 		} else {
 			const int idx = get_param(def, t);

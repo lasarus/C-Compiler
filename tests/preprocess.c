@@ -84,8 +84,10 @@ assert(strcmp(include, "Hello") == 0);
 #define join_va_args(x, ...)            x ## __VA_ARGS__
 
 	join_va_args(ab, cd) = 1;
-
 	assert(abcd == 1);
+
+	join_va_args(abcd,) = 2;
+	assert(abcd == 2);
 
 	return 0;
 }
