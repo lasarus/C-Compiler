@@ -94,3 +94,8 @@ assert(strcmp(include, "Hello") == 0);
 #elif defined(AAAA)
 #else
 #endif
+
+#if 4294967295 == 4294967295U
+#else
+#error
+#endif

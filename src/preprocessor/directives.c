@@ -190,16 +190,45 @@ static struct token buffer_next(void) {
 	}
 }
 
-static intmax_t evaluate_expression(int prec, int evaluate) {
-	intmax_t expr = 0;
+struct result {
+	int is_signed;
+	union {
+		intmax_t i;
+		intmax_t u;
+	};
+};
+
+static struct result result_signed(intmax_t val) {
+	return (struct result) { .is_signed = 1, .i = val };
+}
+
+static struct result result_unsigned(intmax_t val) {
+	return (struct result) { .is_signed = 0, .u = val };
+}
+
+int result_is_zero(struct result result) {
+	return result.is_signed ? (result.i == 0) : (result.u == 0);
+}
+
+#define RESULT_UNARY(OP, EXPR) ((EXPR).is_signed				\
+								? result_signed(OP (EXPR).i)	\
+								: result_unsigned(OP (EXPR).u))
+#define RESULT_BINARY(OP, LHS, RHS) ((LHS).is_signed					\
+									 ? result_signed((LHS).i OP (RHS).i) \
+									 : result_unsigned((LHS).i OP (RHS).u))
+
+static struct result evaluate_expression(int prec, int evaluate) {
+	struct result expr = result_signed(0);
 	struct token t = buffer_next();
 
 	if (t.type == T_ADD) {
 		expr = evaluate_expression(PREFIX_PREC, evaluate);
 	} else if (t.type == T_SUB) {
-		expr = -evaluate_expression(PREFIX_PREC, evaluate);
+		struct result rhs = evaluate_expression(PREFIX_PREC, evaluate);
+		expr = RESULT_UNARY(-, rhs);
 	} else if (t.type == T_NOT) {
-		expr = !evaluate_expression(PREFIX_PREC, evaluate);
+		struct result rhs = evaluate_expression(PREFIX_PREC, evaluate);
+		expr = RESULT_UNARY(!, rhs);
 	} else if (t.type == T_LPAR) {
 		expr = evaluate_expression(0, evaluate);
 		struct token rpar = buffer_next();
@@ -212,10 +241,12 @@ static intmax_t evaluate_expression(int prec, int evaluate) {
 			ERROR(t.pos, "Floating point arithmetic in the preprocessor is not allowed.");
 		if (!type_is_integer(c.data_type))
 			ERROR(t.pos, "Preprocessor variables must be of integer type.");
-		if (type_is_integer(c.data_type))
-			expr = is_signed(c.data_type->simple) ? (intmax_t)c.int_d : (intmax_t)c.uint_d;
+		if (is_signed(c.data_type->simple))
+			expr = result_signed(c.int_d);
+		else
+			expr = result_unsigned(c.uint_d);
 	} else if (t.type == T_CHARACTER_CONSTANT) {
-		expr = escaped_character_constant_to_int(t);
+		expr = result_signed(escaped_character_constant_to_int(t));
 	} else {
 		ERROR(t.pos, "Invalid token in preprocessor expression. %s", dbg_token(&t));
 	}
@@ -226,45 +257,52 @@ static intmax_t evaluate_expression(int prec, int evaluate) {
 		int new_prec = precedence_get(t.type, 0);
 
 		if (t.type == T_QUEST) {
-			int mid = evaluate_expression(0, expr ? evaluate : 0);
+			struct result mid = evaluate_expression(0, evaluate && !result_is_zero(expr));
 			struct token colon = buffer_next();
 			assert(colon.type == T_COLON);
-			int rhs = evaluate_expression(new_prec, expr ? 0 : evaluate);
-			expr = expr ? mid : rhs;
+			struct result rhs = evaluate_expression(new_prec, evaluate && !result_is_zero(expr));
+			expr = !result_is_zero(expr) ? mid : rhs;
 		} else if (t.type == T_AND) {
-			int rhs = evaluate_expression(new_prec, expr ? evaluate : 0);
-			expr = expr && rhs;
+			struct result rhs = evaluate_expression(new_prec, evaluate && !result_is_zero(expr));
+			expr = result_signed(!result_is_zero(expr) && !result_is_zero(rhs));
 		} else if (t.type == T_OR) {
-			int rhs = evaluate_expression(new_prec, expr ? 0 : evaluate);
-			expr = expr || rhs;
+			struct result rhs = evaluate_expression(new_prec, evaluate && !result_is_zero(expr));
+			expr = result_signed(!result_is_zero(expr) || !result_is_zero(rhs));
 		} else {
 			// Standard binary operator.
-			int rhs = evaluate_expression(new_prec, evaluate);
+			struct result rhs = evaluate_expression(new_prec, evaluate);
+
+			// Integer -> Unsigned integer promotion.
+			if (rhs.is_signed && !expr.is_signed)
+				rhs = result_unsigned(rhs.i);
+			else if (!rhs.is_signed && expr.is_signed)
+				expr = result_unsigned(expr.i);
+
 			if (evaluate) {
 				switch (t.type) {
-				case T_BOR: expr = expr | rhs; break;
-				case T_XOR: expr = expr ^ rhs; break;
-				case T_AMP: expr = expr & rhs; break;
-				case T_EQ: expr = expr == rhs; break;
-				case T_NEQ: expr = expr != rhs; break;
-				case T_LEQ: expr = expr <= rhs; break;
-				case T_GEQ: expr = expr >= rhs; break;
-				case T_L: expr = expr < rhs; break;
-				case T_G: expr = expr > rhs; break;
-				case T_LSHIFT: expr = expr << rhs; break;
-				case T_RSHIFT: expr = expr >> rhs; break;
-				case T_ADD: expr = expr + rhs; break;
-				case T_SUB: expr = expr - rhs; break;
-				case T_STAR: expr = expr * rhs; break;
+				case T_BOR: expr = RESULT_BINARY(|, expr, rhs); break;
+				case T_XOR: expr = RESULT_BINARY(^, expr, rhs); break;
+				case T_AMP: expr = RESULT_BINARY(&, expr, rhs); break;
+				case T_EQ: expr = RESULT_BINARY(==, expr, rhs); break;
+				case T_NEQ: expr = RESULT_BINARY(!=, expr, rhs); break;
+				case T_LEQ: expr = RESULT_BINARY(<=, expr, rhs); break;
+				case T_GEQ: expr = RESULT_BINARY(>=, expr, rhs); break;
+				case T_L: expr = RESULT_BINARY(<, expr, rhs); break;
+				case T_G: expr = RESULT_BINARY(>, expr, rhs); break;
+				case T_LSHIFT: expr = RESULT_BINARY(<<, expr, rhs); break;
+				case T_RSHIFT: expr = RESULT_BINARY(>>, expr, rhs); break;
+				case T_ADD: expr = RESULT_BINARY(+, expr, rhs); break;
+				case T_SUB: expr = RESULT_BINARY(-, expr, rhs); break;
+				case T_STAR: expr = RESULT_BINARY(*, expr, rhs); break;
 				case T_DIV:
-					if (rhs)
-						expr = expr / rhs;
+					if (!result_is_zero(rhs))
+						expr = RESULT_BINARY(/, expr, rhs);
 					else
 						ERROR(t.pos, "Division by zero");
 					break;
 				case T_MOD:
-					if (rhs)
-						expr = expr % rhs;
+					if (!result_is_zero(rhs))
+						expr = RESULT_BINARY(%, expr, rhs);
 					else
 						ERROR(t.pos, "Modulo by zero");
 					break;
@@ -284,7 +322,7 @@ static intmax_t evaluate_expression(int prec, int evaluate) {
 	return expr;
 }
 
-static intmax_t evaluate_until_newline(void) {
+static struct result evaluate_until_newline(void) {
 	buffer.size = 0;
 	struct token t = next();
 	while (!t.first_of_line) {
@@ -316,9 +354,7 @@ static intmax_t evaluate_until_newline(void) {
 	token_list_add(&buffer, (struct token) { .type = T_EOI });
 
 	buffer_pos = 0;
-	intmax_t result = evaluate_expression(0, 1);
-
-	return result;
+	return evaluate_expression(0, 1);
 }
 
 static struct string_view get_include_path(struct token dir, struct token t, int *system) {
@@ -351,7 +387,7 @@ static int directiver_evaluate_conditional(struct token dir) {
 		return !(define_map_get(next().str) != NULL);
 	} else if (sv_string_cmp(dir.str, "if") ||
 			   sv_string_cmp(dir.str, "elif")) {
-		return evaluate_until_newline();
+		return !result_is_zero(evaluate_until_newline());
 	} else if (sv_string_cmp(dir.str, "else")) {
 		return 1;
 	}
