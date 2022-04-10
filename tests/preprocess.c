@@ -109,3 +109,7 @@ assert(strcmp(include, "Hello") == 0);
 #if !(-1 || 0/0)
 #error
 #endif
+
+#if !((-1 ? 3 : (0/0)) && (0 ? (0/0) : 3))
+#error
+#endif

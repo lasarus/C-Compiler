@@ -263,10 +263,10 @@ static struct result evaluate_expression(int prec, int evaluate) {
 		int new_prec = precedence_get(t.type, 0);
 
 		if (t.type == T_QUEST) {
-			struct result mid = evaluate_expression(0, evaluate && !result_is_zero(expr));
+			struct result mid = evaluate_expression(0, !result_is_zero(expr) ? evaluate : 0);
 			struct token colon = buffer_next();
 			assert(colon.type == T_COLON);
-			struct result rhs = evaluate_expression(new_prec, evaluate && !result_is_zero(expr));
+			struct result rhs = evaluate_expression(new_prec, result_is_zero(expr) ? evaluate : 0);
 			expr = !result_is_zero(expr) ? mid : rhs;
 		} else if (t.type == T_AND) {
 			struct result rhs = evaluate_expression(new_prec, !result_is_zero(expr) ? evaluate : 0);
