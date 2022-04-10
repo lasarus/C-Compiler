@@ -105,3 +105,7 @@ assert(strcmp(include, "Hello") == 0);
 #if (0 || 0x700 >= 0xE00)
 #error
 #endif
+
+#if !(-1 || 0/0)
+#error
+#endif

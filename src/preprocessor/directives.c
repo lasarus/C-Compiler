@@ -269,10 +269,10 @@ static struct result evaluate_expression(int prec, int evaluate) {
 			struct result rhs = evaluate_expression(new_prec, evaluate && !result_is_zero(expr));
 			expr = !result_is_zero(expr) ? mid : rhs;
 		} else if (t.type == T_AND) {
-			struct result rhs = evaluate_expression(new_prec, evaluate && !result_is_zero(expr));
+			struct result rhs = evaluate_expression(new_prec, !result_is_zero(expr) ? evaluate : 0);
 			expr = result_signed(!result_is_zero(expr) && !result_is_zero(rhs));
 		} else if (t.type == T_OR) {
-			struct result rhs = evaluate_expression(new_prec, evaluate || result_is_zero(expr));
+			struct result rhs = evaluate_expression(new_prec, result_is_zero(expr) ? evaluate : 0);
 			expr = result_signed(!result_is_zero(expr) || !result_is_zero(rhs));
 		} else {
 			// Standard binary operator.
