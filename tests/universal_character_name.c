@@ -17,7 +17,14 @@ int 𒈓(int a) {
 	return a;
 }
 
+int 😀(int 😲) {
+	int 😲😲 = 😲 * 😲;
+	return 😲😲;
+}
+
 int main() {
+	assert(😀(2) == 4);
+
 	assert(func\u1234h(10) == 10);
 	assert(func\u12341234h(10) == 10);
 	assert(funcሴh(10) == 10);
