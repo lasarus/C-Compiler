@@ -213,9 +213,15 @@ int result_is_zero(struct result result) {
 #define RESULT_UNARY(OP, EXPR) ((EXPR).is_signed				\
 								? result_signed(OP (EXPR).i)	\
 								: result_unsigned(OP (EXPR).u))
+
 #define RESULT_BINARY(OP, LHS, RHS) ((LHS).is_signed					\
 									 ? result_signed((LHS).i OP (RHS).i) \
-									 : result_unsigned((LHS).i OP (RHS).u))
+									 : result_unsigned((LHS).u OP (RHS).u))
+
+// Conditionals always returns signed integers.
+#define RESULT_BINARY_COND(OP, LHS, RHS) ((LHS).is_signed				\
+										  ? result_signed((LHS).i OP (RHS).i) \
+										  : result_signed((LHS).u OP (RHS).u))
 
 static struct result evaluate_expression(int prec, int evaluate) {
 	struct result expr = result_signed(0);
@@ -266,7 +272,7 @@ static struct result evaluate_expression(int prec, int evaluate) {
 			struct result rhs = evaluate_expression(new_prec, evaluate && !result_is_zero(expr));
 			expr = result_signed(!result_is_zero(expr) && !result_is_zero(rhs));
 		} else if (t.type == T_OR) {
-			struct result rhs = evaluate_expression(new_prec, evaluate && !result_is_zero(expr));
+			struct result rhs = evaluate_expression(new_prec, evaluate || result_is_zero(expr));
 			expr = result_signed(!result_is_zero(expr) || !result_is_zero(rhs));
 		} else {
 			// Standard binary operator.
@@ -283,12 +289,12 @@ static struct result evaluate_expression(int prec, int evaluate) {
 				case T_BOR: expr = RESULT_BINARY(|, expr, rhs); break;
 				case T_XOR: expr = RESULT_BINARY(^, expr, rhs); break;
 				case T_AMP: expr = RESULT_BINARY(&, expr, rhs); break;
-				case T_EQ: expr = RESULT_BINARY(==, expr, rhs); break;
-				case T_NEQ: expr = RESULT_BINARY(!=, expr, rhs); break;
-				case T_LEQ: expr = RESULT_BINARY(<=, expr, rhs); break;
-				case T_GEQ: expr = RESULT_BINARY(>=, expr, rhs); break;
-				case T_L: expr = RESULT_BINARY(<, expr, rhs); break;
-				case T_G: expr = RESULT_BINARY(>, expr, rhs); break;
+				case T_EQ: expr = RESULT_BINARY_COND(==, expr, rhs); break;
+				case T_NEQ: expr = RESULT_BINARY_COND(!=, expr, rhs); break;
+				case T_LEQ: expr = RESULT_BINARY_COND(<=, expr, rhs); break;
+				case T_GEQ: expr = RESULT_BINARY_COND(>=, expr, rhs); break;
+				case T_L: expr = RESULT_BINARY_COND(<, expr, rhs); break;
+				case T_G: expr = RESULT_BINARY_COND(>, expr, rhs); break;
 				case T_LSHIFT: expr = RESULT_BINARY(<<, expr, rhs); break;
 				case T_RSHIFT: expr = RESULT_BINARY(>>, expr, rhs); break;
 				case T_ADD: expr = RESULT_BINARY(+, expr, rhs); break;
