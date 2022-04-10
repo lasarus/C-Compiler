@@ -736,7 +736,7 @@ static var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		var_id size = expression_to_ir(type_sizeof(type_deref(expr->args[0]->data_type)));
 
 		IR_PUSH_BINARY_OPERATOR(IBO_SUB, lhs, rhs, res);
-		IR_PUSH_BINARY_OPERATOR(IBO_DIV, res, size, res);
+		IR_PUSH_BINARY_OPERATOR(IBO_IDIV, res, size, res);
 	} break;
 
 	case E_ASSIGNMENT: {

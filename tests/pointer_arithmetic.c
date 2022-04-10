@@ -21,6 +21,7 @@ int main() {
 	assert(null_ptr == 0);
 
 	assert(&arr[5] - &arr[3] == 2);
+	assert(&arr[3] - &arr[5] == -2);
 
 	func(NULL);
 }
