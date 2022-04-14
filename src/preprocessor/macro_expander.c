@@ -391,8 +391,6 @@ static void subs_buffer(struct token origin, struct define *def, struct string_s
 				for(int i = 0; i < tl.size; i++)
 					stringify_add(tl.list + i, i == 0);
 
-				ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = '\"';
-
 				struct token t_new = t;
 				t_new.type = T_STRING;
 				t_new.str = stringify_end();
@@ -411,8 +409,6 @@ static void subs_buffer(struct token origin, struct define *def, struct string_s
 
 				for(int i = 0; i < tl.size; i++)
 					stringify_add(tl.list + i, i == 0);
-
-				ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = '\"';
 
 				struct token t_new = t;
 				t_new.type = T_STRING;

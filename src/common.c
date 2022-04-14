@@ -114,6 +114,7 @@ void character_to_escape_sequence(char character, char *output, int allow_compli
 			output[0] = '"';
 			output[1] = '\0';
 		}
+		return;
 	} else if (character == '\'') {
 		if (!string) {
 			output[0] = '\\';
@@ -123,6 +124,7 @@ void character_to_escape_sequence(char character, char *output, int allow_compli
 			output[0] = '\'';
 			output[1] = '\0';
 		}
+		return;
 	} else if ((int)character >= 0 && needs_no_escape[(int)character]) {
 		output[0] = character;
 		output[1] = '\0';
