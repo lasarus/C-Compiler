@@ -110,13 +110,15 @@ static void encode_sib(struct operand *o, int *rex_b, int *rex_x, int *modrm_mod
 			   disp_size <= 4) {
 		if (o->mem.base == REG_RSP ||
 			o->mem.base == REG_R12) {
+			*modrm_rm = 4;
 			*modrm_mod = 2;
 
 			*has_sib = 1;
 			*sib_index = 4;
+			*sib_base = 4;
 
-			*modrm_rm = register_index(o->mem.base) & 7;
-			*rex_b = (register_index(o->mem.base) & 0x8) >> 3;
+			if (o->mem.base == REG_R12)
+				*rex_b = 1;
 		} else {
 			*modrm_mod = 2;
 
