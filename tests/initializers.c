@@ -207,4 +207,21 @@ int main() {
 		*ptr = 13;
 		assert(t.a == 13);
 	}
+
+	{
+		struct T1 {
+			const char *str;
+		};
+
+		static struct T1 ts1[1] = { "abc" };
+
+		assert(strcmp(ts1[0].str, "abc") == 0);
+
+		struct T2 {
+			const char str[4];
+		};
+
+		static struct T2 ts2[1] = { "abc" };
+		assert(strcmp(ts2[0].str, "abc") == 0);
+	}
 }

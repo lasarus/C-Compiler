@@ -1135,6 +1135,8 @@ void parse_initializer_recursive(struct type **type, struct initializer *init, s
 		}
 	} else if (T0->type == T_LBRACE && is_aggregate) {
 		parse_brace_initializer(type, init, 0, 0, NULL);
+	} else if (is_str && is_aggregate) {
+		parse_brace_initializer(type, init, current_idx, 1, expr);
 	} else {
 		ERROR(T0->pos, "Error initializing %s\n", strdup(dbg_type(*type)));
 	}
