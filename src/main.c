@@ -127,7 +127,7 @@ static void compile_file(const char *path,
 		add_definition(arguments->defines[i]);
 
 	for (int i = 0; i < arguments->n_undefine; i++)
-		NOTIMP();
+		define_map_remove(sv_from_str((char *)arguments->undefines[i]));
 
 	if (arguments->flag_MD)
 		directiver_write_dependencies();
