@@ -53,7 +53,7 @@ struct call_info {
 	int shadow_space;
 };
 
-static struct call_info get_calling_convention(struct type *function_type, int n_args, struct type **argument_types, var_id *args, int calling) {
+static struct call_info get_calling_convention(struct type *function_type, int n_args, struct type **argument_types, var_id *args) {
 	struct type *return_type = function_type->children[0];
 
 	static int regs_size = 0, regs_cap = 0;
@@ -140,9 +140,6 @@ static struct call_info get_calling_convention(struct type *function_type, int n
 			for (int j = 0; j < n_parts; j++) {
 				int part_size = MIN(argument_size - j * 8, 8);
 
-				if (calling)
-					part_size = 8;
-
 				var_id part = new_variable_sz(part_size, 1, 1);
 
 				if (classes[j] == CLASS_SSE || classes[j] == CLASS_SSEUP) {
@@ -204,7 +201,7 @@ static void split_variable(var_id variable, int n_parts, var_id *parts) {
 }
 
 static void sysv_ir_function_call(var_id result, var_id func_var, struct type *function_type, int n_args, struct type **argument_types, var_id *args) {
-	struct call_info c = get_calling_convention(function_type, n_args, argument_types, args, 1);
+	struct call_info c = get_calling_convention(function_type, n_args, argument_types, args);
 
 	if (c.returns_address) {
 		ir_push2(IR_ADDRESS_OF, c.ret_address, result);
@@ -284,7 +281,7 @@ static void sysv_ir_function_new(struct type *type, var_id *args, const char *na
 
 	ir_block_start(new_block());
 
-	struct call_info c = get_calling_convention(type, n_args, type->children + 1, args, 0);
+	struct call_info c = get_calling_convention(type, n_args, type->children + 1, args);
 	
 	if (c.returns_address) {
 		variable_set_stack_bucket(c.ret_address, 0);

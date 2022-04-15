@@ -50,12 +50,17 @@ void scalar_to_reg(var_id scalar, int reg) {
 		asm_ins2("xorq", R8(reg), R8(reg));
 		asm_ins2("movw", mem, R2(reg));
 		break;
+	case 3: // Clear upper bits? Sign extend?
 	case 4:
 		asm_ins2("movl", mem, R4(reg));
 		break;
+	case 5: case 6: case 7: // TODO: Perhaps these should clear upper bits.
 	case 8:
 		asm_ins2("movq", mem, R8(reg));
 		break;
+
+	default:
+		NOTIMP();
 	}
 }
 
