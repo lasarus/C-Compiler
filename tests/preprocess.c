@@ -113,3 +113,6 @@ assert(strcmp(include, "Hello") == 0);
 #if !((-1 ? 3 : (0/0)) && (0 ? (0/0) : 3))
 #error
 #endif
+
+// Should ignore:
+#pragma warning(disable : 4996)

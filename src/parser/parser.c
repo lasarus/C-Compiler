@@ -75,6 +75,11 @@ int parse_handle_pragma(void) {
 		current_packing = new_packing;
 	} else {
 		WARNING(T0->pos, "\"#pragma %.*s\" not supported", name.len, name.str);
+
+		// Continue until newline or EOI.
+		while (T0->type != T_EOI &&
+			   !T0->first_of_line)
+			TNEXT();
 	}
 
 	return 1;
