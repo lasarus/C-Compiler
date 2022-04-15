@@ -24,7 +24,7 @@ void parser_reset(void) {
 	symbols_reset();
 }
 
-static int parse_handle_pragma(void) {
+int parse_handle_pragma(void) {
 	if (!TACCEPT(PP_DIRECTIVE))
 		return 0;
 	assert(sv_string_cmp(T0->str, "pragma"));

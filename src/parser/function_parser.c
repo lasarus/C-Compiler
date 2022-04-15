@@ -429,6 +429,7 @@ int parse_statement(struct jump_blocks jump_blocks) {
 		parse_selection_statement(jump_blocks) ||
 		parse_iteration_statement(jump_blocks) ||
 		parse_jump_statement(jump_blocks) ||
+		parse_handle_pragma() ||
 		TACCEPT(T_SEMI_COLON);
 }
 

@@ -12,4 +12,6 @@ extern struct parser_flags parser_flags;
 
 int get_current_packing(void);
 
+int parse_handle_pragma(void);
+
 #endif
