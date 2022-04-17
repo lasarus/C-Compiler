@@ -219,7 +219,14 @@ static void preprocess_file(const char *path, struct arguments *arguments) {
 	while (T0->type != T_EOI) {
 		if (T0->first_of_line)
 			printf("\n");
-		printf("%s ", dbg_token(T0));
+		else if (T0->whitespace)
+			printf(" ");
+
+		printf("%s", dbg_token(T0));
+
+		if (T0->whitespace_after)
+			printf(" ");
+
 		t_next();
 	}
 

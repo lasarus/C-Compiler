@@ -1017,7 +1017,21 @@ static struct expr *parse_prefix(void) {
 
 		return type_sizeof(type);
 	} else if (TACCEPT(T_KALIGNOF)) {
-		NOTIMP();
+		struct type *type = NULL;
+		struct token t = *T0;
+		if (TACCEPT(T_LPAR)) {
+			type = parse_type_name();
+			if (type) {
+				TEXPECT(T_RPAR);
+			} else {
+				t_push(t);
+				type = parse_pratt(PREFIX_PREC)->data_type;
+			}
+		} else {
+			type = parse_pratt(PREFIX_PREC)->data_type;
+		}
+
+		return type_alignof(type);
 	} else if (T0->type == T_IDENT) {
 		struct symbol_identifier *sym = symbols_get_identifier(T0->str);
 

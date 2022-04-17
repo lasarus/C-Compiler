@@ -163,6 +163,7 @@ int type_has_variable_size(struct type *type);
 
 struct expr;
 struct expr *type_sizeof(struct type *type);
+struct expr *type_alignof(struct type *type);
 
 #include <arch/x64.h>
 

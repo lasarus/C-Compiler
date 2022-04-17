@@ -400,6 +400,15 @@ struct expr *type_sizeof(struct type *type) {
 	}
 }
 
+struct expr *type_alignof(struct type *type) {
+	struct constant c = constant_simple_unsigned(abi_info.size_type, calculate_alignment(type));
+
+	return expr_new((struct expr) {
+			.type = E_CONSTANT,
+			.constant = c
+		});
+}
+
 void type_evaluate_vla(struct type *type) {
 	for (int i = 0; i < type->n; i++)
 		type_evaluate_vla(type->children[i]);

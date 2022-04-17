@@ -132,24 +132,14 @@ int is_scalar(struct type *type) {
 		type->type == TY_POINTER;
 }
 
-static int calculate_alignment(struct type *type);
-
 static int alignof_struct(struct struct_data *struct_data) {
-	int max_align = 0;
-
 	if (!struct_data->is_complete)
 		ICE("Struct %.*s not complete", struct_data->name.len, struct_data->name.str);
 
-	for (int i = 0; i < struct_data->n; i++) {
-		struct type *type = struct_data->fields[i].type;
-		if (max_align < calculate_alignment(type))
-			max_align = calculate_alignment(type);
-	}
-
-	return max_align;
+	return struct_data->alignment;
 }
 
-static int calculate_alignment(struct type *type) {
+int calculate_alignment(struct type *type) {
 	switch (type->type) {
 	case TY_SIMPLE:
 		return alignof_simple(type->simple);
@@ -227,12 +217,15 @@ static int calculate_alignment_with_max(struct type *type, int packing) {
 void calculate_offsets(struct struct_data *data) {
 	int current_offset = 0;
 	int max_offset = 0;
-	int alignment = 0;
+	int alignment = 1;
 
 	int last_bit_offset = 0;
 	for (int i = 0; i < data->n; i++) {
 		struct type *field = data->fields[i].type;
 		current_offset = round_up_to_nearest(current_offset, calculate_alignment_with_max(field, data->packing));
+
+		if (data->fields[i].bitfield == 0)
+			continue;
 
 		data->fields[i].offset = current_offset;
 		data->fields[i].bit_offset = 0;

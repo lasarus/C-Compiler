@@ -33,6 +33,7 @@ int is_contained_in(enum simple_type large, int large_bitfield,
 enum simple_type to_unsigned(enum simple_type type);
 
 int calculate_size(struct type *type);
+int calculate_alignment(struct type *type);
 void calculate_offsets(struct struct_data *data);
 
 int calculate_offset(struct type *type, int index);

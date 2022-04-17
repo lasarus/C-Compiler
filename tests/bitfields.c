@@ -117,4 +117,15 @@ int main() {
 
 		assert(*(uint64_t *)&t == 0x100010801);
 	}
+
+	{
+		struct T {
+			struct T2 {
+				int : 0;
+			};
+		};
+
+		_Static_assert(_Alignof(struct T) == 1, "");
+		_Static_assert(sizeof(struct T) == 0, "");
+	}
 }
