@@ -75,9 +75,9 @@ static void set_flags(struct arguments *arguments) {
 		const char *flag = arguments->flags[i];
 
 		if (strcmp(flag, "cmodel=small") == 0) {
-			codegen_flags.cmodel = CMODEL_SMALL;
+			codegen_flags.code_model = CODE_MODEL_SMALL;
 		} else if (strcmp(flag, "cmodel=large") == 0) {
-			codegen_flags.cmodel = CMODEL_LARGE;
+			codegen_flags.code_model = CODE_MODEL_LARGE;
 		} else if (strncmp(flag, "debug-stack-size", 16) == 0) {
 			codegen_flags.debug_stack_size = 1;
 			if (flag[16] == '=') {

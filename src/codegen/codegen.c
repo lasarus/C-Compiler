@@ -14,7 +14,7 @@
 struct variable_info *variable_info;
 
 struct codegen_flags codegen_flags = {
-	.cmodel = CMODEL_SMALL,
+	.code_model = CODE_MODEL_SMALL,
 	.debug_stack_size = 0
 };
 
@@ -161,9 +161,9 @@ static void codegen_instruction(struct instruction ins, struct function *func) {
 		} break;
 
 		case CONSTANT_LABEL:
-			if (codegen_flags.cmodel == CMODEL_LARGE) {
+			if (codegen_flags.code_model == CODE_MODEL_LARGE) {
 				asm_ins2("movabsq", IMML(c.label.label, c.label.offset), R8(REG_RDI));
-			} else if (codegen_flags.cmodel == CMODEL_SMALL) {
+			} else if (codegen_flags.code_model == CODE_MODEL_SMALL) {
 				asm_ins2("movq", IMML(c.label.label, c.label.offset), R8(REG_RDI));
 			}
 			asm_ins2("leaq", MEM(-variable_info[ins.operands[0]].stack_location, REG_RBP), R8(REG_RSI));
@@ -171,10 +171,10 @@ static void codegen_instruction(struct instruction ins, struct function *func) {
 			break;
 
 		case CONSTANT_LABEL_POINTER:
-			if (codegen_flags.cmodel == CMODEL_LARGE) {
+			if (codegen_flags.code_model == CODE_MODEL_LARGE) {
 				asm_ins2("movabsq", IMML(c.label.label, c.label.offset), R8(REG_RAX));
 				asm_ins2("movq", R8(REG_RAX), MEM(-variable_info[ins.operands[0]].stack_location, REG_RBP));
-			} else if (codegen_flags.cmodel == CMODEL_SMALL) {
+			} else if (codegen_flags.code_model == CODE_MODEL_SMALL) {
 				asm_ins2("movq", IMML(c.label.label, c.label.offset),
 						 MEM(-variable_info[ins.operands[0]].stack_location, REG_RBP));
 			}

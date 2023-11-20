@@ -3,11 +3,13 @@
 
 #include <assembler/assembler.h>
 
+enum code_model {
+	CODE_MODEL_SMALL,
+	CODE_MODEL_LARGE,
+};
+
 extern struct codegen_flags {
-	enum {
-		CMODEL_SMALL,
-		CMODEL_LARGE
-	} cmodel;
+	enum code_model code_model;
 	int debug_stack_size;
 	int debug_stack_min;
 } codegen_flags;
