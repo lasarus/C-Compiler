@@ -277,4 +277,6 @@ void abi_init_mingw_workarounds(void) {
 	define_string("__cdecl", "");
 	define_string("_MSVCRT_", "1");
 	define_string("__x86_64", "1");
+
+	codegen_flags.code_model = CODE_MODEL_LARGE;
 }
