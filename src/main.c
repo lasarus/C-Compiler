@@ -11,7 +11,11 @@
 #include "abi/abi.h"
 #include "arguments.h"
 
+#ifdef CONFIG_PATH
+#include CONFIG_PATH
+#else
 #include "../config.h"
+#endif
 
 #include <time.h>
 #include <stdio.h>
@@ -50,6 +54,15 @@ static struct string_view get_basename(const char *path) {
 static int is_ext_file(struct string_view view, char ext) {
 	return view.str[view.len - 2] == '.' &&
 		view.str[view.len - 1] == ext;
+}
+
+static char *replace_object_file_suffix(const char* path) {
+	int len = strlen(path);
+
+    if (len <= 2 || strcmp(path + len - 2, ".o") != 0)
+		return NULL;
+
+	return allocate_printf("%.*s.d", len - 2, path);
 }
 
 static void add_definition(const char *str) {
@@ -167,10 +180,20 @@ static void compile_file(const char *path,
 	}
 
 	if (arguments->flag_MD) {
-		if (!arguments->mt_path || !arguments->mf_path)
-			NOTIMP();
+		const char *mt_path = NULL;
+		if (arguments->mt_path)
+			mt_path = arguments->mt_path;
+		else
+			mt_path = outfile;
 
-		directiver_finish_writing_dependencies(arguments->mt_path, arguments->mf_path);
+		const char *mf_path = NULL;
+		if (arguments->mf_path) {
+			mf_path = arguments->mf_path;
+		} else {
+			mf_path = replace_object_file_suffix(outfile);
+		}
+
+		directiver_finish_writing_dependencies(mt_path, mf_path);
 	}
 
 	// TODO: The compiler currently relies too heavily on global state.
@@ -246,7 +269,7 @@ int main(int argc, char **argv) {
 	}
 
 	if (arguments.flag_g)
-		printf("Warning: -g flag is ignored.");
+		printf("Warning: -g flag is ignored.\n");
 
 	if (arguments.flag_s)
 		NOTIMP();

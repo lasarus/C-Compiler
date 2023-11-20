@@ -12,16 +12,20 @@ I have successfully built TinyCC, Git, and a few other medium to large code-base
 Some small patching is often needed, but seldom anything major.
 
 ## Build instructions
+To compile, use the command:
 
     make
 
 Configuration is done through `config.h`.
 This file will be generated from `config.def.h` at the first run of `make`.
 
+Alternatively a `CMakeLists.txt`, and a simple `compile.sh` script is provided.
+When not using `make`, the config.h file needs to be created manually.
+
 ## Compilation instructions
 
-	cc input.c -o output.s -S -Iinclude/directory -DDEFINITION -DNAME=VALUE
-	cc input.c -o output.o -c -Iinclude/directory -DDEFINITION -DNAME=VALUE
+	bin/cc input.c -o output.s -S -Iinclude/directory -DDEFINITION -DNAME=VALUE
+	bin/cc input.c -o output.o -c -Iinclude/directory -DDEFINITION -DNAME=VALUE
 
 `output.s` is a x86-64 assembly file with AT&T syntax, and `output.o` is a 64-bit relocatable elf file.
 The command line format is similar to that of the `c99` POSIX utility.
@@ -30,16 +34,17 @@ Without any `-S` or `-c` flag, the compiler will try to link the input into an e
 The linker is still under development, and will most likely not work for any non-trivial program.
 
 ## Self compilation
-To start self compilation run the command:
+For self compilation, use the command:
 
-    ./self_compile.sh
-The compiler will then compile itself, and the resulting compiler will in turn also compile itself, and so on in an infinite loop.
-Assembly output from the first generation compiler will be put in asm/, and the output from the following generations is put in asm2/.
-These directories can then be compared to find bugs, they should be exactly identical.
+    make self-compile
+
+The resulting binaries are `bin/cc2`, and `bin/cc3` for the second and third generations.
+The binaries are expected to be exactly identical.
+
 ## Testing
-A basic test runner script is implemented.
-It runs all `*.c` files in `tests/` and aborts if any of them fails during compilation or runtime.
-It also self-compiles twice, and checks that the outputs are identical.
-Use the following command to run the tests:
+To run tests, use the command:
 
-    ./run_tests.sh
+	make check
+
+This compiles and runs all `tests/*.c` files and ensures that there are no errors during compilation or run time.
+It also self compiles and checks that the second and third generations are identical.

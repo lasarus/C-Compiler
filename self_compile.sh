@@ -14,7 +14,7 @@ for SRC in $SOURCES
 do
 	echo -en "\r\033[KCOMPILING $SRC"
 	OUT="$(basename -s .c $SRC).s"
-	./cc $SRC -o asm/$OUT -S -Isrc
+	bin/cc $SRC -o asm/$OUT -S -Isrc
 done
 echo -en "\r\033[KDONE!"
 echo

@@ -1,7 +1,4 @@
-asm/*
-asm2/*
-test_asm/*
-test_asm2/*
-cc
-cc_self
-musl/*
+bin/
+obj/
+musl/
+config.h
