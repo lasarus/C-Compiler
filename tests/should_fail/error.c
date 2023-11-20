@@ -1,9 +1,4 @@
-// DEFS A B C
+#error
 
-#if defined(A)
-#error
-#elif defined(B)
-#error
-#elif defined(C)
-#error
-#endif
+int main() {
+}
