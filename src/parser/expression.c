@@ -623,9 +623,9 @@ static var_id ir_cast(var_id res, struct type *result_type, var_id rhs, struct t
 	} else if(type_is_floating(result_type) && type_is_floating(rhs_type)) {
 		ir_push2(IR_FLOAT_CAST, res, rhs);
 	} else if(type_is_floating(result_type) && type_is_integer(rhs_type)) {
-		IR_PUSH_INT_FLOAT_CAST(res, rhs, 0, is_signed(rhs_type->simple));
+		ir_push2(is_signed(rhs_type->simple) ? IR_INT_FLOAT_CAST : IR_UINT_FLOAT_CAST, res, rhs);
 	} else if(type_is_integer(result_type) && type_is_floating(rhs_type)) {
-		IR_PUSH_INT_FLOAT_CAST(res, rhs, 1, is_signed(result_type->simple));
+		ir_push2(IR_FLOAT_INT_CAST, res, rhs);
 	} else {
 		return rhs;
 	}

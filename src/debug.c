@@ -159,8 +159,15 @@ const char *dbg_instruction(struct instruction ins) {
 		break;
 
 	case IR_INT_FLOAT_CAST:
-		DBG_PRINT("%d = float_cast %d, from float: %d, sign: %d", ins.operands[0], ins.operands[1],
-				  ins.int_float_cast.from_float, ins.int_float_cast.sign);
+		DBG_PRINT("%d = int_float_cast %d", ins.operands[0], ins.operands[1]);
+		break;
+
+	case IR_UINT_FLOAT_CAST:
+		DBG_PRINT("%d = uint_float_cast %d", ins.operands[0], ins.operands[1]);
+		break;
+
+	case IR_FLOAT_INT_CAST:
+		DBG_PRINT("%d = float_int_cast %d", ins.operands[0], ins.operands[1]);
 		break;
 
 	case IR_ADDRESS_OF:

@@ -301,39 +301,59 @@ static void codegen_instruction(struct instruction ins, struct function *func) {
 		scalar_to_reg(ins.operands[1], REG_RAX);
 		int size_rhs = get_variable_size(ins.operands[1]),
 			size_result = get_variable_size(ins.operands[0]);
-		int sign = ins.int_float_cast.sign;
-		if (ins.int_float_cast.from_float) {
-			// This is not the exact same as gcc and clang in the
-			// case of unsigned long. But within the C standard?
-			if (size_rhs == 4) {
-				asm_ins2("movd", R4(REG_RAX), XMM(0));
-				asm_ins2("cvttss2si", XMM(0), R8(REG_RAX));
-			} else if (size_rhs == 8) {
-				asm_ins2("movd", R8(REG_RAX), XMM(0));
-				asm_ins2("cvttsd2si", XMM(0), R8(REG_RAX));
-			}
-		} else {
-			if (sign && size_rhs == 1) {
-				asm_ins2("movsbl", R1(REG_RAX), R4(REG_RAX));
-			} else if (!sign && size_rhs == 1) {
-				asm_ins2("movzbl", R1(REG_RAX), R4(REG_RAX));
-			} else if (sign && size_rhs == 2) {
-				asm_ins2("movswl", R2(REG_RAX), R4(REG_RAX));
-			} else if (!sign && size_rhs == 2) {
-				asm_ins2("movzwl", R2(REG_RAX), R4(REG_RAX));
-			} else if (sign && size_rhs == 4) {
-				asm_ins2("movslq", R4(REG_RAX), R8(REG_RAX));
-			}
+		if (size_rhs == 1) {
+			asm_ins2("movsbl", R1(REG_RAX), R4(REG_RAX));
+		} else if (size_rhs == 2) {
+			asm_ins2("movswl", R2(REG_RAX), R4(REG_RAX));
+		} else if (size_rhs == 4) {
+			asm_ins2("movslq", R4(REG_RAX), R8(REG_RAX));
+		}
 
-			if (size_result == 4) {
-				asm_ins2("cvtsi2ss", R8(REG_RAX), XMM(0));
-				asm_ins2("movd", XMM(0), R4(REG_RAX));
-			} else if (size_result == 8) {
-				asm_ins2("cvtsi2sd", R8(REG_RAX), XMM(0));
-				asm_ins2("movq", XMM(0), R8(REG_RAX));
-			} else {
-				NOTIMP();
-			}
+		if (size_result == 4) {
+			asm_ins2("cvtsi2ss", R8(REG_RAX), XMM(0));
+			asm_ins2("movd", XMM(0), R4(REG_RAX));
+		} else if (size_result == 8) {
+			asm_ins2("cvtsi2sd", R8(REG_RAX), XMM(0));
+			asm_ins2("movq", XMM(0), R8(REG_RAX));
+		} else {
+			NOTIMP();
+		}
+		reg_to_scalar(REG_RAX, ins.operands[0]);
+	} break;
+
+	case IR_UINT_FLOAT_CAST: {
+		scalar_to_reg(ins.operands[1], REG_RAX);
+		int size_rhs = get_variable_size(ins.operands[1]),
+			size_result = get_variable_size(ins.operands[0]);
+		if (size_rhs == 1) {
+			asm_ins2("movzbl", R1(REG_RAX), R4(REG_RAX));
+		} else if (size_rhs == 2) {
+			asm_ins2("movzwl", R2(REG_RAX), R4(REG_RAX));
+		}
+
+		if (size_result == 4) {
+			asm_ins2("cvtsi2ss", R8(REG_RAX), XMM(0));
+			asm_ins2("movd", XMM(0), R4(REG_RAX));
+		} else if (size_result == 8) {
+			asm_ins2("cvtsi2sd", R8(REG_RAX), XMM(0));
+			asm_ins2("movq", XMM(0), R8(REG_RAX));
+		} else {
+			NOTIMP();
+		}
+		reg_to_scalar(REG_RAX, ins.operands[0]);
+	} break;
+
+	case IR_FLOAT_INT_CAST: {
+		scalar_to_reg(ins.operands[1], REG_RAX);
+		int size_rhs = get_variable_size(ins.operands[1]);
+		// This is not the exact same as gcc and clang in the
+		// case of unsigned long. But within the C standard?
+		if (size_rhs == 4) {
+			asm_ins2("movd", R4(REG_RAX), XMM(0));
+			asm_ins2("cvttss2si", XMM(0), R8(REG_RAX));
+		} else if (size_rhs == 8) {
+			asm_ins2("movd", R8(REG_RAX), XMM(0));
+			asm_ins2("cvttsd2si", XMM(0), R8(REG_RAX));
 		}
 		reg_to_scalar(REG_RAX, ins.operands[0]);
 	} break;
