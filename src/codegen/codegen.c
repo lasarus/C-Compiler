@@ -26,31 +26,6 @@ struct vla_info {
 	} *slots;
 } vla_info;
 
-static void codegen_binary_operator(enum ir_binary_operator ibo,
-									var_id lhs, var_id rhs, var_id res) {
-	scalar_to_reg(lhs, REG_RDI);
-	scalar_to_reg(rhs, REG_RSI);
-
-	int size = get_variable_size(lhs);
-
-	if (size != 4 && size != 8) {
-		printf("Invalid size %d = %d op %d with %d\n", get_variable_size(res), size, get_variable_size(rhs), ibo);
-	}
-
-	assert(size == 4 || size == 8);
-
-	struct asm_instruction *bin_op = binary_operator_output[size == 4 ? 0 : 1][ibo];
-	if (bin_op->mnemonic) {
-		for (int i = 0; i < 5 && bin_op[i].mnemonic; i++) {
-			asm_ins(bin_op + i);
-		}
-	} else {
-		ICE("Could not codegen operator! size: %d, ibo: %d", size, ibo);
-	}
-
-	reg_to_scalar(REG_RAX, res);
-}
-
 static void codegen_call(var_id variable, int non_clobbered_register) {
 	scalar_to_reg(variable, non_clobbered_register);
 	asm_ins1("callq", R8S(non_clobbered_register));
@@ -125,6 +100,24 @@ static void codegen_stackcpy(int dest, int source, int len) {
 static void codegen_instruction(struct instruction ins, struct function *func) {
 	const char *ins_str = dbg_instruction(ins);
 	asm_comment("instruction start \"%s\":", ins_str);
+
+	struct asm_instruction (*asm_entry)[2][5] = codegen_asm_table[ins.type];
+	if (asm_entry) {
+		scalar_to_reg(ins.operands[1], REG_RDI);
+		scalar_to_reg(ins.operands[2], REG_RSI);
+
+		const int size = get_variable_size(ins.operands[1]);
+		assert(size == 4 || size == 8);
+
+		struct asm_instruction *asms = (*asm_entry)[size == 8];
+
+		for (int i = 0; i < 5 && asms[i].mnemonic; i++)
+			asm_ins(&asms[i]);
+
+		reg_to_scalar(REG_RAX, ins.operands[0]);
+		return;
+	}
+
 	switch (ins.type) {
 	case IR_CONSTANT: {
 		struct constant c = ins.constant.constant;
@@ -184,13 +177,6 @@ static void codegen_instruction(struct instruction ins, struct function *func) {
 			NOTIMP();
 		}
 	} break;
-
-	case IR_BINARY_OPERATOR:
-		codegen_binary_operator(ins.binary_operator.type,
-								ins.operands[1],
-								ins.operands[2],
-								ins.operands[0]);
-		break;
 
 	case IR_BINARY_NOT:
 		scalar_to_reg(ins.operands[1], REG_RAX);

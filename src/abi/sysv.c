@@ -196,7 +196,7 @@ static void split_variable(var_id variable, int n_parts, var_id *parts) {
 	for (int i = 0; i < n_parts; i++) {
 		parts[i] = new_variable_sz(8, 1, 1);
 		ir_push2(IR_LOAD, parts[i], address);
-		IR_PUSH_BINARY_OPERATOR(IBO_ADD, address, offset_constant, address);
+		ir_push3(IR_ADD, address, address, offset_constant);
 	}
 }
 
@@ -222,7 +222,7 @@ static void sysv_ir_function_call(var_id result, var_id func_var, struct type *f
 
 		IR_PUSH_CONSTANT(constant_simple_unsigned(abi_info.size_type, c.regs[i].merge_pos), offset_constant);
 		ir_push2(IR_ADDRESS_OF, address, c.regs[i].merge_into);
-		IR_PUSH_BINARY_OPERATOR(IBO_ADD, address, offset_constant, address);
+		ir_push3(IR_ADD, address, address, offset_constant);
 		ir_push2(IR_LOAD, c.regs[i].variable, address);
 	}
 
@@ -261,7 +261,7 @@ static void sysv_ir_function_call(var_id result, var_id func_var, struct type *f
 		ir_push2(IR_ADDRESS_OF, address, result);
 
 		ir_push2(IR_STORE, c.ret_regs[0].variable, address);
-		IR_PUSH_BINARY_OPERATOR(IBO_ADD, address, eight_constant, address);
+		ir_push3(IR_ADD, address, address, eight_constant);
 		ir_push2(IR_STORE, c.ret_regs[1].variable, address);
 	}
 
@@ -323,7 +323,7 @@ static void sysv_ir_function_new(struct type *type, var_id *args, const char *na
 
 		IR_PUSH_CONSTANT(constant_simple_unsigned(abi_info.size_type, c.regs[i].merge_pos), offset_constant);
 		ir_push2(IR_ADDRESS_OF, address, c.regs[i].merge_into);
-		IR_PUSH_BINARY_OPERATOR(IBO_ADD, address, offset_constant, address);
+		ir_push3(IR_ADD, address, address, offset_constant);
 		ir_push2(IR_STORE, c.regs[i].variable, address);
 	}
 

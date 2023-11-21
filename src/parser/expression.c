@@ -458,8 +458,8 @@ struct expr *expr_new(struct expr expr) {
 static void pointer_increment(var_id result, var_id pointer, struct expr *index, int decrement, struct type *type) {
 	var_id size = expression_to_ir(type_sizeof(type_deref(type)));
 	var_id index_var = expression_to_ir(expression_cast(index, type_simple(abi_info.pointer_type)));
-	IR_PUSH_BINARY_OPERATOR(IBO_MUL, index_var, size, index_var);
-	IR_PUSH_BINARY_OPERATOR(decrement ? IBO_SUB : IBO_ADD, pointer, index_var, result);
+	ir_push3(IR_MUL, index_var, index_var, size);
+	ir_push3(decrement ? IR_SUB : IR_ADD, result, pointer, index_var);
 }
 
 // Loads pointer into return value.
@@ -660,11 +660,11 @@ static var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		res = new_variable(expr->data_type, 1, 1);
 
 	switch(expr->type) {
-	case E_BINARY_OP:
-		IR_PUSH_BINARY_OPERATOR(ibo_from_type_and_op(expr->args[0]->data_type, expr->binary_op),
-								expression_to_ir(expr->args[0]),
-								expression_to_ir(expr->args[1]), res);
-		break;
+	case E_BINARY_OP: {
+		var_id lhs_var = expression_to_ir(expr->args[0]),
+			rhs_var = expression_to_ir(expr->args[1]);
+		ir_push3(ir_from_type_and_op(expr->args[0]->data_type, expr->binary_op), res, lhs_var, rhs_var);
+	} break;
 
 	case E_UNARY_OP:
 		res = unary_op(res, expression_to_ir(expr->args[0]), expr->args[0]->data_type, expr->unary_op);
@@ -735,8 +735,8 @@ static var_id expression_to_ir_result(struct expr *expr, var_id res) {
 			rhs = expression_to_ir(expr->args[1]);
 		var_id size = expression_to_ir(type_sizeof(type_deref(expr->args[0]->data_type)));
 
-		IR_PUSH_BINARY_OPERATOR(IBO_SUB, lhs, rhs, res);
-		IR_PUSH_BINARY_OPERATOR(IBO_IDIV, res, size, res);
+		ir_push3(IR_SUB, res, lhs, rhs);
+		ir_push3(IR_IDIV, res, res, size);
 	} break;
 
 	case E_ASSIGNMENT: {
@@ -760,13 +760,13 @@ static var_id expression_to_ir_result(struct expr *expr, var_id res) {
 			var_id ac = new_variable(expr->assignment_op.cast, 1, 1);
 			ac = ir_cast(ac, expr->assignment_op.cast, a, a_expr->data_type);
 
-			IR_PUSH_BINARY_OPERATOR(ibo_from_type_and_op(expr->args[1]->data_type, expr->assignment_op.op),
-									ac, b, ac);
+			ir_push3(ir_from_type_and_op(expr->args[1]->data_type, expr->assignment_op.op),
+					 ac, ac, b);
 
 			a = ir_cast(a, a_expr->data_type, ac, expr->assignment_op.cast);
 		} else {
-			IR_PUSH_BINARY_OPERATOR(ibo_from_type_and_op(expr->args[1]->data_type, expr->assignment_op.op),
-									a, b, a);
+			ir_push3(ir_from_type_and_op(expr->args[1]->data_type, expr->assignment_op.op),
+					 a, a, b);
 		}
 
 		bitfield_store(address, a);

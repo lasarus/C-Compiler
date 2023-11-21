@@ -95,20 +95,20 @@ void parse_into_ir(void) {
 	generate_tentative_definitions();
 }
 
-enum ir_binary_operator ibo_from_type_and_op(struct type *type, enum operator_type op) {
+int ir_from_type_and_op(struct type *type, enum operator_type op) {
 	int sign = 0;
 	if (type_is_floating(type)) {
 		switch (op) {
-		case OP_ADD: return IBO_FLT_ADD;
-		case OP_SUB: return IBO_FLT_SUB;
-		case OP_MUL: return IBO_FLT_MUL;
-		case OP_DIV: return IBO_FLT_DIV;
-		case OP_LESS: return IBO_FLT_LESS;
-		case OP_GREATER: return IBO_FLT_GREATER;
-		case OP_LESS_EQ: return IBO_FLT_LESS_EQ;
-		case OP_GREATER_EQ: return IBO_FLT_GREATER_EQ;
-		case OP_EQUAL: return IBO_FLT_EQUAL;
-		case OP_NOT_EQUAL: return IBO_FLT_NOT_EQUAL;
+		case OP_ADD: return IR_FLT_ADD;
+		case OP_SUB: return IR_FLT_SUB;
+		case OP_MUL: return IR_FLT_MUL;
+		case OP_DIV: return IR_FLT_DIV;
+		case OP_LESS: return IR_FLT_LESS;
+		case OP_GREATER: return IR_FLT_GREATER;
+		case OP_LESS_EQ: return IR_FLT_LESS_EQ;
+		case OP_GREATER_EQ: return IR_FLT_GREATER_EQ;
+		case OP_EQUAL: return IR_FLT_EQUAL;
+		case OP_NOT_EQUAL: return IR_FLT_NOT_EQUAL;
 		default: NOTIMP();
 		}
 	} else if (type->type == TY_SIMPLE) {
@@ -120,22 +120,22 @@ enum ir_binary_operator ibo_from_type_and_op(struct type *type, enum operator_ty
 	}
 
 	switch (op) {
-	case OP_ADD: return IBO_ADD;
-	case OP_SUB: return IBO_SUB;
-	case OP_MUL: return sign ? IBO_IMUL : IBO_MUL;
-	case OP_DIV: return sign ? IBO_IDIV : IBO_DIV;
-	case OP_MOD: return sign ? IBO_IMOD : IBO_MOD;
-	case OP_BXOR: return IBO_BXOR;
-	case OP_BOR: return IBO_BOR;
-	case OP_BAND: return IBO_BAND;
-	case OP_LSHIFT: return IBO_LSHIFT;
-	case OP_RSHIFT: return sign ? IBO_IRSHIFT : IBO_RSHIFT;
-	case OP_LESS: return sign ? IBO_ILESS : IBO_LESS;
-	case OP_GREATER: return sign ? IBO_IGREATER : IBO_GREATER;
-	case OP_LESS_EQ: return sign ? IBO_ILESS_EQ : IBO_LESS_EQ;
-	case OP_GREATER_EQ: return sign ? IBO_IGREATER_EQ : IBO_GREATER_EQ;
-	case OP_EQUAL: return IBO_EQUAL;
-	case OP_NOT_EQUAL: return IBO_NOT_EQUAL;
+	case OP_ADD: return IR_ADD;
+	case OP_SUB: return IR_SUB;
+	case OP_MUL: return sign ? IR_IMUL : IR_MUL;
+	case OP_DIV: return sign ? IR_IDIV : IR_DIV;
+	case OP_MOD: return sign ? IR_IMOD : IR_MOD;
+	case OP_BXOR: return IR_BXOR;
+	case OP_BOR: return IR_BOR;
+	case OP_BAND: return IR_BAND;
+	case OP_LSHIFT: return IR_LSHIFT;
+	case OP_RSHIFT: return sign ? IR_IRSHIFT : IR_RSHIFT;
+	case OP_LESS: return sign ? IR_ILESS : IR_LESS;
+	case OP_GREATER: return sign ? IR_IGREATER : IR_GREATER;
+	case OP_LESS_EQ: return sign ? IR_ILESS_EQ : IR_LESS_EQ;
+	case OP_GREATER_EQ: return sign ? IR_IGREATER_EQ : IR_GREATER_EQ;
+	case OP_EQUAL: return IR_EQUAL;
+	case OP_NOT_EQUAL: return IR_NOT_EQUAL;
 	default: NOTIMP();
 	}
 }

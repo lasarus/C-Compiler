@@ -106,12 +106,6 @@ const char *dbg_instruction(struct instruction ins) {
 		DBG_PRINT("%d = constant", ins.operands[0]);
 		break;
 
-	case IR_BINARY_OPERATOR:
-		DBG_PRINT("%d = binary_op(%d, %d) of type %d", ins.operands[0],
-				  ins.operands[1], ins.operands[2],
-				  ins.binary_operator.type);
-		break;
-
 	case IR_BINARY_NOT:
 		DBG_PRINT("%d = bnot(%d)", ins.operands[0], ins.operands[1]);
 		break;
@@ -207,8 +201,13 @@ const char *dbg_instruction(struct instruction ins) {
 		break;
 
 	default:
-		printf("%d", ins.type);
-		NOTIMP();
+		DBG_PRINT("%d <- %d op(%d) %d", ins.operands[0], ins.operands[1],
+				  ins.type, ins.operands[2]);
+		break;
+
+	/* default: */
+	/* 	printf("%d", ins.type); */
+	/* 	NOTIMP(); */
 	}
 
 	return buffer;

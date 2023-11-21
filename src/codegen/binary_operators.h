@@ -4,25 +4,25 @@
 #include <parser/parser.h>
 #include <assembler/assembler.h>
 
-#define BINARY_INS(MNEMONIC) {						\
+#define BINARY_INS_32(MNEMONIC) {						\
 		{"movq", {R8_(REG_RDI), R8_(REG_RAX)}},		\
 		{MNEMONIC, {R4_(REG_RSI), R4_(REG_RAX)}}	\
 	}
 
-#define BINARY_COMP(MNEMONIC) {					\
+#define BINARY_COMP_32(MNEMONIC) {					\
 		{"xorq", {R8_(REG_RAX), R8_(REG_RAX)}},	\
 		{"cmpl", {R4_(REG_RSI), R4_(REG_RDI)}},	\
 		{MNEMONIC, {R1_(REG_RAX)}}				\
 	}
 
-#define BINARY_INS_FLT(MNEMONIC) {				\
+#define BINARY_INS_FLT_32(MNEMONIC) {				\
 		{"movd", {R4_(REG_RDI), XMM_(0)}},		\
 		{"movd", {R4_(REG_RSI), XMM_(1)}},		\
 		{MNEMONIC, {XMM_(1), XMM_(0)}},			\
 		{"movd", {XMM_(0), R4_(REG_RAX)}},		\
 	}
 
-#define BINARY_COMP_FLT(MNEMONIC) {				\
+#define BINARY_COMP_FLT_32(MNEMONIC) {				\
 		{"movd", {R4_(REG_RDI), XMM_(0)}},		\
 		{"movd", {R4_(REG_RSI), XMM_(1)}},		\
 		{"xorq", {R8_(REG_RAX), R8_(REG_RAX)}},	\
@@ -56,86 +56,76 @@
 		{MNEMONIC, {R1_(REG_RAX)}},				\
 	}
 
-struct asm_instruction binary_operator_output[2][IBO_COUNT][5] = {
-	[0][IBO_ADD] = BINARY_INS("addl"),
-	[0][IBO_SUB] = BINARY_INS("subl"),
-	[0][IBO_IMUL] = BINARY_INS("imull"),
-	[0][IBO_MUL] = BINARY_INS("imull"),
-	[0][IBO_BXOR] = BINARY_INS("xorl"),
-	[0][IBO_BOR] = BINARY_INS("orl"),
-	[0][IBO_BAND] = BINARY_INS("andl"),
-	[0][IBO_IDIV] = {{"movq", {R8_(REG_RDI), R8_(REG_RAX)}}, {"cltd", { { 0 } }}, {"idivl", {R4_(REG_RSI)}}},
-	[0][IBO_IMOD] = {{"movq", {R8_(REG_RDI), R8_(REG_RAX)}}, {"cltd", { { 0 } }},
-					 {"idivl", {R4_(REG_RSI)}}, {"movl", {R4_(REG_RDX), R4_(REG_RAX)}}},
-	[0][IBO_LSHIFT] = {{"movq", {R8_(REG_RSI), R8_(REG_RCX)}}, {"movq", {R8_(REG_RDI), R8_(REG_RAX)}},
-					   {"sall", {R1_(REG_RCX), R4_(REG_RAX)}}},
-	[0][IBO_IRSHIFT] = {{"movq", {R8_(REG_RSI), R8_(REG_RCX)}}, {"movq", {R8_(REG_RDI), R8_(REG_RAX)}},
-						{"sarl", {R1_(REG_RCX), R4_(REG_RAX)}}},
-	[0][IBO_RSHIFT] = {{"movq", {R8_(REG_RSI), R8_(REG_RCX)}}, {"movq", {R8_(REG_RDI), R8_(REG_RAX)}},
-						{"shrl", {R1_(REG_RCX), R4_(REG_RAX)}}},
-	[0][IBO_IGREATER] = BINARY_COMP("setg"),
-	[0][IBO_ILESS_EQ] = BINARY_COMP("setle"),
-	[0][IBO_ILESS] = BINARY_COMP("setl"),
-	[0][IBO_IGREATER_EQ] = BINARY_COMP("setge"),
-	[0][IBO_EQUAL] = BINARY_COMP("sete"),
-	[0][IBO_NOT_EQUAL] = BINARY_COMP("setne"),
-	[0][IBO_LESS] = BINARY_COMP("setb"),
-	[0][IBO_GREATER] = BINARY_COMP("seta"),
-	[0][IBO_LESS_EQ] = BINARY_COMP("setbe"),
-	[0][IBO_GREATER_EQ] = BINARY_COMP("setnb"),
-	[0][IBO_DIV] = {{"movq", {R8_(REG_RDI), R8_(REG_RAX)}}, {"xorq", {R8_(REG_RDX), R8_(REG_RDX)}}, {"divl", {R4_(REG_RSI)}}},
-	[0][IBO_MOD] = {{"movq", {R8_(REG_RDI), R8_(REG_RAX)}}, {"xorq", {R8_(REG_RDX), R8_(REG_RDX)}}, {"divl", {R4_(REG_RSI)}}, {"movl", {R4_(REG_RDX), R4_(REG_RAX)}}},
+#define BINARY_INS(M32, M64) BINARY_INS_32(M32), BINARY_INS_64(M64)
+#define BINARY_COMP(M) BINARY_COMP_32(M), BINARY_COMP_64(M)
+#define BINARY_INS_FLT(M32, M64) BINARY_INS_FLT_32(M32), BINARY_INS_FLT_64(M64)
+#define BINARY_COMP_FLT(M) BINARY_COMP_FLT_32(M), BINARY_COMP_FLT_64(M)
 
-	[0][IBO_FLT_ADD] = BINARY_INS_FLT("addss"),
-	[0][IBO_FLT_SUB] = BINARY_INS_FLT("subss"),
-	[0][IBO_FLT_MUL] = BINARY_INS_FLT("mulss"),
-	[0][IBO_FLT_DIV] = BINARY_INS_FLT("divss"),
-	[0][IBO_FLT_LESS] = BINARY_COMP_FLT("setb"),
-	[0][IBO_FLT_GREATER] = BINARY_COMP_FLT("seta"),
-	[0][IBO_FLT_LESS_EQ] = BINARY_COMP_FLT("setbe"),
-	[0][IBO_FLT_GREATER_EQ] = BINARY_COMP_FLT("setnb"),
-	[0][IBO_FLT_EQUAL] = BINARY_COMP_FLT("sete"),
-	[0][IBO_FLT_NOT_EQUAL] = BINARY_COMP_FLT("setne"),
+static struct asm_instruction (*codegen_asm_table[IR_COUNT])[2][5] = {
+	[IR_ADD] = &(struct asm_instruction [2][5]) {BINARY_INS("addl", "addq")},
+	[IR_SUB] = &(struct asm_instruction [2][5]) { BINARY_INS("subl", "subq") },
+	[IR_IMUL] = &(struct asm_instruction [2][5]) { BINARY_INS("imull", "imulq") },
+	[IR_MUL] = &(struct asm_instruction [2][5]) { BINARY_INS("imull", "imulq") },
+	[IR_BXOR] = &(struct asm_instruction [2][5]) { BINARY_INS("xorl", "xorq") },
+	[IR_BOR] = &(struct asm_instruction [2][5]) { BINARY_INS("orl", "orq") },
+	[IR_BAND] = &(struct asm_instruction [2][5]) { BINARY_INS("andl", "andq") },
+	[IR_IDIV] = &(struct asm_instruction [2][5]) {
+		{{"movq", {R8_(REG_RDI), R8_(REG_RAX)}}, {"cltd", { { 0 } }}, {"idivl", {R4_(REG_RSI)}}},
+		{{"movq", {R8_(REG_RDI), R8_(REG_RAX)}}, {"cqto", { { 0 } }}, {"idivq", {R8_(REG_RSI)}}},
+	},
+	[IR_IMOD] = &(struct asm_instruction [2][5]) {
+		{{"movq", {R8_(REG_RDI), R8_(REG_RAX)}}, {"cltd", { { 0 } }},
+		 {"idivl", {R4_(REG_RSI)}}, {"movl", {R4_(REG_RDX), R4_(REG_RAX)}}},
+		{{"movq", {R8_(REG_RDI), R8_(REG_RAX)}}, {"cqto", { { 0 } }},
+		 {"idivq", {R8_(REG_RSI)}}, {"movq", {R8_(REG_RDX), R8_(REG_RAX)}}},
+	},
+	[IR_LSHIFT] = &(struct asm_instruction [2][5]) {
+		{{"movq", {R8_(REG_RSI), R8_(REG_RCX)}}, {"movq", {R8_(REG_RDI), R8_(REG_RAX)}},
+		 {"sall", {R1_(REG_RCX), R4_(REG_RAX)}}},
+		{{"movq", {R8_(REG_RSI), R8_(REG_RCX)}}, {"movq", {R8_(REG_RDI), R8_(REG_RAX)}},
+		 {"salq", {R1_(REG_RCX), R8_(REG_RAX)}}},
+	},
+	[IR_IRSHIFT] = &(struct asm_instruction [2][5]) {
+		{{"movq", {R8_(REG_RSI), R8_(REG_RCX)}}, {"movq", {R8_(REG_RDI), R8_(REG_RAX)}},
+		 {"sarl", {R1_(REG_RCX), R4_(REG_RAX)}}},
+		{{"movq", {R8_(REG_RSI), R8_(REG_RCX)}}, {"movq", {R8_(REG_RDI), R8_(REG_RAX)}},
+		 {"sarq", {R1_(REG_RCX), R8_(REG_RAX)}}},
+	},
+	[IR_RSHIFT] = &(struct asm_instruction [2][5]) {
+		{{"movq", {R8_(REG_RSI), R8_(REG_RCX)}}, {"movq", {R8_(REG_RDI), R8_(REG_RAX)}},
+					{"shrl", {R1_(REG_RCX), R4_(REG_RAX)}}},
+		{{"movq", {R8_(REG_RSI), R8_(REG_RCX)}}, {"movq", {R8_(REG_RDI), R8_(REG_RAX)}},
+		 {"shrq", {R1_(REG_RCX), R8_(REG_RAX)}}},
+	},
+	[IR_IGREATER] = &(struct asm_instruction [2][5]) { BINARY_COMP("setg") },
+	[IR_ILESS_EQ] = &(struct asm_instruction [2][5]) { BINARY_COMP("setle") },
+	[IR_ILESS] = &(struct asm_instruction [2][5]) { BINARY_COMP("setl") },
+	[IR_IGREATER_EQ] = &(struct asm_instruction [2][5]) { BINARY_COMP("setge") },
+	[IR_EQUAL] = &(struct asm_instruction [2][5]) { BINARY_COMP("sete") },
+	[IR_NOT_EQUAL] = &(struct asm_instruction [2][5]) { BINARY_COMP("setne") },
+	[IR_LESS] = &(struct asm_instruction [2][5]) { BINARY_COMP("setb") },
+	[IR_GREATER] = &(struct asm_instruction [2][5]) { BINARY_COMP("seta") },
+	[IR_LESS_EQ] = &(struct asm_instruction [2][5]) { BINARY_COMP("setbe") },
+	[IR_GREATER_EQ] = &(struct asm_instruction [2][5]) { BINARY_COMP("setnb") },
+	[IR_DIV] = &(struct asm_instruction [2][5]) {
+		{{"movq", {R8_(REG_RDI), R8_(REG_RAX)}}, {"xorq", {R8_(REG_RDX), R8_(REG_RDX)}}, {"divl", {R4_(REG_RSI)}}},
+		{{"movq", {R8_(REG_RDI), R8_(REG_RAX)}}, {"xorq", {R8_(REG_RDX), R8_(REG_RDX)}}, {"divq", {R8_(REG_RSI)}}},
+	},
+	[IR_MOD] = &(struct asm_instruction [2][5]) {
+		{{"movq", {R8_(REG_RDI), R8_(REG_RAX)}}, {"xorq", {R8_(REG_RDX), R8_(REG_RDX)}}, {"divl", {R4_(REG_RSI)}}, {"movl", {R4_(REG_RDX), R4_(REG_RAX)}}},
+		{{"movq", {R8_(REG_RDI), R8_(REG_RAX)}}, {"xorq", {R8_(REG_RDX), R8_(REG_RDX)}}, {"divq", {R8_(REG_RSI)}}, {"movq", {R8_(REG_RDX), R8_(REG_RAX)}}},
+	},
 
-	[1][IBO_ADD] = BINARY_INS_64("addq"),
-	[1][IBO_SUB] = BINARY_INS_64("subq"),
-	[1][IBO_IMUL] = BINARY_INS_64("imulq"),
-	[1][IBO_MUL] = BINARY_INS_64("imulq"),
-	[1][IBO_BXOR] = BINARY_INS_64("xorq"),
-	[1][IBO_BOR] = BINARY_INS_64("orq"),
-	[1][IBO_BAND] = BINARY_INS_64("andq"),
-	[1][IBO_IDIV] = {{"movq", {R8_(REG_RDI), R8_(REG_RAX)}}, {"cqto", { { 0 } }}, {"idivq", {R8_(REG_RSI)}}},
-	[1][IBO_IMOD] = {{"movq", {R8_(REG_RDI), R8_(REG_RAX)}}, {"cqto", { { 0 } }},
-					 {"idivq", {R8_(REG_RSI)}}, {"movq", {R8_(REG_RDX), R8_(REG_RAX)}}},
-	[1][IBO_LSHIFT] = {{"movq", {R8_(REG_RSI), R8_(REG_RCX)}}, {"movq", {R8_(REG_RDI), R8_(REG_RAX)}},
-					   {"salq", {R1_(REG_RCX), R8_(REG_RAX)}}},
-	[1][IBO_IRSHIFT] = {{"movq", {R8_(REG_RSI), R8_(REG_RCX)}}, {"movq", {R8_(REG_RDI), R8_(REG_RAX)}},
-						{"sarq", {R1_(REG_RCX), R8_(REG_RAX)}}},
-	[1][IBO_RSHIFT] = {{"movq", {R8_(REG_RSI), R8_(REG_RCX)}}, {"movq", {R8_(REG_RDI), R8_(REG_RAX)}},
-						{"shrq", {R1_(REG_RCX), R8_(REG_RAX)}}},
-	[1][IBO_IGREATER] = BINARY_COMP_64("setg"),
-	[1][IBO_ILESS_EQ] = BINARY_COMP_64("setle"),
-	[1][IBO_ILESS] = BINARY_COMP_64("setl"),
-	[1][IBO_IGREATER_EQ] = BINARY_COMP_64("setge"),
-	[1][IBO_EQUAL] = BINARY_COMP_64("sete"),
-	[1][IBO_NOT_EQUAL] = BINARY_COMP_64("setne"),
-	[1][IBO_LESS] = BINARY_COMP_64("setb"),
-	[1][IBO_GREATER] = BINARY_COMP_64("seta"),
-	[1][IBO_LESS_EQ] = BINARY_COMP_64("setbe"),
-	[1][IBO_GREATER_EQ] = BINARY_COMP_64("setnb"),
-	[1][IBO_DIV] = {{"movq", {R8_(REG_RDI), R8_(REG_RAX)}}, {"xorq", {R8_(REG_RDX), R8_(REG_RDX)}}, {"divq", {R8_(REG_RSI)}}},
-	[1][IBO_MOD] = {{"movq", {R8_(REG_RDI), R8_(REG_RAX)}}, {"xorq", {R8_(REG_RDX), R8_(REG_RDX)}}, {"divq", {R8_(REG_RSI)}}, {"movq", {R8_(REG_RDX), R8_(REG_RAX)}}},
-
-	[1][IBO_FLT_ADD] = BINARY_INS_FLT_64("addsd"),
-	[1][IBO_FLT_SUB] = BINARY_INS_FLT_64("subsd"),
-	[1][IBO_FLT_MUL] = BINARY_INS_FLT_64("mulsd"),
-	[1][IBO_FLT_DIV] = BINARY_INS_FLT_64("divsd"),
-	[1][IBO_FLT_LESS] = BINARY_COMP_FLT_64("setb"),
-	[1][IBO_FLT_GREATER] = BINARY_COMP_FLT_64("seta"),
-	[1][IBO_FLT_LESS_EQ] = BINARY_COMP_FLT_64("setbe"),
-	[1][IBO_FLT_GREATER_EQ] = BINARY_COMP_FLT_64("setnb"),
-	[1][IBO_FLT_EQUAL] = BINARY_COMP_FLT_64("sete"),
-	[1][IBO_FLT_NOT_EQUAL] = BINARY_COMP_FLT_64("setne"),
+	[IR_FLT_ADD] = &(struct asm_instruction [2][5]) { BINARY_INS_FLT("addss", "addsd") },
+	[IR_FLT_SUB] = &(struct asm_instruction [2][5]) { BINARY_INS_FLT("subss", "subsd") },
+	[IR_FLT_MUL] = &(struct asm_instruction [2][5]) { BINARY_INS_FLT("mulss", "mulsd") },
+	[IR_FLT_DIV] = &(struct asm_instruction [2][5]) { BINARY_INS_FLT("divss", "divsd") },
+	[IR_FLT_LESS] = &(struct asm_instruction [2][5]) { BINARY_COMP_FLT("setb") },
+	[IR_FLT_GREATER] = &(struct asm_instruction [2][5]) { BINARY_COMP_FLT("seta") },
+	[IR_FLT_LESS_EQ] = &(struct asm_instruction [2][5]) { BINARY_COMP_FLT("setbe") },
+	[IR_FLT_GREATER_EQ] = &(struct asm_instruction [2][5]) { BINARY_COMP_FLT("setnb") },
+	[IR_FLT_EQUAL] = &(struct asm_instruction [2][5]) { BINARY_COMP_FLT("sete") },
+	[IR_FLT_NOT_EQUAL] = &(struct asm_instruction [2][5]) { BINARY_COMP_FLT("setne") },
 };
 
 #endif

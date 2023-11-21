@@ -8,30 +8,6 @@
 typedef int block_id;
 block_id new_block(void);
 
-enum ir_binary_operator {
-	IBO_ADD, IBO_SUB,
-	IBO_MUL, IBO_IMUL,
-	IBO_DIV, IBO_IDIV,
-	IBO_MOD, IBO_IMOD,
-	IBO_LSHIFT, IBO_RSHIFT, IBO_IRSHIFT,
-	IBO_BXOR, IBO_BOR, IBO_BAND,
-	IBO_LESS, IBO_ILESS,
-	IBO_GREATER, IBO_IGREATER,
-	IBO_LESS_EQ, IBO_ILESS_EQ,
-	IBO_GREATER_EQ, IBO_IGREATER_EQ,
-	IBO_EQUAL, IBO_NOT_EQUAL,
-
-	IBO_FLT_ADD, IBO_FLT_SUB,
-	IBO_FLT_MUL, IBO_FLT_DIV,
-	IBO_FLT_LESS, IBO_FLT_GREATER,
-	IBO_FLT_LESS_EQ,
-	IBO_FLT_GREATER_EQ,
-	IBO_FLT_EQUAL,
-	IBO_FLT_NOT_EQUAL,
-
-	IBO_COUNT
-};
-
 struct instruction;
 void ir_push(struct instruction instruction);
 #define IR_PUSH(...) do { ir_push((struct instruction) { __VA_ARGS__ }); } while(0)
@@ -42,7 +18,27 @@ void ir_push3(int type, var_id op1, var_id op2, var_id op3);
 
 struct instruction {
 	enum {
-		IR_BINARY_OPERATOR,
+		IR_NULL,
+		IR_ADD, IR_SUB,
+		IR_MUL, IR_IMUL,
+		IR_DIV, IR_IDIV,
+		IR_MOD, IR_IMOD,
+		IR_LSHIFT, IR_RSHIFT, IR_IRSHIFT,
+		IR_BXOR, IR_BOR, IR_BAND,
+		IR_LESS, IR_ILESS,
+		IR_GREATER, IR_IGREATER,
+		IR_LESS_EQ, IR_ILESS_EQ,
+		IR_GREATER_EQ, IR_IGREATER_EQ,
+		IR_EQUAL, IR_NOT_EQUAL,
+
+		IR_FLT_ADD, IR_FLT_SUB,
+		IR_FLT_MUL, IR_FLT_DIV,
+		IR_FLT_LESS, IR_FLT_GREATER,
+		IR_FLT_LESS_EQ,
+		IR_FLT_GREATER_EQ,
+		IR_FLT_EQUAL,
+		IR_FLT_NOT_EQUAL,
+
 		IR_NEGATE_INT,
 		IR_NEGATE_FLOAT,
 		IR_BINARY_NOT,
@@ -72,16 +68,13 @@ struct instruction {
 		IR_MODIFY_STACK_POINTER,
 		IR_STORE_STACK_RELATIVE,
 		IR_LOAD_BASE_RELATIVE,
+
+		IR_COUNT
 	} type;
 
 	var_id operands[3];
 
 	union {
-		struct {
-			enum ir_binary_operator type;
-		} binary_operator;
-#define IR_PUSH_BINARY_OPERATOR(TYPE, LHS, RHS, RESULT) IR_PUSH(.type = IR_BINARY_OPERATOR, .operands = {(RESULT), (LHS), (RHS)}, .binary_operator = {(TYPE)})
-
 		struct {
 			struct constant constant;
 		} constant;

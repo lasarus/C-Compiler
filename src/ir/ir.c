@@ -135,7 +135,7 @@ void ir_get_offset(var_id member_address, var_id base_address, var_id offset_var
 	if (!offset_var)
 		offset_var = new_variable(type_pointer(type_simple(ST_VOID)), 1, 1);
 	IR_PUSH_CONSTANT(constant_simple_unsigned(abi_info.pointer_type, offset), offset_var);
-	IR_PUSH_BINARY_OPERATOR(IBO_ADD, base_address, offset_var, member_address);
+	ir_push3(IR_ADD, member_address, base_address, offset_var);
 }
 
 void ir_set_bits(var_id result, var_id field, var_id value, int offset, int length) {
@@ -152,11 +152,11 @@ void ir_set_bits(var_id result, var_id field, var_id value, int offset, int leng
 
 	IR_PUSH_CONSTANT(constant_simple_unsigned(abi_info.size_type, offset), shift_var);
 	IR_PUSH_CONSTANT(constant_simple_unsigned(abi_info.size_type, mask), mask_var);
-	IR_PUSH_BINARY_OPERATOR(IBO_BAND, mask_var, field_large, result_large);
+	ir_push3(IR_BAND, result_large, mask_var, field_large);
 	ir_push2(IR_BINARY_NOT, mask_var, mask_var);
-	IR_PUSH_BINARY_OPERATOR(IBO_LSHIFT, value_large, shift_var, value_large);
-	IR_PUSH_BINARY_OPERATOR(IBO_BAND, mask_var, value_large, mask_var);
-	IR_PUSH_BINARY_OPERATOR(IBO_BOR, mask_var, result_large, result_large);
+	ir_push3(IR_LSHIFT, value_large, value_large, shift_var);
+	ir_push3(IR_BAND, mask_var, mask_var, value_large);
+	ir_push3(IR_BOR, result_large, mask_var, result_large);
 
 	IR_PUSH_INT_CAST(result, result_large, 0);
 }
@@ -168,14 +168,14 @@ void ir_get_bits(var_id result, var_id field, int offset, int length, int sign_e
 	IR_PUSH_INT_CAST(field_large, field, 0);
 
 	IR_PUSH_CONSTANT(constant_simple_unsigned(abi_info.size_type, 64 - offset - length), shift_var);
-	IR_PUSH_BINARY_OPERATOR(IBO_LSHIFT, field_large, shift_var, field_large);
+	ir_push3(IR_LSHIFT, field_large, field_large, shift_var);
 
 	IR_PUSH_CONSTANT(constant_simple_unsigned(abi_info.size_type, 64 - length), shift_var);
 
 	if (sign_extend) {
-		IR_PUSH_BINARY_OPERATOR(IBO_IRSHIFT, field_large, shift_var, field_large);
+		ir_push3(IR_IRSHIFT, field_large, field_large, shift_var);
 	} else {
-		IR_PUSH_BINARY_OPERATOR(IBO_RSHIFT, field_large, shift_var, field_large);
+		ir_push3(IR_RSHIFT, field_large, field_large, shift_var);
 	}
 
 	IR_PUSH_INT_CAST(result, field_large, 0);
@@ -190,7 +190,7 @@ static void ir_init_var_recursive(struct initializer *init, struct type *type, v
 			int child_offset = calculate_offset(type, i);
 			struct type *child_type = type_select(type, i);
 			IR_PUSH_CONSTANT(constant_simple_unsigned(abi_info.size_type, child_offset), child_offset_var);
-			IR_PUSH_BINARY_OPERATOR(IBO_ADD, offset, child_offset_var, child_offset_var);
+			ir_push3(IR_ADD, child_offset_var, offset, child_offset_var);
 			int bit_offset = -1, bit_size = -1;
 
 			if (type->type == TY_STRUCT) {
@@ -224,7 +224,7 @@ static void ir_init_var_recursive(struct initializer *init, struct type *type, v
 		for (int j = 0; j < init->string.len; j++) {
 			IR_PUSH_CONSTANT(constant_simple_unsigned(ST_CHAR, init->string.str[j]), char_var);
 			IR_PUSH_CONSTANT(constant_simple_unsigned(abi_info.size_type, j), offset_var);
-			IR_PUSH_BINARY_OPERATOR(IBO_ADD, offset, offset_var, offset_var);
+			ir_push3(IR_ADD, offset_var, offset, offset_var);
 
 			ir_push2(IR_STORE, char_var, offset_var);
 		}
