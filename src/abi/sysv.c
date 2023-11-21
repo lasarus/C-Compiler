@@ -252,7 +252,7 @@ static void sysv_ir_function_call(var_id result, var_id func_var, struct type *f
 		IR_PUSH_GET_REG(c.ret_regs[i].variable, c.ret_regs[i].register_idx, c.ret_regs[i].is_sse);
 
 	if (c.ret_regs_size == 1) {
-		IR_PUSH_INT_CAST(result, c.ret_regs[0].variable, 0);
+		ir_push2(IR_INT_CAST_ZERO, result, c.ret_regs[0].variable);
 	} else if (c.ret_regs_size == 2) {
 		var_id address = new_variable_sz(8, 1, 1);
 		var_id eight_constant = new_variable_sz(8, 1, 1);

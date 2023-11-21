@@ -142,8 +142,12 @@ const char *dbg_instruction(struct instruction ins) {
 		DBG_PRINT("%d = %d", ins.operands[0], ins.operands[1]);
 		break;
 
-	case IR_INT_CAST:
-		DBG_PRINT("%d = int_cast %d (%s)", ins.operands[0], ins.operands[1], ins.int_cast.sign_extend ? "signed" : "not signed");
+	case IR_INT_CAST_ZERO:
+		DBG_PRINT("%d = int_cast_zero %d", ins.operands[0], ins.operands[1]);
+		break;
+
+	case IR_INT_CAST_SIGN:
+		DBG_PRINT("%d = int_cast_zero %d", ins.operands[0], ins.operands[1]);
 		break;
 
 	case IR_BOOL_CAST:

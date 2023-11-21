@@ -619,7 +619,7 @@ static var_id ir_cast(var_id res, struct type *result_type, var_id rhs, struct t
 		int sign_extend = type_is_integer(rhs_type) && is_signed(rhs_type->simple);
 		if (get_variable_size(res) == get_variable_size(rhs))
 			return rhs;
-		IR_PUSH_INT_CAST(res, rhs, sign_extend);
+		ir_push2(sign_extend ? IR_INT_CAST_SIGN : IR_INT_CAST_ZERO, res, rhs);
 	} else if(type_is_floating(result_type) && type_is_floating(rhs_type)) {
 		ir_push2(IR_FLOAT_CAST, res, rhs);
 	} else if(type_is_floating(result_type) && type_is_integer(rhs_type)) {

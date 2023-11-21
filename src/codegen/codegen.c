@@ -247,11 +247,16 @@ static void codegen_instruction(struct instruction ins, struct function *func) {
 						 get_variable_size(ins.operands[1]));
 		break;
 
-	case IR_INT_CAST: {
+	case IR_INT_CAST_ZERO:
+		scalar_to_reg(ins.operands[1], REG_RAX);
+		reg_to_scalar(REG_RAX, ins.operands[0]);
+		break;
+
+	case IR_INT_CAST_SIGN: {
 		scalar_to_reg(ins.operands[1], REG_RAX);
 		int size_rhs = get_variable_size(ins.operands[1]),
 			size_result = get_variable_size(ins.operands[0]);
-		if (size_result > size_rhs && ins.int_cast.sign_extend) {
+		if (size_result > size_rhs) {
 			if (size_rhs == 1) {
 				asm_ins2("movsbq", R1(REG_RAX), R8(REG_RAX));
 			} else if (size_rhs == 2) {

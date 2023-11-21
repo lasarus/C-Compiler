@@ -147,8 +147,8 @@ void ir_set_bits(var_id result, var_id field, var_id value, int offset, int leng
 	var_id field_large = new_variable_sz(8, 1, 1);
 	var_id result_large = new_variable_sz(8, 1, 1);
 
-	IR_PUSH_INT_CAST(value_large, value, 0);
-	IR_PUSH_INT_CAST(field_large, field, 0);
+	ir_push2(IR_INT_CAST_ZERO, value_large, value);
+	ir_push2(IR_INT_CAST_ZERO, field_large, field);
 
 	IR_PUSH_CONSTANT(constant_simple_unsigned(abi_info.size_type, offset), shift_var);
 	IR_PUSH_CONSTANT(constant_simple_unsigned(abi_info.size_type, mask), mask_var);
@@ -158,14 +158,14 @@ void ir_set_bits(var_id result, var_id field, var_id value, int offset, int leng
 	ir_push3(IR_BAND, mask_var, mask_var, value_large);
 	ir_push3(IR_BOR, result_large, mask_var, result_large);
 
-	IR_PUSH_INT_CAST(result, result_large, 0);
+	ir_push2(IR_INT_CAST_ZERO, result, result_large);
 }
 
 void ir_get_bits(var_id result, var_id field, int offset, int length, int sign_extend) {
 	var_id field_large = new_variable_sz(8, 1, 1);
 	var_id shift_var = new_variable_sz(8, 1, 1);
 
-	IR_PUSH_INT_CAST(field_large, field, 0);
+	ir_push2(IR_INT_CAST_ZERO, field_large, field);
 
 	IR_PUSH_CONSTANT(constant_simple_unsigned(abi_info.size_type, 64 - offset - length), shift_var);
 	ir_push3(IR_LSHIFT, field_large, field_large, shift_var);
@@ -178,7 +178,7 @@ void ir_get_bits(var_id result, var_id field, int offset, int length, int sign_e
 		ir_push3(IR_RSHIFT, field_large, field_large, shift_var);
 	}
 
-	IR_PUSH_INT_CAST(result, field_large, 0);
+	ir_push2(IR_INT_CAST_ZERO, result, field_large);
 }
 
 static void ir_init_var_recursive(struct initializer *init, struct type *type, var_id offset,

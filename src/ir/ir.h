@@ -49,7 +49,8 @@ struct instruction {
 		IR_CALL,
 		IR_COPY,
 		IR_BOOL_CAST,
-		IR_INT_CAST,
+		IR_INT_CAST_ZERO,
+		IR_INT_CAST_SIGN,
 		IR_FLOAT_CAST,
 		IR_INT_FLOAT_CAST,
 		IR_SET_ZERO,
@@ -83,11 +84,6 @@ struct instruction {
 			int non_clobbered_register;
 		} call;
 #define IR_PUSH_CALL(VARIABLE, NON_CLOBBERED_REGISTER) IR_PUSH(.type = IR_CALL, .operands = {(VARIABLE)}, .call = {(NON_CLOBBERED_REGISTER)})
-
-		struct {
-			int sign_extend;
-		} int_cast;
-#define IR_PUSH_INT_CAST(RESULT, RHS, SIGN_EXTEND) IR_PUSH(.type = IR_INT_CAST, .operands = {(RESULT), (RHS)}, .int_cast = {(SIGN_EXTEND)})
 
 		struct {
 			int from_float, sign;
