@@ -103,8 +103,8 @@ static void codegen_instruction(struct instruction ins, struct function *func) {
 
 	struct asm_instruction (*asm_entry)[2][5] = codegen_asm_table[ins.type];
 	if (asm_entry) {
-		scalar_to_reg(ins.operands[1], REG_RDI);
-		scalar_to_reg(ins.operands[2], REG_RSI);
+		scalar_to_reg(ins.operands[1], REG_RAX);
+		scalar_to_reg(ins.operands[2], REG_RCX);
 
 		const int size = get_variable_size(ins.operands[1]);
 		assert(size == 4 || size == 8);
