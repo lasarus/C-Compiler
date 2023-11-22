@@ -43,12 +43,10 @@ void scalar_to_reg(var_id scalar, int reg) {
 	struct operand mem = MEM(-variable_info[scalar].stack_location, REG_RBP);
 	switch (size) {
 	case 1:
-		asm_ins2("xorq", R8(reg), R8(reg));
-		asm_ins2("movb", mem, R1(reg));
+		asm_ins2("movzbl", mem, R4(reg));
 		break;
 	case 2:
-		asm_ins2("xorq", R8(reg), R8(reg));
-		asm_ins2("movw", mem, R2(reg));
+		asm_ins2("movzwl", mem, R4(reg));
 		break;
 	case 3: // Clear upper bits? Sign extend?
 	case 4:

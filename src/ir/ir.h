@@ -18,7 +18,6 @@ void ir_push3(int type, var_id op1, var_id op2, var_id op3);
 
 struct instruction {
 	enum {
-		IR_NULL,
 		IR_ADD, IR_SUB,
 		IR_MUL, IR_IMUL,
 		IR_DIV, IR_IDIV,
