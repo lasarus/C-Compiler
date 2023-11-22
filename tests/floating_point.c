@@ -62,5 +62,17 @@ int main() {
 
 	assert(conv(-1) == (double)-1);
 
+	{
+		float f = 4;
+		f = -f;
+		assert(f == -4);
+	}
+
+	{
+		double d = 4;
+		d = -d;
+		assert(d == -4);
+	}
+
 	return 0;
 }

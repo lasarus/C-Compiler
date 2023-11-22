@@ -267,6 +267,8 @@ struct encoding encodings[] = {
 	{"ucomiss", 0x0f, .op2 = 0x2e, .slash_r = 1, .operand_encoding = {{OE_MODRM_REG, 0}, {OE_MODRM_RM, 0}}, .operand_accepts = {A_XMM, A_XMM_M32}},
 
 	{"ucomisd", 0x0f, .op2 = 0x2e, .slash_r = 1, .op_size_prefix = 1, .operand_encoding = {{OE_MODRM_REG, 0}, {OE_MODRM_RM, 0}}, .operand_accepts = {A_XMM, A_XMM_M64}},
+
+	{ "btcq", .rexw = 1, .opcode = 0x0f, .op2 = 0xba, .modrm_extension = 7, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_IMM8, 0}}, .operand_accepts = {A_REG(8), A_IMM8}},
 };
 
 #endif

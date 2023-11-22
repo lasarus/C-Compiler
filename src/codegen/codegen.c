@@ -193,16 +193,9 @@ static void codegen_instruction(struct instruction ins, struct function *func) {
 	case IR_NEGATE_FLOAT:
 		scalar_to_reg(ins.operands[1], REG_RAX);
 		if (get_variable_size(ins.operands[0]) == 4) {
-			asm_ins2("movd", R4(REG_RAX), XMM(1));
-			asm_ins1("negq", R8(REG_RAX));
-			asm_ins2("xorps", XMM(0), XMM(0));
-			asm_ins2("subss", XMM(1), XMM(0));
-			asm_ins2("movd", XMM(0), R4(REG_RAX));
+			asm_ins2("leal", MEM(-2147483648, REG_RAX), R4(REG_RAX));
 		} else if (get_variable_size(ins.operands[0]) == 8) {
-			asm_ins2("movq", R8(REG_RAX), XMM(1));
-			asm_ins2("xorps", XMM(0), XMM(0));
-			asm_ins2("subsd", XMM(1), XMM(0));
-			asm_ins2("movq", XMM(0), R8(REG_RAX));
+			asm_ins2("btcq", IMM(63), R8(REG_RAX));
 		} else {
 			NOTIMP();
 		}
