@@ -7,7 +7,7 @@
 
 #define VA_STR(...) VA_XSTR(__VA_ARGS__)
 #define VA_XSTR(...) #__VA_ARGS__
-int main() {
+int main(void) {
 	// Testing strcmp first, just to be sure.
 	assert(strcmp("Hello", "Hello") == 0);
 	assert(strcmp("Fr5tlPS93T", "Fr5tlPS93T") == 0);

@@ -2,7 +2,7 @@
 #include <assert.h>
 #include <string.h>
 
-int main() {
+int main(void) {
 	assert('\n' == 10);
 	assert('\0' == 0);
 	assert('\064' == 064);

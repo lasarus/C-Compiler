@@ -3,6 +3,6 @@
 
 char *str = "a\"/*b";
 
-int main() {
+int main(void) {
 	assert(strcmp(str, "a\"/" "*b") == 0);
 }

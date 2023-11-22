@@ -1,6 +1,6 @@
 #include <assert.h>
 
-int main() {
+int main(void) {
 	char c = 1;
 	c += 123l;
 	assert(c == 124);

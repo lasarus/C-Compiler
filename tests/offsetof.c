@@ -14,7 +14,7 @@ enum {
 	CONST = offsetof_builtin(struct T, e),
 };
 
-int main() {
+int main(void) {
 	_Static_assert(CONST == 16, "");
 	assert(offsetof_macro(struct T, e) == 16);
 	assert(offsetof_builtin(struct T, e) == 16);

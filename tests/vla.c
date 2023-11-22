@@ -23,7 +23,7 @@ void func4(char arr[][global_size]) {
 	assert(sizeof *arr == global_size);
 }
 
-int main() {
+int main(void) {
 	int a = 10 * 10;
 	int arr[a];
 	arr[20] = 100;

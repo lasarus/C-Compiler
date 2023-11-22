@@ -15,7 +15,7 @@ double conv(int i) {
 	return i;
 }
 
-int main() {
+int main(void) {
 	assert(add(2.3, 4.5) < 6.9);
 	assert(add(2.3, 4.5) > 6.7);
 

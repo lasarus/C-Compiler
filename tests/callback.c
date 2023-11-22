@@ -15,7 +15,7 @@ int compare_strings(const void *p, const void *q) {
     return strcmp(*(const char **)p, *(const char **)q);
 }
 
-int main() {
+int main(void) {
     atexit(atexit_func);
 
 	const char *strings[] = {

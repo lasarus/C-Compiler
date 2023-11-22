@@ -2,7 +2,7 @@
 #include <string.h>
 #include <stdio.h>
 
-int main() {
+int main(void) {
 	// 6.7.9p11
 	int i1 = 10;
 	int i2 = {10};

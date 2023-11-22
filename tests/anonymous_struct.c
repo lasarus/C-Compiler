@@ -7,6 +7,6 @@ struct T {
 	int c, d;
 } t = {.c = 1, .d = 2};
 
-int main() {
+int main(void) {
 	assert(t.c == 1 && t.d == 2);
 }

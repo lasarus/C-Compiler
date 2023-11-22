@@ -9,7 +9,7 @@ int if_goto(int val) {
 	return 0;
 }
 
-int main() {
+int main(void) {
 	int var = 1;
 	goto label;
 	var = 4;

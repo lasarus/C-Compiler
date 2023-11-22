@@ -20,7 +20,7 @@
 const char *str = "adfadf\\\\asdfasdf\dd\d\\d\d\asd\s";
 #endif
 
-int main() {
+int main(void) {
 	int COMBINE(HELLO) = 10;
 	COMBINE(HELLO) = 30;
 	assert(COMBINE(HELLO) == 30);

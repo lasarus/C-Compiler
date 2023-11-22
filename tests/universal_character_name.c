@@ -22,7 +22,7 @@ int 😀(int 😲) {
 	return 😲😲;
 }
 
-int main() {
+int main(void) {
 	assert(😀(2) == 4);
 
 	assert(func\u1234h(10) == 10);

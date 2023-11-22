@@ -21,7 +21,7 @@ bool ret_false(void) {
 	return false;
 }
 
-int main() {
+int main(void) {
 	assert(ret_true() || ret_false());
 	assert(!ret_false());
 	assert(!(ret_true() && ret_false()));

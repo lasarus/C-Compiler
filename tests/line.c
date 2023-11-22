@@ -5,7 +5,7 @@
 #define MACRO __LINE__
 #define FUNC_MACRO(A, B) A + B
 
-int main() {
+int main(void) {
 	#line 6
 	assert(__LINE__ == 6);
 	assert(MACRO == 7);

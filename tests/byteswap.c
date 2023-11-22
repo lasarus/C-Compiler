@@ -16,7 +16,7 @@ unsigned long byteswap(unsigned long x) {
 
 unsigned long l = 0Xff00000000000000ull;
 
-int main() {
+int main(void) {
 #ifdef __LP64__
 	assert(__bswap_constant_64(0x1490d7d3f094a6e3ull) == 0xe3a694f0d3d79014ull);
 	assert(byteswap(0x1490d7d3f094a6e3ull) == 0xe3a694f0d3d79014ull);

@@ -24,7 +24,7 @@
 						   int *: 17,					\
 						   default: 18)
 
-int main() {
+int main(void) {
 	size_t s;
 	ptrdiff_t p;
 	intmax_t i;

@@ -6,7 +6,7 @@ void function(const void *data, unsigned int len) {
 	(void)len, (void)data;
 }
 
-int main() {
+int main(void) {
 	static const char *str = "Hello world";
 	static const char str_arr[] = "Hello world";
 	static const char str_arr2[40] = "Hello world";

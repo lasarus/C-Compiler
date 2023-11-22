@@ -17,7 +17,7 @@ void *table[] = {
 	&arr[3],
 };
 
-int main() {
+int main(void) {
 	assert(new_func(10) == 10);
 	assert(((func_type)table[0])(10) == 10);
 }

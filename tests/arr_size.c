@@ -5,7 +5,7 @@
 extern int arr[SIZE];
 int arr[] = { 11, 34, };
 
-int main() {
+int main(void) {
 	assert(sizeof arr == SIZE * sizeof (int));
 	return 0;
 }

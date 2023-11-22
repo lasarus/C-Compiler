@@ -18,7 +18,7 @@
 #define LLONG_MAX  0x7fffffffffffffffLL
 #define ULLONG_MAX (2ULL*LLONG_MAX+1)
 
-int main() {
+int main(void) {
 	assert(CHAR_BIT == 8);
 	assert(SCHAR_MIN == -128);
 	assert(SCHAR_MAX == 127);

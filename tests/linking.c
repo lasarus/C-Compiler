@@ -8,7 +8,7 @@ int f(void)
 
 int a;
 
-int main() {
+int main(void) {
 	a = 10;
 	assert(f() == 10);
 }

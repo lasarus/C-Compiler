@@ -1,4 +1,4 @@
-int main() {
+int main(void) {
 }
 
 int func(int arr[const 11]) {

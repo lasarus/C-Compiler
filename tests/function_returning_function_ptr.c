@@ -8,6 +8,6 @@ int (*f2())() {
 	return f1;
 }
 
-int main() {
+int main(void) {
 	assert(f2()() == 10);
 }

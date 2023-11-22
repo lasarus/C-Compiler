@@ -64,7 +64,7 @@ int asum(int n, ...) {
 	return sum;
 }
 
-int main() {
+int main(void) {
 	assert(sum(2, 100, 200) == 300);
 	assert(sum(3, 100, 200, 300) == 600);
 	assert(sum(6, 100, 200, 300, 400, 500, 600) == 2100);

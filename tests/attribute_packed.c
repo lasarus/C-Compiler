@@ -20,7 +20,7 @@ struct __attribute__((packed)) T_packed2 {
 	long c;
 };
 
-int main() {
+int main(void) {
 	struct T_packed t;
 	t.a = 10;
 	t.b = 20;

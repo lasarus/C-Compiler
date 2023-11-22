@@ -3,7 +3,7 @@
 #define X 1
 #define Y 2
 
-int main() {
+int main(void) {
    assert(X == 1);
    assert(Y == 2);
    #define Y 3

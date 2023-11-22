@@ -4,7 +4,7 @@
 
 #define str L"\\"
 
-int main() {
+int main(void) {
 	assert((L"abc" "def")[0]);
 	_Static_assert(sizeof (L"abc" "def")[0] != 1, "test");
 	_Static_assert(sizeof ("abc" u"def")[0] == 2, "test2");

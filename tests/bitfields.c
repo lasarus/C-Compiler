@@ -15,7 +15,7 @@ struct S {
 	};
 };
 
-int main() {
+int main(void) {
 	struct S s;
 	s.val = 0;
 
