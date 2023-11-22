@@ -12,6 +12,7 @@ struct instruction;
 void ir_push(struct instruction instruction);
 #define IR_PUSH(...) do { ir_push((struct instruction) { __VA_ARGS__ }); } while(0)
 
+void ir_push0(int type);
 void ir_push1(int type, var_id op1);
 void ir_push2(int type, var_id op1, var_id op2);
 void ir_push3(int type, var_id op1, var_id op2, var_id op3);
@@ -96,11 +97,6 @@ struct instruction {
 			int dominance;
 		} stack_alloc;
 #define IR_PUSH_STACK_ALLOC(RESULT, LENGTH, SLOT, DOMINANCE) IR_PUSH(.type = IR_STACK_ALLOC, .operands = {(RESULT), (LENGTH), (SLOT)}, .stack_alloc = {(DOMINANCE)})
-
-		struct {
-			int stack_bucket;
-		} clear_stack_bucket;
-#define IR_PUSH_CLEAR_STACK_BUCKET(STACK_BUCKET) IR_PUSH(.type = IR_CLEAR_STACK_BUCKET, .clear_stack_bucket = {(STACK_BUCKET)})
 
 		struct {
 			int register_index, is_sse;

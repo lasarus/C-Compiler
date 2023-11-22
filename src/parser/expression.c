@@ -913,7 +913,7 @@ var_id expression_to_ir(struct expr *expr) {
 var_id expression_to_ir_clear_temp(struct expr *expr) {
 	var_id res = expression_to_ir(expr);
 	variable_set_stack_bucket(res, 0);
-	IR_PUSH_CLEAR_STACK_BUCKET(1);
+	ir_push0(IR_CLEAR_STACK_BUCKET);
 	return res;
 }
 

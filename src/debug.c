@@ -192,7 +192,7 @@ const char *dbg_instruction(struct instruction ins) {
 		break;
 
 	case IR_CLEAR_STACK_BUCKET:
-		DBG_PRINT("clear stack bucket %d", ins.clear_stack_bucket.stack_bucket);
+		DBG_PRINT("clear stack bucket");
 		break;
 
 	case IR_ADD_TEMPORARY:

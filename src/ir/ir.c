@@ -71,6 +71,10 @@ void ir_push1(int type, var_id op1) {
 	ir_push3(type, op1, VOID_VAR, VOID_VAR);
 }
 
+void ir_push0(int type) {
+	ir_push3(type, VOID_VAR, VOID_VAR, VOID_VAR);
+}
+
 void ir_block_start(block_id id) {
 	struct function *func = get_current_function();
 
