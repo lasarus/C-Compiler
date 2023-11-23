@@ -191,7 +191,7 @@ struct result {
 	int is_signed;
 	union {
 		intmax_t i;
-		intmax_t u;
+		uintmax_t u;
 	};
 };
 
@@ -207,6 +207,14 @@ int result_is_zero(struct result result) {
 	return result.is_signed ? (result.i == 0) : (result.u == 0);
 }
 
+void check_div_overflow(struct token *t,
+						struct result lhs, struct result rhs) {
+	if (result_is_zero(rhs))
+		ERROR(t->pos, "Division by zero");
+	if (lhs.is_signed && lhs.i == INTMAX_MIN && rhs.i == -1)
+		ERROR(t->pos, "Division will overflow");
+}
+
 #define RESULT_UNARY(OP, EXPR) ((EXPR).is_signed				\
 								? result_signed(OP (EXPR).i)	\
 								: result_unsigned(OP (EXPR).u))
@@ -220,6 +228,7 @@ int result_is_zero(struct result result) {
 										  ? result_signed((LHS).i OP (RHS).i) \
 										  : result_signed((LHS).u OP (RHS).u))
 
+// TODO: Ensure no UB. Don't allow operators to overflow.
 static struct result evaluate_expression(int prec, int evaluate) {
 	struct result expr = result_signed(0);
 	struct token t = buffer_next();
@@ -298,16 +307,12 @@ static struct result evaluate_expression(int prec, int evaluate) {
 				case T_SUB: expr = RESULT_BINARY(-, expr, rhs); break;
 				case T_STAR: expr = RESULT_BINARY(*, expr, rhs); break;
 				case T_DIV:
-					if (!result_is_zero(rhs))
-						expr = RESULT_BINARY(/, expr, rhs);
-					else
-						ERROR(t.pos, "Division by zero");
+					check_div_overflow(&t, expr, rhs);
+					expr = RESULT_BINARY(/, expr, rhs);
 					break;
 				case T_MOD:
-					if (!result_is_zero(rhs))
-						expr = RESULT_BINARY(%, expr, rhs);
-					else
-						ERROR(t.pos, "Modulo by zero");
+					check_div_overflow(&t, expr, rhs);
+					expr = RESULT_BINARY(%, expr, rhs);
 					break;
 				default:
 					ERROR(t.pos, "Invalid infix %s", dbg_token(&t));

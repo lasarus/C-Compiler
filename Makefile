@@ -126,7 +126,7 @@ run-tests-asm: $(TEST_BINS_ASM)
 run-should-fail-tests: $(SHOULD_FAIL_TEST_SRCS) $(COMPILER)
 	@for test in $(SHOULD_FAIL_TEST_SRCS) ; do \
 		$(COMPILER) -S $$test -o tmp.s >/dev/null; \
-		if [ $$? -ne 0 ]; then \
+		if [ $$? -eq 1 ]; then \
 			echo "Test $$test passed." ; \
 		else \
 			echo "Test $$test failed." ; \
