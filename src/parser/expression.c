@@ -423,7 +423,14 @@ struct expr *expr_new(struct expr expr) {
 		assert(type_is_pointer(expr.call.callee->data_type));
 		struct type *signature = type_deref(expr.call.callee->data_type);
 
-		for (int i = signature->n - 1; i < expr.call.n_args; i++) {
+		int named_arguments_count = signature->n - 1;
+		if (!(signature->function.is_variadic ?
+			  named_arguments_count <= expr.call.n_args :
+			  named_arguments_count == expr.call.n_args)) {
+			ERROR(T0->pos, "Wrong number of arguments.");
+		}
+
+		for (int i = named_arguments_count; i < expr.call.n_args; i++) {
 			do_default_argument_promotion(&expr.call.args[i]);
 		}
 	}
@@ -1320,7 +1327,6 @@ struct expr *parse_pratt(int precedence) {
 					.type = E_CALL,
 					.call = { lhs, n_args, args }
 				});
-
 		} else if (TACCEPT(T_DOT)) {
 			lhs = expr_dot_operator(lhs, T0);
 			if (!lhs)
