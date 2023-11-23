@@ -712,8 +712,16 @@ static var_id expression_to_ir_result(struct expr *expr, var_id res) {
 	case E_ADDRESS_OF:
 		return expression_to_address(expr->args[0]);
 
-	case E_ARRAY_PTR_DECAY:
-		return expression_to_address(expr->args[0]);
+	case E_ARRAY_PTR_DECAY: {
+		// This has to work even if the operand is an rvalue.
+		var_id res;
+		if (!try_expression_to_address(expr->args[0], &res)) {
+			res = new_variable(type_pointer(expr->args[0]->data_type), 1, 1);
+			var_id tmp = expression_to_ir(expr->args[0]);
+			ir_push2(IR_ADDRESS_OF, res, tmp);
+		}
+		return res;
+	} break;
 
 	case E_POINTER_ADD:
 		pointer_increment(res, expression_to_ir(expr->args[0]),
