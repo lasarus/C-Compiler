@@ -87,10 +87,7 @@ static struct object *combine_objects(int n_objects, struct object *objects) {
 		}
 	}
 
-	struct object *ret = cc_malloc(sizeof *ret);
-	*ret = object;
-
-	return ret;
+	return ALLOC(object);
 }
 
 struct executable *linker_link(int n_objects, struct object *_objects) {
@@ -185,7 +182,5 @@ struct executable *linker_link(int n_objects, struct object *_objects) {
 
 	segment->load_size = segment->size;
 
-	struct executable *ret = cc_malloc(sizeof *ret);
-	*ret = executable;
-	return ret;
+	return ALLOC(executable);
 }

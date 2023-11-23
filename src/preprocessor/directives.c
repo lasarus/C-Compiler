@@ -82,15 +82,12 @@ void directiver_push_input(const char *path, int system) {
 	if (!new_input)
 		return;
 
-	struct tokenized_file *new_file = cc_malloc(sizeof *new_file);
-	*new_file = (struct tokenized_file) {
-		.input = new_input,
-		.parent = current_file,
-		.token_idx = 0,
-		.tokens = tokenize_input(new_input),
-	};
-
-	current_file = new_file;
+	current_file = ALLOC((struct tokenized_file) {
+			.input = new_input,
+			.parent = current_file,
+			.token_idx = 0,
+			.tokens = tokenize_input(new_input),
+		});
 }
 
 static struct token next(void);

@@ -306,9 +306,7 @@ static struct object *object_from_elf(struct elf_file *elf) {
 	free(section_mapping);
 	free(symbol_mapping);
 
-	struct object *ret = cc_malloc(sizeof *ret);
-	*ret = object;
-	return ret;
+	return ALLOC(object);
 }
 
 static struct elf_file *elf_from_object(struct object *object) {
@@ -472,9 +470,7 @@ static struct elf_file *elf_from_object(struct object *object) {
 
 	elf_allocate_sections(&elf);
 
-	struct elf_file *ret = cc_malloc(sizeof *ret);
-	*ret = elf;
-	return ret;
+	return ALLOC(elf);
 }
 
 static struct elf_file *elf_from_executable(struct executable *executable) {
@@ -509,9 +505,7 @@ static struct elf_file *elf_from_executable(struct executable *executable) {
 
 	elf_allocate_sections(&elf);
 
-	struct elf_file *ret = cc_malloc(sizeof *ret);
-	*ret = elf;
-	return ret;
+	return ALLOC(elf);
 }
 
 static void elf_free(struct elf_file *elf) {
@@ -801,9 +795,7 @@ static struct elf_file *elf_read(const char *path) {
 
 	fclose(fp);
 
-	struct elf_file *ret = cc_malloc(sizeof *ret);
-	*ret = elf;
-	return ret;
+	return ALLOC(elf);
 }
 
 void elf_write_object(const char *path, struct object *object) {

@@ -26,7 +26,7 @@ static void read_contents(struct input *input, FILE *fp) {
 	ADD_ELEMENT(input->contents_size, input->contents_cap, input->contents) = '\0';
 }
 
-static struct input input_create(const char *filename, FILE *fp) {
+static struct input *input_create(const char *filename, FILE *fp) {
 	struct input input = {
 		.filename = filename,
 		.iline = 1, .icol = 1,
@@ -49,7 +49,7 @@ static struct input input_create(const char *filename, FILE *fp) {
 		input_next(&input);
 	input.c[0] = '\n'; // Needs to start with newline.
 
-	return input;
+	return ALLOC(input);
 }
 
 struct input input_open_string(char *str) {
@@ -183,8 +183,7 @@ struct input *input_open(struct input *parent_input, const char *path, int syste
 		return NULL;
 	}
 
-	struct input *input = cc_malloc(sizeof *input);
-	*input = input_create(strdup(path_buffer), fp);
+	struct input *input = input_create(strdup(path_buffer), fp);
 
 	fclose(fp);
 

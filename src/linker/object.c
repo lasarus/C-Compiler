@@ -43,16 +43,13 @@ void object_start(void) {
 }
 
 struct object *object_finish(void) {
-	struct object *object = cc_malloc(sizeof *object);
-
-	*object = current_object;
+	struct object *object = ALLOC(current_object);
+	current_object = (struct object) { 0 };
 
 	for (unsigned j = 0; j < object->symbol_size; j++) {
 		if (object->symbols[j].section == -1)
 			object->symbols[j].global = 1;
 	}
-
-	current_object = (struct object) { 0 };
 
 	return object;
 }

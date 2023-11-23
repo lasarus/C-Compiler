@@ -446,13 +446,10 @@ struct expr *expr_new(struct expr expr) {
 
 	check_const_correctness(&expr);
 
-	struct expr *ret = cc_malloc(sizeof *ret);
-	*ret = expr;
+	if (!expr.pos.path)
+		expr.pos = T0->pos; // If no position is supplied, at least take something close to it.
 
-	if (!ret->pos.path)
-		ret->pos = T0->pos; // If no position is supplied, at least take something close to it.
-
-	return ret;
+	return ALLOC(expr);
 }
 
 static void pointer_increment(var_id result, var_id pointer, struct expr *index, int decrement, struct type *type) {

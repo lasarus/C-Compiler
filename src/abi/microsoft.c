@@ -151,8 +151,7 @@ static void ms_ir_function_new(struct type *type, var_id *args, const char *name
 		ir_push2(IR_LOAD, loads[i].to, loads[i].from);
 	}
 
-	func->abi_data = cc_malloc(sizeof (struct ms_data));
-	*(struct ms_data *)func->abi_data = abi_data;
+	func->abi_data = ALLOC(abi_data);
 }
 
 static void ms_ir_function_return(struct function *func, var_id value, struct type *type) {

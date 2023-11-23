@@ -327,8 +327,7 @@ static void sysv_ir_function_new(struct type *type, var_id *args, const char *na
 		ir_push2(IR_STORE, c.regs[i].variable, address);
 	}
 
-	func->abi_data = cc_malloc(sizeof (struct sysv_data));
-	*(struct sysv_data *)func->abi_data = abi_data;
+	func->abi_data = ALLOC(abi_data);
 }
 
 static void sysv_ir_function_return(struct function *func, var_id value, struct type *type) {

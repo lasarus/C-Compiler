@@ -29,6 +29,8 @@ void impl_warning(struct position pos, const char *fmt, ...);
 #define ADD_ELEMENTS(SIZE, CAP, PTR, N) ((void)((SIZE + (N)) > CAP && (CAP = MAX(CAP * 2, (SIZE) + (N)), PTR = cc_realloc(PTR, sizeof *PTR * CAP))), (SIZE) += (N), PTR + (SIZE) - (N))
 #define REMOVE_ELEMENT(SIZE, PTR, IDX) (memmove(PTR + (IDX), PTR + (IDX) + 1, ((SIZE) - (IDX) - 1) * sizeof *(PTR)), (SIZE)--)
 
+#define ALLOC(...) memcpy(cc_malloc(sizeof (__VA_ARGS__)), &(__VA_ARGS__), sizeof (__VA_ARGS__))
+
 uint32_t hash32(uint32_t a);
 
 char *allocate_printf(const char *fmt, ...);

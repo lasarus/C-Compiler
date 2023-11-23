@@ -523,10 +523,8 @@ static void ast_get_parameters(struct type_ast *ast,
 }
 
 static struct type_ast *type_ast_new(struct type_ast ast) {
-	struct type_ast *ret = cc_malloc(sizeof (struct type_ast));
-	*ret = ast;
-	ret->pos = T0->pos;
-	return ret;
+	ast.pos = T0->pos;
+	return ALLOC(ast);
 }
 
 static struct type *specifiers_to_type(const struct type_specifiers *ts) {
