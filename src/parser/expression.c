@@ -2,6 +2,7 @@
 #include "declaration.h"
 #include "function_parser.h"
 #include "symbols.h"
+#include "expression_to_ir.h"
 
 #include <common.h>
 #include <codegen/rodata.h>
@@ -15,7 +16,7 @@ static enum simple_type get_arithmetic_type(enum simple_type a, int bitfield_a,
 											enum simple_type b, int bitfield_b) {
 	if (a == ST_LDOUBLE || b == ST_LDOUBLE)
 		return ST_LDOUBLE;
-    else if (a == ST_DOUBLE || b == ST_DOUBLE)
+	else if (a == ST_DOUBLE || b == ST_DOUBLE)
 		return ST_DOUBLE;
 	else if (a == ST_FLOAT || b == ST_FLOAT)
 		return ST_FLOAT;
@@ -346,15 +347,19 @@ static void fix_assignment_operators(struct expr *expr) {
 		if (expr->args[0]->cast.arg->type == E_CAST)
 			expr->args[0]->cast.arg = expr->args[0]->cast.arg->cast.arg;
 
-		expr->assignment_op.cast = expr->args[0]->cast.target;
+		//expr->assignment_op.cast = expr->args[0]->cast.target;
 		expr->args[0] = expr->args[0]->cast.arg;
 	}
 	int lhs_ptr = type_is_pointer(expr->args[0]->data_type);
 
 	if (lhs_ptr && (expr->assignment_op.op == OP_ADD || expr->assignment_op.op == OP_SUB)) {
+		int is_postfix = expr->assignment_op.postfix;
+		int is_sub = expr->assignment_op.op == OP_SUB;
+
 		expr->type = E_ASSIGNMENT_POINTER;
-		expr->assignment_pointer.postfix = expr->assignment_op.postfix;
-		expr->assignment_pointer.sub = expr->assignment_op.op == OP_SUB;
+
+		expr->assignment_pointer.postfix = is_postfix;
+		expr->assignment_pointer.sub = is_sub;
 	}
 }
 
@@ -459,484 +464,6 @@ struct expr *expr_new(struct expr expr) {
 	return ALLOC(expr);
 }
 
-static void pointer_increment(var_id result, var_id pointer, struct expr *index, int decrement, struct type *type) {
-	var_id size = expression_to_ir(type_sizeof(type_deref(type)));
-	var_id index_var = expression_to_ir(expression_cast(index, type_simple(abi_info.pointer_type)));
-	ir_push3(IR_MUL, index_var, index_var, size);
-	ir_push3(decrement ? IR_SUB : IR_ADD, result, pointer, index_var);
-}
-
-// Loads pointer into return value.
-static int try_expression_to_address(struct expr *expr, var_id *var) {
-	switch (expr->type) {
-	case E_INDIRECTION:
-		*var = expression_to_ir(expr->args[0]);
-		return 1;
-
-	case E_VARIABLE: {
-		var_id address = new_variable(type_pointer(expr->data_type), 1, 1);
-		ir_push2(IR_ADDRESS_OF, address, expr->variable.id);
-		*var = address;
-		return 1;
-	}
-
-	case E_VARIABLE_PTR: {
-		var_id address = new_variable(type_pointer(expr->data_type), 1, 1);
-		ir_push2(IR_COPY, address, expr->variable_ptr.ptr);
-		*var = address;
-		return 1;
-	}
-
-	case E_DOT_OPERATOR: {
-		struct type *lhs_type = expr->member.lhs->data_type;
-		assert(lhs_type->type == TY_STRUCT);
-
-		struct struct_data *data = lhs_type->struct_data;
-
-		int field_offset = data->fields[expr->member.member_idx].offset;
-
-		if (data->fields[expr->member.member_idx].bitfield != -1)
-			return 0;
-
-		var_id address;
-
-		if (!try_expression_to_address(expr->member.lhs, &address))
-			return 0;
-
-		var_id member_address = new_variable(type_pointer(expr->data_type), 1, 1);
-		ir_get_offset(member_address, address, 0, field_offset);
-
-		*var = member_address;
-		return 1;
-	}
-
-	case E_CONSTANT: {
-		struct constant c_addr = expr->constant;
-		assert(c_addr.type == CONSTANT_LABEL);
-		c_addr.type = CONSTANT_LABEL_POINTER;
-
-		*var = new_variable(type_pointer(expr->data_type), 1, 1);
-		IR_PUSH_CONSTANT(c_addr, *var);
-		return 1;
-	}
-
-	case E_CAST:
-		return 0;
-
-	case E_COMPOUND_LITERAL: {
-		var_id compound = expression_to_ir(expr);
-		var_id address = new_variable(type_pointer(expr->data_type), 1, 1);
-		ir_push2(IR_ADDRESS_OF, address, compound);
-		*var = address;
-		return 1;
-	}
-
-	default:
-		return 0;
-	}
-}
-
-static var_id expression_to_address(struct expr *expr) {
-	var_id res;
-	if (!try_expression_to_address(expr, &res))
-		ICE("Can't take expression as lvalue");
-	return res;
-}
-
-struct bitfield_address {
-	var_id address;
-	int bitfield, offset, sign_extend;
-};
-
-static struct bitfield_address expression_to_bitfield_address(struct expr *expr) {
-	struct bitfield_address out = { .bitfield = -1 };
-	if (expr->type != E_DOT_OPERATOR) {
-		out.address = expression_to_address(expr);
-	} else {
-		struct struct_data *data = expr->member.lhs->data_type->struct_data;
-		int idx = expr->member.member_idx;
-
-		if (data->fields[idx].bitfield == -1) {
-			out.address = expression_to_address(expr);
-		} else {
-			out.address = expression_to_address(expr->member.lhs);
-			int offset = data->fields[idx].offset;
-
-			ir_get_offset(out.address, out.address, 0, offset);
-
-			out.bitfield = data->fields[idx].bitfield;
-			out.offset = data->fields[idx].bit_offset;
-
-			assert(data->fields[idx].type->type == TY_SIMPLE);
-
-			if (is_signed(data->fields[idx].type->simple))
-				out.sign_extend = 1;
-		}
-	}
-
-	return out;
-}
-
-static var_id address_load(var_id address, struct type *type) {
-	var_id ret = new_variable(type, 1, 1);
-
-	ir_push2(IR_LOAD, ret, address);
-
-	return ret;
-}
-
-static void address_store(var_id address, var_id value) {
-	ir_push2(IR_STORE, value, address);
-}
-
-static var_id bitfield_load(struct bitfield_address address, struct type *type) {
-	var_id ret = new_variable(type, 1, 1);
-	if (address.bitfield == -1) {
-		ir_push2(IR_LOAD, ret, address.address);
-		return ret;
-	} else {
-		ir_push2(IR_LOAD, ret, address.address);
-		ir_get_bits(ret, ret, address.offset, address.bitfield, address.sign_extend);
-		return ret;
-	}
-}
-
-static void bitfield_store(struct bitfield_address address, var_id value) {
-	if (address.bitfield == -1) {
-		ir_push2(IR_STORE, value, address.address);
-	} else {
-		var_id prev = new_variable_sz(get_variable_size(value), 1, 1);
-		ir_push2(IR_LOAD, prev, address.address);
-
-		ir_set_bits(prev, prev, value, address.offset, address.bitfield);
-
-		ir_push2(IR_STORE, prev, address.address);
-	}
-}
-
-static var_id ir_cast(var_id res, struct type *result_type, var_id rhs, struct type *rhs_type) {
-	if (type_is_simple(result_type, ST_VOID)) {
-	} else if (type_is_simple(result_type, ST_BOOL)) {
-		ir_push2(IR_BOOL_CAST, res, rhs);
-	} else if ((type_is_integer(result_type) || type_is_pointer(result_type)) &&
-			   (type_is_integer(rhs_type) || type_is_pointer(rhs_type))) {
-		int sign_extend = type_is_integer(rhs_type) && is_signed(rhs_type->simple);
-		if (get_variable_size(res) == get_variable_size(rhs))
-			return rhs;
-		ir_push2(sign_extend ? IR_INT_CAST_SIGN : IR_INT_CAST_ZERO, res, rhs);
-	} else if(type_is_floating(result_type) && type_is_floating(rhs_type)) {
-		ir_push2(IR_FLOAT_CAST, res, rhs);
-	} else if(type_is_floating(result_type) && type_is_integer(rhs_type)) {
-		ir_push2(is_signed(rhs_type->simple) ? IR_INT_FLOAT_CAST : IR_UINT_FLOAT_CAST, res, rhs);
-	} else if(type_is_integer(result_type) && type_is_floating(rhs_type)) {
-		ir_push2(IR_FLOAT_INT_CAST, res, rhs);
-	} else {
-		return rhs;
-	}
-	return res;
-}
-
-static var_id unary_op(var_id res, var_id operand, struct type *type, enum unary_operator_type uop) {
-	if (uop == UOP_PLUS)
-		return operand;
-	if (type_is_integer(type)) {
-		if (uop == UOP_BNOT) {
-			ir_push2(IR_BINARY_NOT, res, operand);
-		} else if (uop == UOP_NEG) {
-			ir_push2(IR_NEGATE_INT, res, operand);
-		} else {
-			NOTIMP();
-		}
-	} else if (type_is_floating(type)) {
-		if (uop == UOP_NEG) {
-			ir_push2(IR_NEGATE_FLOAT, res, operand);
-		} else {
-			NOTIMP();
-		}
-	} else {
-		NOTIMP();
-	}
-	return res;
-}
-
-static var_id expression_to_ir_result(struct expr *expr, var_id res) {
-	if (!res)
-		res = new_variable(expr->data_type, 1, 1);
-
-	switch(expr->type) {
-	case E_BINARY_OP: {
-		var_id lhs_var = expression_to_ir(expr->args[0]),
-			rhs_var = expression_to_ir(expr->args[1]);
-		ir_push3(ir_from_type_and_op(expr->args[0]->data_type, expr->binary_op), res, lhs_var, rhs_var);
-	} break;
-
-	case E_UNARY_OP:
-		res = unary_op(res, expression_to_ir(expr->args[0]), expr->args[0]->data_type, expr->unary_op);
-		break;
-
-	case E_CONSTANT:
-		IR_PUSH_CONSTANT(expr->constant, res);
-		break;
-
-	case E_CALL: {
-		struct expr *callee = expr->call.callee;
-
-		assert(type_is_pointer(callee->data_type));
-		struct type *signature = type_deref(callee->data_type);
-
-		var_id *args = cc_malloc(sizeof *args * expr->call.n_args);
-		struct type **arg_types = cc_malloc(sizeof *arg_types * expr->call.n_args);
-		for (int i = 0; i < expr->call.n_args; i++) {
-			if (i + 1 < signature->n) {
-				args[i] = expression_to_ir(expression_cast(expr->call.args[i],
-														   signature->children[i + 1]));
-				arg_types[i] = signature->children[i + 1];
-			} else {
-				args[i] = expression_to_ir(expr->call.args[i]);
-				arg_types[i] = expr->call.args[i]->data_type;
-			}
-		}
-
-		var_id func_var = expression_to_ir(callee);
-		struct type *func_type = callee->data_type;
-
-		if (func_type->type != TY_POINTER) {
-			ICE("Can't call type %s", dbg_type(func_type));
-		}
-
-		ir_call(res, func_var, type_deref(func_type), expr->call.n_args, arg_types, args);
-	} break;
-
-	case E_VARIABLE:
-		// TODO: Remove some of these unnecessary copies in an optimization pass.
-		ir_push2(IR_COPY, res, expr->variable.id);
-		break;
-
-	case E_VARIABLE_PTR:
-		ir_push2(IR_LOAD, res, expr->variable_ptr.ptr);
-		break;
-
-	case E_INDIRECTION:
-		ir_push2(IR_LOAD, res, expression_to_ir(expr->args[0]));
-		break;
-
-	case E_ADDRESS_OF:
-		return expression_to_address(expr->args[0]);
-
-	case E_ARRAY_PTR_DECAY: {
-		// This has to work even if the operand is an rvalue.
-		var_id res;
-		if (!try_expression_to_address(expr->args[0], &res)) {
-			res = new_variable(type_pointer(expr->args[0]->data_type), 1, 1);
-			IR_PUSH_ALLOC(res, calculate_size(expr->args[0]->data_type));
-			var_id tmp = expression_to_ir(expr->args[0]);
-			ir_push2(IR_STORE, tmp, res);
-		}
-		return res;
-	} break;
-
-	case E_POINTER_ADD:
-		pointer_increment(res, expression_to_ir(expr->args[0]),
-						  expr->args[1], 0,
-						  expr->args[0]->data_type);
-		break;
-
-	case E_POINTER_SUB:
-		pointer_increment(res, expression_to_ir(expr->args[0]),
-						  expr->args[1], 1,
-						  expr->args[0]->data_type);
-		break;
-
-	case E_POINTER_DIFF: {
-		var_id lhs = expression_to_ir(expr->args[0]),
-			rhs = expression_to_ir(expr->args[1]);
-		var_id size = expression_to_ir(type_sizeof(type_deref(expr->args[0]->data_type)));
-
-		ir_push3(IR_SUB, res, lhs, rhs);
-		ir_push3(IR_IDIV, res, res, size);
-	} break;
-
-	case E_ASSIGNMENT: {
-		res = expression_to_ir_result(expression_cast(expr->args[1], expr->args[0]->data_type), res);
-		bitfield_store(expression_to_bitfield_address(expr->args[0]), res);
-	} break;
-
-	case E_ASSIGNMENT_OP: {
-		struct expr *a_expr = expr->args[0];
-
-		var_id b = expression_to_ir(expr->args[1]);
-
-		struct bitfield_address address = expression_to_bitfield_address(a_expr);
-
-		var_id a = bitfield_load(address, a_expr->data_type);
-
-		if (expr->assignment_op.postfix)
-			ir_push2(IR_COPY, res, a);
-
-		if (expr->assignment_op.cast) {
-			var_id ac = new_variable(expr->assignment_op.cast, 1, 1);
-			ac = ir_cast(ac, expr->assignment_op.cast, a, a_expr->data_type);
-
-			ir_push3(ir_from_type_and_op(expr->args[1]->data_type, expr->assignment_op.op),
-					 ac, ac, b);
-
-			a = ir_cast(a, a_expr->data_type, ac, expr->assignment_op.cast);
-		} else {
-			ir_push3(ir_from_type_and_op(expr->args[1]->data_type, expr->assignment_op.op),
-					 a, a, b);
-		}
-
-		bitfield_store(address, a);
-		return expr->assignment_op.postfix ? res : a;
-	}
-
-	case E_ASSIGNMENT_POINTER: {
-		var_id address = expression_to_address(expr->args[0]);
-
-		var_id prev_val = address_load(address, expr->args[0]->data_type);
-
-		if (expr->assignment_pointer.postfix)
-			ir_push2(IR_COPY, res, prev_val);
-
-		assert(type_is_pointer(expr->args[0]->data_type));
-
-		pointer_increment(prev_val, prev_val, expr->args[1], expr->assignment_pointer.sub, expr->args[0]->data_type);
-
-		address_store(address, prev_val);
-		return expr->assignment_pointer.postfix ? res : prev_val;
-	}
-
-	case E_CAST:
-		res = ir_cast(res, expr->cast.target, expression_to_ir(expr->cast.arg), expr->cast.arg->data_type);
-		break;
-
-	case E_DOT_OPERATOR: {
-		struct type *lhs_type = expr->member.lhs->data_type;
-		assert(lhs_type->type == TY_STRUCT);
-
-		struct struct_data *data = lhs_type->struct_data;
-
-		int field_offset = data->fields[expr->member.member_idx].offset;
-		int field_bitfield = data->fields[expr->member.member_idx].bitfield;
-
-
-		var_id address;
-		if (!try_expression_to_address(expr->member.lhs, &address)) {
-			var_id lhs = expression_to_ir(expr->member.lhs);
-			address = new_variable(type_pointer(expr->member.lhs->data_type), 1, 1);
-			ir_push2(IR_ADDRESS_OF, address, lhs);
-		}
-
-		var_id member_address = new_variable(type_pointer(expr->data_type), 1, 1);
-
-		ir_get_offset(member_address, address, 0, field_offset);
-		ir_push2(IR_LOAD, res, member_address);
-
-		if (field_bitfield != -1) {
-			int sign_extend = is_signed(data->fields[expr->member.member_idx].type->simple);
-			ir_get_bits(res, res, data->fields[expr->member.member_idx].bit_offset, field_bitfield, sign_extend);
-		}
-	} break;
-
-	case E_CONDITIONAL: {
-		var_id condition = expression_to_ir(expr->args[0]);
-		int is_void = type_is_simple(expr->data_type, ST_VOID);
-
-		block_id block_true = new_block(),
-			block_false = new_block(),
-			block_end = new_block();
-
-		ir_if_selection(condition, block_true, block_false);
-
-		ir_block_start(block_true);
-		var_id true_val = expression_to_ir(expr->args[1]);
-		if (!is_void)
-			ir_push2(IR_COPY, res, true_val);
-		ir_goto(block_end);
-
-		ir_block_start(block_false);
-		var_id false_val = expression_to_ir(expr->args[2]);
-		if (!is_void)
-			ir_push2(IR_COPY, res, false_val);
-		ir_goto(block_end);
-
-		ir_block_start(block_end);
-	} break;
-
-	case E_BUILTIN_VA_END:
-		break;
-
-	case E_BUILTIN_VA_START:
-		get_current_function()->uses_va = 1;
-		ir_push1(IR_VA_START, expression_to_address(expr->va_start_.array));
-		break;
-
-	case E_BUILTIN_VA_ARG:
-		if (abi_info.va_list_is_reference) {
-			IR_PUSH_VA_ARG(expression_to_address(expr->va_arg_.v), res, expr->va_arg_.t);
-		} else {
-			IR_PUSH_VA_ARG(expression_to_ir(expr->va_arg_.v), res, expr->va_arg_.t);
-		}
-		break;
-
-	case E_BUILTIN_VA_COPY: {
-		if (abi_info.va_list_is_reference) {
-			var_id dest = expression_to_address(expr->va_copy_.d);
-			var_id source = expression_to_ir(expr->va_copy_.s);
-
-			var_id address = new_variable_sz(8, 1, 1);
-			var_id tmp = new_variable(expr->va_copy_.d->data_type, 1, 1);
-
-			ir_push2(IR_ADDRESS_OF, address, source);
-			ir_push2(IR_LOAD, tmp, address);
-			ir_push2(IR_STORE, tmp, dest);
-		} else {
-			var_id dest = expression_to_ir(expr->va_copy_.d);
-			var_id source = expression_to_ir(expr->va_copy_.s);
-
-			var_id tmp = new_variable(type_deref(expr->va_copy_.d->data_type), 1, 1);
-
-			ir_push2(IR_LOAD, tmp, source);
-			ir_push2(IR_STORE, tmp, dest);
-		}
-	} break;
-
-	case E_COMPOUND_LITERAL: {
-		var_id base_address = new_variable(type_pointer(type_simple(ST_VOID)), 1, 1);
-	
-		ir_push2(IR_ADDRESS_OF, base_address, res);
-		ir_init_ptr(&expr->compound_literal.init, expr->compound_literal.type, base_address);
-		variable_set_stack_bucket(res, 0); // compound literals live until end of block.
-	} break;
-
-	case E_COMMA:
-		expression_to_ir(expr->args[0]);
-		res = expression_to_ir_result(expr->args[1], res);
-		break;
-
-	case E_CONST_REMOVE:
-		res = expression_to_ir_result(expr->args[0], res);
-		break;
-
-	default:
-		printf("%d\n", expr->type);
-		NOTIMP();
-	}
-	return res;
-}
-
-var_id expression_to_ir(struct expr *expr) {
-	var_id res = expression_to_ir_result(expr, 0);
-	return res;
-}
-
-var_id expression_to_ir_clear_temp(struct expr *expr) {
-	var_id res = expression_to_ir(expr);
-	variable_set_stack_bucket(res, 0);
-	ir_push0(IR_CLEAR_STACK_BUCKET);
-	return res;
-}
-
 // Parsing.
 
 static void parse_call_parameters(struct expr ***args, int *n_args) {
@@ -955,7 +482,7 @@ static void parse_call_parameters(struct expr ***args, int *n_args) {
 		struct expr *expr = parse_assignment_expression();
 
 		if (!expr)
-			ERROR(T0->pos, "Expected expression");
+			ERROR(T0->pos, "Expected expression, got %s", dbg_token(T0));
 
 		buffer[pos] = expr;
 	}
@@ -973,6 +500,7 @@ static void parse_call_parameters(struct expr ***args, int *n_args) {
 }
 
 struct expr *parse_pratt(int precedence);
+struct expr *parse_pratt_with_lhs(int precedence, struct expr *lhs);
 
 static struct expr *parse_prefix(void) {
 	if (TACCEPT(T_LPAR)) {
@@ -1228,42 +756,37 @@ static struct expr *parse_prefix(void) {
 			});
 	} else if (TACCEPT(T_KOFFSETOF)) {
 		TEXPECT(T_LPAR);
+		
 		struct type *type = parse_type_name();
 		if (!type)
 			ERROR(T0->pos, "Expectected type-name.");
 		TEXPECT(T_COMMA);
 
-		struct token member = *T0;
-		TEXPECT(T_IDENT);
+		struct expr *expr = expr_new((struct expr) {
+				.type = E_CONSTANT,
+				.constant = {
+					.type = CONSTANT_LABEL,
+					.data_type = type,
+					.label.label = -1, // null label?
+					.label.offset = 0
+				}
+			});
+		expr = expr_dot_operator(expr, T0);
+		TNEXT();
+
+		expr = parse_pratt_with_lhs(0, expr);
+		expr = EXPR_ARGS(E_ADDRESS_OF, expr);
+
 		TEXPECT(T_RPAR);
 
-		int n = 0, *indices;
-		if (!type_search_member(type, member.str, &n, &indices))
-			ERROR(T0->pos, "Could not find %.*s in type %s\n", member.str.len, member.str.str, dbg_type(type));
-
-		int total_offset = 0;
-		for (int i = n - 1; i >= 0; i--) {
-			int offset;
-
-			type_get_offsets(type, indices[i], &offset, NULL, NULL);
-			type = type_select(type, indices[i]);
-
-			total_offset += offset;
-		}
-
-		return EXPR_INT(total_offset);
+		return expression_cast(expr, type_simple(ST_ULONG));
 	} else if (TACCEPT(T_KFUNC)) {
  		return EXPR_STR(get_current_function_name(), ST_CHAR);
 	}
 	return NULL;
 }
 
-struct expr *parse_pratt(int precedence) {
-	struct expr *lhs = parse_prefix();
-
-	if (!lhs)
-		return NULL;
-
+struct expr *parse_pratt_with_lhs(int precedence, struct expr *lhs) {
 	while (precedence < precedence_get(T0->type, 1)) {
 		int new_prec = precedence_get(T0->type, 0);
 
@@ -1369,6 +892,15 @@ struct expr *parse_pratt(int precedence) {
 	return lhs;
 }
 
+struct expr *parse_pratt(int precedence) {
+	struct expr *lhs = parse_prefix();
+
+	if (!lhs)
+		return NULL;
+
+	return parse_pratt_with_lhs(precedence, lhs);
+}
+
 struct expr *parse_assignment_expression(void) {
 	return parse_pratt(ASSIGNMENT_PREC);
 }
@@ -1392,9 +924,18 @@ int evaluate_constant_expression(struct expr *expr,
 		if (rhs.type == CONSTANT_LABEL)
 			return 0;
 		if (type_is_pointer(rhs.data_type) &&
-			!type_is_pointer(expr->cast.target))
-			return 0;
-		*constant = constant_cast(rhs, expr->cast.target);
+			!type_is_pointer(expr->cast.target)) {
+			if (rhs.type == CONSTANT_LABEL_POINTER &&
+				rhs.label.label == -1) {
+				constant->type = CONSTANT_TYPE;
+				constant->data_type = expr->cast.target;
+				constant->uint_d = rhs.label.offset;
+			} else {
+				return 0;
+			}
+		} else {
+			*constant = constant_cast(rhs, expr->cast.target);
+		}
 	} break;
 
 	case E_POINTER_SUB:

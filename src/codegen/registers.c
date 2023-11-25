@@ -58,6 +58,7 @@ void scalar_to_reg(var_id scalar, int reg) {
 		break;
 
 	default:
+		printf("%d\n", size);
 		NOTIMP();
 	}
 }

@@ -219,6 +219,10 @@ const char *dbg_instruction(struct instruction ins) {
 		DBG_PRINT("%d = store part of %d with offset %d", ins.operands[0], ins.operands[1], ins.load_part.offset);
 		break;
 
+	case IR_ALLOC:
+		DBG_PRINT("%d = alloc with size %d", ins.operands[0], ins.alloc.size);
+		break;
+
 	default:
 		DBG_PRINT("%d <- %d op(%d) %d", ins.operands[0], ins.operands[1],
 				  ins.type, ins.operands[2]);

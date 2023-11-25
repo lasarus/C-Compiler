@@ -1,4 +1,5 @@
 #include "function_parser.h"
+#include "expression_to_ir.h"
 #include "symbols.h"
 #include "expression.h"
 #include "declaration.h"
@@ -126,7 +127,7 @@ int parse_expression_statement(void) {
 	if (!expr)
 		return 0;
 	TEXPECT(T_SEMI_COLON);
-	expression_to_ir_clear_temp(expr);
+	expression_to_void(expr);
 	return 1;
 }
 
@@ -157,8 +158,7 @@ static int parse_switch(struct jump_blocks jump_blocks) {
 	ir_goto(block_end);
 	ir_block_start(block_control);
 
-	ir_switch_selection(expression_to_ir_clear_temp(expression_cast(condition, type_simple(ST_INT))),
-						labels);
+	ir_switch_selection(expression_to_int(condition), labels);
 
 	ir_block_start(block_end);
 
@@ -172,7 +172,7 @@ int parse_selection_statement(struct jump_blocks jump_blocks) {
 		if(!expr)
 			ERROR(T0->pos, "Expected expression in if condition");
 
-		var_id condition = expression_to_ir_clear_temp(expr);
+		var_id condition = expression_to_ir(expr);
 
 		TEXPECT(T_RPAR);
 		block_id block_true = new_block(),
@@ -231,7 +231,7 @@ static int parse_do_while_statement(struct jump_blocks jump_blocks) {
 	if (!control_expression)
 		ERROR(T0->pos, "Expected expression");
 
-	var_id control_variable = expression_to_ir_clear_temp(control_expression);
+	var_id control_variable = expression_to_int(control_expression);
 
 	TEXPECT(T_RPAR);
 
@@ -272,7 +272,7 @@ static int parse_while_statement(struct jump_blocks jump_blocks) {
 
 	TEXPECT(T_RPAR);
 
-	var_id control_variable = expression_to_ir_clear_temp(control_expression);
+	var_id control_variable = expression_to_int(control_expression);
 
 	ir_if_selection(control_variable, block_body, block_end);
 
@@ -333,7 +333,7 @@ static int parse_for_statement(struct jump_blocks jump_blocks) {
 
 	struct expr *condition = parse_expression();
 	if (condition) {
-		var_id condition_variable = expression_to_ir_clear_temp(condition);
+		var_id condition_variable = expression_to_int(condition);
 
 		ir_if_selection(condition_variable, block_body, block_end);
 	} else {
@@ -346,7 +346,7 @@ static int parse_for_statement(struct jump_blocks jump_blocks) {
 
 	struct expr *advance_expression = parse_expression();
 	if (advance_expression) // Can be empty
-		expression_to_ir_clear_temp(advance_expression);
+		expression_to_void(advance_expression);
 
 	ir_goto(block_control);
 	ir_block_start(block_body);

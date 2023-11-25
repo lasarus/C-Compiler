@@ -2,7 +2,7 @@
 
 #include <common.h>
 #include <types.h>
-#include <parser/expression.h>
+#include <parser/expression_to_ir.h>
 #include <parser/parser.h>
 
 #include <stdlib.h>
@@ -32,7 +32,7 @@ var_id allocate_vla(struct type *type) {
 	static int dominance = 0;
 	struct type *n_type = type_pointer(type->children[0]);
 	struct expr *size_expr = type_sizeof(type);
-	var_id size = expression_to_ir(size_expr);
+	var_id size = expression_to_size_t(size_expr);
 	var_id ptr = new_variable(n_type, 1, 0);
 	var_id slot = new_variable(n_type, 1, 0);
 	IR_PUSH_STACK_ALLOC(ptr, size, slot, dominance);
