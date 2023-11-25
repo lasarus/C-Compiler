@@ -197,8 +197,8 @@ struct type *symbols_get_identifier_type(struct symbol_identifier *symbol) {
 	switch (symbol->type) {
 	case IDENT_LABEL: return symbol->label.type;
 	case IDENT_CONSTANT: return symbol->constant.data_type;
+	case IDENT_PARAMETER: return symbol->parameter.type;
 	case IDENT_VARIABLE: return symbol->variable.type;
-	case IDENT_VARIABLE_LENGTH_ARRAY: return symbol->variable_length_array.type;
 	default: NOTIMP();
 	}
 }

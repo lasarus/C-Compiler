@@ -24,6 +24,10 @@ var_id new_variable(struct type *type, int allocate, int stack_bucket) {
 	return new_variable_sz(calculate_size(type), allocate, stack_bucket);
 }
 
+var_id new_ptr(void) {
+	return new_variable_sz(8, 1, 0);
+}
+
 var_id allocate_vla(struct type *type) {
 	static int dominance = 0;
 	struct type *n_type = type_pointer(type->children[0]);
@@ -68,10 +72,6 @@ int get_variable_size(var_id variable) {
 void init_variables(void) {
 	variables_size = 0;
 	new_variable(type_simple(ST_VOID), 0, 0);
-}
-
-void change_variable_size(var_id var, int size) {
-	variables[var].size = size;
 }
 
 void variable_set_stack_bucket(var_id var, int stack_bucket) {

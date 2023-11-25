@@ -187,16 +187,9 @@ static struct call_info get_calling_convention(struct type *function_type, int n
 }
 
 static void split_variable(var_id variable, int n_parts, var_id *parts) {
-	var_id address = new_variable_sz(8, 1, 1);
-	var_id offset_constant = new_variable_sz(8, 1, 1);
-	ir_push2(IR_ADDRESS_OF, address, variable);
-
-	IR_PUSH_CONSTANT(constant_simple_unsigned(abi_info.size_type, 8), offset_constant);
-
 	for (int i = 0; i < n_parts; i++) {
 		parts[i] = new_variable_sz(8, 1, 1);
-		ir_push2(IR_LOAD, parts[i], address);
-		ir_push3(IR_ADD, address, address, offset_constant);
+		IR_PUSH_LOAD_PART(parts[i], variable, i * 8);
 	}
 }
 
@@ -204,7 +197,7 @@ static void sysv_ir_function_call(var_id result, var_id func_var, struct type *f
 	struct call_info c = get_calling_convention(function_type, n_args, argument_types, args);
 
 	if (c.returns_address) {
-		ir_push2(IR_ADDRESS_OF, c.ret_address, result);
+		IR_PUSH_ALLOC(c.ret_address, get_variable_size(result));
 	}
 
 	var_id rax_constant = VOID_VAR;
@@ -217,13 +210,7 @@ static void sysv_ir_function_call(var_id result, var_id func_var, struct type *f
 		if (!c.regs[i].merge_into)
 			continue;
 
-		var_id address = new_variable_sz(8, 1, 1);
-		var_id offset_constant = new_variable_sz(8, 1, 1);
-
-		IR_PUSH_CONSTANT(constant_simple_unsigned(abi_info.size_type, c.regs[i].merge_pos), offset_constant);
-		ir_push2(IR_ADDRESS_OF, address, c.regs[i].merge_into);
-		ir_push3(IR_ADD, address, address, offset_constant);
-		ir_push2(IR_LOAD, c.regs[i].variable, address);
+		IR_PUSH_LOAD_PART(c.regs[i].variable, c.regs[i].merge_into, c.regs[i].merge_pos);
 	}
 
 	int total_mem_needed = 0;
@@ -251,18 +238,13 @@ static void sysv_ir_function_call(var_id result, var_id func_var, struct type *f
 	for (int i = 0; i < c.ret_regs_size; i++)
 		IR_PUSH_GET_REG(c.ret_regs[i].variable, c.ret_regs[i].register_idx, c.ret_regs[i].is_sse);
 
-	if (c.ret_regs_size == 1) {
+	if (c.returns_address) {
+		ir_push2(IR_LOAD, result, c.ret_address);
+	} else if (c.ret_regs_size == 1) {
 		ir_push2(IR_INT_CAST_ZERO, result, c.ret_regs[0].variable);
 	} else if (c.ret_regs_size == 2) {
-		var_id address = new_variable_sz(8, 1, 1);
-		var_id eight_constant = new_variable_sz(8, 1, 1);
-
-		IR_PUSH_CONSTANT(constant_simple_unsigned(abi_info.size_type, 8), eight_constant);
-		ir_push2(IR_ADDRESS_OF, address, result);
-
-		ir_push2(IR_STORE, c.ret_regs[0].variable, address);
-		ir_push3(IR_ADD, address, address, eight_constant);
-		ir_push2(IR_STORE, c.ret_regs[1].variable, address);
+		IR_PUSH_STORE_PART(result, c.ret_regs[0].variable, 0);
+		IR_PUSH_STORE_PART(result, c.ret_regs[1].variable, 8);
 	}
 
 	IR_PUSH_MODIFY_STACK_POINTER(+stack_sub + c.shadow_space);
@@ -318,13 +300,7 @@ static void sysv_ir_function_new(struct type *type, var_id *args, const char *na
 		if (!c.regs[i].merge_into)
 			continue;
 
-		var_id address = new_variable_sz(8, 1, 1);
-		var_id offset_constant = new_variable_sz(8, 1, 1);
-
-		IR_PUSH_CONSTANT(constant_simple_unsigned(abi_info.size_type, c.regs[i].merge_pos), offset_constant);
-		ir_push2(IR_ADDRESS_OF, address, c.regs[i].merge_into);
-		ir_push3(IR_ADD, address, address, offset_constant);
-		ir_push2(IR_STORE, c.regs[i].variable, address);
+		IR_PUSH_STORE_PART(c.regs[i].merge_into, c.regs[i].variable, c.regs[i].merge_pos);
 	}
 
 	func->abi_data = ALLOC(abi_data);

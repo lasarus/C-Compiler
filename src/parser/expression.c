@@ -134,8 +134,8 @@ static struct type *calculate_type(struct expr *expr) {
 	case E_VARIABLE:
 		return expr->variable.type;
 
-	case E_VARIABLE_LENGTH_ARRAY:
-		return expr->variable.type;
+	case E_VARIABLE_PTR:
+		return expr->variable_ptr.type;
 
 	case E_INDIRECTION:
 		return type_deref(expr->args[0]->data_type);
@@ -480,9 +480,9 @@ static int try_expression_to_address(struct expr *expr, var_id *var) {
 		return 1;
 	}
 
-	case E_VARIABLE_LENGTH_ARRAY: {
+	case E_VARIABLE_PTR: {
 		var_id address = new_variable(type_pointer(expr->data_type), 1, 1);
-		ir_push2(IR_COPY, address, expr->variable_length_array.ptr);
+		ir_push2(IR_COPY, address, expr->variable_ptr.ptr);
 		*var = address;
 		return 1;
 	}
@@ -712,6 +712,10 @@ static var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		ir_push2(IR_COPY, res, expr->variable.id);
 		break;
 
+	case E_VARIABLE_PTR:
+		ir_push2(IR_LOAD, res, expr->variable_ptr.ptr);
+		break;
+
 	case E_INDIRECTION:
 		ir_push2(IR_LOAD, res, expression_to_ir(expr->args[0]));
 		break;
@@ -896,10 +900,13 @@ static var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		}
 	} break;
 
-	case E_COMPOUND_LITERAL:
-		ir_init_var(&expr->compound_literal.init, expr->compound_literal.type, res);
+	case E_COMPOUND_LITERAL: {
+		var_id base_address = new_variable(type_pointer(type_simple(ST_VOID)), 1, 1);
+	
+		ir_push2(IR_ADDRESS_OF, base_address, res);
+		ir_init_ptr(&expr->compound_literal.init, expr->compound_literal.type, base_address);
 		variable_set_stack_bucket(res, 0); // compound literals live until end of block.
-		break;
+	} break;
 
 	case E_COMMA:
 		expression_to_ir(expr->args[0]);
@@ -1009,7 +1016,8 @@ static struct expr *parse_prefix(void) {
 	} else if (TACCEPT(T_AMP)) {
 		struct position pos = T0->pos;
 		struct expr *rhs = parse_pratt(PREFIX_PREC);
-		if (rhs->type == E_VARIABLE && rhs->variable.is_register)
+		if ((rhs->type == E_VARIABLE && rhs->variable.is_register) ||
+			(rhs->type == E_VARIABLE_PTR && rhs->variable_ptr.is_register))
 			ERROR(pos, "Taking address of register variable is not allowed.");
 		return EXPR_ARGS(E_ADDRESS_OF, rhs);
 	} else if (TACCEPT(T_KSIZEOF)) {
@@ -1063,15 +1071,26 @@ static struct expr *parse_prefix(void) {
 					}
 				});
 
-		case IDENT_VARIABLE:
-			TNEXT();
-			return EXPR_VAR(sym->variable.id, sym->variable.type, sym->is_register);
-
-		case IDENT_VARIABLE_LENGTH_ARRAY:
+		case IDENT_PARAMETER:
 			TNEXT();
 			return expr_new((struct expr) {
-					.type = E_VARIABLE_LENGTH_ARRAY,
-					.variable_length_array = { sym->variable.id, sym->variable.type }
+					.type = E_VARIABLE,
+					.variable = {
+						sym->parameter.id,
+						sym->parameter.type,
+						sym->is_register
+					}
+				});
+
+		case IDENT_VARIABLE:
+			TNEXT();
+			return expr_new((struct expr) {
+					.type = E_VARIABLE_PTR,
+					.variable_ptr = {
+						sym->variable.ptr,
+						sym->variable.type,
+						sym->is_register
+					}
 				});
 
 		case IDENT_CONSTANT:

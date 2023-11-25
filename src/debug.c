@@ -182,8 +182,8 @@ const char *dbg_instruction(struct instruction ins) {
 		DBG_PRINT("%d = v_start", ins.operands[0]);
 		break;
 
-	case IR_SET_ZERO:
-		DBG_PRINT("%d = zero", ins.operands[0]);
+	case IR_SET_ZERO_PTR:
+		DBG_PRINT("zero ptr %d, size: %d", ins.operands[0], ins.set_zero_ptr.size);
 		break;
 
 	case IR_STACK_ALLOC:
@@ -209,6 +209,14 @@ const char *dbg_instruction(struct instruction ins) {
 
 	case IR_MODIFY_STACK_POINTER:
 		DBG_PRINT("modify stack pointer by %d", ins.modify_stack_pointer.change);
+		break;
+
+	case IR_LOAD_PART:
+		DBG_PRINT("%d = load part of %d with offset %d", ins.operands[0], ins.operands[1], ins.load_part.offset);
+		break;
+
+	case IR_STORE_PART:
+		DBG_PRINT("%d = store part of %d with offset %d", ins.operands[0], ins.operands[1], ins.load_part.offset);
 		break;
 
 	default:

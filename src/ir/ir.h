@@ -42,6 +42,7 @@ struct instruction {
 		IR_NEGATE_INT,
 		IR_NEGATE_FLOAT,
 		IR_BINARY_NOT,
+		IR_ALLOC,
 		IR_LOAD,
 		IR_STORE,
 		IR_ADDRESS_OF,
@@ -55,12 +56,15 @@ struct instruction {
 		IR_INT_FLOAT_CAST,
 		IR_FLOAT_INT_CAST,
 		IR_UINT_FLOAT_CAST,
-		IR_SET_ZERO,
+		IR_SET_ZERO_PTR,
 		IR_VA_START,
 		IR_VA_ARG, //IR_VA_COPY,
 		IR_STACK_ALLOC,
 		IR_ADD_TEMPORARY,
 		IR_CLEAR_STACK_BUCKET,
+
+		IR_LOAD_PART,
+		IR_STORE_PART,
 
 		// You should be careful with these instructions.
 		// They are here to allow for easier implementation
@@ -122,6 +126,26 @@ struct instruction {
 			int offset;
 		} load_base_relative;
 #define IR_PUSH_LOAD_BASE_RELATIVE(RESULT, OFFSET) IR_PUSH(.type = IR_LOAD_BASE_RELATIVE, .operands = {(RESULT)}, .load_base_relative = {(OFFSET)})
+
+		struct {
+			int size, stack_location;
+		} alloc;
+#define IR_PUSH_ALLOC(RESULT, SIZE) IR_PUSH(.type = IR_ALLOC, .operands = {(RESULT)}, .alloc = {(SIZE), -1})
+
+		struct {
+			int size;
+		} set_zero_ptr;
+#define IR_PUSH_SET_ZERO_PTR(RESULT, SIZE) IR_PUSH(.type = IR_SET_ZERO_PTR, .operands = {(RESULT)}, .set_zero_ptr = {(SIZE)})
+
+		struct {
+			int offset;
+		} load_part;
+#define IR_PUSH_LOAD_PART(RESULT, VAR, OFFSET) IR_PUSH(.type = IR_LOAD_PART, .operands = {(RESULT), (VAR)}, .load_part = {(OFFSET)})
+
+		struct {
+			int offset;
+		} store_part;
+#define IR_PUSH_STORE_PART(RESULT, VAR, OFFSET) IR_PUSH(.type = IR_STORE_PART, .operands = {(RESULT), (VAR)}, .store_part = {(OFFSET)})
 	};
 };
 
@@ -210,7 +234,7 @@ void ir_goto(block_id jump);
 void ir_return(var_id value, struct type *type);
 void ir_return_void(void);
 
-void ir_init_var(struct initializer *init, struct type *type, var_id result);
+void ir_init_ptr(struct initializer *init, struct type *type, var_id ptr);
 void ir_get_offset(var_id member_address, var_id base_address, var_id offset_var, int offset);
 void ir_set_bits(var_id result, var_id field, var_id value, int offset, int length);
 void ir_get_bits(var_id result, var_id field, int offset, int length, int sign_extend);

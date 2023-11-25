@@ -61,7 +61,7 @@ struct expr {
 	enum {
 		E_INVALID,
 		E_VARIABLE,
-		E_VARIABLE_LENGTH_ARRAY,
+		E_VARIABLE_PTR,
 		E_CALL,
 		E_CONSTANT,
 		E_GENERIC_SELECTION,
@@ -123,7 +123,8 @@ struct expr {
 		struct {
 			var_id ptr;
 			struct type *type;
-		} variable_length_array;
+			int is_register;
+		} variable_ptr;
 
 		struct {
 			struct expr *lhs;

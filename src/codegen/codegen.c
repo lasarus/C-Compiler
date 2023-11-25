@@ -206,26 +206,42 @@ static void codegen_instruction(struct instruction ins, struct function *func) {
 		codegen_call(ins.operands[0], ins.call.non_clobbered_register);
 		break;
 
-	case IR_LOAD: {
+	case IR_LOAD:
 		scalar_to_reg(ins.operands[1], REG_RDI);
 		asm_ins2("leaq", MEM(-variable_info[ins.operands[0]].stack_location, REG_RBP), R8(REG_RSI));
 
 		codegen_memcpy(get_variable_size(ins.operands[0]));
-	} break;
+		break;
+
+	case IR_LOAD_PART:
+		asm_ins2("leaq", MEM(-variable_info[ins.operands[1]].stack_location + ins.load_part.offset, REG_RBP), R8(REG_RDI));
+		asm_ins2("leaq", MEM(-variable_info[ins.operands[0]].stack_location, REG_RBP), R8(REG_RSI));
+
+		codegen_memcpy(get_variable_size(ins.operands[0]));
+		break;
 
 	case IR_LOAD_BASE_RELATIVE:
 		asm_ins2("leaq", MEM(ins.load_base_relative.offset, REG_RBP), R8(REG_RDI));
 		asm_ins2("leaq", MEM(-variable_info[ins.operands[0]].stack_location, REG_RBP), R8(REG_RSI));
 
 		codegen_memcpy(get_variable_size(ins.operands[0]));
-	break;
+		break;
 
-	case IR_STORE: {
+	case IR_STORE:
 		scalar_to_reg(ins.operands[1], REG_RSI);
 		asm_ins2("leaq", MEM(-variable_info[ins.operands[0]].stack_location, REG_RBP), R8(REG_RDI));
 
 		codegen_memcpy(get_variable_size(ins.operands[0]));
-	} break;
+		break;
+
+	case IR_STORE_PART:
+		asm_ins2("leaq", MEM(-variable_info[ins.operands[0]].stack_location + ins.store_part.offset, REG_RBP), R8(REG_RSI));
+		asm_ins2("leaq", MEM(-variable_info[ins.operands[1]].stack_location, REG_RBP), R8(REG_RDI));
+
+		assert(get_variable_size(ins.operands[1]) + ins.store_part.offset <= get_variable_size(ins.operands[0]));
+
+		codegen_memcpy(get_variable_size(ins.operands[1]));
+		break;
 
 	case IR_STORE_STACK_RELATIVE: {
 		asm_ins2("leaq", MEM(ins.store_stack_relative.offset, REG_RSP), R8(REG_RSI));
@@ -364,9 +380,10 @@ static void codegen_instruction(struct instruction ins, struct function *func) {
 		abi_emit_va_arg(ins.operands[0], ins.va_arg_.array, ins.va_arg_.type);
 		break;
 
-	case IR_SET_ZERO:
-		asm_ins2("leaq", MEM(-variable_info[ins.operands[0]].stack_location, REG_RBP), R8(REG_RDI));
-		codegen_memzero(get_variable_size(ins.operands[0]));
+	case IR_SET_ZERO_PTR:
+		scalar_to_reg(ins.operands[0], REG_RDI);
+		//asm_ins2("leaq", MEM(-variable_info[ins.operands[0]].stack_location, REG_RBP), R8(REG_RDI));
+		codegen_memzero(ins.set_zero_ptr.size);
 		break;
 
 	case IR_STACK_ALLOC: {
@@ -428,6 +445,12 @@ static void codegen_instruction(struct instruction ins, struct function *func) {
 
 	case IR_MODIFY_STACK_POINTER:
 		asm_ins2("addq", IMM(ins.modify_stack_pointer.change), R8(REG_RSP));
+		break;
+
+	case IR_ALLOC:
+		assert(ins.alloc.stack_location != -1);
+		asm_ins2("leaq", MEM(-ins.alloc.stack_location, REG_RBP), R8(REG_RSI));
+		reg_to_scalar(REG_RSI, ins.operands[0]);
 		break;
 
 	default:
@@ -512,6 +535,18 @@ static void codegen_function(struct function *func) {
 	}
 
 	vla_info.size = 0;
+
+	for (int i = 0; i < func->size; i++) {
+		struct block *block = get_block(func->blocks[i]);
+
+		for (int j = 0; j < block->size; j++) {
+			struct instruction *ins = block->instructions + j;
+			if (ins->type == IR_ALLOC) {
+				perm_stack_count += ins->alloc.size;
+				ins->alloc.stack_location = perm_stack_count;
+			}
+		}
+	}
 
 	for (int i = 0; i < func->size; i++) {
 		struct block *block = get_block(func->blocks[i]);

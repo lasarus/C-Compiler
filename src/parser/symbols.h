@@ -19,8 +19,8 @@ void symbols_reset(void);
 
 struct symbol_identifier {
 	enum {
+		IDENT_PARAMETER,
 		IDENT_VARIABLE,
-		IDENT_VARIABLE_LENGTH_ARRAY,
 		IDENT_CONSTANT,
 		IDENT_LABEL,
 	} type;
@@ -30,11 +30,11 @@ struct symbol_identifier {
 		struct {
 			struct type *type;
 			var_id id;
-		} variable;
+		} parameter;
 		struct {
 			struct type *type;
-			var_id id;
-		} variable_length_array;
+			var_id ptr;
+		} variable;
 		struct {
 			struct type *type;
 			struct string_view name;

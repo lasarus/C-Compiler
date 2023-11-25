@@ -447,9 +447,8 @@ void parse_function(struct string_view name, struct type *type, int arg_n, var_i
 
 	current_ret_val = type->children[0];
 
-	if (!symbol) {
+	if (!symbol)
 		symbol = symbols_add_identifier_global(name);
-	}
 
 	symbol->type = IDENT_LABEL;
 	symbol->label.type = type;

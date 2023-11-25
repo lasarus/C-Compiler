@@ -33,16 +33,18 @@ static void ms_ir_function_call(var_id result, var_id func_var, struct type *typ
 	var_id registers[4];
 	int is_floating[4] = { 0 };
 	int register_idx = 0;
-	int ret_in_register = 0;
+	int ret_in_register = 0, ret_in_address = 0;
 
 	if (!type_is_simple(return_type, ST_VOID)) {
 		if (fits_into_reg(return_type)) {
 			ret_in_register = 1;
 		} else {
 			registers[0] = new_variable_sz(8, 1, 0);
-			ir_push2(IR_ADDRESS_OF, registers[0], result);
+			IR_PUSH_ALLOC(registers[0], get_variable_size(result));
 
 			register_idx++;
+
+			ret_in_address = 1;
 		}
 	}
 
@@ -55,7 +57,8 @@ static void ms_ir_function_call(var_id result, var_id func_var, struct type *typ
 
 		if (!fits_into_reg(argument_types[i])) {
 			reg_to_push = new_variable_sz(8, 1, 1);
-			ir_push2(IR_ADDRESS_OF, reg_to_push, args[i]);
+			IR_PUSH_ALLOC(reg_to_push, get_variable_size(args[i]));
+			ir_push2(IR_STORE, args[i], reg_to_push);
 		}
 
 		if (register_idx < 4) {
@@ -76,8 +79,11 @@ static void ms_ir_function_call(var_id result, var_id func_var, struct type *typ
 
 	IR_PUSH_CALL(func_var, REG_RBX);
 
-	if (ret_in_register)
+	if (ret_in_register) {
 		IR_PUSH_GET_REG(result, REG_RAX, type_is_floating(return_type));
+	} else if (ret_in_address) {
+		ir_push2(IR_LOAD, result, registers[0]);
+	}
 
 	IR_PUSH_MODIFY_STACK_POINTER(+stack_sub + shadow_space);
 }

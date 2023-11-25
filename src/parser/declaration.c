@@ -728,10 +728,10 @@ static struct parameter_list parse_parameter_list(void) {
 		if (!was_abstract) {
 			ret.arguments = cc_realloc(ret.arguments, ret.n * sizeof(*ret.arguments));
 			struct symbol_identifier *ident = symbols_add_identifier(name);
-			ident->type = IDENT_VARIABLE;
-			ident->variable.type = type;
-			ident->variable.id = new_variable(type, 0, 0);
-			ret.arguments[ret.n - 1] = ident->variable.id;
+			ident->type = IDENT_PARAMETER;
+			ident->parameter.type = type;
+			ident->parameter.id = new_variable(type, 0, 0);
+			ret.arguments[ret.n - 1] = ident->parameter.id;
 		}
 
 		if (T0->type == T_RPAR)
@@ -1339,21 +1339,24 @@ static int parse_init_declarator(struct specifiers s, int external, int *was_fun
 			data_register_static_var(name, type, init, is_global);
 		} else {
 			if (type_has_variable_size(type)) {
-				symbol->type = IDENT_VARIABLE_LENGTH_ARRAY;
-				symbol->variable_length_array.id = allocate_vla(type);
-				symbol->variable_length_array.type = type;
+				symbol->type = IDENT_VARIABLE;
+				symbol->variable.ptr = allocate_vla(type);
+				symbol->variable.type = type;
 
 				if (has_init)
 					ERROR(T0->pos, "Variable length array can't have initializer");
 			} else {
 				symbol->type = IDENT_VARIABLE;
-				symbol->variable.id = new_variable(type, 1, 0);
+				var_id ptr = new_ptr();
+				symbol->variable.ptr = ptr;
 				symbol->variable.type = type;
 				if (has_init) {
 					struct initializer init = parse_initializer(&type);
 					symbol->variable.type = type;
-					change_variable_size(symbol->variable.id, calculate_size(type));
-					ir_init_var(&init, type, symbol->variable.id);
+					IR_PUSH_ALLOC(ptr, calculate_size(type));
+					ir_init_ptr(&init, type, ptr);
+				} else {
+					IR_PUSH_ALLOC(ptr, calculate_size(type));
 				}
 			}
 		}

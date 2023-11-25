@@ -238,12 +238,10 @@ static void ir_init_var_recursive(struct initializer *init, struct type *type, v
 	}
 }
 
-void ir_init_var(struct initializer *init, struct type *type, var_id result) {
-	ir_push1(IR_SET_ZERO, result);
-	var_id base_address = new_variable(type_pointer(type_simple(ST_VOID)), 1, 1);
-	ir_push2(IR_ADDRESS_OF, base_address, result);
+void ir_init_ptr(struct initializer *init, struct type *type, var_id ptr) {
+	IR_PUSH_SET_ZERO_PTR(ptr, calculate_size(type));
 
-	ir_init_var_recursive(init, type, base_address, -1, -1);
+	ir_init_var_recursive(init, type, ptr, -1, -1);
 }
 
 void ir_call(var_id result, var_id func_var, struct type *function_type, int n_args, struct type **argument_types, var_id *args) {
