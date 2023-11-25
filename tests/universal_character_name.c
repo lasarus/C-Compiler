@@ -40,4 +40,9 @@ int main(void) {
 	assert(L'\U00012213' == L'𒈓');
 	assert(u'\u16A8' == u'ᚨ');
 	assert(U'\U00012213' == U'𒈓');
+
+	{
+		int 𒈓 = 0;
+		char *𒈔 = 0;
+	}
 }

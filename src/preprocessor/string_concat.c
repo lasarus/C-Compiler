@@ -3,6 +3,7 @@
 #include "tokenizer.h"
 
 #include <common.h>
+#include <utf8.h>
 
 #include <assert.h>
 
@@ -41,38 +42,12 @@ static struct string_view buffer_get(void) {
 	return ret;
 }
 
-static uint32_t take_utf8(struct position pos, struct string_view *input) {
+static uint32_t take_utf8(struct string_view *input) {
 	assert(input->len);
-	unsigned char c1 = input->str[0];
-	uint32_t codepoint = 0;
 
-	sv_tail(input, 1);
-
-	if (!(c1 & 0x80))
-		return c1;
-
-	unsigned n_bytes = 0; // Additional bytes.
-	if ((c1 & 0xe0) == 0xc0) {
-		n_bytes = 1;
-		codepoint |= c1 & 0x1f;
-	} else if ((c1 & 0xf0) == 0xe0) {
-		n_bytes = 2;
-		codepoint |= c1 & 0x0f;
-	} else if ((c1 & 0xf8) == 0xf0) {
-		n_bytes = 3;
-		codepoint |= c1 & 0x07;
-	}
-
-	if (input->len < (int)n_bytes)
-		ERROR(pos, "Invalid UTF-8 encoding.");
-
-	for (unsigned i = 0; i < n_bytes; i++) {
-		codepoint <<= 6;
-		assert((input->str[i] & 0xc0) == 0x80);
-		codepoint |= input->str[i] & 0x3f;
-	}
-
-	sv_tail(input, n_bytes);
+	const char *advance = input->str;
+	uint32_t codepoint = utf8_decode(&advance);
+	sv_tail(input, advance - input->str);
 
 	return codepoint;
 }
@@ -88,7 +63,7 @@ static int escape_char_to_buffer(struct string_view *input,
 	if (!parse_escape_sequence(input, &character, pos)) {
 		if (type == STRING_L || type == STRING_U_LARGE ||
 			type == STRING_U_SMALL) {
-			character = take_utf8(pos, input);
+			character = take_utf8(input);
 		} else {
 			character = input->str[0];
 			sv_tail(input, 1);

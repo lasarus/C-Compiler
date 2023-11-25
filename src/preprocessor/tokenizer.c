@@ -2,6 +2,7 @@
 #include "input.h"
 
 #include <common.h>
+#include <utf8.h>
 
 #include <string.h>
 #include <limits.h>
@@ -113,55 +114,22 @@ static int eat_universal_character_name(struct input *input) {
 		CNEXT();
 	}
 
-	// Read https://en.wikipedia.org/wiki/UTF-8 for information
-	// on how to encode utf-8.
-	if (codepoint <= 0x7f) {
-		ADD_ELEMENT(buffer_size, buffer_cap, buffer) = codepoint & 0xff;
-	} else if (codepoint <= 0x7ff) {
-		ADD_ELEMENT(buffer_size, buffer_cap, buffer) = (codepoint >> 6) | 0xc0;
-		ADD_ELEMENT(buffer_size, buffer_cap, buffer) = (codepoint & 0x3f) | 0x80;
-	} else if (codepoint <= 0xffff) {
-		ADD_ELEMENT(buffer_size, buffer_cap, buffer) = (codepoint >> 12) | 0xe0;
-		ADD_ELEMENT(buffer_size, buffer_cap, buffer) = ((codepoint >> 6) & 0x3f) | 0x80;
-		ADD_ELEMENT(buffer_size, buffer_cap, buffer) = (codepoint & 0x3f) | 0x80;
-	} else if (codepoint <= 0x10ffff) {
-		ADD_ELEMENT(buffer_size, buffer_cap, buffer) = (codepoint >> 18) | 0xf0;
-		ADD_ELEMENT(buffer_size, buffer_cap, buffer) = ((codepoint >> 12) & 0x3f) | 0x80;
-		ADD_ELEMENT(buffer_size, buffer_cap, buffer) = ((codepoint >> 6) & 0x3f) | 0x80;
-		ADD_ELEMENT(buffer_size, buffer_cap, buffer) = (codepoint & 0x3f) | 0x80;
-	} else {
-		ERROR(input->pos[0], "Cant encode codepoint %ju.", codepoint);
-	}
+	char encoded[4];
+	utf8_encode(codepoint, encoded);
+	for (int i = 0; i < 4 && encoded[i]; i++)
+		ADD_ELEMENT(buffer_size, buffer_cap, buffer) = encoded[i];
 
 	return 1;
 }
 
 // Returns number of codepoints that are valid unicode identifiers.
 static int num_valid_unicode_identifiers(struct input *input) {
-	unsigned char c0 = C0;
+	if (((unsigned char)C0 & 0x80) == 0)
+		return 0;
 
-	int len = 0;
-	uintmax_t codepoint = 0;
-
-	if ((c0 >> 7) == 0) {
-		return 0; // This is just ASCII.
-		/* len = 1; */
-		/* codepoint |= c0 & 0x7f; */
-	} else if ((c0 >> 5) == 0x6) {
-		len = 2;
-		codepoint |= c0 & 0x1f;
-	} else if ((c0 >> 4) == 0xe) {
-		len = 3;
-		codepoint |= c0 & 0xf;
-	} else if ((c0 >> 3) == 0x1e) {
-		len = 4;
-		codepoint |= c0 & 0x7;
-	}
-
-	for (int i = 1; i < len; i++) {
-		codepoint <<= 6;
-		codepoint |= c0 & 0x37;
-	}
+	const char *advance = input->c;
+	uint32_t codepoint = utf8_decode(&advance);
+	int len = advance - input->c;
 
 #define A(A) if (codepoint == 0x ## A) return len;
 #define R(A, B) if (codepoint >= 0x ## A && codepoint <= 0x ## B) return len;
