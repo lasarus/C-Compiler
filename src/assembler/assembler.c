@@ -5,6 +5,7 @@
 #include "linker/elf.h"
 
 #include <common.h>
+#include <escape_sequence.h>
 #include <inttypes.h>
 #include <codegen/registers.h>
 
@@ -112,7 +113,7 @@ void asm_string(struct string_view str) {
 		asm_emit_no_newline("\t.string \"");
 		for (int i = 0; i < str.len; i++) {
 			char buffer[5];
-			character_to_escape_sequence(str.str[i], buffer, 0, 1);
+			character_to_escape_sequence(str.str[i], buffer, 0);
 			asm_emit_no_newline("%s", buffer);
 		}
 		asm_emit_no_newline("\"\n");

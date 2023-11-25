@@ -75,87 +75,6 @@ intmax_t character_constant_char32_to_int(struct string_view str) {
 	return character_constant_wchar_to_int(str);
 }
 
-unsigned char needs_no_escape[CHAR_MAX];
-unsigned char has_simple_escape[CHAR_MAX];
-unsigned char has_complicated_escape[CHAR_MAX]; // Some assemblers don't support escape codes like \a
-
-void init_source_character_set(void) {
-	const char *str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!#%&()*+,-./:;<=>[]^_{|}~ ";
-	for (; *str; str++) {
-		int idx = *str;
-		if (idx >= 0 && idx < 128)
-			needs_no_escape[idx] = 1;
-	}
-
-	has_simple_escape['\n'] = 'n';
-	has_simple_escape['\t'] = 't';
-	has_simple_escape['\"'] = '\"';
-	has_simple_escape['\''] = '\'';
-	has_simple_escape['\\'] = '\\';
-	has_simple_escape['\n'] = 'n';
-	has_simple_escape['\t'] = 't';
-	has_complicated_escape['?'] = '?';
-	has_complicated_escape['\a'] = 'a';
-	has_complicated_escape['\b'] = 'b';
-	has_complicated_escape['\f'] = 'f';
-	has_complicated_escape['\r'] = 'r';
-	has_complicated_escape['\v'] = 'v';
-}
-
-void character_to_escape_sequence(char character, char *output, int allow_complicated_escape, int string) {
-	int octal[3] = { 0 };
-
-	if (character == '"') {
-		if (string) {
-			output[0] = '\\';
-			output[1] = '"';
-			output[2] = '\0';
-		} else {
-			output[0] = '"';
-			output[1] = '\0';
-		}
-		return;
-	} else if (character == '\'') {
-		if (!string) {
-			output[0] = '\\';
-			output[1] = '\'';
-			output[2] = '\0';
-		} else {
-			output[0] = '\'';
-			output[1] = '\0';
-		}
-		return;
-	} else if ((int)character >= 0 && needs_no_escape[(int)character]) {
-		output[0] = character;
-		output[1] = '\0';
-		return;
-	} else if ((int)character >= 0 && has_simple_escape[(int)character]) {
-		output[0] = '\\';
-		output[1] = has_simple_escape[(int)character];
-		output[2] = '\0';
-		return;
-	} else if (allow_complicated_escape && (int)character >= 0 &&
-			   has_complicated_escape[(int)character]) {
-		output[0] = '\\';
-		output[1] = has_complicated_escape[(int)character];
-		output[2] = '\0';
-		return;
-	}
-
-	unsigned char uchar = character;
-	octal[2] = uchar % 8;
-	uchar /= 8;
-	octal[1] = uchar % 8;
-	uchar /= 8;
-	octal[0] = uchar % 8;
-	
-	output[0] = '\\';
-	output[1] = octal[0] + '0';
-	output[2] = octal[1] + '0';
-	output[3] = octal[2] + '0';
-	output[4] = '\0';
-}
-
 uint64_t gen_mask(unsigned char left_pad, unsigned char right_pad) {
     uint64_t start = ~0;
 
@@ -307,4 +226,14 @@ void impl_warning(struct position pos, const char *fmt, ...) {
 	printf("\n");
 
 	va_end(va);
+}
+
+int char_to_int(char c) {
+	if (c >= '0' && c <= '9')
+		return c - '0';
+	if (c >= 'A' && c <= 'F')
+		return c - 'A' + 10;
+	if (c >= 'a' && c <= 'f')
+		return c - 'a' + 10;
+	ICE("%c is not a digit.", c);
 }

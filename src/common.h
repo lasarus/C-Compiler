@@ -45,9 +45,6 @@ intmax_t character_constant_to_int(struct string_view str);
 intmax_t character_constant_wchar_to_int(struct string_view str);
 intmax_t character_constant_char16_to_int(struct string_view str);
 intmax_t character_constant_char32_to_int(struct string_view str);
-void character_to_escape_sequence(char character, char *output, int allow_compilcated_escape, int string);
-
-void init_source_character_set(void);
 
 void write_8(uint8_t *data, uint64_t value);
 void write_16(uint8_t *data, uint64_t value);
@@ -72,6 +69,8 @@ void file_write_skip(FILE *fp, size_t target);
 
 void *cc_malloc(size_t size);
 void *cc_realloc(void *ptr, size_t size);
+
+int char_to_int(char c);
 
 #include <debug.h>
 

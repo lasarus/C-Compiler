@@ -8,6 +8,7 @@
 #include "linker/coff.h"
 #include "abi/abi.h"
 #include "arguments.h"
+#include "escape_sequence.h"
 
 #ifdef CONFIG_PATH
 #include CONFIG_PATH
@@ -277,7 +278,6 @@ int main(int argc, char **argv) {
 		ERROR_NO_POS("Can't have multiple input files with -o.");
 	}
 
-	init_source_character_set();
 	set_flags(&arguments);
 
 	for (int i = 0; i < arguments.n_operand; i++) {

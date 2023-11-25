@@ -2,7 +2,9 @@
 #include "input.h"
 
 #include <common.h>
+#include <escape_sequence.h>
 #include <utf8.h>
+#include <character_types.h>
 
 #include <string.h>
 #include <limits.h>
@@ -13,33 +15,9 @@
 #define C3 (input->c[3])
 #define CNEXT() input_next(input)
 
-enum {
-	C_DIGIT = 0x1,
-	C_OCTAL_DIGIT = 0x2,
-	C_HEXADECIMAL_DIGIT = 0x4,
-	C_SPACE = 0x10,
-	C_IDENTIFIER_NONDIGIT = 0x20,
-};
-
-// Sorry for this hardcoded table.
-// These are the constants above, and ored together to build a lookup table.
-// E.g.: char_props['c'] = C_HEXADECIMAL_DIGIT | C_IDENTIFIER_NONDIGIT
-static const unsigned char char_props[UCHAR_MAX] = {
-	['\t'] = 0x10, 0x10, 0x10, 0x10, 
-	[' '] = 0x10, ['$'] = 0x20, 
-	['_'] = 0x20, 
-	['0'] = 0x7, 0x7, 0x7, 0x7, 0x7, 0x7, 0x7, 0x7, 0x5, 0x5, 
-	['A'] = 0x24, 0x24, 0x24, 0x24, 0x24, 0x24, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 
-	0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 
-	['a'] = 0x24, 0x24, 0x24, 0x24, 0x24, 0x24, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 
-	0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20
-};
-
-#define HAS_PROP(C, PROP) (char_props[(unsigned char)(C)] & (PROP))
-
 static void flush_whitespace(struct input *input, int *whitespace, int *first_of_line) {
 	for (;;) {
-		if (HAS_PROP(C0, C_SPACE)) {
+		if (is_space(C0)) {
 			if(C0 == '\n')
 				*first_of_line = 1;
 
@@ -161,14 +139,14 @@ static int num_valid_unicode_identifiers(struct input *input) {
 
 static int parse_identifier(struct input *input, struct token *next) {
 	int unicode_len = num_valid_unicode_identifiers(input);
-	if (!HAS_PROP(C0, C_IDENTIFIER_NONDIGIT) && unicode_len == 0)
+	if (!is_nondigit_identifier(C0) && unicode_len == 0)
 		return 0;
 
 	buffer_start();
 	buffer_eat_len(input, unicode_len);
 
 	for (;;) {
-		if (HAS_PROP(C0, C_IDENTIFIER_NONDIGIT | C_DIGIT)) {
+		if (is_nondigit_identifier(C0) || is_decimal(C0)) {
 			buffer_eat(input);
 		} else if ((unicode_len = num_valid_unicode_identifiers(input))) {
 			buffer_eat_len(input, unicode_len);
@@ -183,8 +161,8 @@ static int parse_identifier(struct input *input, struct token *next) {
 }
 
 static int parse_pp_number(struct input *input, struct token *next) {
-	if (!(HAS_PROP(C0, C_DIGIT) ||
-		  (C0 == '.' && HAS_PROP(C1, C_DIGIT))))
+	if (!(is_decimal(C0) ||
+		  (C0 == '.' && is_decimal(C1))))
 		return 0;
 
 	buffer_start();
@@ -195,7 +173,7 @@ static int parse_pp_number(struct input *input, struct token *next) {
 			(C1 == '+' || C1 == '-')) {
 			buffer_eat(input);
 			buffer_eat(input);
-		} else if (HAS_PROP(C0, C_DIGIT | C_IDENTIFIER_NONDIGIT) || C0 == '.') {
+		} else if (is_decimal(C0) || is_nondigit_identifier(C0) || C0 == '.') {
 			buffer_eat(input);
 		} else {
 			break;
@@ -204,68 +182,6 @@ static int parse_pp_number(struct input *input, struct token *next) {
 
 	next->type = T_NUM;
 	next->str = buffer_get();
-	return 1;
-}
-
-int parse_escape_sequence(struct string_view *string, uint32_t *character, struct position pos) {
-	if (string->len == 0 || string->str[0] != '\\')
-		return 0;
-
-	sv_tail(string, 1);
-
-	if (HAS_PROP(string->str[0], C_OCTAL_DIGIT)) {
-		int result = 0;
-		for (int i = 0; i < 3 && string->len &&
-				 HAS_PROP(string->str[0], C_OCTAL_DIGIT); i++) {
-			result *= 8;
-			result += string->str[0] - '0';
-			sv_tail(string, 1);
-		}
-
-		*character = result;
-
-		return 1;
-	} else if (string->str[0] == 'x') {
-		sv_tail(string, 1);
-		int result = 0;
-
-		while (string->len && HAS_PROP(string->str[0], C_HEXADECIMAL_DIGIT)) {
-			result *= 16;
-			char digit = string->str[0];
-			if (HAS_PROP(digit, C_DIGIT)) {
-				result += digit - '0';
-			} else if (digit >= 'a' && digit <= 'f') {
-				result += digit - 'a' + 10;
-			} else if (digit >= 'A' && digit <= 'F') {
-				result += digit - 'A' + 10;
-			}
-
-			sv_tail(string, 1);
-		}
-
-		*character = result;
-		return 1;
-	}
-
-	switch (string->str[0]) {
-	case '\'': *character = '\''; break;
-	case '\"': *character = '\"'; break;
-	case '\?': *character = '?'; break; // Trigraphs are stupid.
-	case '\\': *character = '\\'; break;
-	case 'a': *character = '\a'; break;
-	case 'b': *character = '\b'; break;
-	case 'f': *character = '\f'; break;
-	case 'n': *character = '\n'; break;
-	case 'r': *character = '\r'; break;
-	case 't': *character = '\t'; break;
-	case 'v': *character = '\v'; break;
-
-	default:
-		ERROR(pos, "Invalid escape sequence \\%c", string->str[0]);
-	}
-
-	sv_tail(string, 1);
-
 	return 1;
 }
 
@@ -293,7 +209,7 @@ static struct string_view eat_string_like(struct input *input) {
 
 	if (C0 != end_char) {
 		char output[5];
-		character_to_escape_sequence(C0, output, 1, 1);
+		character_to_escape_sequence(C0, output, 1);
 		ERROR(input->pos[0], "Expected '%c', got '%s', while parsing \"%.*s\"", end_char, output,
 			  (int)buffer_size, buffer);
 	}

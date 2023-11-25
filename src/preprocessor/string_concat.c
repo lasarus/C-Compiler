@@ -4,6 +4,7 @@
 
 #include <common.h>
 #include <utf8.h>
+#include <escape_sequence.h>
 
 #include <assert.h>
 
@@ -54,13 +55,15 @@ static uint32_t take_utf8(struct string_view *input) {
 
 static int escape_char_to_buffer(struct string_view *input,
 								 char end_char,
-								 enum string_type type,
-								 struct position pos) {
+								 enum string_type type) {
 	if (input->len == 0 || input->str[0] == end_char)
 		return 0;
 
-	uint32_t character = 0;
-	if (!parse_escape_sequence(input, &character, pos)) {
+	uint32_t character;
+	const char *advance = input->str;
+	if (escape_sequence_read(&character, &advance, input->len)) {
+		sv_tail(input, advance - input->str);
+	} else {
 		if (type == STRING_L || type == STRING_U_LARGE ||
 			type == STRING_U_SMALL) {
 			character = take_utf8(input);
@@ -110,7 +113,7 @@ static enum string_type take_string_prefix(struct string_view *input) {
 	return STRING_DEFAULT;
 }
 
-static void escape_string_to_buffer(struct string_view input, enum string_type type, struct position pos) {
+static void escape_string_to_buffer(struct string_view input, enum string_type type) {
 	assert(input.len);
 
 	char end_char = input.str[0];
@@ -119,7 +122,7 @@ static void escape_string_to_buffer(struct string_view input, enum string_type t
 
 	sv_tail(&input, 1);
 
-	while (escape_char_to_buffer(&input, end_char, type, pos));
+	while (escape_char_to_buffer(&input, end_char, type));
 
 	if (!(input.len && input.str[0] == end_char)) {
 		printf("Left over: \"%.*s\"\n", input.len, input.str);
@@ -166,7 +169,7 @@ struct token string_concat_next(void) {
 
 		buffer_start();
 		for (unsigned i = 0; i < string_tokens_size; i++)
-			escape_string_to_buffer(string_tokens[i].str, combined_type, string_tokens[i].pos);
+			escape_string_to_buffer(string_tokens[i].str, combined_type);
 		struct token ret = string_tokens[0];
 
 		switch (combined_type) {
@@ -209,7 +212,7 @@ struct token string_concat_next(void) {
 			ERROR(t.pos, "Can't have character constant with u8 prefix.");
 
 		buffer_start();
-		escape_string_to_buffer(t.str, type, t.pos);
+		escape_string_to_buffer(t.str, type);
 		t.str = buffer_get();
 
 		switch (type) {
@@ -235,7 +238,7 @@ struct token string_concat_next(void) {
 intmax_t escaped_character_constant_to_int(struct token t) {
 	enum string_type type = take_string_prefix(&t.str);
 	buffer_start();
-	escape_string_to_buffer(t.str, type, t.pos);
+	escape_string_to_buffer(t.str, type);
 
 	// No need to call buffer_get(), since we do not need
 	// a permanent string_view.
