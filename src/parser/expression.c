@@ -728,8 +728,9 @@ static var_id expression_to_ir_result(struct expr *expr, var_id res) {
 		var_id res;
 		if (!try_expression_to_address(expr->args[0], &res)) {
 			res = new_variable(type_pointer(expr->args[0]->data_type), 1, 1);
+			IR_PUSH_ALLOC(res, calculate_size(expr->args[0]->data_type));
 			var_id tmp = expression_to_ir(expr->args[0]);
-			ir_push2(IR_ADDRESS_OF, res, tmp);
+			ir_push2(IR_STORE, tmp, res);
 		}
 		return res;
 	} break;
