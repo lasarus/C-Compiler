@@ -5,7 +5,7 @@
 #include <codegen/registers.h>
 #include <arch/calling.h>
 #include <common.h>
-#include <preprocessor/macro_expander.h>
+#include <preprocessor/preprocessor.h>
 
 static const int calling_convention[] = { REG_RDI, REG_RSI, REG_RDX, REG_RCX, REG_R8, REG_R9 };
 static const int return_convention[] = { REG_RAX, REG_RDX };

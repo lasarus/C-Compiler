@@ -44,3 +44,16 @@ void preprocessor_reset(void) {
 	input_reset();
 	macro_expander_reset();
 }
+
+void define_remove(const char *name) {
+	// This is a safe (char *) cast, it will not be modified.
+	define_map_remove(sv_from_str((char *)name));
+}
+
+void preprocessor_write_dependencies(void) {
+	directiver_write_dependencies();
+}
+
+void preprocessor_finish_writing_dependencies(const char *mt, const char *mf) {
+	directiver_finish_writing_dependencies(mt, mf);
+}

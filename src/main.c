@@ -1,6 +1,4 @@
 #include "preprocessor/preprocessor.h"
-#include "preprocessor/macro_expander.h"
-#include "preprocessor/directives.h"
 #include "parser/parser.h"
 #include "parser/symbols.h"
 #include "codegen/codegen.h"
@@ -140,10 +138,10 @@ static void compile_file(const char *path,
 		add_definition(arguments->defines[i]);
 
 	for (int i = 0; i < arguments->n_undefine; i++)
-		define_map_remove(sv_from_str((char *)arguments->undefines[i]));
+		define_remove(arguments->undefines[i]);
 
 	if (arguments->flag_MD)
-		directiver_write_dependencies();
+		preprocessor_write_dependencies();
 
 	preprocessor_init(path);
 	parse_into_ir();
@@ -193,7 +191,7 @@ static void compile_file(const char *path,
 			mf_path = replace_object_file_suffix(outfile);
 		}
 
-		directiver_finish_writing_dependencies(mt_path, mf_path);
+		preprocessor_finish_writing_dependencies(mt_path, mf_path);
 	}
 
 	// TODO: The compiler currently relies too heavily on global state.
@@ -235,7 +233,7 @@ static void preprocess_file(const char *path, struct arguments *arguments) {
 		NOTIMP();
 
 	if (arguments->flag_MD)
-		directiver_write_dependencies();
+		preprocessor_write_dependencies();
 
 	preprocessor_init(path);
 

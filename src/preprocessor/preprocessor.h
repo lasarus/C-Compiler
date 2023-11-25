@@ -55,4 +55,10 @@ struct token *t_peek(int n);
 void preprocessor_init(const char *path);
 void preprocessor_reset(void);
 
+void define_string(char *name, char *value); // Defined in macro_expander.c
+void define_remove(const char *name);
+
+void preprocessor_write_dependencies(void);
+void preprocessor_finish_writing_dependencies(const char *mt, const char *mf);
+
 #endif
