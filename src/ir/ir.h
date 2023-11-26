@@ -45,8 +45,8 @@ struct instruction {
 		IR_ALLOC,
 		IR_LOAD,
 		IR_STORE,
-		IR_ADDRESS_OF,
 		IR_CONSTANT,
+		IR_CONSTANT_ADDRESS,
 		IR_CALL,
 		IR_COPY,
 		IR_BOOL_CAST,
@@ -93,6 +93,7 @@ struct instruction {
 			struct constant constant;
 		} constant;
 #define IR_PUSH_CONSTANT(CONSTANT, RESULT) IR_PUSH(.type = IR_CONSTANT, .operands={(RESULT)}, .constant = {(CONSTANT)})
+#define IR_PUSH_CONSTANT_ADDRESS(CONSTANT, ADDRESS) IR_PUSH(.type = IR_CONSTANT_ADDRESS, .operands={(ADDRESS)}, .constant = {(CONSTANT)})
 		struct {
 			int non_clobbered_register;
 		} call;

@@ -16,9 +16,10 @@ var_id evaluated_expression_to_address(struct evaluated_expression *evaluated_ex
 	switch (evaluated_expression->type) {
 	case EE_BITFIELD_POINTER: {
 		var_id bitfield_var = evaluated_expression_to_var(evaluated_expression);
-		var_id var = new_variable_sz(8, 1, 1);
-		ir_push2(IR_ADDRESS_OF, var, bitfield_var);
-		return var;
+		var_id address = new_variable_sz(8, 1, 1);
+		IR_PUSH_ALLOC(address, calculate_size(evaluated_expression->data_type));
+		ir_push2(IR_STORE, bitfield_var, address);
+		return address;
 	}
 
 	case EE_CONSTANT: {
@@ -34,10 +35,9 @@ var_id evaluated_expression_to_address(struct evaluated_expression *evaluated_ex
 			return var;
 		} else {
 			// Allocate memory, and push the constant to it.
-			var_id var = new_variable(evaluated_expression->data_type, 1, 1);
-			IR_PUSH_CONSTANT(constant, var);
 			var_id address = new_variable_sz(8, 1, 1);
-			ir_push2(IR_ADDRESS_OF, address, var);
+			IR_PUSH_ALLOC(address, calculate_size(evaluated_expression->data_type));
+			IR_PUSH_CONSTANT_ADDRESS(constant, address);
 			return address;
 		}
 	}
@@ -46,9 +46,10 @@ var_id evaluated_expression_to_address(struct evaluated_expression *evaluated_ex
 		return evaluated_expression->pointer;
 
 	case EE_VARIABLE: {
-		var_id var = new_variable_sz(8, 1, 1);
-		ir_push2(IR_ADDRESS_OF, var, evaluated_expression->variable);
-		return var;
+		var_id address = new_variable_sz(8, 1, 1);
+		IR_PUSH_ALLOC(address, calculate_size(evaluated_expression->data_type));
+		ir_push2(IR_STORE, evaluated_expression->variable, address);
+		return address;
 	}
 
 	case EE_VOID:
@@ -227,12 +228,10 @@ static struct evaluated_expression evaluate_symbol(struct expr *expr) {
 }
 
 static struct evaluated_expression evaluate_variable(struct expr *expr) {
-	var_id pointer = new_variable_sz(8, 1, 1);
-	ir_push2(IR_ADDRESS_OF, pointer, expr->variable.id);
 	return (struct evaluated_expression) {
-		.type = EE_POINTER,
+		.type = EE_VARIABLE,
 		.is_lvalue = 1,
-		.pointer = pointer
+		.pointer = expr->variable.id
 	};
 }
 

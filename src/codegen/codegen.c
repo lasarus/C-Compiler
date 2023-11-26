@@ -98,6 +98,63 @@ static void codegen_stackcpy(int dest, int source, int len) {
 	}
 }
 
+static void codegen_constant_to_rdi(struct constant *constant) {
+	switch (constant->type) {
+	case CONSTANT_TYPE: {
+		int size = calculate_size(constant->data_type);
+		if (constant->data_type->type == TY_SIMPLE ||
+			type_is_pointer(constant->data_type)) {
+			switch (size) {
+			case 1:
+				asm_ins2("movb", IMM(constant_to_u64(*constant)), MEM(0, REG_RDI));
+				break;
+			case 2:
+				asm_ins2("movw", IMM(constant_to_u64(*constant)), MEM(0, REG_RDI));
+				break;
+			case 4:
+				asm_ins2("movl", IMM(constant_to_u64(*constant)), MEM(0, REG_RDI));
+				break;
+			case 8:
+				asm_ins2("movabsq", IMM(constant_to_u64(*constant)), R8(REG_RAX));
+				asm_ins2("movq", R8(REG_RAX), MEM(0, REG_RDI));
+				break;
+
+			case 0: break;
+
+			default: NOTIMP();
+			}
+		} else {
+			uint8_t buffer[size];
+			constant_to_buffer(buffer, *constant, 0, -1);
+			for (int i = 0; i < size; i++)
+				asm_ins2("movb", IMM(buffer[i]), MEM(-i, REG_RDI));
+		}
+	} break;
+
+	case CONSTANT_LABEL:
+		if (codegen_flags.code_model == CODE_MODEL_LARGE) {
+			asm_ins2("movabsq", IMML(constant->label.label, constant->label.offset), R8(REG_RDI));
+		} else if (codegen_flags.code_model == CODE_MODEL_SMALL) {
+			asm_ins2("movq", IMML(constant->label.label, constant->label.offset), R8(REG_RDI));
+		}
+		asm_ins2("leaq", MEM(0, REG_RDI), R8(REG_RSI));
+		codegen_memcpy(calculate_size(constant->data_type));
+		break;
+
+	case CONSTANT_LABEL_POINTER:
+		if (codegen_flags.code_model == CODE_MODEL_LARGE) {
+			asm_ins2("movabsq", IMML(constant->label.label, constant->label.offset), R8(REG_RAX));
+			asm_ins2("movq", R8(REG_RAX), MEM(0, REG_RDI));
+		} else if (codegen_flags.code_model == CODE_MODEL_SMALL) {
+			asm_ins2("movq", IMML(constant->label.label, constant->label.offset), MEM(0, REG_RDI));
+		}
+		break;
+
+	default:
+		NOTIMP();
+	}
+}
+
 static void codegen_instruction(struct instruction ins, struct function *func) {
 	const char *ins_str = dbg_instruction(ins);
 	asm_comment("instruction start \"%s\":", ins_str);
@@ -120,64 +177,15 @@ static void codegen_instruction(struct instruction ins, struct function *func) {
 	}
 
 	switch (ins.type) {
-	case IR_CONSTANT: {
-		struct constant c = ins.constant.constant;
-		switch (c.type) {
-		case CONSTANT_TYPE: {
-			int size = calculate_size(c.data_type);
-			if (c.data_type->type == TY_SIMPLE ||
-				type_is_pointer(c.data_type)) {
-				switch (size) {
-				case 1:
-					asm_ins2("movb", IMM(constant_to_u64(c)), MEM(-variable_info[ins.operands[0]].stack_location, REG_RBP));
-					break;
-				case 2:
-					asm_ins2("movw", IMM(constant_to_u64(c)), MEM(-variable_info[ins.operands[0]].stack_location, REG_RBP));
-					break;
-				case 4:
-					asm_ins2("movl", IMM(constant_to_u64(c)), MEM(-variable_info[ins.operands[0]].stack_location, REG_RBP));
-					break;
-				case 8:
-					asm_ins2("movabsq", IMM(constant_to_u64(c)), R8(REG_RAX));
-					asm_ins2("movq", R8(REG_RAX), MEM(-variable_info[ins.operands[0]].stack_location, REG_RBP));
-					break;
+	case IR_CONSTANT:
+		asm_ins2("leaq", MEM(-variable_info[ins.operands[0]].stack_location, REG_RBP), R8(REG_RDI));
+		codegen_constant_to_rdi(&ins.constant.constant);
+		break;
 
-				case 0: break;
-
-				default: NOTIMP();
-				}
-			} else {
-				uint8_t buffer[size];
-				constant_to_buffer(buffer, c, 0, -1);
-				for (int i = 0; i < size; i++)
-					asm_ins2("movb", IMM(buffer[i]), MEM(-variable_info[ins.operands[0]].stack_location - i, REG_RBP));
-			}
-		} break;
-
-		case CONSTANT_LABEL:
-			if (codegen_flags.code_model == CODE_MODEL_LARGE) {
-				asm_ins2("movabsq", IMML(c.label.label, c.label.offset), R8(REG_RDI));
-			} else if (codegen_flags.code_model == CODE_MODEL_SMALL) {
-				asm_ins2("movq", IMML(c.label.label, c.label.offset), R8(REG_RDI));
-			}
-			asm_ins2("leaq", MEM(-variable_info[ins.operands[0]].stack_location, REG_RBP), R8(REG_RSI));
-			codegen_memcpy(get_variable_size(ins.operands[0]));
-			break;
-
-		case CONSTANT_LABEL_POINTER:
-			if (codegen_flags.code_model == CODE_MODEL_LARGE) {
-				asm_ins2("movabsq", IMML(c.label.label, c.label.offset), R8(REG_RAX));
-				asm_ins2("movq", R8(REG_RAX), MEM(-variable_info[ins.operands[0]].stack_location, REG_RBP));
-			} else if (codegen_flags.code_model == CODE_MODEL_SMALL) {
-				asm_ins2("movq", IMML(c.label.label, c.label.offset),
-						 MEM(-variable_info[ins.operands[0]].stack_location, REG_RBP));
-			}
-			break;
-
-		default:
-			NOTIMP();
-		}
-	} break;
+	case IR_CONSTANT_ADDRESS:
+		scalar_to_reg(ins.operands[0], REG_RDI);
+		codegen_constant_to_rdi(&ins.constant.constant);
+		break;
 
 	case IR_BINARY_NOT:
 		scalar_to_reg(ins.operands[1], REG_RAX);
@@ -397,11 +405,6 @@ static void codegen_instruction(struct instruction ins, struct function *func) {
 		}
 		reg_to_scalar(REG_RAX, ins.operands[0]);
 	} break;
-
-	case IR_ADDRESS_OF:
-		asm_ins2("leaq", MEM(-variable_info[ins.operands[1]].stack_location, REG_RBP), R8(REG_RAX));
-		reg_to_scalar(REG_RAX, ins.operands[0]);
-		break;
 
 	case IR_VA_START:
 		abi_emit_va_start(ins.operands[0], func);

@@ -174,10 +174,6 @@ const char *dbg_instruction(struct instruction ins) {
 		DBG_PRINT("%d = float_int_cast %d", ins.operands[0], ins.operands[1]);
 		break;
 
-	case IR_ADDRESS_OF:
-		DBG_PRINT("%d = address of %d", ins.operands[0], ins.operands[1]);
-		break;
-
 	case IR_VA_ARG:
 		DBG_PRINT("%d = v_arg", ins.operands[0]);
 		break;
