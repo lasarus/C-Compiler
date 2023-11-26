@@ -26,6 +26,7 @@ struct variable_info {
 extern struct variable_info *variable_info;
 
 void codegen(void);
+int codegen_get_alloc_preamble(void);
 
 // TODO: Why is rdi not destination?
 // From rdi to rsi address

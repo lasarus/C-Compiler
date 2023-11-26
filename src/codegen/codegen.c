@@ -24,6 +24,7 @@ struct vla_info {
 		var_id slot;
 		int dominance;
 	} *slots;
+	int alloc_preamble;
 } vla_info;
 
 static void codegen_call(var_id variable, int non_clobbered_register) {
@@ -220,11 +221,26 @@ static void codegen_instruction(struct instruction ins, struct function *func) {
 		codegen_memcpy(get_variable_size(ins.operands[0]));
 		break;
 
+	case IR_LOAD_PART_ADDRESS:
+		scalar_to_reg(ins.operands[1], REG_RDI);
+		asm_ins2("leaq", MEM(ins.load_part.offset, REG_RDI), R8(REG_RDI));
+		asm_ins2("leaq", MEM(-variable_info[ins.operands[0]].stack_location, REG_RBP), R8(REG_RSI));
+
+		codegen_memcpy(get_variable_size(ins.operands[0]));
+		break;
+
 	case IR_LOAD_BASE_RELATIVE:
 		asm_ins2("leaq", MEM(ins.load_base_relative.offset, REG_RBP), R8(REG_RDI));
 		asm_ins2("leaq", MEM(-variable_info[ins.operands[0]].stack_location, REG_RBP), R8(REG_RSI));
 
 		codegen_memcpy(get_variable_size(ins.operands[0]));
+		break;
+
+	case IR_LOAD_BASE_RELATIVE_ADDRESS:
+		asm_ins2("leaq", MEM(ins.load_base_relative_address.offset, REG_RBP), R8(REG_RDI));
+		scalar_to_reg(ins.operands[0], REG_RSI);
+
+		codegen_memcpy(ins.load_base_relative_address.size);
 		break;
 
 	case IR_STORE:
@@ -243,11 +259,26 @@ static void codegen_instruction(struct instruction ins, struct function *func) {
 		codegen_memcpy(get_variable_size(ins.operands[1]));
 		break;
 
+	case IR_STORE_PART_ADDRESS:
+		scalar_to_reg(ins.operands[0], REG_RSI);
+		asm_ins2("leaq", MEM(+ins.store_part.offset, REG_RSI), R8(REG_RSI));
+		asm_ins2("leaq", MEM(-variable_info[ins.operands[1]].stack_location, REG_RBP), R8(REG_RDI));
+
+		codegen_memcpy(get_variable_size(ins.operands[1]));
+		break;
+
 	case IR_STORE_STACK_RELATIVE: {
 		asm_ins2("leaq", MEM(ins.store_stack_relative.offset, REG_RSP), R8(REG_RSI));
 		asm_ins2("leaq", MEM(-variable_info[ins.operands[0]].stack_location, REG_RBP), R8(REG_RDI));
 
 		codegen_memcpy(get_variable_size(ins.operands[0]));
+	} break;
+
+	case IR_STORE_STACK_RELATIVE_ADDRESS: {
+		asm_ins2("leaq", MEM(ins.store_stack_relative_address.offset, REG_RSP), R8(REG_RSI));
+		scalar_to_reg(ins.operands[0], REG_RDI);
+
+		codegen_memcpy(ins.store_stack_relative_address.size);
 	} break;
 
 	case IR_COPY:
@@ -382,7 +413,6 @@ static void codegen_instruction(struct instruction ins, struct function *func) {
 
 	case IR_SET_ZERO_PTR:
 		scalar_to_reg(ins.operands[0], REG_RDI);
-		//asm_ins2("leaq", MEM(-variable_info[ins.operands[0]].stack_location, REG_RBP), R8(REG_RDI));
 		codegen_memzero(ins.set_zero_ptr.size);
 		break;
 
@@ -451,6 +481,13 @@ static void codegen_instruction(struct instruction ins, struct function *func) {
 		assert(ins.alloc.stack_location != -1);
 		asm_ins2("leaq", MEM(-ins.alloc.stack_location, REG_RBP), R8(REG_RSI));
 		reg_to_scalar(REG_RSI, ins.operands[0]);
+		break;
+
+	case IR_COPY_MEMORY:
+		scalar_to_reg(ins.operands[0], REG_RSI);
+		scalar_to_reg(ins.operands[1], REG_RDI);
+
+		codegen_memcpy(ins.copy_memory.size);
 		break;
 
 	default:
@@ -544,6 +581,9 @@ static void codegen_function(struct function *func) {
 			if (ins->type == IR_ALLOC) {
 				perm_stack_count += ins->alloc.size;
 				ins->alloc.stack_location = perm_stack_count;
+
+				if (ins->alloc.save_to_preamble)
+					vla_info.alloc_preamble = perm_stack_count;
 			}
 		}
 	}
@@ -597,6 +637,10 @@ static void codegen_function(struct function *func) {
 	int total_stack_usage = max_temp_stack + perm_stack_count;
 	if (codegen_flags.debug_stack_size && total_stack_usage >= codegen_flags.debug_stack_min)
 		printf("Function %s has stack consumption: %d\n", func->name, total_stack_usage);
+}
+
+int codegen_get_alloc_preamble(void) {
+	return vla_info.alloc_preamble;
 }
 
 void codegen(void) {

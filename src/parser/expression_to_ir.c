@@ -1,5 +1,6 @@
 #include "expression_to_ir.h"
 #include "arch/x64.h"
+#include "ir/ir.h"
 #include "ir/operators.h"
 #include "ir/variables.h"
 #include "parser/expression.h"
@@ -11,43 +12,34 @@
 
 #include <assert.h>
 
-struct evaluated_expression {
-	enum {
-		EE_VOID,
-		EE_CONSTANT,
-		EE_VARIABLE,
-		EE_POINTER,
-		EE_BITFIELD_POINTER,
-	} type;
-
-	int is_lvalue; // only for EE_POINTER and EE_BITFIELD_POINTER.
-
-	struct type *data_type;
-
-	union {
-		struct constant constant;
-		var_id variable;
-		var_id pointer;
-
-		struct {
-			var_id pointer;
-			int bitfield, offset, sign_extend;
-		} bitfield_pointer;
-	};
-};
-
-static struct evaluated_expression expression_evaluate(struct expr *expr);
-
-static var_id evaluated_expression_to_address(struct evaluated_expression *evaluated_expression) {
+var_id evaluated_expression_to_address(struct evaluated_expression *evaluated_expression) {
 	switch (evaluated_expression->type) {
-	case EE_BITFIELD_POINTER:
-		NOTIMP();
-		break;
+	case EE_BITFIELD_POINTER: {
+		var_id bitfield_var = evaluated_expression_to_var(evaluated_expression);
+		var_id var = new_variable_sz(8, 1, 1);
+		ir_push2(IR_ADDRESS_OF, var, bitfield_var);
+		return var;
+	}
 
 	case EE_CONSTANT: {
-		var_id var = new_variable_sz(8, 1, 1);
-		IR_PUSH_CONSTANT(evaluated_expression->constant, var);
-		return var;
+		struct constant constant = evaluated_expression->constant;
+		if (constant.type == CONSTANT_LABEL || constant.type == CONSTANT_TYPE_POINTER) {
+			var_id var = new_variable_sz(8, 1, 1);
+
+			if (constant.type == CONSTANT_TYPE_POINTER) {
+				constant.type = CONSTANT_TYPE;
+			}
+
+			IR_PUSH_CONSTANT(constant, var);
+			return var;
+		} else {
+			// Allocate memory, and push the constant to it.
+			var_id var = new_variable(evaluated_expression->data_type, 1, 1);
+			IR_PUSH_CONSTANT(constant, var);
+			var_id address = new_variable_sz(8, 1, 1);
+			ir_push2(IR_ADDRESS_OF, address, var);
+			return address;
+		}
 	}
 
 	case EE_POINTER:
@@ -68,7 +60,7 @@ static var_id evaluated_expression_to_address(struct evaluated_expression *evalu
 	}
 }
 
-static var_id evaluated_expression_to_var(struct evaluated_expression *evaluated_expression) {
+var_id evaluated_expression_to_var(struct evaluated_expression *evaluated_expression) {
 	switch (evaluated_expression->type) {
 	case EE_BITFIELD_POINTER: {
 		var_id var = new_variable(evaluated_expression->data_type, 1, 1);
@@ -104,7 +96,7 @@ static var_id evaluated_expression_to_var(struct evaluated_expression *evaluated
 	}
 }
 
-var_id variable_cast(var_id operand_var, struct type *operand_type, struct type *resulting_type) {
+static var_id variable_cast(var_id operand_var, struct type *operand_type, struct type *resulting_type) {
 	var_id res = operand_var;
 
 	if (type_is_simple(resulting_type, ST_BOOL)) {
@@ -169,6 +161,22 @@ static void assign_to_ee(struct evaluated_expression *lhs, var_id rhs_var) {
 	}
 }
 
+static void assign_ee_to_ee(struct evaluated_expression *lhs, struct evaluated_expression *rhs) {
+	assert(lhs->data_type == rhs->data_type);
+	if (calculate_size(rhs->data_type) <= 8) { // If fits into variable, take shortcut.
+		var_id rhs_var = evaluated_expression_to_var(rhs);
+		assign_to_ee(lhs, rhs_var);
+	} else {
+		// Otherwise copy address.
+		var_id rhs_adress = evaluated_expression_to_address(rhs);
+		switch (lhs->type) {
+		case EE_POINTER:
+			IR_PUSH_COPY_MEMORY(lhs->pointer, rhs_adress, calculate_size(lhs->data_type));
+			break;
+		default: NOTIMP();
+		}
+	}
+}
 
 // The following functions are called in expression_evaluate.
 static struct evaluated_expression evaluate_indirection(struct expr *expr) {
@@ -193,6 +201,10 @@ static struct evaluated_expression evaluate_indirection(struct expr *expr) {
 	}
 
 	case EE_CONSTANT: // For example &((type *)0)->member)
+		if (rhs.constant.type == CONSTANT_TYPE) {
+			rhs.constant.type = CONSTANT_TYPE_POINTER;
+		}
+
 		return (struct evaluated_expression) {
 			.type = EE_CONSTANT,
 			.is_lvalue = 1,
@@ -203,6 +215,15 @@ static struct evaluated_expression evaluate_indirection(struct expr *expr) {
 	default:
 		ICE("Invalid evaluated type %d %s:%d", rhs.type, expr->pos.path, expr->pos.line);
 	}
+}
+
+static struct evaluated_expression evaluate_symbol(struct expr *expr) {
+	assert(expr->symbol->type == IDENT_VARIABLE);
+	return (struct evaluated_expression) {
+		.type = EE_POINTER,
+		.is_lvalue = 1,
+		.pointer = expr->symbol->variable.ptr
+	};
 }
 
 static struct evaluated_expression evaluate_variable(struct expr *expr) {
@@ -226,39 +247,19 @@ static struct evaluated_expression evaluate_variable_ptr(struct expr *expr) {
 static struct evaluated_expression evaluate_call(struct expr *expr) {
 	struct evaluated_expression callee = expression_evaluate(expr->call.callee);
 
-	assert(type_is_pointer(callee.data_type));
 	struct type *signature = type_deref(callee.data_type);
 
-	var_id *args = cc_malloc(sizeof *args * expr->call.n_args);
-	struct type **arg_types = cc_malloc(sizeof *arg_types * expr->call.n_args);
+	struct evaluated_expression arguments[128];
 	for (int i = 0; i < expr->call.n_args; i++) {
 		struct evaluated_expression argument = expression_evaluate(expr->call.args[i]);
 
-		if (i + 1 < signature->n) {
+		if (i + 1 < signature->n)
 			argument = evaluated_expression_cast(&argument, signature->children[i + 1]);
-			arg_types[i] = signature->children[i + 1];
-		} else {
-			arg_types[i] = expr->call.args[i]->data_type;
-		}
 
-		args[i] = evaluated_expression_to_var(&argument);
+		arguments[i] = argument;
 	}
 
-
-	var_id callee_var = evaluated_expression_to_var(&callee);
-
-	if (callee.data_type->type != TY_POINTER) {
-		ICE("Can't call type %s", dbg_type(callee.data_type));
-	}
-
-	var_id res = new_variable(expr->data_type, 1, 1);
-
-	ir_call(res, callee_var, type_deref(callee.data_type), expr->call.n_args, arg_types, args);
-
-	return (struct evaluated_expression) {
-		.type = EE_VARIABLE,
-		.variable = res
-	};
+	return abi_expr_call(&callee, expr->call.n_args, arguments);
 }
 
 static struct evaluated_expression evaluate_constant(struct expr *expr) {
@@ -471,10 +472,10 @@ static struct evaluated_expression evaluate_assignment(struct expr *expr) {
 
 	rhs = evaluated_expression_cast(&rhs, expr->args[0]->data_type);
 
-	var_id rhs_var = evaluated_expression_to_var(&rhs);
+	/* var_id rhs_address = evaluated_expression_to_address(&rhs); */
 	assert(lhs.is_lvalue);
 
-	assign_to_ee(&lhs, rhs_var);
+	assign_ee_to_ee(&lhs, &rhs);
 
 	return rhs;
 }
@@ -530,35 +531,58 @@ static struct evaluated_expression evaluate_conditional(struct expr *expr) {
 	struct evaluated_expression condition = expression_evaluate(expr->args[0]);
 	var_id condition_var = evaluated_expression_to_var(&condition);
 
-	var_id res = new_variable(expr->data_type, 1, 1);
 	int is_void = type_is_simple(expr->data_type, ST_VOID);
 
-	block_id block_true = new_block(),
-		block_false = new_block(),
-		block_end = new_block();
+	if (is_void) {
+		block_id block_true = new_block(),
+			block_false = new_block(),
+			block_end = new_block();
 
-	ir_if_selection(condition_var, block_true, block_false);
+		ir_if_selection(condition_var, block_true, block_false);
 
-	ir_block_start(block_true);
-	struct evaluated_expression true_ = expression_evaluate(expr->args[1]);
-	var_id true_var = evaluated_expression_to_var(&true_);
-	if (!is_void)
-		ir_push2(IR_COPY, res, true_var);
-	ir_goto(block_end);
+		ir_block_start(block_true);
+		expression_evaluate(expr->args[1]);
+		ir_goto(block_end);
 
-	ir_block_start(block_false);
-	struct evaluated_expression false_ = expression_evaluate(expr->args[2]);
-	var_id false_var = evaluated_expression_to_var(&false_);
-	if (!is_void)
-		ir_push2(IR_COPY, res, false_var);
-	ir_goto(block_end);
+		ir_block_start(block_false);
+		expression_evaluate(expr->args[2]);
+		ir_goto(block_end);
 
-	ir_block_start(block_end);
+		ir_block_start(block_end);
 
-	return (struct evaluated_expression) {
-		.type = EE_VARIABLE,
-		.variable = res,
-	};
+		return (struct evaluated_expression) {
+			.type = EE_VOID
+		};
+	} else {
+		var_id res_address = new_variable_sz(8, 1, 1);
+
+		block_id block_true = new_block(),
+			block_false = new_block(),
+			block_end = new_block();
+
+		ir_if_selection(condition_var, block_true, block_false);
+
+		ir_block_start(block_true);
+		struct evaluated_expression true_ = expression_evaluate(expr->args[1]);
+		var_id true_address = evaluated_expression_to_address(&true_);
+		if (!is_void)
+			ir_push2(IR_COPY, res_address, true_address);
+		ir_goto(block_end);
+
+		ir_block_start(block_false);
+		struct evaluated_expression false_ = expression_evaluate(expr->args[2]);
+		var_id false_address = evaluated_expression_to_address(&false_);
+		if (!is_void)
+			ir_push2(IR_COPY, res_address, false_address);
+		ir_goto(block_end);
+
+		ir_block_start(block_end);
+
+		return (struct evaluated_expression) {
+			.type = EE_POINTER,
+			.pointer = res_address,
+		};
+	}
 }
 
 static struct evaluated_expression evaluate_assignment_pointer(struct expr *expr) {
@@ -607,50 +631,52 @@ static struct evaluated_expression evaluate_va_start(struct expr *expr) {
 
 static struct evaluated_expression evaluate_va_arg(struct expr *expr) {
 	struct evaluated_expression v = expression_evaluate(expr->va_arg_.v);
-	var_id res = new_variable(expr->data_type, 1, 1);
+	var_id result_address = new_variable_sz(8, 1, 1);
+	IR_PUSH_ALLOC(result_address, calculate_size(expr->data_type));
 	if (abi_info.va_list_is_reference) {
-		IR_PUSH_VA_ARG(evaluated_expression_to_address(&v), res, expr->va_arg_.t);
+		IR_PUSH_VA_ARG(evaluated_expression_to_address(&v), result_address, expr->va_arg_.t);
 	} else {
-		IR_PUSH_VA_ARG(evaluated_expression_to_var(&v), res, expr->va_arg_.t);
+		IR_PUSH_VA_ARG(evaluated_expression_to_var(&v), result_address, expr->va_arg_.t);
 	}
 
 	return (struct evaluated_expression) {
-		.type = EE_VARIABLE,
-		.variable = res
+		.type = EE_POINTER,
+		.variable = result_address
 	};
 }
 
 static struct evaluated_expression evaluate_va_copy(struct expr *expr) {
 	struct evaluated_expression dest = expression_evaluate(expr->va_copy_.d);
 	struct evaluated_expression src = expression_evaluate(expr->va_copy_.s);
+
+	var_id dest_var, src_var;
+	int size;
+
 	if (abi_info.va_list_is_reference) {
-		var_id dest_var = evaluated_expression_to_address(&dest);
-		var_id source_address = evaluated_expression_to_address(&src);
+		dest_var = evaluated_expression_to_address(&dest);
+		src_var = evaluated_expression_to_address(&src);
 
-		var_id tmp = new_variable(expr->va_copy_.d->data_type, 1, 1);
-
-		ir_push2(IR_LOAD, tmp, source_address);
-		ir_push2(IR_STORE, tmp, dest_var);
+		size = calculate_size(expr->va_copy_.d->data_type);
 	} else {
-		var_id dest_var = evaluated_expression_to_var(&dest);
-		var_id source_var = evaluated_expression_to_var(&src);
+		dest_var = evaluated_expression_to_var(&dest);
+		src_var = evaluated_expression_to_var(&src);
 
-		var_id tmp = new_variable(type_deref(expr->va_copy_.d->data_type), 1, 1);
-
-		ir_push2(IR_LOAD, tmp, source_var);
-		ir_push2(IR_STORE, tmp, dest_var);
+		size = calculate_size(type_deref(expr->va_copy_.d->data_type));
 	}
+
+	IR_PUSH_COPY_MEMORY(dest_var, src_var, size);
 
 	return (struct evaluated_expression) {
 		.type = EE_VOID,
 	};
 }
 
-static struct evaluated_expression expression_evaluate(struct expr *expr) {
+struct evaluated_expression expression_evaluate(struct expr *expr) {
 	struct evaluated_expression ret;
 
 	switch (expr->type) {
 		// All these follow the same pattern.
+	case E_SYMBOL: ret = evaluate_symbol(expr); break;
 	case E_VARIABLE: ret = evaluate_variable(expr); break;
 	case E_VARIABLE_PTR: ret = evaluate_variable_ptr(expr); break;
 	case E_INDIRECTION: ret = evaluate_indirection(expr); break;
@@ -732,7 +758,24 @@ var_id expression_to_int(struct expr *expr) {
 }
 
 void expression_to_void(struct expr *expr) {
-	var_id res = expression_to_ir(expr);
-	variable_set_stack_bucket(res, 0);
+	struct evaluated_expression ee = expression_evaluate(expr);
+	(void)ee;
+	/* var_id res = expression_to_ir(expr); */
+	/* variable_set_stack_bucket(res, 0); */
 	ir_push0(IR_CLEAR_STACK_BUCKET);
+}
+
+void expression_to_address(struct expr *expr, var_id address) {
+	struct evaluated_expression ee = expression_evaluate(expr);
+
+	switch (ee.type) {
+	case EE_POINTER:
+		IR_PUSH_COPY_MEMORY(address, ee.pointer, calculate_size(ee.data_type));
+		break;
+
+	default: {
+		var_id var = evaluated_expression_to_var(&ee);
+		ir_push2(IR_STORE, var, address);
+	} break;
+	}
 }

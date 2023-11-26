@@ -62,9 +62,13 @@ struct instruction {
 		IR_STACK_ALLOC,
 		IR_ADD_TEMPORARY,
 		IR_CLEAR_STACK_BUCKET,
+		IR_COPY_MEMORY,
 
 		IR_LOAD_PART,
 		IR_STORE_PART,
+
+		IR_LOAD_PART_ADDRESS,
+		IR_STORE_PART_ADDRESS,
 
 		// You should be careful with these instructions.
 		// They are here to allow for easier implementation
@@ -75,6 +79,9 @@ struct instruction {
 		IR_MODIFY_STACK_POINTER,
 		IR_STORE_STACK_RELATIVE,
 		IR_LOAD_BASE_RELATIVE,
+
+		IR_STORE_STACK_RELATIVE_ADDRESS,
+		IR_LOAD_BASE_RELATIVE_ADDRESS,
 
 		IR_COUNT
 	} type;
@@ -123,14 +130,25 @@ struct instruction {
 #define IR_PUSH_STORE_STACK_RELATIVE(OFFSET, VARIABLE) IR_PUSH(.type = IR_STORE_STACK_RELATIVE, .operands = {(VARIABLE)}, .store_stack_relative = {(OFFSET)})
 
 		struct {
+			int offset, size;
+		} store_stack_relative_address;
+#define IR_PUSH_STORE_STACK_RELATIVE_ADDRESS(VARIABLE, OFFSET, SIZE) IR_PUSH(.type = IR_STORE_STACK_RELATIVE_ADDRESS, .operands = {(VARIABLE)}, .store_stack_relative_address = {(OFFSET), (SIZE)})
+
+		struct {
 			int offset;
 		} load_base_relative;
 #define IR_PUSH_LOAD_BASE_RELATIVE(RESULT, OFFSET) IR_PUSH(.type = IR_LOAD_BASE_RELATIVE, .operands = {(RESULT)}, .load_base_relative = {(OFFSET)})
 
 		struct {
-			int size, stack_location;
+			int offset, size;
+		} load_base_relative_address;
+#define IR_PUSH_LOAD_BASE_RELATIVE_ADDRESS(RESULT, OFFSET, SIZE) IR_PUSH(.type = IR_LOAD_BASE_RELATIVE_ADDRESS, .operands = {(RESULT)}, .load_base_relative_address = {(OFFSET), (SIZE)})
+
+		struct {
+			int size, stack_location, save_to_preamble;
 		} alloc;
-#define IR_PUSH_ALLOC(RESULT, SIZE) IR_PUSH(.type = IR_ALLOC, .operands = {(RESULT)}, .alloc = {(SIZE), -1})
+#define IR_PUSH_ALLOC(RESULT, SIZE) IR_PUSH(.type = IR_ALLOC, .operands = {(RESULT)}, .alloc = {(SIZE), -1, 0})
+#define IR_PUSH_ALLOC_PREAMBLE(RESULT, SIZE) IR_PUSH(.type = IR_ALLOC, .operands = {(RESULT)}, .alloc = {(SIZE), -1, 1})
 
 		struct {
 			int size;
@@ -146,6 +164,14 @@ struct instruction {
 			int offset;
 		} store_part;
 #define IR_PUSH_STORE_PART(RESULT, VAR, OFFSET) IR_PUSH(.type = IR_STORE_PART, .operands = {(RESULT), (VAR)}, .store_part = {(OFFSET)})
+
+#define IR_PUSH_LOAD_PART_ADDRESS(RESULT, VAR, OFFSET) IR_PUSH(.type = IR_LOAD_PART_ADDRESS, .operands = {(RESULT), (VAR)}, .load_part = {(OFFSET)})
+#define IR_PUSH_STORE_PART_ADDRESS(RESULT, VAR, OFFSET) IR_PUSH(.type = IR_STORE_PART_ADDRESS, .operands = {(RESULT), (VAR)}, .store_part = {(OFFSET)})
+
+		struct {
+			int size;
+		} copy_memory;
+#define IR_PUSH_COPY_MEMORY(DESTINATION, SOURCE, SIZE) IR_PUSH(.type = IR_COPY_MEMORY, .operands = {(DESTINATION), (SOURCE)}, .copy_memory = {(SIZE)})
 	};
 };
 
@@ -170,9 +196,6 @@ struct function {
 
 	void *abi_data;
 };
-
-void ir_new_function(struct type *signature, var_id *arguments, const char *name, int is_global);
-void ir_call(var_id result, var_id func_var, struct type *function_type, int n_args, struct type **argument_types, var_id *args);
 
 struct block *get_block(block_id id);
 
@@ -231,8 +254,7 @@ void ir_block_start(block_id id);
 void ir_if_selection(var_id condition, block_id block_true, block_id block_false);
 void ir_switch_selection(var_id condition, struct case_labels labels);
 void ir_goto(block_id jump);
-void ir_return(var_id value, struct type *type);
-void ir_return_void(void);
+void ir_return(void);
 
 void ir_init_ptr(struct initializer *init, struct type *type, var_id ptr);
 void ir_get_offset(var_id member_address, var_id base_address, var_id offset_var, int offset);

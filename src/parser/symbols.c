@@ -22,7 +22,7 @@ struct table_entry {
 	struct entry_id id;
 
 	union {
-		struct symbol_identifier identifier_data;
+		struct symbol_identifier *identifier_data; // References need to be stable.
 		struct symbol_struct struct_data;
 		struct symbol_typedef typedef_data;
 	};
@@ -166,17 +166,19 @@ static struct table_entry *symbols_get_in_current_scope(enum entry_type type, st
 
 // Identifier help functions.
 struct symbol_identifier *symbols_add_identifier(struct string_view name) {
-	return &symbols_add(ENTRY_IDENTIFIER, name)->identifier_data;
+	struct table_entry *entry = symbols_add(ENTRY_IDENTIFIER, name);
+	entry->identifier_data = ALLOC((struct symbol_identifier) { 0 });
+	return entry->identifier_data;
 }
 
 struct symbol_identifier *symbols_get_identifier(struct string_view name) {
 	struct table_entry *entry = symbols_get(ENTRY_IDENTIFIER, name);
-	return entry ? &entry->identifier_data : NULL;
+	return entry ? entry->identifier_data : NULL;
 }
 
 struct symbol_identifier *symbols_get_identifier_in_current_scope(struct string_view name) {
 	struct table_entry *entry = symbols_get_in_current_scope(ENTRY_IDENTIFIER, name);
-	return entry ? &entry->identifier_data : NULL;
+	return entry ? entry->identifier_data : NULL;
 }
 
 struct symbol_identifier *symbols_add_identifier_global(struct string_view name) {
@@ -185,12 +187,14 @@ struct symbol_identifier *symbols_add_identifier_global(struct string_view name)
 	if (entry && entry->block == current_block)
 		ICE("Name already declared, %.*s", name.len, name.str);
 
-	return &add_entry_with_block((struct entry_id) { ENTRY_IDENTIFIER, name }, 0)->identifier_data;
+	entry = add_entry_with_block((struct entry_id) { ENTRY_IDENTIFIER, name }, 0);
+	entry->identifier_data = ALLOC((struct symbol_identifier) { 0 });
+	return entry->identifier_data;
 }
 
 struct symbol_identifier *symbols_get_identifier_global(struct string_view name) {
 	struct table_entry *entry = get_entry((struct entry_id) { ENTRY_IDENTIFIER, name }, 1);
-	return entry ? &entry->identifier_data : NULL;
+	return entry ? entry->identifier_data : NULL;
 }
 
 struct type *symbols_get_identifier_type(struct symbol_identifier *symbol) {

@@ -29,7 +29,6 @@ struct symbol_identifier {
 		struct constant constant;
 		struct {
 			struct type *type;
-			var_id id;
 		} parameter;
 		struct {
 			struct type *type;

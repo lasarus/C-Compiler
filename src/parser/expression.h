@@ -1,6 +1,7 @@
 #ifndef PARSER_EXPRESSION_H
 #define PARSER_EXPRESSION_H
 
+#include "parser/symbols.h"
 #include "preprocessor/preprocessor.h"
 #include "parser.h"
 #include "declaration.h"
@@ -60,6 +61,7 @@ struct expr *expr_new(struct expr expr);
 struct expr {
 	enum {
 		E_INVALID,
+		E_SYMBOL,
 		E_VARIABLE,
 		E_VARIABLE_PTR,
 		E_CALL,
@@ -105,11 +107,6 @@ struct expr {
 		} call;
 
 		struct {
-			const char *name;
-			struct type *type;
-		} symbol;
-
-		struct {
 			struct expr *arg;
 			struct type *target;
 		} cast;
@@ -125,6 +122,8 @@ struct expr {
 			struct type *type;
 			int is_register;
 		} variable_ptr;
+
+		struct symbol_identifier *symbol;
 
 		struct {
 			struct expr *lhs;

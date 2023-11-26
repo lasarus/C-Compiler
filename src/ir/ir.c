@@ -114,26 +114,11 @@ void ir_goto(block_id jump) {
 	block->exit.jump = jump;
 }
 
-void ir_return(var_id value, struct type *type) {
+void ir_return(void) {
 	struct block *block = get_current_block();
 	assert(block->exit.type == BLOCK_EXIT_NONE);
 
 	block->exit.type = BLOCK_EXIT_RETURN;
-	block->exit.return_.type = type;
-	block->exit.return_.value = value;
-
-	abi_ir_function_return(get_current_function(), value, type);
-}
-
-void ir_return_void(void) {
-	struct block *block = get_current_block();
-	assert(block->exit.type == BLOCK_EXIT_NONE);
-
-	block->exit.type = BLOCK_EXIT_RETURN;
-	block->exit.return_.type = type_simple(ST_VOID);
-	block->exit.return_.value = 0;
-
-	abi_ir_function_return(get_current_function(), VOID_VAR, type_simple(ST_VOID));
 }
 
 void ir_get_offset(var_id member_address, var_id base_address, var_id offset_var, int offset) {
@@ -211,7 +196,7 @@ static void ir_init_var_recursive(struct initializer *init, struct type *type, v
 
 	case INIT_EXPRESSION:
 		if (bit_size == -1) {
-			ir_push2(IR_STORE, expression_to_ir(init->expr), offset);
+			expression_to_address(init->expr, offset);
 		} else {
 			var_id value = expression_to_ir(init->expr);
 			var_id prev = new_variable_sz(get_variable_size(value), 1, 1);
@@ -243,12 +228,4 @@ void ir_init_ptr(struct initializer *init, struct type *type, var_id ptr) {
 	IR_PUSH_SET_ZERO_PTR(ptr, calculate_size(type));
 
 	ir_init_var_recursive(init, type, ptr, -1, -1);
-}
-
-void ir_call(var_id result, var_id func_var, struct type *function_type, int n_args, struct type **argument_types, var_id *args) {
-	abi_ir_function_call(result, func_var, function_type, n_args, argument_types, args);
-}
-
-void ir_new_function(struct type *function_type, var_id *args, const char *name, int is_global) {
-	abi_ir_function_new(function_type, args, name, is_global);
 }

@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <stdio.h>
 
 struct T {
 	int n, arr[];

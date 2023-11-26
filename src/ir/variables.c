@@ -41,6 +41,9 @@ var_id allocate_vla(struct type *type) {
 }
 
 var_id new_variable_sz(int size, int allocate, int stack_bucket) {
+	if (size > 8) {
+		ICE("Too large register");
+	}
 	// A bit of a shortcut.
 	if (variables_size && size == 0)
 		return VOID_VAR;

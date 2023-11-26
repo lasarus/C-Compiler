@@ -75,7 +75,7 @@ struct type_ast {
 		struct {
 			int n;
 			struct type **types;
-			var_id *arguments;
+			struct symbol_identifier **arguments;
 			//char **names;
 			int vararg;
 		} function;
@@ -494,7 +494,7 @@ int parse_struct(struct type_specifiers *ts) {
 }
 
 static void ast_get_parameters(struct type_ast *ast,
-							   int *n, var_id **arguments) {
+							   int *n, struct symbol_identifier ***arguments) {
 	while (ast->type != TAST_TERMINAL) {
 		switch (ast->type) {
 		case TAST_POINTER:
@@ -700,7 +700,7 @@ struct parameter_list {
 	int n;
 	int vararg;
 	struct type **types;
-	var_id *arguments;
+	struct symbol_identifier **arguments;
 };
 
 static struct parameter_list parse_parameter_list(void) {
@@ -730,8 +730,7 @@ static struct parameter_list parse_parameter_list(void) {
 			struct symbol_identifier *ident = symbols_add_identifier(name);
 			ident->type = IDENT_PARAMETER;
 			ident->parameter.type = type;
-			ident->parameter.id = new_variable(type, 0, 0);
-			ret.arguments[ret.n - 1] = ident->parameter.id;
+			ret.arguments[ret.n - 1] = ident;
 		}
 
 		if (T0->type == T_RPAR)
@@ -1204,7 +1203,7 @@ static int parse_init_declarator(struct specifiers s, int external, int *was_fun
 
 	if (T0->type == T_LBRACE) {
 		int arg_n = 0;
-		var_id *args = NULL;
+		struct symbol_identifier **args = NULL;
 		ast_get_parameters(ast, &arg_n, &args);
 
 		if (!has_symbols)

@@ -7,6 +7,7 @@
 
 #include <common.h>
 #include <preprocessor/preprocessor.h>
+#include <abi/abi.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -408,13 +409,13 @@ int parse_jump_statement(struct jump_blocks jump_blocks) {
 		struct expr *expr = parse_expression();
 		TEXPECT(T_SEMI_COLON);
 
-		if (!expr) {
-			ir_return_void();
-		} else {
-			var_id return_variable = expression_to_ir_clear_temp(
-				expression_cast(expr, current_ret_val));
-			ir_return(return_variable, current_ret_val);
-		}
+		struct evaluated_expression value = { .type = EE_VOID };
+
+		if (expr)
+			value = expression_evaluate(expression_cast(expr, current_ret_val));
+
+		abi_expr_return(get_current_function(), &value);
+		ir_return();
 		ir_block_start(new_block());
 		return 1;
 	} else {
@@ -439,7 +440,8 @@ struct string_view get_current_function_name(void) {
 	return current_function;
 }
 
-void parse_function(struct string_view name, struct type *type, int arg_n, var_id *args, int global) {
+void parse_function(struct string_view name, struct type *type, int arg_n, struct symbol_identifier **args, int global) {
+	(void)arg_n;
 	current_function = name;
 	struct symbol_identifier *symbol = symbols_get_identifier_global(name);
 
@@ -456,13 +458,9 @@ void parse_function(struct string_view name, struct type *type, int arg_n, var_i
 
 	assert(type->type == TY_FUNCTION);
 
-	ir_new_function(type, args, sv_to_str(name), global);
+	abi_expr_function(type, args, sv_to_str(name), global);
 
 	type_evaluate_vla(type);
-
-	for (int i = 0; i < arg_n; i++) {
-		allocate_var(args[i]);
-	}
 
 	struct jump_blocks jump_blocks = { 0 };
 	parse_compound_statement(jump_blocks);
@@ -472,7 +470,8 @@ void parse_function(struct string_view name, struct type *type, int arg_n, var_i
 		if (b->exit.type == BLOCK_EXIT_NONE)
 			b->exit.type = BLOCK_EXIT_RETURN_ZERO;
 	} else if (current_ret_val == type_simple(ST_VOID)) {
-		ir_return_void();
+		ir_return();
+		abi_expr_return(get_current_function(), &(struct evaluated_expression) { .type = EE_VOID });
 	}
 	
 	symbols_pop_scope();

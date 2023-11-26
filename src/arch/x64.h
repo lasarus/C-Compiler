@@ -47,10 +47,12 @@ typedef uint64_t constant_uint;
 typedef int64_t constant_int;
 
 struct constant {
+	// TODO: Add is_reference field and remove LABEL_POINTER and TYPE_POINTER.
 	enum {
 		CONSTANT_LABEL, // $LABEL
 		CONSTANT_LABEL_POINTER, // (LABEL)
-		CONSTANT_TYPE
+		CONSTANT_TYPE,
+		CONSTANT_TYPE_POINTER,
 	} type;
 
 	struct type *data_type;

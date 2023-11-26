@@ -88,3 +88,28 @@ void reg_to_scalar(int reg, var_id scalar) {
 		i += msize;
 	}
 }
+
+void reg_to_memory(int reg, int size) {
+	int msize = 0;
+	for (int i = 0; i < size;) {
+		if (msize)
+			asm_ins2("shrq", IMM(msize * 8), R8(reg));
+
+		struct operand mem = MEM(i, REG_RSI);
+		if (i + 8 <= size) {
+			asm_ins2("movq", R8(reg), mem);
+			msize = 8;
+		} else if (i + 4 <= size) {
+			asm_ins2("movl", R4(reg), mem);
+			msize = 4;
+		} else if (i + 2 <= size) {
+			asm_ins2("movw", R2(reg), mem);
+			msize = 2;
+		} else if (i + 1 <= size) {
+			asm_ins2("movb", R1(reg), mem);
+			msize = 1;
+		}
+
+		i += msize;
+	}
+}

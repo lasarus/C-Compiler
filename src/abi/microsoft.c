@@ -1,4 +1,8 @@
 #include "abi.h"
+#include "arch/x64.h"
+#include "ir/ir.h"
+#include "ir/variables.h"
+#include "parser/expression_to_ir.h"
 
 #include <parser/symbols.h>
 #include <codegen/codegen.h>
@@ -8,7 +12,6 @@
 #include <preprocessor/preprocessor.h>
 
 static const int calling_convention[] = { REG_RCX, REG_RDX, REG_R8, REG_R9 };
-//static const int return_convention[] = { REG_RAX };
 static const int shadow_space = 32;
 
 struct ms_data {
@@ -27,20 +30,31 @@ static int fits_into_reg(struct type *type) {
 	return size == 1 || size == 2 || size == 4 || size == 8;
 }
 
-static void ms_ir_function_call(var_id result, var_id func_var, struct type *type, int n_args, struct type **argument_types, var_id *args) {
-	struct type *return_type = type->children[0];
+static struct evaluated_expression ms_expr_call(struct evaluated_expression *callee,
+										   int n, struct evaluated_expression arguments[static n]) {
+	struct type *argument_types[128];
+	var_id arg_addresses[128];
+	struct type *callee_type = type_deref(callee->data_type);
+	struct type *return_type = callee_type->children[0];
+
+	for (int i = 0; i < n; i++) {
+		arg_addresses[i] = evaluated_expression_to_address(&arguments[i]);
+		argument_types[i] = arguments[i].data_type;
+	}
 
 	var_id registers[4];
 	int is_floating[4] = { 0 };
 	int register_idx = 0;
 	int ret_in_register = 0, ret_in_address = 0;
+	
+	var_id callee_var = evaluated_expression_to_var(callee);
 
 	if (!type_is_simple(return_type, ST_VOID)) {
 		if (fits_into_reg(return_type)) {
 			ret_in_register = 1;
 		} else {
 			registers[0] = new_variable_sz(8, 1, 0);
-			IR_PUSH_ALLOC(registers[0], get_variable_size(result));
+			IR_PUSH_ALLOC(registers[0], calculate_size(return_type));
 
 			register_idx++;
 
@@ -48,21 +62,20 @@ static void ms_ir_function_call(var_id result, var_id func_var, struct type *typ
 		}
 	}
 
-	int stack_sub = MAX(32, round_up_to_nearest(n_args * 8, 16));
+	int stack_sub = MAX(32, round_up_to_nearest(n * 8, 16));
 
 	IR_PUSH_MODIFY_STACK_POINTER(-stack_sub - shadow_space);
 	int current_mem = 0;
-	for (int i = 0; i < n_args; i++) {
-		var_id reg_to_push = args[i];
+	for (int i = 0; i < n; i++) {
+		var_id reg_to_push = arg_addresses[i];
 
-		if (!fits_into_reg(argument_types[i])) {
-			reg_to_push = new_variable_sz(8, 1, 1);
-			IR_PUSH_ALLOC(reg_to_push, get_variable_size(args[i]));
-			ir_push2(IR_STORE, args[i], reg_to_push);
+		if (fits_into_reg(argument_types[i])) {
+			reg_to_push = new_variable_sz(calculate_size(argument_types[i]), 1, 1);
+			ir_push2(IR_LOAD, reg_to_push, arg_addresses[i]);
 		}
 
 		if (register_idx < 4) {
-			is_floating[register_idx] = (i < type->n - 1) ? type_is_floating(argument_types[i]) : 0;
+			is_floating[register_idx] = (i < callee_type->n - 1) ? type_is_floating(argument_types[i]) : 0;
 			registers[register_idx++] = reg_to_push;
 		} else {
 			IR_PUSH_STORE_STACK_RELATIVE(current_mem + shadow_space, reg_to_push);
@@ -77,20 +90,37 @@ static void ms_ir_function_call(var_id result, var_id func_var, struct type *typ
 			IR_PUSH_SET_REG(registers[i], calling_convention[i], 0);
 	}
 
-	IR_PUSH_CALL(func_var, REG_RBX);
+	IR_PUSH_CALL(callee_var, REG_RBX);
 
+	struct evaluated_expression result;
 	if (ret_in_register) {
-		IR_PUSH_GET_REG(result, REG_RAX, type_is_floating(return_type));
+		var_id variable = new_variable(return_type, 1, 0); // TODO: Stack bucket 0 necessary?
+		IR_PUSH_GET_REG(variable, REG_RAX, type_is_floating(return_type));
+		result = (struct evaluated_expression) {
+			.type = EE_VARIABLE,
+			.data_type = return_type,
+			.variable = variable,
+		};
 	} else if (ret_in_address) {
-		ir_push2(IR_LOAD, result, registers[0]);
+		result = (struct evaluated_expression) {
+			.type = EE_POINTER,
+			.data_type = return_type,
+			.pointer = registers[0],
+		};
+	} else {
+		result = (struct evaluated_expression) {
+			.type = EE_VOID,
+		};
 	}
 
 	IR_PUSH_MODIFY_STACK_POINTER(+stack_sub + shadow_space);
+
+	return result;
 }
 
-static void ms_ir_function_new(struct type *type, var_id *args, const char *name, int is_global) {
-	struct type *return_type = type->children[0];
-	int n_args = type->n - 1;
+static void ms_expr_function(struct type *function_type, struct symbol_identifier **args, const char *name, int is_global) {
+	struct type *return_type = function_type->children[0];
+	int n_args = function_type->n - 1;
 
 	struct function *func = &ADD_ELEMENT(ir.size, ir.cap, ir.functions);
 	*func = (struct function) {
@@ -110,7 +140,7 @@ static void ms_ir_function_new(struct type *type, var_id *args, const char *name
 		IR_PUSH_GET_REG(abi_data.ret_address, calling_convention[register_idx++], 0);
 	}
 
-	if (type->function.is_variadic) {
+	if (function_type->function.is_variadic) {
 		abi_data.is_variadic = 1;
 		abi_data.n_args = n_args;
 	}
@@ -122,57 +152,64 @@ static void ms_ir_function_new(struct type *type, var_id *args, const char *name
 	IR_PUSH_GET_REG(abi_data.rdi_store, REG_RDI, 0);
 	IR_PUSH_GET_REG(abi_data.rsi_store, REG_RSI, 0);
 
-	static int loads_cap = 0;
-	struct load_pair {
-		var_id from, to;
-	};
-	int loads_size = 0;
-	struct load_pair *loads = NULL;
-	
 	int current_mem = 0;
 
+	var_id inputs[128];
+
 	for (int i = 0; i < n_args; i++) {
-		var_id reg_to_push = args[i];
-
-		if (!fits_into_reg(type->children[i + 1])) {
-			reg_to_push = new_variable_sz(8, 1, 1);
-
-			ADD_ELEMENT(loads_size, loads_cap, loads) = (struct load_pair) {
-				reg_to_push, args[i]
-			};
+		if (fits_into_reg(args[i]->parameter.type)) {
+			int size = calculate_size(args[i]->parameter.type);
+			inputs[i] = new_variable_sz(size, 1, 1);
+		} else {
+			inputs[i] = new_ptr();
 		}
 
 		if (register_idx < 4) {
-			if (type_is_floating(type->children[i + 1]))
-				IR_PUSH_GET_REG(reg_to_push, register_idx++, 1);
-			else
-				IR_PUSH_GET_REG(reg_to_push, calling_convention[register_idx++], 0);
+			if (type_is_floating(function_type->children[i + 1])) {
+				IR_PUSH_GET_REG(inputs[i], register_idx++, 1);
+			} else {
+				IR_PUSH_GET_REG(inputs[i], calling_convention[register_idx++], 0);
+			}
 		} else {
-			IR_PUSH_LOAD_BASE_RELATIVE(reg_to_push, current_mem + 16 + shadow_space);
+			IR_PUSH_LOAD_BASE_RELATIVE(inputs[i], current_mem + 16 + shadow_space);
 			current_mem += 8;
 		}
 	}
 
-	for (int i = 0; i < loads_size; i++) {
-		ir_push2(IR_LOAD, loads[i].to, loads[i].from);
+	for (int i = 0; i < n_args; i++) {
+		struct symbol_identifier *symbol = args[i];
+
+		var_id address = new_ptr();
+		struct type *type = symbol->parameter.type;
+		IR_PUSH_ALLOC(address, calculate_size(symbol->parameter.type));
+
+		symbol->type = IDENT_VARIABLE;
+		symbol->variable.type = type;
+		symbol->variable.ptr = address;
+
+		if (fits_into_reg(function_type->children[i + 1])) {
+			ir_push2(IR_STORE, inputs[i], address);
+		} else {
+			IR_PUSH_COPY_MEMORY(address, inputs[i], calculate_size(type));
+		}
 	}
 
 	func->abi_data = ALLOC(abi_data);
 }
 
-static void ms_ir_function_return(struct function *func, var_id value, struct type *type) {
+static void ms_expr_return(struct function *func, struct evaluated_expression *value) {
 	struct ms_data *abi_data = func->abi_data;
 
-	if (type == type_simple(ST_VOID))
-		goto unclobber;
-
-	if (abi_data->returns_address) {
-		ir_push2(IR_STORE, value, abi_data->ret_address);
-	} else {
-		IR_PUSH_SET_REG(value, 0, type_is_floating(type));
+	if (value->type != EE_VOID) {
+		if (abi_data->returns_address) {
+			var_id value_address = evaluated_expression_to_address(value);
+			IR_PUSH_COPY_MEMORY(abi_data->ret_address, value_address, calculate_size(value->data_type));
+		} else {
+			var_id value_var = evaluated_expression_to_var(value);
+			IR_PUSH_SET_REG(value_var, 0, type_is_floating(value->data_type));
+		}
 	}
 
-unclobber:
 	IR_PUSH_SET_REG(abi_data->rbx_store, REG_RBX, 0);
 	IR_PUSH_SET_REG(abi_data->rdi_store, REG_RDI, 0);
 	IR_PUSH_SET_REG(abi_data->rsi_store, REG_RSI, 0);
@@ -198,20 +235,19 @@ static void ms_emit_va_start(var_id result, struct function *func) {
 	asm_ins2("movq", R8(REG_RAX), MEM(0, REG_RDX));
 }
 
-static void ms_emit_va_arg(var_id result, var_id va_list, struct type *type) {
-	(void)result, (void)va_list, (void)type;
-
+static void ms_emit_va_arg(var_id address, var_id va_list, struct type *type) {
 	scalar_to_reg(va_list, REG_RBX); // va_list is a pointer to the actual va_list.
 	asm_ins2("movq", MEM(0, REG_RBX), R8(REG_RAX));
 	asm_ins2("leaq", MEM(8, REG_RAX), R8(REG_RDX));
 	asm_ins2("movq", R8(REG_RDX), MEM(0, REG_RBX));
 	asm_ins2("movq", MEM(0, REG_RAX), R8(REG_RAX));
 	if (fits_into_reg(type)) {
-		reg_to_scalar(REG_RAX, result);
+		scalar_to_reg(address, REG_RSI);
+		reg_to_memory(REG_RAX, calculate_size(type));
 	} else {
 		asm_ins2("movq", R8(REG_RAX), R8(REG_RDI));
-		asm_ins2("leaq", MEM(-variable_info[result].stack_location, REG_RBP), R8(REG_RSI));
-		codegen_memcpy(get_variable_size(result));
+		scalar_to_reg(address, REG_RSI);
+		codegen_memcpy(calculate_size(type));
 	}
 }
 
@@ -238,9 +274,9 @@ void abi_init_microsoft(void) {
 	abi_info.size_type = ST_ULLONG;
 	abi_info.wchar_type = ST_USHORT;
 
-	abi_ir_function_call = ms_ir_function_call;
-	abi_ir_function_new = ms_ir_function_new;
-	abi_ir_function_return = ms_ir_function_return;
+	abi_expr_call = ms_expr_call;
+	abi_expr_function = ms_expr_function;
+	abi_expr_return = ms_expr_return;
 	abi_emit_function_preamble = ms_emit_function_preamble;
 	abi_emit_va_start = ms_emit_va_start;
 	abi_emit_va_start = ms_emit_va_start;

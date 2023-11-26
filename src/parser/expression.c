@@ -184,6 +184,10 @@ static struct type *calculate_type(struct expr *expr) {
 	case E_CONST_REMOVE:
 		return type_make_const(expr->args[0]->data_type, 0);
 
+	case E_SYMBOL:
+		assert(expr->symbol->type == IDENT_PARAMETER);
+		return expr->symbol->parameter.type;
+
 	default:
 		printf("%d\n", expr->type);
 		NOTIMP();
@@ -603,12 +607,8 @@ static struct expr *parse_prefix(void) {
 		case IDENT_PARAMETER:
 			TNEXT();
 			return expr_new((struct expr) {
-					.type = E_VARIABLE,
-					.variable = {
-						sym->parameter.id,
-						sym->parameter.type,
-						sym->is_register
-					}
+					.type = E_SYMBOL,
+					.symbol = sym
 				});
 
 		case IDENT_VARIABLE:
