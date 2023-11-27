@@ -449,10 +449,6 @@ static void codegen_instruction(struct instruction ins, struct function *func) {
 		asm_ins2("andq", IMM(-16), R8(REG_RSP));
 	} break;
 
-	case IR_CLEAR_STACK_BUCKET: // no-op
-	case IR_ADD_TEMPORARY:
-		break;
-
 	case IR_SET_REG:
 		if (ins.set_reg.is_sse) {
 			asm_ins2("movsd", MEM(-variable_info[ins.operands[0]].stack_location, REG_RBP),
@@ -558,13 +554,11 @@ static void codegen_block(struct block *block, struct function *func) {
 }
 
 static void codegen_function(struct function *func) {
-	int temp_stack_count = 0, perm_stack_count = 0;
+	int perm_stack_count = 0;
 	int max_temp_stack = 0;
 
 	for (int i = 0; i < func->var_size; i++) {
 		var_id var = func->vars[i];
-		if (get_variable_stack_bucket(var))
-			continue;
 
 		int size = get_variable_size(var);
 
@@ -597,21 +591,7 @@ static void codegen_function(struct function *func) {
 		for (int j = 0; j < block->size; j++) {
 			struct instruction *ins = block->instructions + j;
 
-			if (ins->type == IR_ADD_TEMPORARY) {
-				var_id var = ins->operands[0];
-				if (!get_variable_stack_bucket(var))
-					continue;
-
-				int size = get_variable_size(var);
-
-				temp_stack_count += size;
-				max_temp_stack = MAX(max_temp_stack, temp_stack_count);
-
-				variable_info[var].storage = VAR_STOR_STACK;
-				variable_info[var].stack_location = temp_stack_count + perm_stack_count;
-			} else if (ins->type == IR_CLEAR_STACK_BUCKET) {
-				temp_stack_count = 0;
-			} else if (ins->type == IR_STACK_ALLOC) {
+			if (ins->type == IR_STACK_ALLOC) {
 				ADD_ELEMENT(vla_info.size, vla_info.cap, vla_info.slots) = (struct vla_slot) {
 					.slot = ins->operands[2],
 					.dominance = ins->stack_alloc.dominance

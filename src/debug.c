@@ -191,14 +191,6 @@ const char *dbg_instruction(struct instruction ins) {
 			  ins.operands[1]);
 		break;
 
-	case IR_CLEAR_STACK_BUCKET:
-		DBG_PRINT("clear stack bucket");
-		break;
-
-	case IR_ADD_TEMPORARY:
-		DBG_PRINT("%d <- temporary", ins.operands[0]);
-		break;
-
 	case IR_GET_REG:
 		DBG_PRINT("%d <- %s", ins.operands[0], get_reg_name(ins.get_reg.register_index, 8));
 		break;

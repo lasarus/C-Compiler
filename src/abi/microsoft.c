@@ -53,7 +53,7 @@ static struct evaluated_expression ms_expr_call(struct evaluated_expression *cal
 		if (fits_into_reg(return_type)) {
 			ret_in_register = 1;
 		} else {
-			registers[0] = new_variable_sz(8, 1, 0);
+			registers[0] = new_variable_sz(8, 1);
 			IR_PUSH_ALLOC(registers[0], calculate_size(return_type));
 
 			register_idx++;
@@ -70,7 +70,7 @@ static struct evaluated_expression ms_expr_call(struct evaluated_expression *cal
 		var_id reg_to_push = arg_addresses[i];
 
 		if (fits_into_reg(argument_types[i])) {
-			reg_to_push = new_variable_sz(calculate_size(argument_types[i]), 1, 1);
+			reg_to_push = new_variable_sz(calculate_size(argument_types[i]), 1);
 			ir_push2(IR_LOAD, reg_to_push, arg_addresses[i]);
 		}
 
@@ -94,7 +94,7 @@ static struct evaluated_expression ms_expr_call(struct evaluated_expression *cal
 
 	struct evaluated_expression result;
 	if (ret_in_register) {
-		var_id variable = new_variable(return_type, 1, 0); // TODO: Stack bucket 0 necessary?
+		var_id variable = new_variable(return_type, 1);
 		IR_PUSH_GET_REG(variable, REG_RAX, type_is_floating(return_type));
 		result = (struct evaluated_expression) {
 			.type = EE_VARIABLE,
@@ -135,7 +135,7 @@ static void ms_expr_function(struct type *function_type, struct symbol_identifie
 	int register_idx = 0;
 	if (!type_is_simple(return_type, ST_VOID) && !fits_into_reg(return_type)) {
 		abi_data.returns_address = 1;
-		abi_data.ret_address = new_variable_sz(8, 1, 0);
+		abi_data.ret_address = new_variable_sz(8, 1);
 
 		IR_PUSH_GET_REG(abi_data.ret_address, calling_convention[register_idx++], 0);
 	}
@@ -145,9 +145,9 @@ static void ms_expr_function(struct type *function_type, struct symbol_identifie
 		abi_data.n_args = n_args;
 	}
 
-	abi_data.rbx_store = new_variable_sz(8, 1, 0);
-	abi_data.rdi_store = new_variable_sz(8, 1, 0);
-	abi_data.rsi_store = new_variable_sz(8, 1, 0);
+	abi_data.rbx_store = new_variable_sz(8, 1);
+	abi_data.rdi_store = new_variable_sz(8, 1);
+	abi_data.rsi_store = new_variable_sz(8, 1);
 	IR_PUSH_GET_REG(abi_data.rbx_store, REG_RBX, 0);
 	IR_PUSH_GET_REG(abi_data.rdi_store, REG_RDI, 0);
 	IR_PUSH_GET_REG(abi_data.rsi_store, REG_RSI, 0);
@@ -159,7 +159,7 @@ static void ms_expr_function(struct type *function_type, struct symbol_identifie
 	for (int i = 0; i < n_args; i++) {
 		if (fits_into_reg(args[i]->parameter.type)) {
 			int size = calculate_size(args[i]->parameter.type);
-			inputs[i] = new_variable_sz(size, 1, 1);
+			inputs[i] = new_variable_sz(size, 1);
 		} else {
 			inputs[i] = new_ptr();
 		}

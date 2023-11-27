@@ -123,19 +123,19 @@ void ir_return(void) {
 
 void ir_get_offset(var_id member_address, var_id base_address, var_id offset_var, int offset) {
 	if (!offset_var)
-		offset_var = new_variable(type_pointer(type_simple(ST_VOID)), 1, 1);
+		offset_var = new_variable(type_pointer(type_simple(ST_VOID)), 1);
 	IR_PUSH_CONSTANT(constant_simple_unsigned(abi_info.pointer_type, offset), offset_var);
 	ir_push3(IR_ADD, member_address, base_address, offset_var);
 }
 
 void ir_set_bits(var_id result, var_id field, var_id value, int offset, int length) {
 	uint64_t mask = gen_mask(64 - offset - length, offset);
-	var_id mask_var = new_variable_sz(8, 1, 1);
-	var_id shift_var = new_variable_sz(8, 1, 1);
+	var_id mask_var = new_variable_sz(8, 1);
+	var_id shift_var = new_variable_sz(8, 1);
 
-	var_id value_large = new_variable_sz(8, 1, 1);
-	var_id field_large = new_variable_sz(8, 1, 1);
-	var_id result_large = new_variable_sz(8, 1, 1);
+	var_id value_large = new_variable_sz(8, 1);
+	var_id field_large = new_variable_sz(8, 1);
+	var_id result_large = new_variable_sz(8, 1);
 
 	ir_push2(IR_INT_CAST_ZERO, value_large, value);
 	ir_push2(IR_INT_CAST_ZERO, field_large, field);
@@ -152,8 +152,8 @@ void ir_set_bits(var_id result, var_id field, var_id value, int offset, int leng
 }
 
 void ir_get_bits(var_id result, var_id field, int offset, int length, int sign_extend) {
-	var_id field_large = new_variable_sz(8, 1, 1);
-	var_id shift_var = new_variable_sz(8, 1, 1);
+	var_id field_large = new_variable_sz(8, 1);
+	var_id shift_var = new_variable_sz(8, 1);
 
 	ir_push2(IR_INT_CAST_ZERO, field_large, field);
 
@@ -175,7 +175,7 @@ static void ir_init_var_recursive(struct initializer *init, struct type *type, v
 								  int bit_offset, int bit_size) {
 	switch (init->type) {
 	case INIT_BRACE: {
-		var_id child_offset_var = new_variable(type_pointer(type_simple(ST_VOID)), 1, 1);
+		var_id child_offset_var = new_variable(type_pointer(type_simple(ST_VOID)), 1);
 		for (int i = 0; i < init->brace.size; i++) {
 			int child_offset = calculate_offset(type, i);
 			struct type *child_type = type_select(type, i);
@@ -199,7 +199,7 @@ static void ir_init_var_recursive(struct initializer *init, struct type *type, v
 			expression_to_address(init->expr, offset);
 		} else {
 			var_id value = expression_to_ir(init->expr);
-			var_id prev = new_variable_sz(get_variable_size(value), 1, 1);
+			var_id prev = new_variable_sz(get_variable_size(value), 1);
 			ir_push2(IR_LOAD, prev, offset);
 
 			ir_set_bits(prev, prev, value, bit_offset, bit_size);
@@ -209,8 +209,8 @@ static void ir_init_var_recursive(struct initializer *init, struct type *type, v
 		break;
 
 	case INIT_STRING: {
-		var_id offset_var = new_variable(type_pointer(type_simple(ST_VOID)), 1, 1);
-		var_id char_var = new_variable_sz(1, 1, 1);
+		var_id offset_var = new_variable(type_pointer(type_simple(ST_VOID)), 1);
+		var_id char_var = new_variable_sz(1, 1);
 		for (int j = 0; j < init->string.len; j++) {
 			IR_PUSH_CONSTANT(constant_simple_unsigned(ST_CHAR, init->string.str[j]), char_var);
 			IR_PUSH_CONSTANT(constant_simple_unsigned(abi_info.size_type, j), offset_var);
