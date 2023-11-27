@@ -593,9 +593,9 @@ static struct expr *parse_prefix(void) {
 		if (!sym)
 			ERROR(T0->pos, "Could not find identifier %.*s", T0->str.len, T0->str.str);
 
+		TNEXT();
 		switch (sym->type) {
 		case IDENT_LABEL:
-			TNEXT();
 			return expr_new((struct expr) {
 					.type = E_CONSTANT,
 					.constant = {
@@ -607,29 +607,17 @@ static struct expr *parse_prefix(void) {
 				});
 
 		case IDENT_PARAMETER:
-			TNEXT();
-			return expr_new((struct expr) {
-					.type = E_SYMBOL,
-					.symbol = sym
-				});
-
 		case IDENT_VARIABLE:
-			TNEXT();
 			return expr_new((struct expr) {
 					.type = E_SYMBOL,
 					.symbol = sym
 				});
 
 		case IDENT_CONSTANT:
-			TNEXT();
 			return expr_new((struct expr) {
 					.type = E_CONSTANT,
 					.constant = sym->constant
 				});
-
-		default:
-			printf("%.*s\n", T0->str.len, T0->str.str);
-			NOTIMP();
 		}
 	} else if (T0->type == T_STRING) {
 		struct string_view str = T0->str;
