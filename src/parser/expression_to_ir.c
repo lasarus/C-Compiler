@@ -235,14 +235,6 @@ static struct evaluated_expression evaluate_variable(struct expr *expr) {
 	};
 }
 
-static struct evaluated_expression evaluate_variable_ptr(struct expr *expr) {
-	return (struct evaluated_expression) {
-		.type = EE_POINTER,
-		.is_lvalue = 1,
-		.pointer = expr->variable_ptr.ptr
-	};
-}
-
 static struct evaluated_expression evaluate_call(struct expr *expr) {
 	struct evaluated_expression callee = expression_evaluate(expr->call.callee);
 
@@ -677,7 +669,6 @@ struct evaluated_expression expression_evaluate(struct expr *expr) {
 		// All these follow the same pattern.
 	case E_SYMBOL: ret = evaluate_symbol(expr); break;
 	case E_VARIABLE: ret = evaluate_variable(expr); break;
-	case E_VARIABLE_PTR: ret = evaluate_variable_ptr(expr); break;
 	case E_INDIRECTION: ret = evaluate_indirection(expr); break;
 	case E_CALL: ret = evaluate_call(expr); break;
 	case E_CONSTANT: ret = evaluate_constant(expr); break;

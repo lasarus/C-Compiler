@@ -135,9 +135,6 @@ static struct type *calculate_type(struct expr *expr) {
 	case E_VARIABLE:
 		return expr->variable.type;
 
-	case E_VARIABLE_PTR:
-		return expr->variable_ptr.type;
-
 	case E_INDIRECTION:
 		return type_deref(expr->args[0]->data_type);
 
@@ -185,8 +182,13 @@ static struct type *calculate_type(struct expr *expr) {
 		return type_make_const(expr->args[0]->data_type, 0);
 
 	case E_SYMBOL:
-		assert(expr->symbol->type == IDENT_PARAMETER);
-		return expr->symbol->parameter.type;
+		switch (expr->symbol->type) {
+		case IDENT_PARAMETER:
+			return expr->symbol->parameter.type;
+		case IDENT_VARIABLE:
+			return expr->symbol->variable.type;
+		default: NOTIMP();
+		}
 
 	default:
 		printf("%d\n", expr->type);
@@ -550,7 +552,7 @@ static struct expr *parse_prefix(void) {
 		struct position pos = T0->pos;
 		struct expr *rhs = parse_pratt(PREFIX_PREC);
 		if ((rhs->type == E_VARIABLE && rhs->variable.is_register) ||
-			(rhs->type == E_VARIABLE_PTR && rhs->variable_ptr.is_register))
+			(rhs->type == E_SYMBOL && rhs->symbol->is_register))
 			ERROR(pos, "Taking address of register variable is not allowed.");
 		return EXPR_ARGS(E_ADDRESS_OF, rhs);
 	} else if (TACCEPT(T_KSIZEOF)) {
@@ -614,12 +616,8 @@ static struct expr *parse_prefix(void) {
 		case IDENT_VARIABLE:
 			TNEXT();
 			return expr_new((struct expr) {
-					.type = E_VARIABLE_PTR,
-					.variable_ptr = {
-						sym->variable.ptr,
-						sym->variable.type,
-						sym->is_register
-					}
+					.type = E_SYMBOL,
+					.symbol = sym
 				});
 
 		case IDENT_CONSTANT:
