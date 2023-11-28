@@ -1,6 +1,13 @@
 #ifndef VARIABLES_H
 #define VARIABLES_H
 
+struct variable_data {
+	int size;
+	int spans_block;
+	int first_block;
+	int used;
+};
+
 #define VOID_VAR 0
 typedef int var_id;
 
@@ -19,5 +26,7 @@ void init_variables(void);
 int get_variable_size(var_id variable);
 
 void variables_reset(void);
+
+struct variable_data *var_get_data(var_id variable);
 
 #endif

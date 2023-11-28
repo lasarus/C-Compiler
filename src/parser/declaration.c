@@ -1,6 +1,7 @@
 #include "declaration.h"
 #include "common.h"
 #include "expression.h"
+#include "ir/ir.h"
 #include "symbols.h"
 #include "expression.h"
 #include "function_parser.h"
@@ -1346,17 +1347,17 @@ static int parse_init_declarator(struct specifiers s, int external, int *was_fun
 					ERROR(T0->pos, "Variable length array can't have initializer");
 			} else {
 				symbol->type = IDENT_VARIABLE;
-				var_id ptr = new_ptr();
-				symbol->variable.ptr = ptr;
+				var_id ptr;
 				symbol->variable.type = type;
 				if (has_init) {
 					struct initializer init = parse_initializer(&type);
 					symbol->variable.type = type;
-					IR_PUSH_ALLOC(ptr, calculate_size(type));
+					ptr = ir_allocate(calculate_size(type));
 					ir_init_ptr(&init, type, ptr);
 				} else {
-					IR_PUSH_ALLOC(ptr, calculate_size(type));
+					ptr = ir_allocate(calculate_size(type));
 				}
+				symbol->variable.ptr = ptr;
 			}
 		}
 	} else {

@@ -1,4 +1,7 @@
 #include "codegen.h"
+#include "assembler/assembler.h"
+#include "ir/ir.h"
+#include "ir/variables.h"
 #include "registers.h"
 #include "binary_operators.h"
 
@@ -222,13 +225,6 @@ static void codegen_instruction(struct instruction ins, struct function *func) {
 		codegen_memcpy(get_variable_size(ins.operands[0]));
 		break;
 
-	case IR_LOAD_PART:
-		asm_ins2("leaq", MEM(-variable_info[ins.operands[1]].stack_location + ins.load_part.offset, REG_RBP), R8(REG_RDI));
-		asm_ins2("leaq", MEM(-variable_info[ins.operands[0]].stack_location, REG_RBP), R8(REG_RSI));
-
-		codegen_memcpy(get_variable_size(ins.operands[0]));
-		break;
-
 	case IR_LOAD_PART_ADDRESS:
 		scalar_to_reg(ins.operands[1], REG_RDI);
 		asm_ins2("leaq", MEM(ins.load_part.offset, REG_RDI), R8(REG_RDI));
@@ -256,15 +252,6 @@ static void codegen_instruction(struct instruction ins, struct function *func) {
 		asm_ins2("leaq", MEM(-variable_info[ins.operands[0]].stack_location, REG_RBP), R8(REG_RDI));
 
 		codegen_memcpy(get_variable_size(ins.operands[0]));
-		break;
-
-	case IR_STORE_PART:
-		asm_ins2("leaq", MEM(-variable_info[ins.operands[0]].stack_location + ins.store_part.offset, REG_RBP), R8(REG_RSI));
-		asm_ins2("leaq", MEM(-variable_info[ins.operands[1]].stack_location, REG_RBP), R8(REG_RDI));
-
-		assert(get_variable_size(ins.operands[1]) + ins.store_part.offset <= get_variable_size(ins.operands[0]));
-
-		codegen_memcpy(get_variable_size(ins.operands[1]));
 		break;
 
 	case IR_STORE_PART_ADDRESS:
@@ -411,7 +398,7 @@ static void codegen_instruction(struct instruction ins, struct function *func) {
 		break;
 
 	case IR_VA_ARG:
-		abi_emit_va_arg(ins.operands[0], ins.va_arg_.array, ins.va_arg_.type);
+		abi_emit_va_arg(ins.operands[0], ins.operands[1], ins.va_arg_.type);
 		break;
 
 	case IR_SET_ZERO_PTR:
@@ -495,6 +482,28 @@ static void codegen_instruction(struct instruction ins, struct function *func) {
 	}
 }
 
+static void codegen_phi_node(struct block *current_block, struct block *next_block) {
+	for (unsigned i = 0; i < next_block->phi_size; i++) {
+		struct phi_node *phi = &next_block->phi_nodes[i];
+
+		var_id source_var;
+
+		if (current_block->id == phi->block_a) {
+			source_var = phi->var_a;
+		} else if (current_block->id == phi->block_b) {
+			source_var = phi->var_b;
+		} else {
+			ICE("Phi node in %d reachable from invalid block %d (not %d or %d)",
+				next_block->id,
+				current_block->id,
+				phi->block_a, phi->block_b);
+		}
+
+		scalar_to_reg(source_var, REG_RAX);
+		reg_to_scalar(REG_RAX, phi->result);
+	}
+}
+
 static void codegen_block(struct block *block, struct function *func) {
 	asm_label(0, block->label);
 
@@ -504,9 +513,11 @@ static void codegen_block(struct block *block, struct function *func) {
 	struct block_exit *block_exit = &block->exit;
 	asm_comment("EXIT IS OF TYPE : %d", block_exit->type);
 	switch (block_exit->type) {
-	case BLOCK_EXIT_JUMP:
-		asm_ins1("jmp", IMML_ABS(get_block(block_exit->jump)->label, 0));
-		break;
+	case BLOCK_EXIT_JUMP: {
+		struct block *target = get_block(block_exit->jump);
+		codegen_phi_node(block, target);
+		asm_ins1("jmp", IMML_ABS(target->label, 0));
+	} break;
 
 	case BLOCK_EXIT_IF: {
 		var_id cond = block_exit->if_.condition;
@@ -557,12 +568,15 @@ static void codegen_function(struct function *func) {
 	int perm_stack_count = 0;
 	int max_temp_stack = 0;
 
+	// Allocate variables that spans multiple blocks.
 	for (int i = 0; i < func->var_size; i++) {
 		var_id var = func->vars[i];
+		struct variable_data *data = var_get_data(var);
 
-		int size = get_variable_size(var);
-
-		perm_stack_count += size;
+		/* if (!data->spans_block) */
+		/* 	continue; */
+			
+		perm_stack_count += data->size;
 
 		variable_info[var].storage = VAR_STOR_STACK;
 		variable_info[var].stack_location = perm_stack_count;
@@ -570,6 +584,7 @@ static void codegen_function(struct function *func) {
 
 	vla_info.size = 0;
 
+	// Allocate IR_ALLOC instructions.
 	for (int i = 0; i < func->size; i++) {
 		struct block *block = get_block(func->blocks[i]);
 
@@ -585,6 +600,25 @@ static void codegen_function(struct function *func) {
 		}
 	}
 
+	// Allocate variables that are local to one block.
+	/* for (int i = 0; i < func->var_size; i++) { */
+	/* 	var_id var = func->vars[i]; */
+	/* 	struct variable_data *data = var_get_data(var); */
+
+	/* 	if (data->spans_block || !data->used) */
+	/* 		continue; */
+
+	/* 	struct block *block = get_block(data->first_block); */
+
+	/* 	block->stack_counter += data->size; */
+
+	/* 	variable_info[var].storage = VAR_STOR_STACK; */
+	/* 	variable_info[var].stack_location = perm_stack_count + block->stack_counter; */
+
+	/* 	max_temp_stack = MAX(block->stack_counter, max_temp_stack); */
+	/* } */
+
+	// Allocate VLAs, a bit tricky, but works.
 	for (int i = 0; i < func->size; i++) {
 		struct block *block = get_block(func->blocks[i]);
 

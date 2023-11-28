@@ -10,6 +10,7 @@
 #include <abi/abi.h>
 
 #include <assert.h>
+#include <stddef.h>
 
 // Type conversions
 static enum simple_type get_arithmetic_type(enum simple_type a, int bitfield_a,
@@ -173,7 +174,7 @@ static struct type *calculate_type(struct expr *expr) {
 		return expr->compound_literal.type;
 
 	case E_POINTER_DIFF:
-		return type_simple(ST_INT);
+		return type_simple(abi_info.ptrdiff_type);
 
 	case E_COMMA:
 		return expr->args[1]->data_type;

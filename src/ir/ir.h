@@ -8,15 +8,6 @@
 typedef int block_id;
 block_id new_block(void);
 
-struct instruction;
-void ir_push(struct instruction instruction);
-#define IR_PUSH(...) do { ir_push((struct instruction) { __VA_ARGS__ }); } while(0)
-
-void ir_push0(int type);
-void ir_push1(int type, var_id op1);
-void ir_push2(int type, var_id op1, var_id op2);
-void ir_push3(int type, var_id op1, var_id op2, var_id op3);
-
 struct instruction {
 	enum {
 		IR_ADD, IR_SUB,
@@ -62,9 +53,6 @@ struct instruction {
 		IR_STACK_ALLOC,
 		IR_COPY_MEMORY,
 
-		IR_LOAD_PART,
-		IR_STORE_PART,
-
 		IR_LOAD_PART_ADDRESS,
 		IR_STORE_PART_ADDRESS,
 
@@ -90,87 +78,65 @@ struct instruction {
 		struct {
 			struct constant constant;
 		} constant;
-#define IR_PUSH_CONSTANT(CONSTANT, RESULT) IR_PUSH(.type = IR_CONSTANT, .operands={(RESULT)}, .constant = {(CONSTANT)})
-#define IR_PUSH_CONSTANT_ADDRESS(CONSTANT, ADDRESS) IR_PUSH(.type = IR_CONSTANT_ADDRESS, .operands={(ADDRESS)}, .constant = {(CONSTANT)})
 		struct {
 			int non_clobbered_register;
 		} call;
-#define IR_PUSH_CALL(VARIABLE, NON_CLOBBERED_REGISTER) IR_PUSH(.type = IR_CALL, .operands = {(VARIABLE)}, .call = {(NON_CLOBBERED_REGISTER)})
 
 		struct {
-			var_id array;
 			struct type *type;
 		} va_arg_;
-#define IR_PUSH_VA_ARG(ARRAY, RESULT, TYPE) IR_PUSH(.type = IR_VA_ARG, .operands = {(RESULT)}, .va_arg_ = {(ARRAY), (TYPE)})
 
 		struct {
 			int dominance;
 		} stack_alloc;
-#define IR_PUSH_STACK_ALLOC(RESULT, LENGTH, SLOT, DOMINANCE) IR_PUSH(.type = IR_STACK_ALLOC, .operands = {(RESULT), (LENGTH), (SLOT)}, .stack_alloc = {(DOMINANCE)})
 
 		struct {
 			int register_index, is_sse;
 		} set_reg;
-#define IR_PUSH_SET_REG(VARIABLE, REGISTER_INDEX, IS_SSE) IR_PUSH(.type = IR_SET_REG, .operands = {(VARIABLE)}, .set_reg = {(REGISTER_INDEX), (IS_SSE)})
 
 		struct {
 			int register_index, is_sse;
 		} get_reg;
-#define IR_PUSH_GET_REG(RESULT, REGISTER_INDEX, IS_SSE) IR_PUSH(.type = IR_GET_REG, .operands = {(RESULT)}, .get_reg = {(REGISTER_INDEX), (IS_SSE)})
 
 		struct {
 			int change;
 		} modify_stack_pointer;
-#define IR_PUSH_MODIFY_STACK_POINTER(CHANGE) IR_PUSH(.type = IR_MODIFY_STACK_POINTER, .modify_stack_pointer = {(CHANGE)})
 
 		struct {
 			int offset;
 		} store_stack_relative;
-#define IR_PUSH_STORE_STACK_RELATIVE(OFFSET, VARIABLE) IR_PUSH(.type = IR_STORE_STACK_RELATIVE, .operands = {(VARIABLE)}, .store_stack_relative = {(OFFSET)})
 
 		struct {
 			int offset, size;
 		} store_stack_relative_address;
-#define IR_PUSH_STORE_STACK_RELATIVE_ADDRESS(VARIABLE, OFFSET, SIZE) IR_PUSH(.type = IR_STORE_STACK_RELATIVE_ADDRESS, .operands = {(VARIABLE)}, .store_stack_relative_address = {(OFFSET), (SIZE)})
 
 		struct {
 			int offset;
 		} load_base_relative;
-#define IR_PUSH_LOAD_BASE_RELATIVE(RESULT, OFFSET) IR_PUSH(.type = IR_LOAD_BASE_RELATIVE, .operands = {(RESULT)}, .load_base_relative = {(OFFSET)})
 
 		struct {
 			int offset, size;
 		} load_base_relative_address;
-#define IR_PUSH_LOAD_BASE_RELATIVE_ADDRESS(RESULT, OFFSET, SIZE) IR_PUSH(.type = IR_LOAD_BASE_RELATIVE_ADDRESS, .operands = {(RESULT)}, .load_base_relative_address = {(OFFSET), (SIZE)})
 
 		struct {
 			int size, stack_location, save_to_preamble;
 		} alloc;
-#define IR_PUSH_ALLOC(RESULT, SIZE) IR_PUSH(.type = IR_ALLOC, .operands = {(RESULT)}, .alloc = {(SIZE), -1, 0})
-#define IR_PUSH_ALLOC_PREAMBLE(RESULT, SIZE) IR_PUSH(.type = IR_ALLOC, .operands = {(RESULT)}, .alloc = {(SIZE), -1, 1})
 
 		struct {
 			int size;
 		} set_zero_ptr;
-#define IR_PUSH_SET_ZERO_PTR(RESULT, SIZE) IR_PUSH(.type = IR_SET_ZERO_PTR, .operands = {(RESULT)}, .set_zero_ptr = {(SIZE)})
 
 		struct {
 			int offset;
 		} load_part;
-#define IR_PUSH_LOAD_PART(RESULT, VAR, OFFSET) IR_PUSH(.type = IR_LOAD_PART, .operands = {(RESULT), (VAR)}, .load_part = {(OFFSET)})
 
 		struct {
 			int offset;
 		} store_part;
-#define IR_PUSH_STORE_PART(RESULT, VAR, OFFSET) IR_PUSH(.type = IR_STORE_PART, .operands = {(RESULT), (VAR)}, .store_part = {(OFFSET)})
-
-#define IR_PUSH_LOAD_PART_ADDRESS(RESULT, VAR, OFFSET) IR_PUSH(.type = IR_LOAD_PART_ADDRESS, .operands = {(RESULT), (VAR)}, .load_part = {(OFFSET)})
-#define IR_PUSH_STORE_PART_ADDRESS(RESULT, VAR, OFFSET) IR_PUSH(.type = IR_STORE_PART_ADDRESS, .operands = {(RESULT), (VAR)}, .store_part = {(OFFSET)})
 
 		struct {
 			int size;
 		} copy_memory;
-#define IR_PUSH_COPY_MEMORY(DESTINATION, SOURCE, SIZE) IR_PUSH(.type = IR_COPY_MEMORY, .operands = {(DESTINATION), (SOURCE)}, .copy_memory = {(SIZE)})
 	};
 };
 
@@ -239,13 +205,26 @@ struct block_exit {
 	};
 };
 
+struct phi_node {
+	var_id var_a, var_b;
+	block_id block_a, block_b;
+
+	var_id result;
+};
+
 struct block {
 	block_id id;
 	label_id label;
+
 	int size, cap;
 	struct instruction *instructions;
 
+	size_t phi_size, phi_cap;
+	struct phi_node *phi_nodes;
+
 	struct block_exit exit;
+
+	int stack_counter; // Used in codegen for allocating variables local to block.
 };
 
 void ir_block_start(block_id id);
@@ -256,13 +235,72 @@ void ir_goto(block_id jump);
 void ir_return(void);
 
 void ir_init_ptr(struct initializer *init, struct type *type, var_id ptr);
-void ir_get_offset(var_id member_address, var_id base_address, var_id offset_var, int offset);
-void ir_set_bits(var_id result, var_id field, var_id value, int offset, int length);
-void ir_get_bits(var_id result, var_id field, int offset, int length, int sign_extend);
 
 struct function *get_current_function(void);
 struct block *get_current_block(void);
 
 void ir_reset(void);
+
+void ir_calculate_block_local_variables(void);
+
+// New interface. Below here all variables should be immutable.
+void ir_va_start(var_id address);
+void ir_va_arg(var_id array, var_id result_address, struct type *type);
+
+void ir_store(var_id address, var_id value);
+var_id ir_load(var_id address, int size);
+var_id ir_copy(var_id var); // TODO: Remove.
+var_id ir_phi(var_id var_a, var_id var_b, block_id block_a, block_id block_b);
+var_id ir_bool_cast(var_id operand);
+var_id ir_cast_int(var_id operand, int target_size, int sign_extend);
+var_id ir_cast_float(var_id operand, int target_size);
+var_id ir_cast_float_to_int(var_id operand, int target_size);
+var_id ir_cast_int_to_float(var_id operand, int target_size, int is_signed);
+
+var_id ir_binary_not(var_id operand);
+var_id ir_negate_int(var_id operand);
+var_id ir_negate_float(var_id operand);
+
+var_id ir_binary_and(var_id lhs, var_id rhs);
+var_id ir_left_shift(var_id lhs, var_id rhs);
+var_id ir_right_shift(var_id lhs, var_id rhs, int arithmetic);
+var_id ir_binary_or(var_id lhs, var_id rhs);
+var_id ir_add(var_id lhs, var_id rhs);
+var_id ir_sub(var_id lhs, var_id rhs);
+var_id ir_mul(var_id lhs, var_id rhs);
+var_id ir_imul(var_id lhs, var_id rhs);
+var_id ir_div(var_id lhs, var_id rhs);
+var_id ir_idiv(var_id lhs, var_id rhs);
+var_id ir_binary_op(int type, var_id lhs, var_id rhs);
+
+var_id ir_set_bits(var_id field, var_id value, int offset, int length);
+var_id ir_get_bits(var_id field, int offset, int length, int sign_extend);
+
+var_id ir_get_offset(var_id base_address, int offset);
+
+var_id ir_constant(struct constant constant);
+void ir_write_constant_to_address(struct constant constant, var_id address);
+
+void ir_call(var_id callee, int non_clobbered_register);
+var_id ir_stack_alloc(var_id length, var_id slot, int dominance);
+
+void ir_set_reg(var_id variable, int register_index, int is_sse);
+var_id ir_get_reg(int size, int register_index, int is_sse);
+
+var_id ir_allocate(int size);
+var_id ir_allocate_preamble(int size);
+
+void ir_modify_stack_pointer(int change);
+void ir_store_stack_relative(var_id variable, int offset);
+void ir_store_stack_relative_address(var_id variable, int offset, int size);
+var_id ir_load_base_relative(int offset, int size);
+void ir_load_base_relative_address(var_id address, int offset, int size);
+
+void ir_set_zero_ptr(var_id address, int size);
+
+var_id ir_load_part_address(var_id address, int offset, int size);
+void ir_store_part_address(var_id address, var_id value, int offset);
+
+void ir_copy_memory(var_id destination, var_id source, int size);
 
 #endif

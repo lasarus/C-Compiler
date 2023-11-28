@@ -30,10 +30,22 @@ struct T3 ret3(void) {
 	return (struct T3) { 10, 20 };
 }
 
+struct T4 {
+	int d;
+	long a, b;
+};
+
+struct T4 ret4(void) {
+	struct T4 t = { .d = 1 };
+	return t;
+}
+
 int main(void) {
 	assert(sum_a((struct a) { 1, 2, 3 }) == 6);
 	ret_struct();
 
 	assert(ret3().a == 10);
 	assert(ret3().b == 20);
+
+	assert(ret4().d == 1);
 }

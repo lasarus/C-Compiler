@@ -9,6 +9,7 @@
 struct abi_info {
 	int va_list_is_reference;
 	enum simple_type pointer_type,
+		ptrdiff_type,
 		size_type,
 		wchar_type;
 };

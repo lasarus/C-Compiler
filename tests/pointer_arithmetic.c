@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <stdlib.h>
+#include <stddef.h>
 
 void func(int *ptr) {
 	ptr--;
@@ -24,4 +25,6 @@ int main(void) {
 	assert(&arr[3] - &arr[5] == -2);
 
 	func(NULL);
+
+	assert(sizeof(&arr[0] - &arr[3]) == sizeof(ptrdiff_t));
 }

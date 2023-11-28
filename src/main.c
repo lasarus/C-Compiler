@@ -1,3 +1,4 @@
+#include "ir/ir.h"
 #include "preprocessor/preprocessor.h"
 #include "parser/parser.h"
 #include "parser/symbols.h"
@@ -146,6 +147,7 @@ static void compile_file(const char *path,
 
 	preprocessor_init(path);
 	parse_into_ir();
+	ir_calculate_block_local_variables();
 
 	struct object out_object = { 0 };
 
