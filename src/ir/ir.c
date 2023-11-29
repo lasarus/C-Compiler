@@ -279,12 +279,6 @@ var_id ir_load(var_id address, int size) {
 	return var;
 }
 
-var_id ir_copy(var_id var) {
-	var_id ret = new_variable(get_variable_size(var));
-	ir_push2(IR_COPY, ret, var);
-	return ret;
-}
-
 var_id ir_bool_cast(var_id operand) {
 	var_id res = new_variable(calculate_size(type_simple(ST_BOOL)));
 	ir_push2(IR_BOOL_CAST, res, operand);

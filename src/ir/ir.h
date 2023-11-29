@@ -39,7 +39,6 @@ struct instruction {
 		IR_CONSTANT,
 		IR_CONSTANT_ADDRESS,
 		IR_CALL,
-		IR_COPY,
 		IR_BOOL_CAST,
 		IR_INT_CAST_ZERO,
 		IR_INT_CAST_SIGN,
@@ -242,7 +241,6 @@ void ir_va_arg(var_id array, var_id result_address, struct type *type);
 
 void ir_store(var_id address, var_id value);
 var_id ir_load(var_id address, int size);
-var_id ir_copy(var_id var); // TODO: Remove.
 var_id ir_phi(var_id var_a, var_id var_b, block_id block_a, block_id block_b);
 var_id ir_bool_cast(var_id operand);
 var_id ir_cast_int(var_id operand, int target_size, int sign_extend);

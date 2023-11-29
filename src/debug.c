@@ -142,10 +142,6 @@ const char *dbg_instruction(struct instruction *ins) {
 		DBG_PRINT("store %d into %d relative to stack", ins->result, ins->store_stack_relative.offset);
 		break;
 
-	case IR_COPY:
-		DBG_PRINT("%d = %d", ins->result, ins->arguments[0]);
-		break;
-
 	case IR_INT_CAST_ZERO:
 		DBG_PRINT("%d = int_cast_zero %d", ins->result, ins->arguments[0]);
 		break;

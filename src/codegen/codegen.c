@@ -75,29 +75,6 @@ void codegen_memcpy(int len) {
 	}
 }
 
-static void codegen_stackcpy(int dest, int source, int len) {
-	for (int i = 0; i < len;) {
-		if (i + 8 <= len) {
-			asm_ins2("movq", MEM(source + i, REG_RBP), R8(REG_RAX));
-			asm_ins2("movq", R8(REG_RAX), MEM(dest + i, REG_RBP));
-			i += 8;
-		} else if (i + 4 <= len) {
-			asm_ins2("movl", MEM(source + i, REG_RBP), R4(REG_RAX));
-			asm_ins2("movl", R4(REG_RAX), MEM(dest + i, REG_RBP));
-			i += 4;
-		} else if (i + 2 <= len) {
-			asm_ins2("movw", MEM(source + i, REG_RBP), R2(REG_RAX));
-			asm_ins2("movw", R2(REG_RAX), MEM(dest + i, REG_RBP));
-			i += 2;
-		} else if (i + 1 <= len) {
-			asm_ins2("movb", MEM(source + i, REG_RBP), R1(REG_RAX));
-			asm_ins2("movb", R1(REG_RAX), MEM(dest + i, REG_RBP));
-			i += 1;
-		} else
-			break;
-	}
-}
-
 static void codegen_constant_to_rdi(struct constant *constant) {
 	switch (constant->type) {
 	case CONSTANT_TYPE: {
@@ -272,12 +249,6 @@ static void codegen_instruction(struct instruction *ins, struct function *func) 
 
 		codegen_memcpy(ins->store_stack_relative_address.size);
 	} break;
-
-	case IR_COPY:
-		codegen_stackcpy(-variable_info[ins->result].stack_location,
-						 -variable_info[ins->arguments[0]].stack_location,
-						 get_variable_size(ins->arguments[0]));
-		break;
 
 	case IR_INT_CAST_ZERO:
 		scalar_to_reg(ins->arguments[0], REG_RAX);
