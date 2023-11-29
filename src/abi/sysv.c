@@ -29,9 +29,7 @@ struct sysv_data {
 	var_id rbx_store;
 };
 
-
 struct reg_info {
-	var_id variable;
 	int register_idx, is_sse;
 	int is_merged;
 	var_id merge_into, merge_pos;
@@ -88,29 +86,24 @@ static struct call_info get_calling_convention(struct type *function_type, int n
 
 		if (classes[0] == CLASS_MEMORY) {
 			returns_address = 1;
-			var_id ret_address = new_ptr();
 			ret_address_index = 0;
 
 			current_gp_reg = 1;
 			ADD_ELEMENT(regs_size, regs_cap, regs) = (struct reg_info) {
-				.variable = ret_address,
 				.register_idx = calling_convention[0],
 				.size = 8,
 			};
 		} else {
 			int gp_idx = 0, ssa_idx = 0;
 			for (int j = 0; j < n_parts; j++) {
-				var_id part = new_ptr();
 				if (classes[j] == CLASS_SSE || classes[j] == CLASS_SSEUP) {
 					ADD_ELEMENT(ret_regs_size, ret_regs_cap, ret_regs) = (struct reg_info) {
-						.variable = part,
 						.is_sse = 1,
 						.register_idx = ssa_idx++,
 						.size = 8,
 					};
 				} else {
 					ADD_ELEMENT(ret_regs_size, ret_regs_cap, ret_regs) = (struct reg_info) {
-						.variable = part,
 						.is_sse = 0,
 						.register_idx = return_convention[gp_idx++],
 						.size = 8,
@@ -149,11 +142,8 @@ static struct call_info get_calling_convention(struct type *function_type, int n
 			for (int j = 0; j < n_parts; j++) {
 				int part_size = MIN(argument_size - j * 8, 8);
 
-				var_id part = new_variable(part_size);
-
 				if (classes[j] == CLASS_SSE || classes[j] == CLASS_SSEUP) {
 					ADD_ELEMENT(regs_size, regs_cap, regs) = (struct reg_info) {
-						.variable = part,
 						.is_sse = 1,
 						.register_idx = current_sse_reg++,
 						.is_merged = 1,
@@ -163,7 +153,6 @@ static struct call_info get_calling_convention(struct type *function_type, int n
 					};
 				} else {
 					ADD_ELEMENT(regs_size, regs_cap, regs) = (struct reg_info) {
-						.variable = part,
 						.is_sse = 0,
 						.register_idx = calling_convention[current_gp_reg++],
 						.is_merged = 1,
@@ -208,6 +197,8 @@ static struct evaluated_expression sysv_expr_call(struct evaluated_expression *c
 										   int n, struct evaluated_expression arguments[static n]) {
 	struct type *argument_types[128];
 	var_id arg_addresses[128];
+	var_id reg_variables[sizeof calling_convention / sizeof *calling_convention];
+	var_id ret_reg_variables[sizeof return_convention / sizeof *return_convention];
 	struct type *callee_type = type_deref(callee->data_type);
 	struct type *return_type = callee_type->children[0];
 
@@ -223,7 +214,7 @@ static struct evaluated_expression sysv_expr_call(struct evaluated_expression *c
 
 	if (c.returns_address) {
 		ret_address = ir_allocate(calculate_size(return_type));
-		c.regs[c.ret_address_index].variable = ret_address;
+		reg_variables[c.ret_address_index] = ret_address;
 	}
 
 	var_id rax_constant = VOID_VAR;
@@ -235,7 +226,7 @@ static struct evaluated_expression sysv_expr_call(struct evaluated_expression *c
 		if (!c.regs[i].is_merged)
 			continue;
 
-		c.regs[i].variable = ir_load_part_address(arg_addresses[c.regs[i].merge_into], c.regs[i].merge_pos, c.regs[i].size);
+		reg_variables[i] = ir_load_part_address(arg_addresses[c.regs[i].merge_into], c.regs[i].merge_pos, c.regs[i].size);
 	}
 
 	int total_mem_needed = 0;
@@ -254,7 +245,7 @@ static struct evaluated_expression sysv_expr_call(struct evaluated_expression *c
 	}
 
 	for (int i = 0; i < c.regs_size; i++)
-		ir_set_reg(c.regs[i].variable, c.regs[i].register_idx, c.regs[i].is_sse);
+		ir_set_reg(reg_variables[i], c.regs[i].register_idx, c.regs[i].is_sse);
 
 	if (c.rax != -1)
 		ir_set_reg(rax_constant, REG_RAX, 0);
@@ -262,7 +253,7 @@ static struct evaluated_expression sysv_expr_call(struct evaluated_expression *c
 	ir_call(callee_var, REG_RBX);
 
 	for (int i = 0; i < c.ret_regs_size; i++)
-		c.ret_regs[i].variable = ir_get_reg(c.ret_regs[i].size, c.ret_regs[i].register_idx, c.ret_regs[i].is_sse);
+		ret_reg_variables[i] = ir_get_reg(c.ret_regs[i].size, c.ret_regs[i].register_idx, c.ret_regs[i].is_sse);
 
 	struct evaluated_expression result;
 
@@ -273,7 +264,7 @@ static struct evaluated_expression sysv_expr_call(struct evaluated_expression *c
 			.pointer = ret_address,
 		};
 	} else if (c.ret_regs_size == 1) {
-		var_id variable = ir_cast_int(c.ret_regs[0].variable, calculate_size(return_type), 0);
+		var_id variable = ir_cast_int(ret_reg_variables[0], calculate_size(return_type), 0);
 		result = (struct evaluated_expression) {
 			.type = EE_VARIABLE,
 			.data_type = return_type,
@@ -281,8 +272,8 @@ static struct evaluated_expression sysv_expr_call(struct evaluated_expression *c
 		};
 	} else if (c.ret_regs_size == 2) {
 		var_id address = ir_allocate(calculate_size(return_type));
-		ir_store_part_address(address, c.ret_regs[0].variable, 0);
-		ir_store_part_address(address, c.ret_regs[1].variable, 8);
+		ir_store_part_address(address, ret_reg_variables[0], 0);
+		ir_store_part_address(address, ret_reg_variables[1], 8);
 		result = (struct evaluated_expression) {
 			.type = EE_POINTER,
 			.data_type = return_type,
@@ -301,6 +292,7 @@ static struct evaluated_expression sysv_expr_call(struct evaluated_expression *c
 
 static void sysv_expr_function(struct type *type, struct symbol_identifier **args, const char *name, int is_global) {
 	int n_args = type->n - 1;
+	var_id reg_variables[sizeof calling_convention / sizeof *calling_convention];
 
 	struct function *func = &ADD_ELEMENT(ir.size, ir.cap, ir.functions);
 	*func = (struct function) {
@@ -317,10 +309,10 @@ static void sysv_expr_function(struct type *type, struct symbol_identifier **arg
 	abi_data.rbx_store = ir_get_reg(8, REG_RBX, 0);
 
 	for (int i = 0; i < c.regs_size; i++)
-		c.regs[i].variable = ir_get_reg(c.regs[i].size, c.regs[i].register_idx, c.regs[i].is_sse);
+		reg_variables[i] = ir_get_reg(c.regs[i].size, c.regs[i].register_idx, c.regs[i].is_sse);
 	
 	if (c.returns_address) {
-		abi_data.ret_address = c.regs[c.ret_address_index].variable;
+		abi_data.ret_address = reg_variables[c.ret_address_index];
 		abi_data.returns_address = 1;
 	}
 
@@ -358,7 +350,7 @@ static void sysv_expr_function(struct type *type, struct symbol_identifier **arg
 
 		var_id address = arg_addresses[c.regs[i].merge_into];
 
-		ir_store_part_address(address, c.regs[i].variable, c.regs[i].merge_pos);
+		ir_store_part_address(address, reg_variables[i], c.regs[i].merge_pos);
 	}
 
 	if (type->function.is_variadic) {
