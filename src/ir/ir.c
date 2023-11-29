@@ -57,16 +57,16 @@ struct block *get_current_block(void) {
 void ir_push(struct instruction instruction) {
 	struct block *block = get_current_block();
 
-	ADD_ELEMENT(block->size, block->cap, block->instructions) = instruction;
+	ADD_ELEMENT(block->size, block->cap, block->instructions) = ALLOC(instruction);
 }
 
 void ir_push3(int type, var_id op1, var_id op2, var_id op3) {
 	struct block *block = get_current_block();
 
-	ADD_ELEMENT(block->size, block->cap, block->instructions) = (struct instruction) {
+	ADD_ELEMENT(block->size, block->cap, block->instructions) = ALLOC((struct instruction) {
 		.type = type,
 		.operands = { op1, op2, op3 }
-	};
+		});
 }
 
 static void ir_push2(int type, var_id op1, var_id op2) {
@@ -234,7 +234,7 @@ void ir_calculate_block_local_variables(void) {
 			struct block *b = get_block(f->blocks[j]);
 
 			for (int k = 0; k < b->size; k++) {
-				struct instruction *ins = &b->instructions[k];
+				struct instruction *ins = b->instructions[k];
 
 				for (int l = 0; l < 3; l++) {
 					var_id usage = ins->operands[l];

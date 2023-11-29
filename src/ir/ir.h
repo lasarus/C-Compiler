@@ -212,7 +212,7 @@ struct block {
 	label_id label;
 
 	int size, cap;
-	struct instruction *instructions;
+	struct instruction **instructions;
 
 	struct block_exit exit;
 
