@@ -65,7 +65,8 @@ void ir_push3(int type, var_id op1, var_id op2, var_id op3) {
 
 	ADD_ELEMENT(block->size, block->cap, block->instructions) = ALLOC((struct instruction) {
 		.type = type,
-		.operands = { op1, op2, op3 }
+		.result = op1,
+		.arguments = { op2, op3 }
 		});
 }
 
@@ -236,10 +237,9 @@ void ir_calculate_block_local_variables(void) {
 			for (int k = 0; k < b->size; k++) {
 				struct instruction *ins = b->instructions[k];
 
-				for (int l = 0; l < 3; l++) {
-					var_id usage = ins->operands[l];
-					register_usage(b, usage);
-				}
+				register_usage(b, ins->result);
+				register_usage(b, ins->arguments[0]);
+				register_usage(b, ins->arguments[1]);
 			}
 
 			switch (b->exit.type) {
@@ -266,8 +266,7 @@ void ir_va_start(var_id address) {
 }
 
 void ir_va_arg(var_id array, var_id result_address, struct type *type) {
-#define IR_PUSH_VA_ARG(ARRAY, RESULT, TYPE) IR_PUSH(.type = IR_VA_ARG, .operands = {(RESULT), (ARRAY)}, .va_arg_ = {(TYPE)})
-	IR_PUSH_VA_ARG(array, result_address, type);
+	IR_PUSH(.type = IR_VA_ARG, .result = result_address, .arguments = {result_address, array}, .va_arg_ = {type});
 }
 
 void ir_store(var_id address, var_id value) {
@@ -339,14 +338,12 @@ var_id ir_constant(struct constant constant) {
 	if (constant.type == CONSTANT_LABEL_POINTER)
 		size = 8;
 	var_id var = new_variable(size);
-#define IR_PUSH_CONSTANT(CONSTANT, RESULT) IR_PUSH(.type = IR_CONSTANT, .operands={(RESULT)}, .constant = {(CONSTANT)})
-	IR_PUSH_CONSTANT(constant, var);
+	IR_PUSH(.type = IR_CONSTANT, .result=var, .constant = {constant});
 	return var;
 }
 
 void ir_write_constant_to_address(struct constant constant, var_id address) {
-#define IR_PUSH_CONSTANT_ADDRESS(CONSTANT, ADDRESS) IR_PUSH(.type = IR_CONSTANT_ADDRESS, .operands={(ADDRESS)}, .constant = {(CONSTANT)})
-	IR_PUSH_CONSTANT_ADDRESS(constant, address);
+	IR_PUSH(.type = IR_CONSTANT_ADDRESS, .arguments={address}, .constant = {constant});
 }
 
 var_id ir_binary_and(var_id lhs, var_id rhs) {
@@ -416,36 +413,29 @@ var_id ir_binary_op(int type, var_id lhs, var_id rhs) {
 }
 
 void ir_call(var_id callee, int non_clobbered_register) {
-#define IR_PUSH_CALL(VARIABLE, NON_CLOBBERED_REGISTER) IR_PUSH(.type = IR_CALL, .operands = {(VARIABLE)}, .call = {(NON_CLOBBERED_REGISTER)})
-	IR_PUSH_CALL(callee, non_clobbered_register);
+	IR_PUSH(.type = IR_CALL, .arguments = {callee}, .call = {non_clobbered_register});
 }
 
 var_id ir_vla_alloc(var_id length) {
-#define IR_PUSH_VLA_ALLOC(RESULT, LENGTH) IR_PUSH(.type = IR_VLA_ALLOC, .operands = {(RESULT), (LENGTH)}, .vla_alloc = {0})
 	var_id result = new_ptr();
-	IR_PUSH_VLA_ALLOC(result, length);
+	IR_PUSH(.type = IR_VLA_ALLOC, .result = result, .arguments = {length}, .vla_alloc = {0});
 	return result;
 }
 
 void ir_set_reg(var_id variable, int register_index, int is_sse) {
-#define IR_PUSH_SET_REG(VARIABLE, REGISTER_INDEX, IS_SSE) IR_PUSH(.type = IR_SET_REG, .operands = {(VARIABLE)}, .set_reg = {(REGISTER_INDEX), (IS_SSE)})
-	IR_PUSH_SET_REG(variable, register_index, is_sse);
+	IR_PUSH(.type = IR_SET_REG, .arguments = {variable}, .set_reg = {register_index, is_sse});
 }
 
 var_id ir_get_reg(int size, int register_index, int is_sse) {
-#define IR_PUSH_GET_REG(RESULT, REGISTER_INDEX, IS_SSE) IR_PUSH(.type = IR_GET_REG, .operands = {(RESULT)}, .get_reg = {(REGISTER_INDEX), (IS_SSE)})
 	var_id reg = new_variable(size);
-	IR_PUSH_GET_REG(reg, register_index, is_sse);
+	IR_PUSH(.type = IR_GET_REG, .result = reg, .get_reg = {register_index, is_sse});
 	return reg;
 }
-
-#define IR_PUSH_ALLOC(RESULT, SIZE) IR_PUSH(.type = IR_ALLOC, .operands = {(RESULT)}, .alloc = {(SIZE), -1, 0})
-#define IR_PUSH_ALLOC_PREAMBLE(RESULT, SIZE) IR_PUSH(.type = IR_ALLOC, .operands = {(RESULT)}, .alloc = {(SIZE), -1, 1})
 
 var_id ir_allocate(int size) {
 	var_id res = new_ptr();
 
-	IR_PUSH_ALLOC(res, size);
+	IR_PUSH(.type = IR_ALLOC, .result = res, .alloc = {size, -1, 0});
 
 	return res;
 }
@@ -453,65 +443,55 @@ var_id ir_allocate(int size) {
 var_id ir_allocate_preamble(int size) {
 	var_id res = new_ptr();
 
-	IR_PUSH_ALLOC_PREAMBLE(res, size);
+	IR_PUSH(.type = IR_ALLOC, .result = res, .alloc = {size, -1, 1});
 
 	return res;
 }
 
 void ir_modify_stack_pointer(int change) {
-#define IR_PUSH_MODIFY_STACK_POINTER(CHANGE) IR_PUSH(.type = IR_MODIFY_STACK_POINTER, .modify_stack_pointer = {(CHANGE)})
-	IR_PUSH_MODIFY_STACK_POINTER(change);
+	IR_PUSH(.type = IR_MODIFY_STACK_POINTER, .modify_stack_pointer = {change});
 }
 
 void ir_store_stack_relative(var_id variable, int offset) {
-#define IR_PUSH_STORE_STACK_RELATIVE(OFFSET, VARIABLE) IR_PUSH(.type = IR_STORE_STACK_RELATIVE, .operands = {(VARIABLE)}, .store_stack_relative = {(OFFSET)})
-	IR_PUSH_STORE_STACK_RELATIVE(offset, variable);
+	IR_PUSH(.type = IR_STORE_STACK_RELATIVE, .arguments = {variable}, .store_stack_relative = {offset});
 }
 
 void ir_store_stack_relative_address(var_id variable, int offset, int size) {
-#define IR_PUSH_STORE_STACK_RELATIVE_ADDRESS(VARIABLE, OFFSET, SIZE) IR_PUSH(.type = IR_STORE_STACK_RELATIVE_ADDRESS, .operands = {(VARIABLE)}, .store_stack_relative_address = {(OFFSET), (SIZE)})
-	IR_PUSH_STORE_STACK_RELATIVE_ADDRESS(variable, offset, size);
+	IR_PUSH(.type = IR_STORE_STACK_RELATIVE_ADDRESS, .arguments = {variable}, .store_stack_relative_address = {offset, size});
 }
 
 var_id ir_load_base_relative(int offset, int size) {
-#define IR_PUSH_LOAD_BASE_RELATIVE(RESULT, OFFSET) IR_PUSH(.type = IR_LOAD_BASE_RELATIVE, .operands = {(RESULT)}, .load_base_relative = {(OFFSET)})
 	var_id res = new_variable(size);
-	IR_PUSH_LOAD_BASE_RELATIVE(res, offset);
+	IR_PUSH(.type = IR_LOAD_BASE_RELATIVE, .result = res, .load_base_relative = {offset});
 	return res;
 }
 
 void ir_load_base_relative_address(var_id address, int offset, int size) {
-#define IR_PUSH_LOAD_BASE_RELATIVE_ADDRESS(RESULT, OFFSET, SIZE) IR_PUSH(.type = IR_LOAD_BASE_RELATIVE_ADDRESS, .operands = {(RESULT)}, .load_base_relative_address = {(OFFSET), (SIZE)})
-	IR_PUSH_LOAD_BASE_RELATIVE_ADDRESS(address, offset, size);
+	IR_PUSH(.type = IR_LOAD_BASE_RELATIVE_ADDRESS, .arguments = {address}, .load_base_relative_address = {offset, size});
 }
 
 void ir_set_zero_ptr(var_id address, int size) {
-#define IR_PUSH_SET_ZERO_PTR(RESULT, SIZE) IR_PUSH(.type = IR_SET_ZERO_PTR, .operands = {(RESULT)}, .set_zero_ptr = {(SIZE)})
-	IR_PUSH_SET_ZERO_PTR(address, size);
+	IR_PUSH(.type = IR_SET_ZERO_PTR, .arguments = {address}, .set_zero_ptr = {size});
 }
 
 var_id ir_load_part_address(var_id address, int offset, int size) {
-#define IR_PUSH_LOAD_PART_ADDRESS(RESULT, VAR, OFFSET) IR_PUSH(.type = IR_LOAD_PART_ADDRESS, .operands = {(RESULT), (VAR)}, .load_part = {(OFFSET)})
 	var_id res = new_variable(size);
-	IR_PUSH_LOAD_PART_ADDRESS(res, address, offset);
+	IR_PUSH(.type = IR_LOAD_PART_ADDRESS, .result = res, .arguments = {address}, .load_part = {offset});
 	return res;
 }
 
 void ir_store_part_address(var_id address, var_id value, int offset) {
-#define IR_PUSH_STORE_PART_ADDRESS(RESULT, VAR, OFFSET) IR_PUSH(.type = IR_STORE_PART_ADDRESS, .operands = {(RESULT), (VAR)}, .store_part = {(OFFSET)})
-	IR_PUSH_STORE_PART_ADDRESS(address, value, offset);
+	IR_PUSH(.type = IR_STORE_PART_ADDRESS, .arguments = {address, value}, .store_part = {offset});
 }
 
 void ir_copy_memory(var_id destination, var_id source, int size) {
-#define IR_PUSH_COPY_MEMORY(DESTINATION, SOURCE, SIZE) IR_PUSH(.type = IR_COPY_MEMORY, .operands = {(DESTINATION), (SOURCE)}, .copy_memory = {(SIZE)})
-	IR_PUSH_COPY_MEMORY(destination, source, size);
+	IR_PUSH(.type = IR_COPY_MEMORY, .arguments = {destination, source}, .copy_memory = {size});
 }
 
 var_id ir_phi(var_id var_a, var_id var_b, block_id block_a, block_id block_b) {
-#define IR_PUSH_PHI(DESTINATION, VAR_A, VAR_B, BLOCK_A, BLOCK_B) IR_PUSH(.type = IR_PHI, .operands = {(DESTINATION), (VAR_A), (VAR_B)}, .phi = {(BLOCK_A), (BLOCK_B)})
 	var_id result = new_variable(get_variable_size(var_a));
 
-	IR_PUSH_PHI(result, var_a, var_b, block_a, block_b);
+	IR_PUSH(.type = IR_PHI, .result = result, .arguments = {var_a, var_b}, .phi = {block_a, block_b});
 
 	return result;
 }

@@ -74,7 +74,8 @@ struct instruction {
 		IR_COUNT
 	} type;
 
-	var_id operands[3];
+	var_id result;
+	var_id arguments[2];
 
 	union {
 		struct {
