@@ -120,7 +120,7 @@ void ir_return(void) {
 
 var_id ir_phi(var_id var_a, var_id var_b, block_id block_a, block_id block_b) {
 	struct block *block = get_current_block();
-	var_id result = new_variable_sz(get_variable_size(var_a), 1);
+	var_id result = new_variable(get_variable_size(var_a));
 
 	ADD_ELEMENT(block->phi_size, block->phi_cap, block->phi_nodes) = (struct phi_node) {
 		.block_a = block_a,
@@ -273,61 +273,61 @@ void ir_store(var_id address, var_id value) {
 }
 
 var_id ir_load(var_id address, int size) {
-	var_id var = new_variable_sz(size, 1);
+	var_id var = new_variable(size);
 	ir_push2(IR_LOAD, var, address);
 	return var;
 }
 
 var_id ir_copy(var_id var) {
-	var_id ret = new_variable_sz(get_variable_size(var), 1);
+	var_id ret = new_variable(get_variable_size(var));
 	ir_push2(IR_COPY, ret, var);
 	return ret;
 }
 
 var_id ir_bool_cast(var_id operand) {
-	var_id res = new_variable_sz(calculate_size(type_simple(ST_BOOL)), 1);
+	var_id res = new_variable(calculate_size(type_simple(ST_BOOL)));
 	ir_push2(IR_BOOL_CAST, res, operand);
 	return res;
 }
 
 var_id ir_cast_int(var_id operand, int target_size, int sign_extend) {
-	var_id res = new_variable_sz(target_size, 1);
+	var_id res = new_variable(target_size);
 	ir_push2(sign_extend ? IR_INT_CAST_SIGN : IR_INT_CAST_ZERO, res, operand);
 	return res;
 }
 
 var_id ir_cast_float(var_id operand, int target_size) {
-	var_id res = new_variable_sz(target_size, 1);
+	var_id res = new_variable(target_size);
 	ir_push2(IR_FLOAT_CAST, res, operand);
 	return res;
 }
 
 var_id ir_cast_int_to_float(var_id operand, int target_size, int is_signed) {
-	var_id res = new_variable_sz(target_size, 1);
+	var_id res = new_variable(target_size);
 	ir_push2(is_signed ? IR_INT_FLOAT_CAST : IR_UINT_FLOAT_CAST, res, operand);
 	return res;
 }
 
 var_id ir_cast_float_to_int(var_id operand, int target_size) {
-	var_id res = new_variable_sz(target_size, 1);
+	var_id res = new_variable(target_size);
 	ir_push2(IR_FLOAT_INT_CAST, res, operand);
 	return res;
 }
 
 var_id ir_binary_not(var_id operand) {
-	var_id ret = new_variable_sz(get_variable_size(operand), 1);
+	var_id ret = new_variable(get_variable_size(operand));
 	ir_push2(IR_BINARY_NOT, ret, operand);
 	return ret;
 }
 
 var_id ir_negate_int(var_id operand) {
-	var_id ret = new_variable_sz(get_variable_size(operand), 1);
+	var_id ret = new_variable(get_variable_size(operand));
 	ir_push2(IR_NEGATE_INT, ret, operand);
 	return ret;
 }
 
 var_id ir_negate_float(var_id operand) {
-	var_id ret = new_variable_sz(get_variable_size(operand), 1);
+	var_id ret = new_variable(get_variable_size(operand));
 	ir_push2(IR_NEGATE_FLOAT, ret, operand);
 	return ret;
 }
@@ -336,7 +336,7 @@ var_id ir_constant(struct constant constant) {
 	int size = calculate_size(constant.data_type);
 	if (constant.type == CONSTANT_LABEL_POINTER)
 		size = 8;
-	var_id var = new_variable_sz(size, 1);
+	var_id var = new_variable(size);
 #define IR_PUSH_CONSTANT(CONSTANT, RESULT) IR_PUSH(.type = IR_CONSTANT, .operands={(RESULT)}, .constant = {(CONSTANT)})
 	IR_PUSH_CONSTANT(constant, var);
 	return var;
@@ -348,67 +348,67 @@ void ir_write_constant_to_address(struct constant constant, var_id address) {
 }
 
 var_id ir_binary_and(var_id lhs, var_id rhs) {
-	var_id var = new_variable_sz(get_variable_size(lhs), 1);
+	var_id var = new_variable(get_variable_size(lhs));
 	ir_push3(IR_BAND, var, lhs, rhs);
 	return var;
 }
 
 var_id ir_left_shift(var_id lhs, var_id rhs) {
-	var_id var = new_variable_sz(get_variable_size(lhs), 1);
+	var_id var = new_variable(get_variable_size(lhs));
 	ir_push3(IR_LSHIFT, var, lhs, rhs);
 	return var;
 }
 
 var_id ir_right_shift(var_id lhs, var_id rhs, int arithmetic) {
-	var_id var = new_variable_sz(get_variable_size(lhs), 1);
+	var_id var = new_variable(get_variable_size(lhs));
 	ir_push3(arithmetic ? IR_IRSHIFT : IR_RSHIFT, var, lhs, rhs);
 	return var;
 }
 
 var_id ir_binary_or(var_id lhs, var_id rhs) {
-	var_id var = new_variable_sz(get_variable_size(lhs), 1);
+	var_id var = new_variable(get_variable_size(lhs));
 	ir_push3(IR_BOR, var, lhs, rhs);
 	return var;
 }
 
 var_id ir_add(var_id lhs, var_id rhs) {
-	var_id var = new_variable_sz(get_variable_size(lhs), 1);
+	var_id var = new_variable(get_variable_size(lhs));
 	ir_push3(IR_ADD, var, lhs, rhs);
 	return var;
 }
 
 var_id ir_sub(var_id lhs, var_id rhs) {
-	var_id var = new_variable_sz(get_variable_size(lhs), 1);
+	var_id var = new_variable(get_variable_size(lhs));
 	ir_push3(IR_SUB, var, lhs, rhs);
 	return var;
 }
 
 var_id ir_mul(var_id lhs, var_id rhs) {
-	var_id var = new_variable_sz(get_variable_size(lhs), 1);
+	var_id var = new_variable(get_variable_size(lhs));
 	ir_push3(IR_MUL, var, lhs, rhs);
 	return var;
 }
 
 var_id ir_imul(var_id lhs, var_id rhs) {
-	var_id var = new_variable_sz(get_variable_size(lhs), 1);
+	var_id var = new_variable(get_variable_size(lhs));
 	ir_push3(IR_IMUL, var, lhs, rhs);
 	return var;
 }
 
 var_id ir_div(var_id lhs, var_id rhs) {
-	var_id var = new_variable_sz(get_variable_size(lhs), 1);
+	var_id var = new_variable(get_variable_size(lhs));
 	ir_push3(IR_DIV, var, lhs, rhs);
 	return var;
 }
 
 var_id ir_idiv(var_id lhs, var_id rhs) {
-	var_id var = new_variable_sz(get_variable_size(lhs), 1);
+	var_id var = new_variable(get_variable_size(lhs));
 	ir_push3(IR_IDIV, var, lhs, rhs);
 	return var;
 }
 
 var_id ir_binary_op(int type, var_id lhs, var_id rhs) {
-	var_id var = new_variable_sz(get_variable_size(lhs), 1);
+	var_id var = new_variable(get_variable_size(lhs));
 	ir_push3(type, var, lhs, rhs);
 	return var;
 }
@@ -418,10 +418,10 @@ void ir_call(var_id callee, int non_clobbered_register) {
 	IR_PUSH_CALL(callee, non_clobbered_register);
 }
 
-var_id ir_stack_alloc(var_id length, var_id slot, int dominance) {
-#define IR_PUSH_STACK_ALLOC(RESULT, LENGTH, SLOT, DOMINANCE) IR_PUSH(.type = IR_STACK_ALLOC, .operands = {(RESULT), (LENGTH), (SLOT)}, .stack_alloc = {(DOMINANCE)})
+var_id ir_vla_alloc(var_id length) {
+#define IR_PUSH_VLA_ALLOC(RESULT, LENGTH) IR_PUSH(.type = IR_VLA_ALLOC, .operands = {(RESULT), (LENGTH)}, .vla_alloc = {0})
 	var_id result = new_ptr();
-	IR_PUSH_STACK_ALLOC(result, length, slot, dominance);
+	IR_PUSH_VLA_ALLOC(result, length);
 	return result;
 }
 
@@ -432,7 +432,7 @@ void ir_set_reg(var_id variable, int register_index, int is_sse) {
 
 var_id ir_get_reg(int size, int register_index, int is_sse) {
 #define IR_PUSH_GET_REG(RESULT, REGISTER_INDEX, IS_SSE) IR_PUSH(.type = IR_GET_REG, .operands = {(RESULT)}, .get_reg = {(REGISTER_INDEX), (IS_SSE)})
-	var_id reg = new_variable_sz(size, 1);
+	var_id reg = new_variable(size);
 	IR_PUSH_GET_REG(reg, register_index, is_sse);
 	return reg;
 }
@@ -473,7 +473,7 @@ void ir_store_stack_relative_address(var_id variable, int offset, int size) {
 
 var_id ir_load_base_relative(int offset, int size) {
 #define IR_PUSH_LOAD_BASE_RELATIVE(RESULT, OFFSET) IR_PUSH(.type = IR_LOAD_BASE_RELATIVE, .operands = {(RESULT)}, .load_base_relative = {(OFFSET)})
-	var_id res = new_variable_sz(size, 1);
+	var_id res = new_variable(size);
 	IR_PUSH_LOAD_BASE_RELATIVE(res, offset);
 	return res;
 }
@@ -490,7 +490,7 @@ void ir_set_zero_ptr(var_id address, int size) {
 
 var_id ir_load_part_address(var_id address, int offset, int size) {
 #define IR_PUSH_LOAD_PART_ADDRESS(RESULT, VAR, OFFSET) IR_PUSH(.type = IR_LOAD_PART_ADDRESS, .operands = {(RESULT), (VAR)}, .load_part = {(OFFSET)})
-	var_id res = new_variable_sz(size, 1);
+	var_id res = new_variable(size);
 	IR_PUSH_LOAD_PART_ADDRESS(res, address, offset);
 	return res;
 }

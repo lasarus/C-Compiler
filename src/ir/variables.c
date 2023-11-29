@@ -1,4 +1,6 @@
 #include "variables.h"
+#include "arch/x64.h"
+#include "ir/ir.h"
 
 #include <common.h>
 #include <types.h>
@@ -17,31 +19,23 @@ void variables_reset(void) {
 	variable_data = NULL;
 }
 
-var_id new_variable(struct type *type, int allocate) {
-	return new_variable_sz(calculate_size(type), allocate);
-}
-
 var_id new_ptr(void) {
-	return new_variable_sz(8, 1);
+	return new_variable(8);
 }
 
 var_id allocate_vla(struct type *type) {
-	static int dominance = 0;
-	struct type *n_type = type_pointer(type->children[0]);
 	struct expr *size_expr = type_sizeof(type);
 	var_id size = expression_to_size_t(size_expr);
-	var_id slot = new_variable(n_type, 1);
-	var_id ptr = ir_stack_alloc(size, slot, dominance);
-	dominance++;
+	var_id ptr = ir_vla_alloc(size);
 	return ptr;
 }
 
-var_id new_variable_sz(int size, int allocate) {
+var_id new_variable(int size) {
 	if (size > 8) {
 		ICE("Too large register");
 	}
 	// A bit of a shortcut.
-	if (variables_size && size == 0)
+	if (size == 0)
 		return VOID_VAR;
 
 	var_id id = variables_size;
@@ -51,8 +45,7 @@ var_id new_variable_sz(int size, int allocate) {
 		.spans_block = 0,
 	};
 
-	if (allocate)
-		allocate_var(id);
+	allocate_var(id);
 
 	return id;
 }
@@ -67,7 +60,8 @@ int get_variable_size(var_id variable) {
 
 void init_variables(void) {
 	variables_size = 0;
-	new_variable(type_simple(ST_VOID), 0);
+	// VOID_VAR
+	ADD_ELEMENT(variables_size, variables_cap, variable_data) = (struct variable_data) { 0 };
 }
 
 struct variable_data *var_get_data(var_id variable) {

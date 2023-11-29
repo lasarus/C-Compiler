@@ -22,11 +22,8 @@ struct codegen_flags codegen_flags = {
 };
 
 struct vla_info {
-	size_t size, cap;
-	struct vla_slot {
-		var_id slot;
-		int dominance;
-	} *slots;
+	int vla_slot_buffer_offset;
+	int count;
 	int alloc_preamble;
 } vla_info;
 
@@ -406,29 +403,23 @@ static void codegen_instruction(struct instruction ins, struct function *func) {
 		codegen_memzero(ins.set_zero_ptr.size);
 		break;
 
-	case IR_STACK_ALLOC: {
-		struct vla_slot *slot = NULL;
-		for (size_t i = 0; i < vla_info.size; i++) {
-			if (vla_info.slots[i].dominance == ins.stack_alloc.dominance) {
-				slot = vla_info.slots + i;
-			} else if (vla_info.slots[i].dominance > ins.stack_alloc.dominance) {
-				asm_ins2("movq", IMM(0), MEM(-variable_info[vla_info.slots[i].slot].stack_location, REG_RBP));
-			}
-		}
-		assert(slot);
+	case IR_VLA_ALLOC: {
+		int slot_offset = ins.vla_alloc.dominance * 8;
+		for (int i = ins.vla_alloc.dominance + 1; i < vla_info.count; i++)
+			asm_ins2("movq", IMM(0), MEM(-vla_info.vla_slot_buffer_offset + i * 8, REG_RBP));
 
 		label_id tmp_label = register_label();
-		asm_ins2("movq", MEM(-variable_info[slot->slot].stack_location, REG_RBP), R8(REG_RAX));
+		asm_ins2("movq", MEM(-vla_info.vla_slot_buffer_offset + slot_offset, REG_RBP), R8(REG_RAX));
 		asm_ins2("cmpq", IMM(0), R8(REG_RAX));
 		asm_ins1("jne", IMML_ABS(tmp_label, 0));
 		asm_ins2("movq", R8(REG_RSP), R8(REG_RAX));
-		asm_ins2("movq", R8(REG_RAX), MEM(-variable_info[slot->slot].stack_location, REG_RBP));
+		asm_ins2("movq", R8(REG_RAX), MEM(-vla_info.vla_slot_buffer_offset + slot_offset, REG_RBP));
 		asm_label(0, tmp_label);
 		tmp_label++;
 
 		asm_ins2("movq", R8(REG_RAX), R8(REG_RSP));
 
-		asm_ins2("movq", R8(REG_RSP), MEM(-variable_info[slot->slot].stack_location, REG_RBP));
+		asm_ins2("movq", R8(REG_RSP), MEM(-vla_info.vla_slot_buffer_offset + slot_offset, REG_RBP));
 		scalar_to_reg(ins.operands[1], REG_RAX);
 		asm_ins2("subq", R8(REG_RAX), R8(REG_RSP));
 		reg_to_scalar(REG_RSP, ins.operands[0]);
@@ -582,7 +573,21 @@ static void codegen_function(struct function *func) {
 		variable_info[var].stack_location = perm_stack_count;
 	}
 
-	vla_info.size = 0;
+	// Allocate VLAs, a bit tricky, but works.
+	vla_info.count = 0;
+	for (int i = 0; i < func->size; i++) {
+		struct block *block = get_block(func->blocks[i]);
+
+		for (int j = 0; j < block->size; j++) {
+			struct instruction *ins = block->instructions + j;
+
+			if (ins->type == IR_VLA_ALLOC)
+				ins->vla_alloc.dominance = vla_info.count++;
+		}
+	}
+
+	perm_stack_count += vla_info.count * 8;
+	vla_info.vla_slot_buffer_offset = perm_stack_count;
 
 	// Allocate IR_ALLOC instructions.
 	for (int i = 0; i < func->size; i++) {
@@ -618,22 +623,6 @@ static void codegen_function(struct function *func) {
 	/* 	max_temp_stack = MAX(block->stack_counter, max_temp_stack); */
 	/* } */
 
-	// Allocate VLAs, a bit tricky, but works.
-	for (int i = 0; i < func->size; i++) {
-		struct block *block = get_block(func->blocks[i]);
-
-		for (int j = 0; j < block->size; j++) {
-			struct instruction *ins = block->instructions + j;
-
-			if (ins->type == IR_STACK_ALLOC) {
-				ADD_ELEMENT(vla_info.size, vla_info.cap, vla_info.slots) = (struct vla_slot) {
-					.slot = ins->operands[2],
-					.dominance = ins->stack_alloc.dominance
-				};
-			}
-		}
-	}
-
 	label_id func_label = register_label_name(sv_from_str((char *)func->name));
 	asm_label(func->is_global, func_label);
 	asm_ins1("pushq", R8(REG_RBP));
@@ -643,10 +632,10 @@ static void codegen_function(struct function *func) {
 	if (stack_sub)
 		asm_ins2("subq", IMM(stack_sub), R8(REG_RSP));
 
-	for (size_t i = 0; i < vla_info.size; i++)
-		asm_ins2("movq", IMM(0), MEM(-variable_info[vla_info.slots[i].slot].stack_location, REG_RBP));
-
 	abi_emit_function_preamble(func);
+
+	for (int i = 0; i < vla_info.count; i++)
+		asm_ins2("movq", IMM(0), MEM(-vla_info.vla_slot_buffer_offset + i * 8, REG_RBP));
 
 	for (int i = 0; i < func->size; i++)
 		codegen_block(get_block(func->blocks[i]), func);

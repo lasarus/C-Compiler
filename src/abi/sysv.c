@@ -89,7 +89,7 @@ static struct call_info get_calling_convention(struct type *function_type, int n
 
 		if (classes[0] == CLASS_MEMORY) {
 			returns_address = 1;
-			var_id ret_address = new_variable_sz(8, 1);
+			var_id ret_address = new_ptr();
 			ret_address_index = 0;
 
 			current_gp_reg = 1;
@@ -101,7 +101,7 @@ static struct call_info get_calling_convention(struct type *function_type, int n
 		} else {
 			int gp_idx = 0, ssa_idx = 0;
 			for (int j = 0; j < n_parts; j++) {
-				var_id part = new_variable_sz(8, 1);
+				var_id part = new_ptr();
 				if (classes[j] == CLASS_SSE || classes[j] == CLASS_SSEUP) {
 					ADD_ELEMENT(ret_regs_size, ret_regs_cap, ret_regs) = (struct reg_info) {
 						.variable = part,
@@ -150,7 +150,7 @@ static struct call_info get_calling_convention(struct type *function_type, int n
 			for (int j = 0; j < n_parts; j++) {
 				int part_size = MIN(argument_size - j * 8, 8);
 
-				var_id part = new_variable_sz(part_size, 1);
+				var_id part = new_variable(part_size);
 
 				if (classes[j] == CLASS_SSE || classes[j] == CLASS_SSEUP) {
 					ADD_ELEMENT(regs_size, regs_cap, regs) = (struct reg_info) {

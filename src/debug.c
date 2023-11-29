@@ -186,9 +186,9 @@ const char *dbg_instruction(struct instruction ins) {
 		DBG_PRINT("zero ptr %d, size: %d", ins.operands[0], ins.set_zero_ptr.size);
 		break;
 
-	case IR_STACK_ALLOC:
-		DBG_PRINT("%d = allocate %d on stack", ins.operands[0],
-			  ins.operands[1]);
+	case IR_VLA_ALLOC:
+		DBG_PRINT("%d = allocate vla of length %d", ins.operands[0],
+				  ins.operands[1]);
 		break;
 
 	case IR_GET_REG:

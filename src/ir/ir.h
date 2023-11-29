@@ -50,7 +50,7 @@ struct instruction {
 		IR_SET_ZERO_PTR,
 		IR_VA_START,
 		IR_VA_ARG, //IR_VA_COPY,
-		IR_STACK_ALLOC,
+		IR_VLA_ALLOC,
 		IR_COPY_MEMORY,
 
 		IR_LOAD_PART_ADDRESS,
@@ -88,7 +88,7 @@ struct instruction {
 
 		struct {
 			int dominance;
-		} stack_alloc;
+		} vla_alloc;
 
 		struct {
 			int register_index, is_sse;
@@ -282,7 +282,7 @@ var_id ir_constant(struct constant constant);
 void ir_write_constant_to_address(struct constant constant, var_id address);
 
 void ir_call(var_id callee, int non_clobbered_register);
-var_id ir_stack_alloc(var_id length, var_id slot, int dominance);
+var_id ir_vla_alloc(var_id length);
 
 void ir_set_reg(var_id variable, int register_index, int is_sse);
 var_id ir_get_reg(int size, int register_index, int is_sse);
