@@ -136,14 +136,10 @@ static void asm_emit_operand(struct operand op) {
 			NOTIMP();
 		asm_emit_no_newline("*%s", get_reg_name(op.reg.reg, op.reg.size));
 		break;
-	case OPERAND_IMM:
-		asm_emit_no_newline("$%" PRIi64, op.imm);
-		break;
-	case OPERAND_IMM_ABSOLUTE:
-		asm_emit_no_newline("%" PRIi64, op.imm);
-		break;
 	case OPERAND_IMM_LABEL:
-		if (op.imm_label.offset) {
+		if (op.imm_label.label_ == -1) {
+			asm_emit_no_newline("$%" PRIi64, op.imm_label.offset);
+		} else if (op.imm_label.offset) {
 			asm_emit_no_newline("$");
 			emit_label(op.imm_label.label_);
 			asm_emit_no_newline("+%" PRIi64, op.imm_label.offset);
@@ -153,7 +149,9 @@ static void asm_emit_operand(struct operand op) {
 		}
 		break;
 	case OPERAND_IMM_LABEL_ABSOLUTE:
-		if (op.imm_label.offset) {
+		if (op.imm_label.label_ == -1) {
+			asm_emit_no_newline("%" PRIi64, op.imm_label.offset);
+		} else if (op.imm_label.offset) {
 			emit_label(op.imm_label.label_);
 			asm_emit_no_newline("+%" PRIi64, op.imm_label.offset);
 		} else {
@@ -254,20 +252,17 @@ void asm_ins2(const char *mnemonic, struct operand op1, struct operand op2) {
 void asm_quad(struct operand op) {
 	if (!assemble_to_text) {
 		switch (op.type) {
-		case OPERAND_IMM:
-			NOTIMP();
-			break;
 		case OPERAND_IMM_LABEL:
 			NOTIMP();
 			break;
 
-		case OPERAND_IMM_ABSOLUTE:
-			object_write_quad(op.imm);
-			break;
-
 		case OPERAND_IMM_LABEL_ABSOLUTE:
-			object_symbol_relocate(op.imm_label.label_, 0, op.imm_label.offset, RELOCATE_64);
-			object_write_quad(0);
+			if (op.imm_label.label_ == -1) {
+				object_write_quad(op.imm_label.offset);
+			} else {
+				object_symbol_relocate(op.imm_label.label_, 0, op.imm_label.offset, RELOCATE_64);
+				object_write_quad(0);
+			}
 			break;
 
 		default: NOTIMP();
@@ -282,8 +277,12 @@ void asm_quad(struct operand op) {
 void asm_byte(struct operand op) {
 	if (!assemble_to_text) {
 		switch (op.type) {
-		case OPERAND_IMM_ABSOLUTE:
-			object_write_byte(op.imm);
+		case OPERAND_IMM_LABEL_ABSOLUTE:
+			if (op.imm_label.label_ == -1) {
+				object_write_byte(op.imm_label.offset);
+			} else {
+				NOTIMP();
+			}
 			break;
 
 		default: NOTIMP();

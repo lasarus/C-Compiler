@@ -10,12 +10,24 @@ struct T {
 	long e;
 };
 
+struct T2 {
+	struct T3 {
+		int a;
+		int arr[12];
+	} inner;
+};
+
 enum {
 	CONST = offsetof_builtin(struct T, e),
+	CONST2 = offsetof_builtin(struct T2, inner.arr[1 << 1])
 };
 
 int main(void) {
 	_Static_assert(CONST == 16, "");
 	assert(offsetof_macro(struct T, e) == 16);
 	assert(offsetof_builtin(struct T, e) == 16);
+	assert(offsetof_builtin(struct T2, inner.a) == 0);
+	assert(offsetof_builtin(struct T2, inner.arr[0]) == 4);
+	int idx = 2;
+	assert(offsetof_builtin(struct T2, inner.arr[idx]) == 4 + idx * 4);
 }

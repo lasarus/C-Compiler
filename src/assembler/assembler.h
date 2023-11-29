@@ -34,8 +34,6 @@ struct operand {
 		OPERAND_REG, // Register.
 		OPERAND_SSE_REG, // SSE Register.
 		OPERAND_STAR_REG, // *Register. callq *%rax.
-		OPERAND_IMM, // Immediate.
-		OPERAND_IMM_ABSOLUTE,
 		OPERAND_IMM_LABEL, // Immediate of the form $label+offset.
 		OPERAND_IMM_LABEL_ABSOLUTE,
 		OPERAND_MEM // Memory.
@@ -56,8 +54,6 @@ struct operand {
 			uint64_t offset;
 		} mem;
 
-		uint64_t imm;
-
 		struct {
 			label_id label_;
 			//const char *label;
@@ -66,10 +62,10 @@ struct operand {
 	};
 };
 
-#define IMM_(X) { .type = OPERAND_IMM, .imm = (X) }
+#define IMM_(X) { .type = OPERAND_IMM_LABEL, .imm_label = {-1, (X)} }
 #define IMML_(LABEL_ID, X) { .type = OPERAND_IMM_LABEL, .imm_label = { (LABEL_ID), (X) } }
 #define IMML_ABS_(LABEL_ID, X) { .type = OPERAND_IMM_LABEL_ABSOLUTE, .imm_label = { (LABEL_ID), (X) } }
-#define IMM_ABS_(X) { .type = OPERAND_IMM_ABSOLUTE, .imm = (X) }
+#define IMM_ABS_(X) { .type = OPERAND_IMM_LABEL_ABSOLUTE, .imm_label = {-1, (X)} }
 #define MEM_(OFFSET, BASE) { .type = OPERAND_MEM, .mem = { (REG_NONE), BASE, 1, (OFFSET) } }
 #define R8S_(REG) { .type = OPERAND_STAR_REG, .reg = { (REG), 0, 8 } }
 #define R8_(REG) { .type = OPERAND_REG, .reg = { (REG), 0, 8 } }

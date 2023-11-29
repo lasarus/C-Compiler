@@ -204,8 +204,6 @@ static void assemble_encoding(uint8_t *output, int *len, struct encoding *encodi
 			if (o->type == OPERAND_IMM_LABEL) {
 				imm_label = o->imm_label.label_;
 				imm = o->imm_label.offset;
-			} else if (o->type == OPERAND_IMM) {
-				imm = o->imm;
 			}
 			break;
 
@@ -214,8 +212,6 @@ static void assemble_encoding(uint8_t *output, int *len, struct encoding *encodi
 			if (o->type == OPERAND_IMM_LABEL) {
 				imm_label = o->imm_label.label_;
 				imm = o->imm_label.offset;
-			} else if (o->type == OPERAND_IMM) {
-				imm = o->imm;
 			}
 			break;
 
@@ -224,8 +220,6 @@ static void assemble_encoding(uint8_t *output, int *len, struct encoding *encodi
 			if (o->type == OPERAND_IMM_LABEL) {
 				imm_label = o->imm_label.label_;
 				imm = o->imm_label.offset;
-			} else if (o->type == OPERAND_IMM) {
-				imm = o->imm;
 			}
 			break;
 
@@ -234,8 +228,6 @@ static void assemble_encoding(uint8_t *output, int *len, struct encoding *encodi
 			if (o->type == OPERAND_IMM_LABEL) {
 				imm_label = o->imm_label.label_;
 				imm = o->imm_label.offset;
-			} else if (o->type == OPERAND_IMM) {
-				imm = o->imm;
 			}
 			break;
 
@@ -305,8 +297,6 @@ static void assemble_encoding(uint8_t *output, int *len, struct encoding *encodi
 			if (o->type == OPERAND_IMM_LABEL_ABSOLUTE) {
 				rel_label = o->imm_label.label_;
 				rel = o->imm_label.offset;
-			} else if (o->type == OPERAND_IMM_ABSOLUTE) {
-				rel = o->imm;
 			}
 			break;
 
@@ -496,49 +486,49 @@ static int does_match(struct operand *o, struct operand_accepts *oa) {
 		break;
 
 	case ACC_IMM8_S: {
-		long s = o->imm;
-		if (o->type != OPERAND_IMM && o->type != OPERAND_IMM_LABEL)
+		long s = o->imm_label.offset;
+		if (o->type != OPERAND_IMM_LABEL)
 			return 0;
 		if (s < INT8_MIN || s > INT8_MAX)
 			return 0;
 	} break;
 
 	case ACC_IMM8_U: {
-		long s = o->imm;
-		if (o->type != OPERAND_IMM && o->type != OPERAND_IMM_LABEL)
+		long s = o->imm_label.offset;
+		if (o->type != OPERAND_IMM_LABEL)
 			return 0;
 		if (s > UINT8_MAX)
 			return 0;
 	} break;
 
 	case ACC_IMM16_S: {
-		long s = o->imm;
-		if (o->type != OPERAND_IMM && o->type != OPERAND_IMM_LABEL)
+		long s = o->imm_label.offset;
+		if (o->type != OPERAND_IMM_LABEL)
 			return 0;
 		if (s < INT16_MIN || s > INT16_MAX)
 			return 0;
 	} break;
 
 	case ACC_IMM16_U: {
-		long s = o->imm;
-		if (o->type != OPERAND_IMM && o->type != OPERAND_IMM_LABEL)
+		long s = o->imm_label.offset;
+		if (o->type != OPERAND_IMM_LABEL)
 			return 0;
 		if (s > UINT16_MAX)
 			return 0;
 	} break;
 
 	case ACC_IMM32_S: {
-		long s = o->imm;
-		if (o->type != OPERAND_IMM && o->type != OPERAND_IMM_LABEL)
+		long s = o->imm_label.offset;
+		if (o->type != OPERAND_IMM_LABEL)
 			return 0;
 		if (s < INT32_MIN || s > INT32_MAX)
 			return 0;
 	} break;
 
 	case ACC_IMM32_U: {
-		if (o->type != OPERAND_IMM && o->type != OPERAND_IMM_LABEL)
+		if (o->type != OPERAND_IMM_LABEL)
 			return 0;
-		if (o->imm > UINT32_MAX)
+		if (o->imm_label.offset > UINT32_MAX)
 			return 0;
 	} break;
 
@@ -563,13 +553,12 @@ static int does_match(struct operand *o, struct operand_accepts *oa) {
 		break;
 
 	case ACC_IMM64:
-		if (o->type != OPERAND_IMM && o->type != OPERAND_IMM_LABEL)
+		if (o->type != OPERAND_IMM_LABEL)
 			return 0;
 		break;
 
 	case ACC_REL32:
-		if (o->type != OPERAND_IMM_ABSOLUTE &&
-			o->type != OPERAND_IMM_LABEL_ABSOLUTE)
+		if (o->type != OPERAND_IMM_LABEL_ABSOLUTE)
 			return 0;
 		break;
 
