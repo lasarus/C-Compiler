@@ -467,6 +467,9 @@ static void codegen_instruction(struct instruction ins, struct function *func) {
 		codegen_memcpy(ins.copy_memory.size);
 		break;
 
+	case IR_PHI:
+		break;
+
 	default:
 		printf("%d\n", ins.type);
 		NOTIMP();
@@ -474,24 +477,28 @@ static void codegen_instruction(struct instruction ins, struct function *func) {
 }
 
 static void codegen_phi_node(struct block *current_block, struct block *next_block) {
-	for (unsigned i = 0; i < next_block->phi_size; i++) {
-		struct phi_node *phi = &next_block->phi_nodes[i];
+	// Assume the phi nodes come at the beginning of a block.
+	for (int i = 0; i < next_block->size; i++) {
+		struct instruction *ins = &next_block->instructions[i];
+
+		if (ins->type != IR_PHI)
+			break;
 
 		var_id source_var;
 
-		if (current_block->id == phi->block_a) {
-			source_var = phi->var_a;
-		} else if (current_block->id == phi->block_b) {
-			source_var = phi->var_b;
+		if (current_block->id == ins->phi.block_a) {
+			source_var = ins->operands[1];
+		} else if (current_block->id == ins->phi.block_b) {
+			source_var = ins->operands[2];
 		} else {
 			ICE("Phi node in %d reachable from invalid block %d (not %d or %d)",
 				next_block->id,
 				current_block->id,
-				phi->block_a, phi->block_b);
+				ins->phi.block_a, ins->phi.block_b);
 		}
 
 		scalar_to_reg(source_var, REG_RAX);
-		reg_to_scalar(REG_RAX, phi->result);
+		reg_to_scalar(REG_RAX, ins->operands[0]);
 	}
 }
 

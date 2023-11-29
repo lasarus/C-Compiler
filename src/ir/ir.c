@@ -118,21 +118,6 @@ void ir_return(void) {
 	block->exit.type = BLOCK_EXIT_RETURN;
 }
 
-var_id ir_phi(var_id var_a, var_id var_b, block_id block_a, block_id block_b) {
-	struct block *block = get_current_block();
-	var_id result = new_variable(get_variable_size(var_a));
-
-	ADD_ELEMENT(block->phi_size, block->phi_cap, block->phi_nodes) = (struct phi_node) {
-		.block_a = block_a,
-		.block_b = block_b,
-		.var_a = var_a,
-		.var_b = var_b,
-		.result = result,
-	};
-
-	return result;
-}
-
 var_id ir_get_offset(var_id base_address, int offset) {
 	var_id offset_var = ir_constant(constant_simple_unsigned(abi_info.pointer_type, offset));
 	return ir_add(base_address, offset_var);
@@ -269,13 +254,6 @@ void ir_calculate_block_local_variables(void) {
 			case BLOCK_EXIT_RETURN_ZERO:
 			case BLOCK_EXIT_NONE:
 				break;
-			}
-
-			for (unsigned k = 0; k < b->phi_size; k++) {
-				struct phi_node *phi = &b->phi_nodes[k];
-				register_usage(b, phi->var_a);
-				register_usage(b, phi->var_b);
-				register_usage(b, phi->result);
 			}
 		}
 	}
@@ -527,4 +505,13 @@ void ir_store_part_address(var_id address, var_id value, int offset) {
 void ir_copy_memory(var_id destination, var_id source, int size) {
 #define IR_PUSH_COPY_MEMORY(DESTINATION, SOURCE, SIZE) IR_PUSH(.type = IR_COPY_MEMORY, .operands = {(DESTINATION), (SOURCE)}, .copy_memory = {(SIZE)})
 	IR_PUSH_COPY_MEMORY(destination, source, size);
+}
+
+var_id ir_phi(var_id var_a, var_id var_b, block_id block_a, block_id block_b) {
+#define IR_PUSH_PHI(DESTINATION, VAR_A, VAR_B, BLOCK_A, BLOCK_B) IR_PUSH(.type = IR_PHI, .operands = {(DESTINATION), (VAR_A), (VAR_B)}, .phi = {(BLOCK_A), (BLOCK_B)})
+	var_id result = new_variable(get_variable_size(var_a));
+
+	IR_PUSH_PHI(result, var_a, var_b, block_a, block_b);
+
+	return result;
 }

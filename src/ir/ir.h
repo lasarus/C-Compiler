@@ -69,6 +69,8 @@ struct instruction {
 		IR_STORE_STACK_RELATIVE_ADDRESS,
 		IR_LOAD_BASE_RELATIVE_ADDRESS,
 
+		IR_PHI,
+
 		IR_COUNT
 	} type;
 
@@ -138,6 +140,10 @@ struct instruction {
 		struct {
 			int size;
 		} copy_memory;
+
+		struct {
+			block_id block_a, block_b;
+		} phi;
 	};
 };
 
@@ -201,22 +207,12 @@ struct block_exit {
 	};
 };
 
-struct phi_node {
-	var_id var_a, var_b;
-	block_id block_a, block_b;
-
-	var_id result;
-};
-
 struct block {
 	block_id id;
 	label_id label;
 
 	int size, cap;
 	struct instruction *instructions;
-
-	size_t phi_size, phi_cap;
-	struct phi_node *phi_nodes;
 
 	struct block_exit exit;
 
