@@ -212,7 +212,7 @@ const char *dbg_instruction(struct instruction ins) {
 		break;
 
 	case IR_ALLOC:
-		DBG_PRINT("%d = alloc with size %d", ins.operands[0], ins.alloc.size);
+		DBG_PRINT("%d = alloc with size %d (save to preamble: %d)", ins.operands[0], ins.alloc.size, ins.alloc.save_to_preamble);
 		break;
 
 	default:

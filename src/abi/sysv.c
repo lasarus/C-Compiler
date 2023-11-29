@@ -17,7 +17,6 @@ static const int return_convention[] = { REG_RAX, REG_RDX };
 static struct struct_data *builtin_va_list = NULL;
 
 struct sysv_data {
-	var_id reg_save_area_pointer;
 	int overflow_position;
 	int gp_offset;
 	int fp_offset;
@@ -365,7 +364,7 @@ static void sysv_expr_function(struct type *type, struct symbol_identifier **arg
 	if (type->function.is_variadic) {
 		abi_data.is_variadic = 1;
         // Sized according to Figure 3.33 in sysV AMD64 ABI:
-		abi_data.reg_save_area_pointer = ir_allocate_preamble(304);
+		ir_allocate_preamble(304);
 		abi_data.gp_offset = c.gp_offset;
 		abi_data.overflow_position = total_mem_needed + 16;
 	}
@@ -434,7 +433,8 @@ static void sysv_emit_va_start(var_id result, struct function *func) {
 	asm_ins2("leaq", MEM(abi_data->overflow_position, REG_RBP), R8(REG_RDI));
 	asm_ins2("movq", R8(REG_RDI), MEM(overflow_arg_area_offset, REG_RAX));
 
-	scalar_to_reg(abi_data->reg_save_area_pointer, REG_RDI);
+	int preamble_ptr = codegen_get_alloc_preamble();
+	asm_ins2("leaq", MEM(-preamble_ptr, REG_RBP), R8(REG_RDI));
 	asm_ins2("movq", R8(REG_RDI), MEM(reg_save_area_offset, REG_RAX));
 }
 

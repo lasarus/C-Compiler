@@ -78,6 +78,7 @@ struct instruction {
 		struct {
 			struct constant constant;
 		} constant;
+
 		struct {
 			int non_clobbered_register;
 		} call;
@@ -197,11 +198,6 @@ struct block_exit {
 		} if_;
 
 		block_id jump;
-
-		struct {
-			struct type *type;
-			var_id value;
-		} return_;
 	};
 };
 

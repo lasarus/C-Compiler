@@ -564,8 +564,8 @@ static void codegen_function(struct function *func) {
 		var_id var = func->vars[i];
 		struct variable_data *data = var_get_data(var);
 
-		/* if (!data->spans_block) */
-		/* 	continue; */
+		if (!(data->spans_block))
+			continue;
 			
 		perm_stack_count += data->size;
 
@@ -606,22 +606,25 @@ static void codegen_function(struct function *func) {
 	}
 
 	// Allocate variables that are local to one block.
-	/* for (int i = 0; i < func->var_size; i++) { */
-	/* 	var_id var = func->vars[i]; */
-	/* 	struct variable_data *data = var_get_data(var); */
+	for (int i = 0; i < func->var_size; i++) {
+		var_id var = func->vars[i];
+		struct variable_data *data = var_get_data(var);
 
-	/* 	if (data->spans_block || !data->used) */
-	/* 		continue; */
+		if (data->spans_block || !data->used)
+			continue;
 
-	/* 	struct block *block = get_block(data->first_block); */
+		struct block *block = get_block(data->first_block);
 
-	/* 	block->stack_counter += data->size; */
+		block->stack_counter += data->size;
+		//tmp_stack_counter += data->size;
 
-	/* 	variable_info[var].storage = VAR_STOR_STACK; */
-	/* 	variable_info[var].stack_location = perm_stack_count + block->stack_counter; */
+		variable_info[var].storage = VAR_STOR_STACK;
+		variable_info[var].stack_location = perm_stack_count + block->stack_counter;
+		//variable_info[var].stack_location = perm_stack_count + tmp_stack_counter;
 
-	/* 	max_temp_stack = MAX(block->stack_counter, max_temp_stack); */
-	/* } */
+		max_temp_stack = MAX(block->stack_counter, max_temp_stack);
+		//max_temp_stack = MAX(tmp_stack_counter, max_temp_stack);
+	}
 
 	label_id func_label = register_label_name(sv_from_str((char *)func->name));
 	asm_label(func->is_global, func_label);

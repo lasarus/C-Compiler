@@ -226,6 +226,21 @@ void ir_init_ptr(struct initializer *init, struct type *type, var_id ptr) {
 	ir_init_var_recursive(init, type, ptr, -1, -1);
 }
 
+static void register_usage(struct block *block, var_id var) {
+	if (var == 0)
+		return;
+
+	struct variable_data *data = var_get_data(var);
+
+	if (data->first_block == -1) {
+		data->first_block = block->id;
+	} else if (data->first_block != block->id) {
+		data->spans_block = 1;
+	}
+
+	data->used = 1;
+}
+
 void ir_calculate_block_local_variables(void) {
 	for (int i = 0; i < ir.size; i++) {
 		struct function *f = &ir.functions[i];
@@ -238,20 +253,29 @@ void ir_calculate_block_local_variables(void) {
 
 				for (int l = 0; l < 3; l++) {
 					var_id usage = ins->operands[l];
-
-					if (usage == 0)
-						continue;
-
-					struct variable_data *data = var_get_data(usage);
-
-					if (data->first_block == -1) {
-						data->first_block = f->blocks[j];
-					} else if (data->first_block != f->blocks[j]) {
-						data->spans_block = 1;
-					}
-
-					data->used = 1;
+					register_usage(b, usage);
 				}
+			}
+
+			switch (b->exit.type) {
+			case BLOCK_EXIT_SWITCH:
+				register_usage(b, b->exit.switch_.condition);
+				break;
+			case BLOCK_EXIT_IF:
+				register_usage(b, b->exit.if_.condition);
+				break;
+			case BLOCK_EXIT_RETURN:
+			case BLOCK_EXIT_JUMP:
+			case BLOCK_EXIT_RETURN_ZERO:
+			case BLOCK_EXIT_NONE:
+				break;
+			}
+
+			for (unsigned k = 0; k < b->phi_size; k++) {
+				struct phi_node *phi = &b->phi_nodes[k];
+				register_usage(b, phi->var_a);
+				register_usage(b, phi->var_b);
+				register_usage(b, phi->result);
 			}
 		}
 	}
