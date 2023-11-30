@@ -157,6 +157,8 @@ struct instruction {
 
 		int stack_location;
 	} cg_info;
+
+	struct instruction *next;
 };
 
 struct ir {
@@ -220,8 +222,7 @@ struct block {
 	block_id id;
 	label_id label;
 
-	size_t size, cap;
-	struct instruction **instructions;
+	struct instruction *first, *last;
 
 	struct block_exit exit;
 

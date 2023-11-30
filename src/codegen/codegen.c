@@ -446,8 +446,7 @@ static void codegen_instruction(struct instruction *ins, struct function *func) 
 
 static void codegen_phi_node(struct block *current_block, struct block *next_block) {
 	// Assume the phi nodes come at the beginning of a block.
-	for (unsigned i = 0; i < next_block->size; i++) {
-		struct instruction *ins = next_block->instructions[i];
+	for (struct instruction *ins = next_block->first; ins; ins = ins->next) {
 
 		if (ins->type != IR_PHI)
 			break;
@@ -473,8 +472,8 @@ static void codegen_phi_node(struct block *current_block, struct block *next_blo
 static void codegen_block(struct block *block, struct function *func) {
 	asm_label(0, block->label);
 
-	for (unsigned i = 0; i < block->size; i++)
-		codegen_instruction(block->instructions[i], func);
+	for (struct instruction *ins = block->first; ins; ins = ins->next)
+		codegen_instruction(ins, func);
 
 	struct block_exit *block_exit = &block->exit;
 	asm_comment("EXIT IS OF TYPE : %d", block_exit->type);
@@ -538,9 +537,7 @@ static void codegen_function(struct function *func) {
 	for (unsigned i = 0; i < func->size; i++) {
 		struct block *block = get_block(func->blocks[i]);
 
-		for (unsigned j = 0; j < block->size; j++) {
-			struct instruction *ins = block->instructions[j];
-
+		for (struct instruction *ins = block->first; ins; ins = ins->next) {
 			if (!(ins->spans_block))
 				continue;
 			
@@ -555,9 +552,7 @@ static void codegen_function(struct function *func) {
 	vla_info.count = 0;
 	for (unsigned i = 0; i < func->size; i++) {
 		struct block *block = get_block(func->blocks[i]);
-
-		for (unsigned j = 0; j < block->size; j++) {
-			struct instruction *ins = block->instructions[j];
+		for (struct instruction *ins = block->first; ins; ins = ins->next) {
 
 			if (ins->type == IR_VLA_ALLOC)
 				ins->vla_alloc.dominance = vla_info.count++;
@@ -571,8 +566,7 @@ static void codegen_function(struct function *func) {
 	for (unsigned i = 0; i < func->size; i++) {
 		struct block *block = get_block(func->blocks[i]);
 
-		for (unsigned j = 0; j < block->size; j++) {
-			struct instruction *ins = block->instructions[j];
+		for (struct instruction *ins = block->first; ins; ins = ins->next) {
 			if (ins->type == IR_ALLOC) {
 				perm_stack_count += ins->alloc.size;
 				ins->alloc.stack_location = perm_stack_count;
@@ -587,9 +581,7 @@ static void codegen_function(struct function *func) {
 	for (unsigned i = 0; i < func->size; i++) {
 		struct block *block = get_block(func->blocks[i]);
 
-		for (unsigned j = 0; j < block->size; j++) {
-			struct instruction *ins = block->instructions[j];
-
+		for (struct instruction *ins = block->first; ins; ins = ins->next) {
 			if (ins->spans_block || !ins->used)
 				continue;
 
