@@ -10,8 +10,6 @@ struct instruction;
 var_id new_variable(struct instruction *instruction, int size);
 
 var_id allocate_vla(struct type *type);
-void allocate_var(var_id var);
-int get_n_vars(void);
 
 void init_variables(void);
 

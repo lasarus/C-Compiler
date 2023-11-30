@@ -14,17 +14,6 @@ extern struct codegen_flags {
 	int debug_stack_min;
 } codegen_flags;
 
-struct variable_info {
-	enum {
-		VAR_STOR_NONE,
-		VAR_STOR_STACK
-	} storage;
-
-	int stack_location;
-};
-
-extern struct variable_info *variable_info;
-
 void codegen(void);
 int codegen_get_alloc_preamble(void);
 

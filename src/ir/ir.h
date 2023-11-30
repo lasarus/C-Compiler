@@ -148,6 +148,15 @@ struct instruction {
 	var_id result;
 	int size;
 	int spans_block, first_block, used;
+
+	struct codegen_info {
+		enum {
+			VAR_STOR_NONE,
+			VAR_STOR_STACK
+		} storage;
+
+		int stack_location;
+	} cg_info;
 };
 
 struct ir {
@@ -160,9 +169,6 @@ extern struct ir ir;
 struct function {
 	int is_global;
 	const char *name;
-
-	int var_size, var_cap;
-	var_id *vars;
 
 	int uses_va;
 

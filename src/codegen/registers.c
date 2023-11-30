@@ -38,9 +38,11 @@ const char *get_reg_name(int id, int size) {
 	return registers[id][size_to_idx(size)];
 }
 
+struct codegen_info *get_info(var_id var);
+
 void scalar_to_reg(var_id scalar, int reg) {
 	int size = get_variable_size(scalar);
-	struct operand mem = MEM(-variable_info[scalar].stack_location, REG_RBP);
+	struct operand mem = MEM(-get_info(scalar)->stack_location, REG_RBP);
 	switch (size) {
 	case 1:
 		asm_ins2("movzbl", mem, R4(reg));
@@ -70,7 +72,7 @@ void reg_to_scalar(int reg, var_id scalar) {
 		if (msize)
 			asm_ins2("shrq", IMM(msize * 8), R8(reg));
 
-		struct operand mem = MEM(-variable_info[scalar].stack_location + i, REG_RBP);
+		struct operand mem = MEM(-get_info(scalar)->stack_location + i, REG_RBP);
 		if (i + 8 <= size) {
 			asm_ins2("movq", R8(reg), mem);
 			msize = 8;

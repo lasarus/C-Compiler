@@ -33,18 +33,12 @@ var_id new_variable(struct instruction *instruction, int size) {
 	var_id id = variables_size;
 	ADD_ELEMENT(variables_size, variables_cap, variable_instructions) = instruction;
 
-	allocate_var(id);
-
 	instruction->result = id;
 	instruction->size = size;
 	instruction->first_block = -1;
 	instruction->spans_block = 0;
 
 	return id;
-}
-
-int get_n_vars(void) {
-	return variables_size;
 }
 
 int get_variable_size(var_id variable) {

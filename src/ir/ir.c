@@ -83,11 +83,6 @@ void ir_block_start(block_id id) {
 	ADD_ELEMENT(func->size, func->cap, func->blocks) = id;
 }
 
-void allocate_var(var_id var) {
-	struct function *func = &ir.functions[ir.size - 1];
-	ADD_ELEMENT(func->var_size, func->var_cap, func->vars) = var;
-}
-
 void ir_if_selection(var_id condition, block_id block_true, block_id block_false) {
 	struct block *block = get_current_block();
 	assert(block->exit.type == BLOCK_EXIT_NONE);
