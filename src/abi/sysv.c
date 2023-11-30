@@ -1,7 +1,6 @@
 #include "abi.h"
 #include "arch/x64.h"
 #include "ir/ir.h"
-#include "ir/variables.h"
 #include "parser/expression_to_ir.h"
 
 #include <parser/symbols.h>
@@ -24,15 +23,15 @@ struct sysv_data {
 	int is_variadic;
 
 	int returns_address;
-	var_id ret_address;
+	struct instruction *ret_address;
 
-	var_id rbx_store;
+	struct instruction *rbx_store;
 };
 
 struct reg_info {
 	int register_idx, is_sse;
 	int is_merged;
-	var_id merge_into, merge_pos;
+	int merge_into, merge_pos;
 	int size;
 };
 
@@ -44,7 +43,7 @@ struct call_info {
 	struct reg_info *ret_regs;
 
 	int stack_variables_size;
-	var_id *stack_variables;
+	int *stack_variables;
 
 	int returns_address;
 	int ret_address_index;
@@ -69,7 +68,7 @@ static struct call_info get_calling_convention(struct type *function_type, int n
 
 	static int stack_variables_size = 0, stack_variables_cap = 0;
 	stack_variables_size = 0;
-	var_id *stack_variables = NULL;
+	int *stack_variables = NULL;
 
 	int returns_address = 0;
 	int ret_address_index = 0;
@@ -188,7 +187,7 @@ static struct call_info get_calling_convention(struct type *function_type, int n
 	};
 }
 
-static void split_variable(var_id variable_address, int n_parts, var_id *parts) {
+static void split_variable(struct instruction *variable_address, int n_parts, struct instruction *parts[n_parts]) {
 	for (int i = 0; i < n_parts; i++)
 		parts[i] = ir_load_part_address(variable_address, i * 8, 8);
 }
@@ -196,9 +195,9 @@ static void split_variable(var_id variable_address, int n_parts, var_id *parts) 
 static struct evaluated_expression sysv_expr_call(struct evaluated_expression *callee,
 										   int n, struct evaluated_expression arguments[static n]) {
 	struct type *argument_types[128];
-	var_id arg_addresses[128];
-	var_id reg_variables[sizeof calling_convention / sizeof *calling_convention];
-	var_id ret_reg_variables[sizeof return_convention / sizeof *return_convention];
+	struct instruction *arg_addresses[128];
+	struct instruction *reg_variables[sizeof calling_convention / sizeof *calling_convention];
+	struct instruction *ret_reg_variables[sizeof return_convention / sizeof *return_convention];
 	struct type *callee_type = type_deref(callee->data_type);
 	struct type *return_type = callee_type->children[0];
 
@@ -209,15 +208,15 @@ static struct evaluated_expression sysv_expr_call(struct evaluated_expression *c
 
 	struct call_info c = get_calling_convention(callee_type, n, argument_types);
 
-	var_id callee_var = evaluated_expression_to_var(callee);
-	var_id ret_address;
+	struct instruction *callee_var = evaluated_expression_to_var(callee);
+	struct instruction *ret_address;
 
 	if (c.returns_address) {
 		ret_address = ir_allocate(calculate_size(return_type));
 		reg_variables[c.ret_address_index] = ret_address;
 	}
 
-	var_id rax_constant = VOID_VAR;
+	struct instruction *rax_constant = NULL;
 	if (c.rax != -1) {
 		rax_constant = ir_constant(constant_simple_unsigned(abi_info.size_type, c.rax));
 	}
@@ -264,14 +263,14 @@ static struct evaluated_expression sysv_expr_call(struct evaluated_expression *c
 			.pointer = ret_address,
 		};
 	} else if (c.ret_regs_size == 1) {
-		var_id variable = ir_cast_int(ret_reg_variables[0], calculate_size(return_type), 0);
+		struct instruction *variable = ir_cast_int(ret_reg_variables[0], calculate_size(return_type), 0);
 		result = (struct evaluated_expression) {
 			.type = EE_VARIABLE,
 			.data_type = return_type,
 			.variable = variable,
 		};
 	} else if (c.ret_regs_size == 2) {
-		var_id address = ir_allocate(calculate_size(return_type));
+		struct instruction *address = ir_allocate(calculate_size(return_type));
 		ir_store_part_address(address, ret_reg_variables[0], 0);
 		ir_store_part_address(address, ret_reg_variables[1], 8);
 		result = (struct evaluated_expression) {
@@ -292,7 +291,7 @@ static struct evaluated_expression sysv_expr_call(struct evaluated_expression *c
 
 static void sysv_expr_function(struct type *type, struct symbol_identifier **args, const char *name, int is_global) {
 	int n_args = type->n - 1;
-	var_id reg_variables[sizeof calling_convention / sizeof *calling_convention];
+	struct instruction *reg_variables[sizeof calling_convention / sizeof *calling_convention];
 
 	struct function *func = &ADD_ELEMENT(ir.size, ir.cap, ir.functions);
 	*func = (struct function) {
@@ -316,13 +315,13 @@ static void sysv_expr_function(struct type *type, struct symbol_identifier **arg
 		abi_data.returns_address = 1;
 	}
 
-	var_id arg_addresses[128];
+	struct instruction *arg_addresses[128];
 	for (int i = 0; i < type->n - 1; i++) {
 		struct symbol_identifier *symbol = args[i];
 
 		struct type *type = symbol->parameter.type;
 		int size = calculate_size(type);
-		var_id address = ir_allocate(size);
+		struct instruction *address = ir_allocate(size);
 
 		symbol->type = IDENT_VARIABLE;
 		symbol->variable.type = type;
@@ -335,7 +334,7 @@ static void sysv_expr_function(struct type *type, struct symbol_identifier **arg
 	int total_mem_needed = 0;
 	for (int i = 0; i < c.stack_variables_size; i++) {
 		int idx = c.stack_variables[i];
-		var_id address = arg_addresses[idx];
+		struct instruction *address = arg_addresses[idx];
 		struct type *arg_type = type->children[idx + 1];
 		int size = calculate_size(arg_type);
 
@@ -348,7 +347,7 @@ static void sysv_expr_function(struct type *type, struct symbol_identifier **arg
 		if (!c.regs[i].is_merged)
 			continue;
 
-		var_id address = arg_addresses[c.regs[i].merge_into];
+		struct instruction *address = arg_addresses[c.regs[i].merge_into];
 
 		ir_store_part_address(address, reg_variables[i], c.regs[i].merge_pos);
 	}
@@ -375,20 +374,20 @@ static void sysv_expr_return(struct function *func, struct evaluated_expression 
 	classify(value->data_type, &n_parts, classes);
 
 	if (n_parts == 1 && classes[0] == CLASS_MEMORY) {
-		var_id value_address = evaluated_expression_to_address(value);
+		struct instruction *value_address = evaluated_expression_to_address(value);
 		ir_copy_memory(abi_data->ret_address, value_address, calculate_size(value->data_type));
 	} else if (n_parts == 1 && classes[0] == CLASS_INTEGER) {
-		var_id value_var = evaluated_expression_to_var(value);
+		struct instruction *value_var = evaluated_expression_to_var(value);
 		ir_set_reg(value_var, return_convention[0], 0);
 	} else if (n_parts == 2 && classes[0] == CLASS_INTEGER) {
-		var_id value_address = evaluated_expression_to_address(value);
-		var_id parts[2];
+		struct instruction *value_address = evaluated_expression_to_address(value);
+		struct instruction *parts[2];
 		split_variable(value_address, 2, parts);
 		
 		ir_set_reg(parts[0], return_convention[0], 0);
 		ir_set_reg(parts[1], return_convention[1], 0);
 	} else if (n_parts == 1 && classes[0] == CLASS_SSE) {
-		var_id value_var = evaluated_expression_to_var(value);
+		struct instruction *value_var = evaluated_expression_to_var(value);
 		ir_set_reg(value_var, 0, 1);
 	} else {
 		NOTIMP();
@@ -413,7 +412,7 @@ static void sysv_emit_function_preamble(struct function *func) {
 	asm_ins2("movq", R8(REG_R9), MEM(40 - position, REG_RBP));
 }
 
-static void sysv_emit_va_start(var_id result, struct function *func) {
+static void sysv_emit_va_start(struct instruction *result, struct function *func) {
 	struct sysv_data *abi_data = func->abi_data;
 	int gp_offset_offset = builtin_va_list->fields[0].offset;
 	int fp_offset_offset = builtin_va_list->fields[1].offset;
@@ -430,7 +429,7 @@ static void sysv_emit_va_start(var_id result, struct function *func) {
 	asm_ins2("movq", R8(REG_RDI), MEM(reg_save_area_offset, REG_RAX));
 }
 
-static void sysv_emit_va_arg(var_id address, var_id va_list, struct type *type) {
+static void sysv_emit_va_arg(struct instruction *address, struct instruction *va_list, struct type *type) {
 	int n_parts;
 	enum parameter_class classes[4];
 	classify(type, &n_parts, classes);

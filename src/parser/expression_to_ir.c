@@ -3,7 +3,6 @@
 #include "debug.h"
 #include "ir/ir.h"
 #include "ir/operators.h"
-#include "ir/variables.h"
 #include "parser/expression.h"
 #include "parser/parser.h"
 #include "types.h"
@@ -58,11 +57,11 @@ static int ir_from_type_and_op(struct type *type, enum operator_type op) {
 	}
 }
 
-var_id evaluated_expression_to_address(struct evaluated_expression *evaluated_expression) {
+struct instruction *evaluated_expression_to_address(struct evaluated_expression *evaluated_expression) {
 	switch (evaluated_expression->type) {
 	case EE_BITFIELD_POINTER: {
-		var_id bitfield_var = evaluated_expression_to_var(evaluated_expression);
-		var_id address = ir_allocate(calculate_size(evaluated_expression->data_type));
+		struct instruction *bitfield_var = evaluated_expression_to_var(evaluated_expression);
+		struct instruction *address = ir_allocate(calculate_size(evaluated_expression->data_type));
 		ir_store(address, bitfield_var);
 		return address;
 	}
@@ -77,7 +76,7 @@ var_id evaluated_expression_to_address(struct evaluated_expression *evaluated_ex
 			return ir_constant(constant);
 		} else {
 			// Allocate memory, and push the constant to it.
-			var_id address = ir_allocate(calculate_size(evaluated_expression->data_type));
+			struct instruction *address = ir_allocate(calculate_size(evaluated_expression->data_type));
 			ir_write_constant_to_address(constant, address);
 			return address;
 		}
@@ -87,7 +86,7 @@ var_id evaluated_expression_to_address(struct evaluated_expression *evaluated_ex
 		return evaluated_expression->pointer;
 
 	case EE_VARIABLE: {
-		var_id address = ir_allocate(calculate_size(evaluated_expression->data_type));
+		struct instruction *address = ir_allocate(calculate_size(evaluated_expression->data_type));
 		ir_store(address, evaluated_expression->variable);
 		return address;
 	}
@@ -101,10 +100,10 @@ var_id evaluated_expression_to_address(struct evaluated_expression *evaluated_ex
 	}
 }
 
-var_id evaluated_expression_to_var(struct evaluated_expression *evaluated_expression) {
+struct instruction *evaluated_expression_to_var(struct evaluated_expression *evaluated_expression) {
 	switch (evaluated_expression->type) {
 	case EE_BITFIELD_POINTER: {
-		var_id var = ir_load(evaluated_expression->bitfield_pointer.pointer,
+		struct instruction *var = ir_load(evaluated_expression->bitfield_pointer.pointer,
 							 calculate_size(evaluated_expression->data_type));
 
 		return ir_get_bits(var, evaluated_expression->bitfield_pointer.offset,
@@ -127,8 +126,8 @@ var_id evaluated_expression_to_var(struct evaluated_expression *evaluated_expres
 	}
 }
 
-static var_id variable_cast(var_id operand_var, struct type *operand_type, struct type *resulting_type) {
-	var_id res = operand_var;
+static struct instruction *variable_cast(struct instruction *operand_var, struct type *operand_type, struct type *resulting_type) {
+	struct instruction *res = operand_var;
 
 	if (operand_type == resulting_type)
 		return operand_var;
@@ -161,8 +160,8 @@ struct evaluated_expression evaluated_expression_cast(struct evaluated_expressio
 		};
 	}
 
-	var_id operand_var = evaluated_expression_to_var(operand);
-	var_id res = variable_cast(operand_var, operand->data_type, resulting_type);
+	struct instruction *operand_var = evaluated_expression_to_var(operand);
+	struct instruction *res = variable_cast(operand_var, operand->data_type, resulting_type);
 
 	return (struct evaluated_expression) {
 		.type = EE_VARIABLE,
@@ -171,16 +170,16 @@ struct evaluated_expression evaluated_expression_cast(struct evaluated_expressio
 	};
 }
 
-static void assign_to_ee(struct evaluated_expression *lhs, var_id rhs_var) {
+static void assign_to_ee(struct evaluated_expression *lhs, struct instruction *rhs_var) {
 	switch (lhs->type) {
 	case EE_POINTER:
 		ir_store(lhs->pointer, rhs_var);
 		break;
 
 	case EE_BITFIELD_POINTER: {
-		var_id prev = ir_load(lhs->bitfield_pointer.pointer, get_variable_size(rhs_var));
+		struct instruction *prev = ir_load(lhs->bitfield_pointer.pointer, rhs_var->size);
 
-		var_id new = ir_set_bits(prev, rhs_var, lhs->bitfield_pointer.offset, lhs->bitfield_pointer.bitfield);
+		struct instruction *new = ir_set_bits(prev, rhs_var, lhs->bitfield_pointer.offset, lhs->bitfield_pointer.bitfield);
 
 		ir_store(lhs->bitfield_pointer.pointer, new);
 	} break;
@@ -192,11 +191,11 @@ static void assign_to_ee(struct evaluated_expression *lhs, var_id rhs_var) {
 static void assign_ee_to_ee(struct evaluated_expression *lhs, struct evaluated_expression *rhs) {
 	assert(lhs->data_type == rhs->data_type);
 	if (calculate_size(rhs->data_type) <= 8) { // If fits into variable, take shortcut.
-		var_id rhs_var = evaluated_expression_to_var(rhs);
+		struct instruction *rhs_var = evaluated_expression_to_var(rhs);
 		assign_to_ee(lhs, rhs_var);
 	} else {
 		// Otherwise copy address.
-		var_id rhs_adress = evaluated_expression_to_address(rhs);
+		struct instruction *rhs_adress = evaluated_expression_to_address(rhs);
 		switch (lhs->type) {
 		case EE_POINTER:
 			ir_copy_memory(lhs->pointer, rhs_adress, calculate_size(lhs->data_type));
@@ -219,7 +218,7 @@ static struct evaluated_expression evaluate_indirection(struct expr *expr) {
 		};
 
 	case EE_POINTER: {
-		var_id value = ir_load(rhs.pointer, 8);
+		struct instruction *value = ir_load(rhs.pointer, 8);
 
 		return (struct evaluated_expression) {
 			.type = EE_POINTER,
@@ -294,7 +293,7 @@ static struct evaluated_expression evaluate_constant(struct expr *expr) {
 	case CONSTANT_LABEL: {
 		constant->type = CONSTANT_LABEL_POINTER;
 
-		var_id pointer = ir_constant(*constant);
+		struct instruction *pointer = ir_constant(*constant);
 
 		return (struct evaluated_expression) {
 			.type = EE_POINTER,
@@ -314,13 +313,13 @@ static struct evaluated_expression evaluate_pointer_arithmetic(struct expr *expr
 
 	index = evaluated_expression_cast(&index, type_simple(abi_info.pointer_type));
 
-	var_id pointer_var = evaluated_expression_to_var(&pointer),
-		index_var = evaluated_expression_to_var(&index),
-		size_var = evaluated_expression_to_var(&size);
+	struct instruction *pointer_var = evaluated_expression_to_var(&pointer),
+		*index_var = evaluated_expression_to_var(&index),
+		*size_var = evaluated_expression_to_var(&size);
 
 	index_var = ir_mul(index_var, size_var);
 
-	var_id result;
+	struct instruction *result;
 	if (expr->type == E_POINTER_ADD) {
 		result = ir_add(pointer_var, index_var);
 	} else if (expr->type == E_POINTER_SUB) {
@@ -340,11 +339,11 @@ static struct evaluated_expression evaluate_pointer_diff(struct expr *expr) {
 		rhs = expression_evaluate(expr->args[1]),
 		size = expression_evaluate(type_sizeof(type_deref(expr->args[0]->data_type)));
 
-	var_id lhs_var = evaluated_expression_to_var(&lhs),
-		rhs_var = evaluated_expression_to_var(&rhs),
-		size_var = evaluated_expression_to_var(&size);
+	struct instruction *lhs_var = evaluated_expression_to_var(&lhs),
+		*rhs_var = evaluated_expression_to_var(&rhs),
+		*size_var = evaluated_expression_to_var(&size);
 
-	var_id res = ir_idiv(ir_sub(lhs_var, rhs_var), size_var);
+	struct instruction *res = ir_idiv(ir_sub(lhs_var, rhs_var), size_var);
 
 	return (struct evaluated_expression) {
 		.type = EE_VARIABLE,
@@ -361,9 +360,9 @@ static struct evaluated_expression evaluate_dot_operator(struct expr *expr) {
 	int idx = expr->member.member_idx;
 	int field_offset = data->fields[idx].offset;
 
-	var_id address = evaluated_expression_to_address(&lhs);
+	struct instruction *address = evaluated_expression_to_address(&lhs);
 
-	var_id member_address = ir_get_offset(address, field_offset);
+	struct instruction *member_address = ir_get_offset(address, field_offset);
 
 	if (data->fields[idx].bitfield != -1) {
 		assert(data->fields[idx].type->type == TY_SIMPLE);
@@ -421,7 +420,7 @@ static struct evaluated_expression evaluate_array_ptr_decay(struct expr *expr) {
 }
 
 static struct evaluated_expression evaluate_compound_literal(struct expr *expr) {
-	var_id address = ir_allocate(calculate_size(expr->compound_literal.type));
+	struct instruction *address = ir_allocate(calculate_size(expr->compound_literal.type));
 	ir_init_ptr(&expr->compound_literal.init, expr->compound_literal.type, address);
 
 	return (struct evaluated_expression) {
@@ -434,10 +433,10 @@ static struct evaluated_expression evaluate_binary_operator(struct expr *expr) {
 	struct evaluated_expression lhs = expression_evaluate(expr->args[0]),
 		rhs = expression_evaluate(expr->args[1]);
 
-	var_id lhs_var = evaluated_expression_to_var(&lhs),
-		rhs_var = evaluated_expression_to_var(&rhs);
+	struct instruction *lhs_var = evaluated_expression_to_var(&lhs),
+		*rhs_var = evaluated_expression_to_var(&rhs);
 
-	var_id res = ir_binary_op(ir_from_type_and_op(expr->args[0]->data_type, expr->binary_op), lhs_var, rhs_var);
+	struct instruction *res = ir_binary_op(ir_from_type_and_op(expr->args[0]->data_type, expr->binary_op), lhs_var, rhs_var);
 
 	return (struct evaluated_expression) {
 		.type = EE_VARIABLE,
@@ -453,8 +452,8 @@ static struct evaluated_expression evaluate_unary_operator(struct expr *expr) {
 	if (uop == UOP_PLUS)
 		return rhs;
 
-	var_id res;
-	var_id rhs_var = evaluated_expression_to_var(&rhs);
+	struct instruction *res;
+	struct instruction *rhs_var = evaluated_expression_to_var(&rhs);
 
 	if (type_is_integer(type)) {
 		if (uop == UOP_BNOT) {
@@ -500,10 +499,10 @@ static struct evaluated_expression evaluate_assignment_op(struct expr *expr) {
 	struct type *operator_type = expr->args[1]->data_type;
 	int ir_operator = ir_from_type_and_op(operator_type, expr->assignment_op.op);
 
-	var_id lhs_var = evaluated_expression_to_var(&lhs);
-	var_id rhs_var = evaluated_expression_to_var(&rhs);
+	struct instruction *lhs_var = evaluated_expression_to_var(&lhs);
+	struct instruction *rhs_var = evaluated_expression_to_var(&rhs);
 
-	var_id res_var = lhs_var;
+	struct instruction *res_var = lhs_var;
 
 	//     a += b
 	// should be interpreted as
@@ -536,7 +535,7 @@ static struct evaluated_expression evaluate_assignment_op(struct expr *expr) {
 
 static struct evaluated_expression evaluate_conditional(struct expr *expr) {
 	struct evaluated_expression condition = expression_evaluate(expr->args[0]);
-	var_id condition_var = evaluated_expression_to_var(&condition);
+	struct instruction *condition_var = evaluated_expression_to_var(&condition);
 
 	int is_void = type_is_simple(expr->data_type, ST_VOID);
 
@@ -570,21 +569,21 @@ static struct evaluated_expression evaluate_conditional(struct expr *expr) {
 
 		ir_block_start(block_true);
 		struct evaluated_expression true_ = expression_evaluate(expr->args[1]);
-		var_id true_address = evaluated_expression_to_address(&true_);
+		struct instruction *true_address = evaluated_expression_to_address(&true_);
 
 		block_true = get_current_block()->id; // Current block might have changed.
 		ir_goto(block_end);
 
 		ir_block_start(block_false);
 		struct evaluated_expression false_ = expression_evaluate(expr->args[2]);
-		var_id false_address = evaluated_expression_to_address(&false_);
+		struct instruction *false_address = evaluated_expression_to_address(&false_);
 
 		block_false = get_current_block()->id;
 		ir_goto(block_end);
 
 		ir_block_start(block_end);
 
-		var_id res_address = ir_phi(true_address, false_address, block_true, block_false);
+		struct instruction *res_address = ir_phi(true_address, false_address, block_true, block_false);
 
 		return (struct evaluated_expression) {
 			.type = EE_POINTER,
@@ -600,11 +599,11 @@ static struct evaluated_expression evaluate_assignment_pointer(struct expr *expr
 
 	index = evaluated_expression_cast(&index, type_simple(abi_info.pointer_type));
 
-	var_id pointer_var = evaluated_expression_to_var(&pointer),
-		index_var = evaluated_expression_to_var(&index),
-		size_var = evaluated_expression_to_var(&size);
+	struct instruction *pointer_var = evaluated_expression_to_var(&pointer),
+		*index_var = evaluated_expression_to_var(&index),
+		*size_var = evaluated_expression_to_var(&size);
 
-	var_id res = pointer_var;
+	struct instruction *res = pointer_var;
 
 	index_var = ir_mul(index_var, size_var);
 
@@ -628,7 +627,7 @@ static struct evaluated_expression evaluate_assignment_pointer(struct expr *expr
 static struct evaluated_expression evaluate_va_start(struct expr *expr) {
 	get_current_function()->uses_va = 1;
 	struct evaluated_expression arr = expression_evaluate(expr->va_start_.array);
-	var_id address = evaluated_expression_to_address(&arr);
+	struct instruction *address = evaluated_expression_to_address(&arr);
 
 	ir_va_start(address);
 
@@ -639,7 +638,7 @@ static struct evaluated_expression evaluate_va_start(struct expr *expr) {
 
 static struct evaluated_expression evaluate_va_arg(struct expr *expr) {
 	struct evaluated_expression v = expression_evaluate(expr->va_arg_.v);
-	var_id result_address = ir_allocate(calculate_size(expr->data_type));
+	struct instruction *result_address = ir_allocate(calculate_size(expr->data_type));
 	if (abi_info.va_list_is_reference) {
 		ir_va_arg(evaluated_expression_to_address(&v), result_address, expr->va_arg_.t);
 	} else {
@@ -656,7 +655,7 @@ static struct evaluated_expression evaluate_va_copy(struct expr *expr) {
 	struct evaluated_expression dest = expression_evaluate(expr->va_copy_.d);
 	struct evaluated_expression src = expression_evaluate(expr->va_copy_.s);
 
-	var_id dest_var, src_var;
+	struct instruction *dest_var, *src_var;
 	int size;
 
 	if (abi_info.va_list_is_reference) {
@@ -733,27 +732,27 @@ struct evaluated_expression expression_evaluate(struct expr *expr) {
 }
 
 // Helper functions.
-var_id expression_to_ir(struct expr *expr) {
+struct instruction *expression_to_ir(struct expr *expr) {
 	struct evaluated_expression ee = expression_evaluate(expr);
 	return evaluated_expression_to_var(&ee);
 }
 
-var_id expression_to_ir_clear_temp(struct expr *expr) {
-	var_id res = expression_to_ir(expr);
+struct instruction *expression_to_ir_clear_temp(struct expr *expr) {
+	struct instruction *res = expression_to_ir(expr);
 	return res;
 }
 
-var_id expression_to_size_t(struct expr *expr) {
+struct instruction *expression_to_size_t(struct expr *expr) {
 	struct evaluated_expression ee = expression_evaluate(expr);
 	ee = evaluated_expression_cast(&ee, type_simple(ST_ULLONG));
-	var_id res = evaluated_expression_to_var(&ee);
+	struct instruction *res = evaluated_expression_to_var(&ee);
 	return res;
 }
 
-var_id expression_to_int(struct expr *expr) {
+struct instruction *expression_to_int(struct expr *expr) {
 	struct evaluated_expression ee = expression_evaluate(expr);
 	ee = evaluated_expression_cast(&ee, type_simple(ST_INT));
-	var_id res = evaluated_expression_to_var(&ee);
+	struct instruction *res = evaluated_expression_to_var(&ee);
 	return res;
 }
 
@@ -761,7 +760,7 @@ void expression_to_void(struct expr *expr) {
 	expression_evaluate(expr);
 }
 
-void expression_to_address(struct expr *expr, var_id address) {
+void expression_to_address(struct expr *expr, struct instruction *address) {
 	struct evaluated_expression ee = expression_evaluate(expr);
 
 	switch (ee.type) {
@@ -770,7 +769,7 @@ void expression_to_address(struct expr *expr, var_id address) {
 		break;
 
 	default: {
-		var_id var = evaluated_expression_to_var(&ee);
+		struct instruction *var = evaluated_expression_to_var(&ee);
 		ir_store(address, var);
 	} break;
 	}

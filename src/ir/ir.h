@@ -1,7 +1,6 @@
 #ifndef IR_H
 #define IR_H
 
-#include "variables.h"
 #include "operators.h"
 #include <codegen/rodata.h>
 
@@ -73,7 +72,7 @@ struct instruction {
 		IR_COUNT
 	} type;
 
-	var_id arguments[2];
+	struct instruction *arguments[2];
 
 	union {
 		struct {
@@ -145,7 +144,8 @@ struct instruction {
 		} phi;
 	};
 
-	var_id result;
+	int index;
+
 	int size;
 	int spans_block, first_block, used;
 
@@ -203,12 +203,12 @@ struct block_exit {
 
 	union {
 		struct {
-			var_id condition;
+			struct instruction *condition;
 			struct case_labels labels;
 		} switch_;
 
 		struct {
-			var_id condition;
+			struct instruction *condition;
 			block_id block_true, block_false;
 		} if_;
 
@@ -230,12 +230,12 @@ struct block {
 
 void ir_block_start(block_id id);
 
-void ir_if_selection(var_id condition, block_id block_true, block_id block_false);
-void ir_switch_selection(var_id condition, struct case_labels labels);
+void ir_if_selection(struct instruction *condition, block_id block_true, block_id block_false);
+void ir_switch_selection(struct instruction *condition, struct case_labels labels);
 void ir_goto(block_id jump);
 void ir_return(void);
 
-void ir_init_ptr(struct initializer *init, struct type *type, var_id ptr);
+void ir_init_ptr(struct initializer *init, struct type *type, struct instruction *ptr);
 
 struct function *get_current_function(void);
 struct block *get_current_block(void);
@@ -245,62 +245,62 @@ void ir_reset(void);
 void ir_calculate_block_local_variables(void);
 
 // New interface. Below here all variables should be immutable.
-void ir_va_start(var_id address);
-void ir_va_arg(var_id array, var_id result_address, struct type *type);
+void ir_va_start(struct instruction *address);
+void ir_va_arg(struct instruction *array, struct instruction *result_address, struct type *type);
 
-void ir_store(var_id address, var_id value);
-var_id ir_load(var_id address, int size);
-var_id ir_phi(var_id var_a, var_id var_b, block_id block_a, block_id block_b);
-var_id ir_bool_cast(var_id operand);
-var_id ir_cast_int(var_id operand, int target_size, int sign_extend);
-var_id ir_cast_float(var_id operand, int target_size);
-var_id ir_cast_float_to_int(var_id operand, int target_size);
-var_id ir_cast_int_to_float(var_id operand, int target_size, int is_signed);
+void ir_store(struct instruction *address, struct instruction *value);
+struct instruction *ir_load(struct instruction *address, int size);
+struct instruction *ir_phi(struct instruction *var_a, struct instruction *var_b, block_id block_a, block_id block_b);
+struct instruction *ir_bool_cast(struct instruction *operand);
+struct instruction *ir_cast_int(struct instruction *operand, int target_size, int sign_extend);
+struct instruction *ir_cast_float(struct instruction *operand, int target_size);
+struct instruction *ir_cast_float_to_int(struct instruction *operand, int target_size);
+struct instruction *ir_cast_int_to_float(struct instruction *operand, int target_size, int is_signed);
 
-var_id ir_binary_not(var_id operand);
-var_id ir_negate_int(var_id operand);
-var_id ir_negate_float(var_id operand);
+struct instruction *ir_binary_not(struct instruction *operand);
+struct instruction *ir_negate_int(struct instruction *operand);
+struct instruction *ir_negate_float(struct instruction *operand);
 
-var_id ir_binary_and(var_id lhs, var_id rhs);
-var_id ir_left_shift(var_id lhs, var_id rhs);
-var_id ir_right_shift(var_id lhs, var_id rhs, int arithmetic);
-var_id ir_binary_or(var_id lhs, var_id rhs);
-var_id ir_add(var_id lhs, var_id rhs);
-var_id ir_sub(var_id lhs, var_id rhs);
-var_id ir_mul(var_id lhs, var_id rhs);
-var_id ir_imul(var_id lhs, var_id rhs);
-var_id ir_div(var_id lhs, var_id rhs);
-var_id ir_idiv(var_id lhs, var_id rhs);
-var_id ir_binary_op(int type, var_id lhs, var_id rhs);
+struct instruction *ir_binary_and(struct instruction *lhs, struct instruction *rhs);
+struct instruction *ir_left_shift(struct instruction *lhs, struct instruction *rhs);
+struct instruction *ir_right_shift(struct instruction *lhs, struct instruction *rhs, int arithmetic);
+struct instruction *ir_binary_or(struct instruction *lhs, struct instruction *rhs);
+struct instruction *ir_add(struct instruction *lhs, struct instruction *rhs);
+struct instruction *ir_sub(struct instruction *lhs, struct instruction *rhs);
+struct instruction *ir_mul(struct instruction *lhs, struct instruction *rhs);
+struct instruction *ir_imul(struct instruction *lhs, struct instruction *rhs);
+struct instruction *ir_div(struct instruction *lhs, struct instruction *rhs);
+struct instruction *ir_idiv(struct instruction *lhs, struct instruction *rhs);
+struct instruction *ir_binary_op(int type, struct instruction *lhs, struct instruction *rhs);
 
-var_id ir_set_bits(var_id field, var_id value, int offset, int length);
-var_id ir_get_bits(var_id field, int offset, int length, int sign_extend);
+struct instruction *ir_set_bits(struct instruction *field, struct instruction *value, int offset, int length);
+struct instruction *ir_get_bits(struct instruction *field, int offset, int length, int sign_extend);
 
-var_id ir_get_offset(var_id base_address, int offset);
+struct instruction *ir_get_offset(struct instruction *base_address, int offset);
 
-var_id ir_constant(struct constant constant);
-void ir_write_constant_to_address(struct constant constant, var_id address);
+struct instruction *ir_constant(struct constant constant);
+void ir_write_constant_to_address(struct constant constant, struct instruction *address);
 
-void ir_call(var_id callee, int non_clobbered_register);
-var_id ir_vla_alloc(var_id length);
+void ir_call(struct instruction *callee, int non_clobbered_register);
+struct instruction *ir_vla_alloc(struct instruction *length);
 
-void ir_set_reg(var_id variable, int register_index, int is_sse);
-var_id ir_get_reg(int size, int register_index, int is_sse);
+void ir_set_reg(struct instruction *variable, int register_index, int is_sse);
+struct instruction *ir_get_reg(int size, int register_index, int is_sse);
 
-var_id ir_allocate(int size);
-var_id ir_allocate_preamble(int size);
+struct instruction *ir_allocate(int size);
+struct instruction *ir_allocate_preamble(int size);
 
 void ir_modify_stack_pointer(int change);
-void ir_store_stack_relative(var_id variable, int offset);
-void ir_store_stack_relative_address(var_id variable, int offset, int size);
-var_id ir_load_base_relative(int offset, int size);
-void ir_load_base_relative_address(var_id address, int offset, int size);
+void ir_store_stack_relative(struct instruction *variable, int offset);
+void ir_store_stack_relative_address(struct instruction *variable, int offset, int size);
+struct instruction *ir_load_base_relative(int offset, int size);
+void ir_load_base_relative_address(struct instruction *address, int offset, int size);
 
-void ir_set_zero_ptr(var_id address, int size);
+void ir_set_zero_ptr(struct instruction *address, int size);
 
-var_id ir_load_part_address(var_id address, int offset, int size);
-void ir_store_part_address(var_id address, var_id value, int offset);
+struct instruction *ir_load_part_address(struct instruction *address, int offset, int size);
+void ir_store_part_address(struct instruction *address, struct instruction *value, int offset);
 
-void ir_copy_memory(var_id destination, var_id source, int size);
+void ir_copy_memory(struct instruction *destination, struct instruction *source, int size);
 
 #endif

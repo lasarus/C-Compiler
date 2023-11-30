@@ -86,8 +86,6 @@ int parse_handle_pragma(void) {
 }
 
 void parse_into_ir(void) {
-	init_variables();
-
 	while (parse_declaration(1) || TACCEPT(T_SEMI_COLON) || parse_handle_pragma());
 
 	TEXPECT(T_EOI);

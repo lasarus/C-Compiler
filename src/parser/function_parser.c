@@ -173,7 +173,7 @@ int parse_selection_statement(struct jump_blocks jump_blocks) {
 		if(!expr)
 			ERROR(T0->pos, "Expected expression in if condition");
 
-		var_id condition = expression_to_ir(expr);
+		struct instruction *condition = expression_to_ir(expr);
 
 		TEXPECT(T_RPAR);
 		block_id block_true = new_block(),
@@ -232,7 +232,7 @@ static int parse_do_while_statement(struct jump_blocks jump_blocks) {
 	if (!control_expression)
 		ERROR(T0->pos, "Expected expression");
 
-	var_id control_variable = expression_to_int(control_expression);
+	struct instruction *control_variable = expression_to_int(control_expression);
 
 	TEXPECT(T_RPAR);
 
@@ -273,7 +273,7 @@ static int parse_while_statement(struct jump_blocks jump_blocks) {
 
 	TEXPECT(T_RPAR);
 
-	var_id control_variable = expression_to_int(control_expression);
+	struct instruction *control_variable = expression_to_int(control_expression);
 
 	ir_if_selection(control_variable, block_body, block_end);
 
@@ -334,7 +334,7 @@ static int parse_for_statement(struct jump_blocks jump_blocks) {
 
 	struct expr *condition = parse_expression();
 	if (condition) {
-		var_id condition_variable = expression_to_int(condition);
+		struct instruction *condition_variable = expression_to_int(condition);
 
 		ir_if_selection(condition_variable, block_body, block_end);
 	} else {

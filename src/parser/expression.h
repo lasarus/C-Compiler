@@ -111,13 +111,13 @@ struct expr {
 		} cast;
 
 		struct {
-			var_id id;
+			struct instruction *id;
 			struct type *type;
 			int is_register;
 		} variable;
 
 		struct {
-			var_id ptr;
+			struct instruction *ptr;
 			struct type *type;
 			int is_register;
 		} variable_ptr;

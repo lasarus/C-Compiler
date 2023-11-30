@@ -1,7 +1,6 @@
 #include "codegen.h"
 #include "assembler/assembler.h"
 #include "ir/ir.h"
-#include "ir/variables.h"
 #include "registers.h"
 #include "binary_operators.h"
 
@@ -14,11 +13,6 @@
 #include <assert.h>
 #include <stdarg.h>
 
-struct codegen_info *get_info(var_id var) {
-	struct instruction *ins = var_get_instruction(var);
-	return &ins->cg_info;
-}
-
 struct codegen_flags codegen_flags = {
 	.code_model = CODE_MODEL_SMALL,
 	.debug_stack_size = 0
@@ -30,7 +24,7 @@ struct vla_info {
 	int alloc_preamble;
 } vla_info;
 
-static void codegen_call(var_id variable, int non_clobbered_register) {
+static void codegen_call(struct instruction *variable, int non_clobbered_register) {
 	scalar_to_reg(variable, non_clobbered_register);
 	asm_ins1("callq", R8S(non_clobbered_register));
 }
@@ -144,7 +138,7 @@ static void codegen_instruction(struct instruction *ins, struct function *func) 
 		scalar_to_reg(ins->arguments[0], REG_RAX);
 		scalar_to_reg(ins->arguments[1], REG_RCX);
 
-		const int size = get_variable_size(ins->arguments[0]);
+		const int size = ins->arguments[0]->size;
 		assert(size == 4 || size == 8);
 
 		struct asm_instruction *asms = (*asm_entry)[size == 8];
@@ -152,13 +146,13 @@ static void codegen_instruction(struct instruction *ins, struct function *func) 
 		for (int i = 0; i < 5 && asms[i].mnemonic; i++)
 			asm_ins(&asms[i]);
 
-		reg_to_scalar(REG_RAX, ins->result);
+		reg_to_scalar(REG_RAX, ins);
 		return;
 	}
 
 	switch (ins->type) {
 	case IR_CONSTANT:
-		asm_ins2("leaq", MEM(-get_info(ins->result)->stack_location, REG_RBP), R8(REG_RDI));
+		asm_ins2("leaq", MEM(-ins->cg_info.stack_location, REG_RBP), R8(REG_RDI));
 		codegen_constant_to_rdi(&ins->constant.constant);
 		break;
 
@@ -170,25 +164,25 @@ static void codegen_instruction(struct instruction *ins, struct function *func) 
 	case IR_BINARY_NOT:
 		scalar_to_reg(ins->arguments[0], REG_RAX);
 		asm_ins1("notq", R8(REG_RAX));
-		reg_to_scalar(REG_RAX, ins->result);
+		reg_to_scalar(REG_RAX, ins);
 		break;
 
 	case IR_NEGATE_INT:
 		scalar_to_reg(ins->arguments[0], REG_RAX);
 		asm_ins1("negq", R8(REG_RAX));
-		reg_to_scalar(REG_RAX, ins->result);
+		reg_to_scalar(REG_RAX, ins);
 		break;
 
 	case IR_NEGATE_FLOAT:
 		scalar_to_reg(ins->arguments[0], REG_RAX);
-		if (get_variable_size(ins->result) == 4) {
+		if (ins->size == 4) {
 			asm_ins2("leal", MEM(-2147483648, REG_RAX), R4(REG_RAX));
-		} else if (get_variable_size(ins->result) == 8) {
+		} else if (ins->size == 8) {
 			asm_ins2("btcq", IMM(63), R8(REG_RAX));
 		} else {
 			NOTIMP();
 		}
-		reg_to_scalar(REG_RAX, ins->result);
+		reg_to_scalar(REG_RAX, ins);
 		break;
 
 	case IR_CALL:
@@ -197,24 +191,24 @@ static void codegen_instruction(struct instruction *ins, struct function *func) 
 
 	case IR_LOAD:
 		scalar_to_reg(ins->arguments[0], REG_RDI);
-		asm_ins2("leaq", MEM(-get_info(ins->result)->stack_location, REG_RBP), R8(REG_RSI));
+		asm_ins2("leaq", MEM(-ins->cg_info.stack_location, REG_RBP), R8(REG_RSI));
 
-		codegen_memcpy(get_variable_size(ins->result));
+		codegen_memcpy(ins->size);
 		break;
 
 	case IR_LOAD_PART_ADDRESS:
 		scalar_to_reg(ins->arguments[0], REG_RDI);
 		asm_ins2("leaq", MEM(ins->load_part.offset, REG_RDI), R8(REG_RDI));
-		asm_ins2("leaq", MEM(-get_info(ins->result)->stack_location, REG_RBP), R8(REG_RSI));
+		asm_ins2("leaq", MEM(-ins->cg_info.stack_location, REG_RBP), R8(REG_RSI));
 
-		codegen_memcpy(get_variable_size(ins->result));
+		codegen_memcpy(ins->size);
 		break;
 
 	case IR_LOAD_BASE_RELATIVE:
 		asm_ins2("leaq", MEM(ins->load_base_relative.offset, REG_RBP), R8(REG_RDI));
-		asm_ins2("leaq", MEM(-get_info(ins->result)->stack_location, REG_RBP), R8(REG_RSI));
+		asm_ins2("leaq", MEM(-ins->cg_info.stack_location, REG_RBP), R8(REG_RSI));
 
-		codegen_memcpy(get_variable_size(ins->result));
+		codegen_memcpy(ins->size);
 		break;
 
 	case IR_LOAD_BASE_RELATIVE_ADDRESS:
@@ -226,24 +220,24 @@ static void codegen_instruction(struct instruction *ins, struct function *func) 
 
 	case IR_STORE:
 		scalar_to_reg(ins->arguments[0], REG_RSI);
-		asm_ins2("leaq", MEM(-get_info(ins->arguments[1])->stack_location, REG_RBP), R8(REG_RDI));
+		asm_ins2("leaq", MEM(-ins->arguments[1]->cg_info.stack_location, REG_RBP), R8(REG_RDI));
 
-		codegen_memcpy(get_variable_size(ins->arguments[1]));
+		codegen_memcpy(ins->arguments[1]->size);
 		break;
 
 	case IR_STORE_PART_ADDRESS:
 		scalar_to_reg(ins->arguments[0], REG_RSI);
 		asm_ins2("leaq", MEM(+ins->store_part.offset, REG_RSI), R8(REG_RSI));
-		asm_ins2("leaq", MEM(-get_info(ins->arguments[1])->stack_location, REG_RBP), R8(REG_RDI));
+		asm_ins2("leaq", MEM(-ins->arguments[1]->cg_info.stack_location, REG_RBP), R8(REG_RDI));
 
-		codegen_memcpy(get_variable_size(ins->arguments[1]));
+		codegen_memcpy(ins->arguments[1]->size);
 		break;
 
 	case IR_STORE_STACK_RELATIVE: {
 		asm_ins2("leaq", MEM(ins->store_stack_relative.offset, REG_RSP), R8(REG_RSI));
-		asm_ins2("leaq", MEM(-get_info(ins->arguments[0])->stack_location, REG_RBP), R8(REG_RDI));
+		asm_ins2("leaq", MEM(-ins->arguments[0]->cg_info.stack_location, REG_RBP), R8(REG_RDI));
 
-		codegen_memcpy(get_variable_size(ins->arguments[0]));
+		codegen_memcpy(ins->arguments[0]->size);
 	} break;
 
 	case IR_STORE_STACK_RELATIVE_ADDRESS: {
@@ -255,13 +249,13 @@ static void codegen_instruction(struct instruction *ins, struct function *func) 
 
 	case IR_INT_CAST_ZERO:
 		scalar_to_reg(ins->arguments[0], REG_RAX);
-		reg_to_scalar(REG_RAX, ins->result);
+		reg_to_scalar(REG_RAX, ins);
 		break;
 
 	case IR_INT_CAST_SIGN: {
 		scalar_to_reg(ins->arguments[0], REG_RAX);
-		int size_rhs = get_variable_size(ins->arguments[0]),
-			size_result = get_variable_size(ins->result);
+		int size_rhs = ins->arguments[0]->size,
+			size_result = ins->size;
 		if (size_result > size_rhs) {
 			if (size_rhs == 1) {
 				asm_ins2("movsbq", R1(REG_RAX), R8(REG_RAX));
@@ -271,7 +265,7 @@ static void codegen_instruction(struct instruction *ins, struct function *func) 
 				asm_ins2("movslq", R4(REG_RAX), R8(REG_RAX));
 			}
 		}
-		reg_to_scalar(REG_RAX, ins->result);
+		reg_to_scalar(REG_RAX, ins);
 	} break;
 
 	case IR_BOOL_CAST: {
@@ -280,13 +274,13 @@ static void codegen_instruction(struct instruction *ins, struct function *func) 
 		asm_ins2("testq", R8(REG_RAX), R8(REG_RAX));
 		asm_ins1("setne", R1(REG_RAX));
 
-		reg_to_scalar(REG_RAX, ins->result);
+		reg_to_scalar(REG_RAX, ins);
 	} break;
 
 	case IR_FLOAT_CAST: {
 		scalar_to_reg(ins->arguments[0], REG_RAX);
-		int size_rhs = get_variable_size(ins->arguments[0]),
-			size_result = get_variable_size(ins->result);
+		int size_rhs = ins->arguments[0]->size,
+			size_result = ins->size;
 
 		if (size_rhs == 4 && size_result == 8) {
 			asm_ins2("movd", R4(REG_RAX), XMM(0));
@@ -300,13 +294,13 @@ static void codegen_instruction(struct instruction *ins, struct function *func) 
 			assert(size_rhs == size_result);
 		}
 
-		reg_to_scalar(REG_RAX, ins->result);
+		reg_to_scalar(REG_RAX, ins);
 	} break;
 
 	case IR_INT_FLOAT_CAST: {
 		scalar_to_reg(ins->arguments[0], REG_RAX);
-		int size_rhs = get_variable_size(ins->arguments[0]),
-			size_result = get_variable_size(ins->result);
+		int size_rhs = ins->arguments[0]->size,
+			size_result = ins->size;
 		if (size_rhs == 1) {
 			asm_ins2("movsbl", R1(REG_RAX), R4(REG_RAX));
 		} else if (size_rhs == 2) {
@@ -324,13 +318,13 @@ static void codegen_instruction(struct instruction *ins, struct function *func) 
 		} else {
 			NOTIMP();
 		}
-		reg_to_scalar(REG_RAX, ins->result);
+		reg_to_scalar(REG_RAX, ins);
 	} break;
 
 	case IR_UINT_FLOAT_CAST: {
 		scalar_to_reg(ins->arguments[0], REG_RAX);
-		int size_rhs = get_variable_size(ins->arguments[0]),
-			size_result = get_variable_size(ins->result);
+		int size_rhs = ins->arguments[0]->size,
+			size_result = ins->size;
 		if (size_rhs == 1) {
 			asm_ins2("movzbl", R1(REG_RAX), R4(REG_RAX));
 		} else if (size_rhs == 2) {
@@ -346,12 +340,12 @@ static void codegen_instruction(struct instruction *ins, struct function *func) 
 		} else {
 			NOTIMP();
 		}
-		reg_to_scalar(REG_RAX, ins->result);
+		reg_to_scalar(REG_RAX, ins);
 	} break;
 
 	case IR_FLOAT_INT_CAST: {
 		scalar_to_reg(ins->arguments[0], REG_RAX);
-		int size_rhs = get_variable_size(ins->arguments[0]);
+		int size_rhs = ins->arguments[0]->size;
 		// This is not the exact same as gcc and clang in the
 		// case of unsigned long. But within the C standard?
 		if (size_rhs == 4) {
@@ -361,7 +355,7 @@ static void codegen_instruction(struct instruction *ins, struct function *func) 
 			asm_ins2("movd", R8(REG_RAX), XMM(0));
 			asm_ins2("cvttsd2si", XMM(0), R8(REG_RAX));
 		}
-		reg_to_scalar(REG_RAX, ins->result);
+		reg_to_scalar(REG_RAX, ins);
 	} break;
 
 	case IR_VA_START:
@@ -396,14 +390,14 @@ static void codegen_instruction(struct instruction *ins, struct function *func) 
 		asm_ins2("movq", R8(REG_RSP), MEM(-vla_info.vla_slot_buffer_offset + slot_offset, REG_RBP));
 		scalar_to_reg(ins->arguments[0], REG_RAX);
 		asm_ins2("subq", R8(REG_RAX), R8(REG_RSP));
-		reg_to_scalar(REG_RSP, ins->result);
+		reg_to_scalar(REG_RSP, ins);
 		// Align %rsp to 16 boundary. (Remember stack grows downwards. So rounding down is actually correct.)
 		asm_ins2("andq", IMM(-16), R8(REG_RSP));
 	} break;
 
 	case IR_SET_REG:
 		if (ins->set_reg.is_sse) {
-			asm_ins2("movsd", MEM(-get_info(ins->arguments[0])->stack_location, REG_RBP),
+			asm_ins2("movsd", MEM(-ins->arguments[0]->cg_info.stack_location, REG_RBP),
 					 XMM(ins->set_reg.register_index));
 		} else {
 			scalar_to_reg(ins->arguments[0], ins->set_reg.register_index);
@@ -412,15 +406,15 @@ static void codegen_instruction(struct instruction *ins, struct function *func) 
 
 	case IR_GET_REG:
 		if (ins->get_reg.is_sse) {
-			if (get_variable_size(ins->result) == 4) {
+			if (ins->size == 4) {
 				asm_ins2("movss", XMM(ins->get_reg.register_index),
-						 MEM(-get_info(ins->result)->stack_location, REG_RBP));
+						 MEM(-ins->cg_info.stack_location, REG_RBP));
 			} else {
 				asm_ins2("movsd", XMM(ins->get_reg.register_index),
-						 MEM(-get_info(ins->result)->stack_location, REG_RBP));
+						 MEM(-ins->cg_info.stack_location, REG_RBP));
 			}
 		} else {
-			reg_to_scalar(ins->get_reg.register_index, ins->result);
+			reg_to_scalar(ins->get_reg.register_index, ins);
 		}
 		break;
 
@@ -431,7 +425,7 @@ static void codegen_instruction(struct instruction *ins, struct function *func) 
 	case IR_ALLOC:
 		assert(ins->alloc.stack_location != -1);
 		asm_ins2("leaq", MEM(-ins->alloc.stack_location, REG_RBP), R8(REG_RSI));
-		reg_to_scalar(REG_RSI, ins->result);
+		reg_to_scalar(REG_RSI, ins);
 		break;
 
 	case IR_COPY_MEMORY:
@@ -458,7 +452,7 @@ static void codegen_phi_node(struct block *current_block, struct block *next_blo
 		if (ins->type != IR_PHI)
 			break;
 
-		var_id source_var;
+		struct instruction *source_var;
 
 		if (current_block->id == ins->phi.block_a) {
 			source_var = ins->arguments[0];
@@ -472,7 +466,7 @@ static void codegen_phi_node(struct block *current_block, struct block *next_blo
 		}
 
 		scalar_to_reg(source_var, REG_RAX);
-		reg_to_scalar(REG_RAX, ins->result);
+		reg_to_scalar(REG_RAX, ins);
 	}
 }
 
@@ -492,8 +486,8 @@ static void codegen_block(struct block *block, struct function *func) {
 	} break;
 
 	case BLOCK_EXIT_IF: {
-		var_id cond = block_exit->if_.condition;
-		int size = get_variable_size(cond);
+		struct instruction *cond = block_exit->if_.condition;
+		int size = cond->size;
 		scalar_to_reg(cond, REG_RDI);
 		switch (size) {
 		case 1: asm_ins2("testb", R1(REG_RDI), R1(REG_RDI)); break;
@@ -519,7 +513,7 @@ static void codegen_block(struct block *block, struct function *func) {
 
 	case BLOCK_EXIT_SWITCH: {
 		asm_comment("SWITCH");
-		var_id control = block_exit->switch_.condition;
+		struct instruction *control = block_exit->switch_.condition;
 		scalar_to_reg(control, REG_RDI);
 		for (int i = 0; i < block_exit->switch_.labels.size; i++) {
 			asm_ins2("cmpl", IMM(block_exit->switch_.labels.labels[i].value.int_d), R4(REG_RDI));

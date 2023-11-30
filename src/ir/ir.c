@@ -1,7 +1,6 @@
 #include "ir.h"
 #include "arch/x64.h"
 #include "debug.h"
-#include "ir/variables.h"
 #include "types.h"
 
 #include <common.h>
@@ -24,8 +23,6 @@ void ir_reset(void) {
 	blocks = NULL;
 
 	ir = (struct ir) { 0 };
-
-	variables_reset();
 }
 
 block_id new_block(void) {
@@ -62,7 +59,7 @@ static struct instruction *ir_push(struct instruction instruction) {
 	return block->instructions[block->size - 1];
 }
 
-static struct instruction *ir_push3(int type, var_id op2, var_id op3) {
+static struct instruction *ir_push3(int type, struct instruction *op2, struct instruction *op3) {
 	struct block *block = get_current_block();
 
 	ADD_ELEMENT(block->size, block->cap, block->instructions) = ALLOC((struct instruction) {
@@ -73,8 +70,8 @@ static struct instruction *ir_push3(int type, var_id op2, var_id op3) {
 	return block->instructions[block->size - 1];
 }
 
-static struct instruction *ir_push2(int type, var_id op2) {
-	return ir_push3(type, op2, VOID_VAR);
+static struct instruction *ir_push2(int type, struct instruction *op2) {
+	return ir_push3(type, op2, NULL);
 }
 
 void ir_block_start(block_id id) {
@@ -83,7 +80,7 @@ void ir_block_start(block_id id) {
 	ADD_ELEMENT(func->size, func->cap, func->blocks) = id;
 }
 
-void ir_if_selection(var_id condition, block_id block_true, block_id block_false) {
+void ir_if_selection(struct instruction *condition, block_id block_true, block_id block_false) {
 	struct block *block = get_current_block();
 	assert(block->exit.type == BLOCK_EXIT_NONE);
 
@@ -93,7 +90,7 @@ void ir_if_selection(var_id condition, block_id block_true, block_id block_false
 	block->exit.if_.block_false = block_false;
 }
 
-void ir_switch_selection(var_id condition, struct case_labels labels) {
+void ir_switch_selection(struct instruction *condition, struct case_labels labels) {
 	struct block *block = get_current_block();
 	assert(block->exit.type == BLOCK_EXIT_NONE);
 
@@ -117,51 +114,51 @@ void ir_return(void) {
 	block->exit.type = BLOCK_EXIT_RETURN;
 }
 
-var_id ir_get_offset(var_id base_address, int offset) {
-	var_id offset_var = ir_constant(constant_simple_unsigned(abi_info.pointer_type, offset));
+struct instruction *ir_get_offset(struct instruction *base_address, int offset) {
+	struct instruction *offset_var = ir_constant(constant_simple_unsigned(abi_info.pointer_type, offset));
 	return ir_add(base_address, offset_var);
 }
 
-var_id ir_set_bits(var_id field, var_id value, int offset, int length) {
+struct instruction *ir_set_bits(struct instruction *field, struct instruction *value, int offset, int length) {
 	uint64_t mask = gen_mask(64 - offset - length, offset);
 
-	var_id value_large = ir_cast_int(value, 8, 0);
-	var_id field_large = ir_cast_int(field, 8, 0);
+	struct instruction *value_large = ir_cast_int(value, 8, 0);
+	struct instruction *field_large = ir_cast_int(field, 8, 0);
 
-	var_id shift_var = ir_constant(constant_simple_unsigned(abi_info.size_type, offset));
-	var_id mask_var = ir_constant(constant_simple_unsigned(abi_info.size_type, mask));
+	struct instruction *shift_var = ir_constant(constant_simple_unsigned(abi_info.size_type, offset));
+	struct instruction *mask_var = ir_constant(constant_simple_unsigned(abi_info.size_type, mask));
 
-	var_id result_large = ir_binary_and(mask_var, field_large);
+	struct instruction *result_large = ir_binary_and(mask_var, field_large);
 
-	var_id mask_inverted = ir_binary_not(mask_var);
+	struct instruction *mask_inverted = ir_binary_not(mask_var);
 	value_large = ir_left_shift(value_large, shift_var);
 	mask_inverted = ir_binary_and(mask_inverted, value_large);
 
 	result_large = ir_binary_or(mask_inverted, result_large);
 
-	return ir_cast_int(result_large, get_variable_size(field), 0);
+	return ir_cast_int(result_large, field->size, 0);
 }
 
-var_id ir_get_bits(var_id field, int offset, int length, int sign_extend) {
-	var_id field_large = ir_cast_int(field, 8, 0);
-	var_id lshift_var = ir_constant(constant_simple_unsigned(abi_info.size_type, 64 - offset - length));
-	var_id rshift_var = ir_constant(constant_simple_unsigned(abi_info.size_type, 64 - length));
+struct instruction *ir_get_bits(struct instruction *field, int offset, int length, int sign_extend) {
+	struct instruction *field_large = ir_cast_int(field, 8, 0);
+	struct instruction *lshift_var = ir_constant(constant_simple_unsigned(abi_info.size_type, 64 - offset - length));
+	struct instruction *rshift_var = ir_constant(constant_simple_unsigned(abi_info.size_type, 64 - length));
 
 	field_large = ir_left_shift(field_large, lshift_var);
 	field_large = ir_right_shift(field_large, rshift_var, sign_extend);
 
-	return ir_cast_int(field_large, get_variable_size(field), 0);
+	return ir_cast_int(field_large, field->size, 0);
 }
 
-static void ir_init_var_recursive(struct initializer *init, struct type *type, var_id offset,
+static void ir_init_var_recursive(struct initializer *init, struct type *type, struct instruction *offset,
 								  int bit_offset, int bit_size) {
 	switch (init->type) {
 	case INIT_BRACE: {
 		for (int i = 0; i < init->brace.size; i++) {
 			int child_offset = calculate_offset(type, i);
 			struct type *child_type = type_select(type, i);
-			var_id child_offset_var = ir_add(offset,
-											 ir_constant(constant_simple_unsigned(abi_info.size_type, child_offset)));
+			struct instruction *child_offset_var = ir_add(offset,
+														  ir_constant(constant_simple_unsigned(abi_info.size_type, child_offset)));
 			int bit_offset = -1, bit_size = -1;
 
 			if (type->type == TY_STRUCT) {
@@ -179,11 +176,9 @@ static void ir_init_var_recursive(struct initializer *init, struct type *type, v
 		if (bit_size == -1) {
 			expression_to_address(init->expr, offset);
 		} else {
-			var_id value = expression_to_ir(init->expr);
-
-			var_id prev = ir_load(offset, get_variable_size(value));
-
-			var_id new = ir_set_bits(prev, value, bit_offset, bit_size);
+			struct instruction *value = expression_to_ir(init->expr);
+			struct instruction *prev = ir_load(offset, value->size);
+			struct instruction *new = ir_set_bits(prev, value, bit_offset, bit_size);
 
 			ir_store(offset, new);
 		}
@@ -191,8 +186,8 @@ static void ir_init_var_recursive(struct initializer *init, struct type *type, v
 
 	case INIT_STRING: {
 		for (int j = 0; j < init->string.len; j++) {
-			var_id char_var = ir_constant(constant_simple_unsigned(ST_CHAR, init->string.str[j]));
-			var_id offset_var = ir_constant(constant_simple_unsigned(abi_info.size_type, j));
+			struct instruction *char_var = ir_constant(constant_simple_unsigned(ST_CHAR, init->string.str[j]));
+			struct instruction *offset_var = ir_constant(constant_simple_unsigned(abi_info.size_type, j));
 
 			offset_var = ir_add(offset_var, offset);
 
@@ -204,25 +199,23 @@ static void ir_init_var_recursive(struct initializer *init, struct type *type, v
 	}
 }
 
-void ir_init_ptr(struct initializer *init, struct type *type, var_id ptr) {
+void ir_init_ptr(struct initializer *init, struct type *type, struct instruction *ptr) {
 	ir_set_zero_ptr(ptr, calculate_size(type));
 
 	ir_init_var_recursive(init, type, ptr, -1, -1);
 }
 
-static void register_usage(struct block *block, var_id var) {
-	if (var == 0)
+static void register_usage(struct block *block, struct instruction *var) {
+	if (!var)
 		return;
 
-	struct instruction *ins = var_get_instruction(var);
-
-	if (ins->first_block == -1) {
-		ins->first_block = block->id;
-	} else if (ins->first_block != block->id) {
-		ins->spans_block = 1;
+	if (var->first_block == -1) {
+		var->first_block = block->id;
+	} else if (var->first_block != block->id) {
+		var->spans_block = 1;
 	}
 
-	ins->used = 1;
+	var->used = 1;
 }
 
 void ir_calculate_block_local_variables(void) {
@@ -235,7 +228,7 @@ void ir_calculate_block_local_variables(void) {
 			for (int k = 0; k < b->size; k++) {
 				struct instruction *ins = b->instructions[k];
 
-				register_usage(b, ins->result);
+				register_usage(b, ins);
 				register_usage(b, ins->arguments[0]);
 				register_usage(b, ins->arguments[1]);
 			}
@@ -259,200 +252,183 @@ void ir_calculate_block_local_variables(void) {
 
 #define IR_PUSH(...) ir_push((struct instruction) { __VA_ARGS__ })
 
-void ir_va_start(var_id address) {
-	ir_push3(IR_VA_START, address, VOID_VAR);
+struct instruction *new_variable(struct instruction *instruction, int size) {
+	if (size > 8 || size == 0)
+		ICE("Invalid register size: %d", size);
+
+	static int counter = 0;
+
+	instruction->index = ++counter;
+	instruction->size = size;
+	instruction->first_block = -1;
+	instruction->spans_block = 0;
+
+	return instruction;
 }
 
-void ir_va_arg(var_id array, var_id result_address, struct type *type) {
+void ir_va_start(struct instruction *address) {
+	ir_push3(IR_VA_START, address, NULL);
+}
+
+void ir_va_arg(struct instruction *array, struct instruction *result_address, struct type *type) {
 	IR_PUSH(.type = IR_VA_ARG, .arguments = {result_address, array}, .va_arg_ = {type});
 }
 
-void ir_store(var_id address, var_id value) {
+void ir_store(struct instruction *address, struct instruction *value) {
 	ir_push3(IR_STORE, address, value);
 }
 
-var_id ir_load(var_id address, int size) {
-	var_id var = new_variable(ir_push2(IR_LOAD, address), size);
-	return var;
+struct instruction *ir_load(struct instruction *address, int size) {
+	return new_variable(ir_push2(IR_LOAD, address), size);
 }
 
-var_id ir_bool_cast(var_id operand) {
-	var_id res = new_variable(ir_push2(IR_BOOL_CAST, operand), calculate_size(type_simple(ST_BOOL)));
-	return res;
+struct instruction *ir_bool_cast(struct instruction *operand) {
+	return new_variable(ir_push2(IR_BOOL_CAST, operand), calculate_size(type_simple(ST_BOOL)));
 }
 
-var_id ir_cast_int(var_id operand, int target_size, int sign_extend) {
-	var_id res = new_variable(ir_push2(sign_extend ? IR_INT_CAST_SIGN : IR_INT_CAST_ZERO, operand), target_size);
-	return res;
+struct instruction *ir_cast_int(struct instruction *operand, int target_size, int sign_extend) {
+	return new_variable(ir_push2(sign_extend ? IR_INT_CAST_SIGN : IR_INT_CAST_ZERO, operand), target_size);
 }
 
-var_id ir_cast_float(var_id operand, int target_size) {
-	var_id res = new_variable(ir_push2(IR_FLOAT_CAST, operand), target_size);
-	return res;
+struct instruction *ir_cast_float(struct instruction *operand, int target_size) {
+	return new_variable(ir_push2(IR_FLOAT_CAST, operand), target_size);
 }
 
-var_id ir_cast_int_to_float(var_id operand, int target_size, int is_signed) {
-	var_id res = new_variable(ir_push2(is_signed ? IR_INT_FLOAT_CAST : IR_UINT_FLOAT_CAST, operand), target_size);
-	return res;
+struct instruction *ir_cast_int_to_float(struct instruction *operand, int target_size, int is_signed) {
+	return new_variable(ir_push2(is_signed ? IR_INT_FLOAT_CAST : IR_UINT_FLOAT_CAST, operand), target_size);
 }
 
-var_id ir_cast_float_to_int(var_id operand, int target_size) {
-	var_id res = new_variable(ir_push2(IR_FLOAT_INT_CAST, operand), target_size);
-	return res;
+struct instruction *ir_cast_float_to_int(struct instruction *operand, int target_size) {
+	return new_variable(ir_push2(IR_FLOAT_INT_CAST, operand), target_size);
 }
 
-var_id ir_binary_not(var_id operand) {
-	var_id ret = new_variable(ir_push2(IR_BINARY_NOT, operand), get_variable_size(operand));
-	return ret;
+struct instruction *ir_binary_not(struct instruction *operand) {
+	return new_variable(ir_push2(IR_BINARY_NOT, operand), operand->size);
 }
 
-var_id ir_negate_int(var_id operand) {
-	var_id ret = new_variable(ir_push2(IR_NEGATE_INT, operand), get_variable_size(operand));
-	return ret;
+struct instruction *ir_negate_int(struct instruction *operand) {
+	return new_variable(ir_push2(IR_NEGATE_INT, operand), operand->size);
 }
 
-var_id ir_negate_float(var_id operand) {
-	var_id ret = new_variable(ir_push2(IR_NEGATE_FLOAT, operand), get_variable_size(operand));
-	return ret;
+struct instruction *ir_negate_float(struct instruction *operand) {
+	return new_variable(ir_push2(IR_NEGATE_FLOAT, operand), operand->size);
 }
 
-var_id ir_constant(struct constant constant) {
+struct instruction *ir_constant(struct constant constant) {
 	int size = calculate_size(constant.data_type);
 	if (constant.type == CONSTANT_LABEL_POINTER)
 		size = 8;
-	var_id var = new_variable(IR_PUSH(.type = IR_CONSTANT, .constant = {constant}), size);
-	return var;
+	return new_variable(IR_PUSH(.type = IR_CONSTANT, .constant = {constant}), size);
 }
 
-void ir_write_constant_to_address(struct constant constant, var_id address) {
+void ir_write_constant_to_address(struct constant constant, struct instruction *address) {
 	IR_PUSH(.type = IR_CONSTANT_ADDRESS, .arguments={address}, .constant = {constant});
 }
 
-var_id ir_binary_and(var_id lhs, var_id rhs) {
-	var_id var = new_variable(ir_push3(IR_BAND, lhs, rhs), get_variable_size(lhs));
-	return var;
+struct instruction *ir_binary_and(struct instruction *lhs, struct instruction *rhs) {
+	return new_variable(ir_push3(IR_BAND, lhs, rhs), lhs->size);
 }
 
-var_id ir_left_shift(var_id lhs, var_id rhs) {
-	var_id var = new_variable(ir_push3(IR_LSHIFT, lhs, rhs), get_variable_size(lhs));
-	return var;
+struct instruction *ir_left_shift(struct instruction *lhs, struct instruction *rhs) {
+	return new_variable(ir_push3(IR_LSHIFT, lhs, rhs), lhs->size);
 }
 
-var_id ir_right_shift(var_id lhs, var_id rhs, int arithmetic) {
-	var_id var = new_variable(ir_push3(arithmetic ? IR_IRSHIFT : IR_RSHIFT, lhs, rhs), get_variable_size(lhs));
-	return var;
+struct instruction *ir_right_shift(struct instruction *lhs, struct instruction *rhs, int arithmetic) {
+	return new_variable(ir_push3(arithmetic ? IR_IRSHIFT : IR_RSHIFT, lhs, rhs), lhs->size);
 }
 
-var_id ir_binary_or(var_id lhs, var_id rhs) {
-	var_id var = new_variable(ir_push3(IR_BOR, lhs, rhs), get_variable_size(lhs));
-	return var;
+struct instruction *ir_binary_or(struct instruction *lhs, struct instruction *rhs) {
+	return new_variable(ir_push3(IR_BOR, lhs, rhs), lhs->size);
 }
 
-var_id ir_add(var_id lhs, var_id rhs) {
-	var_id var = new_variable(ir_push3(IR_ADD, lhs, rhs), get_variable_size(lhs));
-	return var;
+struct instruction *ir_add(struct instruction *lhs, struct instruction *rhs) {
+	return new_variable(ir_push3(IR_ADD, lhs, rhs), lhs->size);
 }
 
-var_id ir_sub(var_id lhs, var_id rhs) {
-	var_id var = new_variable(ir_push3(IR_SUB, lhs, rhs), get_variable_size(lhs));
-	return var;
+struct instruction *ir_sub(struct instruction *lhs, struct instruction *rhs) {
+	return new_variable(ir_push3(IR_SUB, lhs, rhs), lhs->size);
 }
 
-var_id ir_mul(var_id lhs, var_id rhs) {
-	var_id var = new_variable(ir_push3(IR_MUL, lhs, rhs), get_variable_size(lhs));
-	return var;
+struct instruction *ir_mul(struct instruction *lhs, struct instruction *rhs) {
+	return new_variable(ir_push3(IR_MUL, lhs, rhs), lhs->size);
 }
 
-var_id ir_imul(var_id lhs, var_id rhs) {
-	var_id var = new_variable(ir_push3(IR_IMUL, lhs, rhs), get_variable_size(lhs));
-	return var;
+struct instruction *ir_imul(struct instruction *lhs, struct instruction *rhs) {
+	return new_variable(ir_push3(IR_IMUL, lhs, rhs), lhs->size);
 }
 
-var_id ir_div(var_id lhs, var_id rhs) {
-	var_id var = new_variable(ir_push3(IR_DIV, lhs, rhs), get_variable_size(lhs));
-	return var;
+struct instruction *ir_div(struct instruction *lhs, struct instruction *rhs) {
+	return new_variable(ir_push3(IR_DIV, lhs, rhs), lhs->size);
 }
 
-var_id ir_idiv(var_id lhs, var_id rhs) {
-	var_id var = new_variable(ir_push3(IR_IDIV, lhs, rhs), get_variable_size(lhs));
-	return var;
+struct instruction *ir_idiv(struct instruction *lhs, struct instruction *rhs) {
+	return new_variable(ir_push3(IR_IDIV, lhs, rhs), lhs->size);
 }
 
-var_id ir_binary_op(int type, var_id lhs, var_id rhs) {
-	var_id var = new_variable(ir_push3(type, lhs, rhs), get_variable_size(lhs));
-	return var;
+struct instruction *ir_binary_op(int type, struct instruction *lhs, struct instruction *rhs) {
+	return new_variable(ir_push3(type, lhs, rhs), lhs->size);
 }
 
-void ir_call(var_id callee, int non_clobbered_register) {
+void ir_call(struct instruction *callee, int non_clobbered_register) {
 	IR_PUSH(.type = IR_CALL, .arguments = {callee}, .call = {non_clobbered_register});
 }
 
-var_id ir_vla_alloc(var_id length) {
-	var_id result = new_variable(IR_PUSH(.type = IR_VLA_ALLOC, .arguments = {length}, .vla_alloc = {0}), 8);
-	return result;
+struct instruction *ir_vla_alloc(struct instruction *length) {
+	return new_variable(IR_PUSH(.type = IR_VLA_ALLOC, .arguments = {length}, .vla_alloc = {0}), 8);
 }
 
-void ir_set_reg(var_id variable, int register_index, int is_sse) {
+void ir_set_reg(struct instruction *variable, int register_index, int is_sse) {
 	IR_PUSH(.type = IR_SET_REG, .arguments = {variable}, .set_reg = {register_index, is_sse});
 }
 
-var_id ir_get_reg(int size, int register_index, int is_sse) {
-	var_id reg = new_variable(IR_PUSH(.type = IR_GET_REG, .get_reg = {register_index, is_sse}), size);
-	return reg;
+struct instruction *ir_get_reg(int size, int register_index, int is_sse) {
+	return new_variable(IR_PUSH(.type = IR_GET_REG, .get_reg = {register_index, is_sse}), size);
 }
 
-var_id ir_allocate(int size) {
-	var_id res = new_variable(IR_PUSH(.type = IR_ALLOC, .alloc = {size, -1, 0}), 8);
-
-	return res;
+struct instruction *ir_allocate(int size) {
+	return new_variable(IR_PUSH(.type = IR_ALLOC, .alloc = {size, -1, 0}), 8);
 }
 
-var_id ir_allocate_preamble(int size) {
-	var_id res = new_variable(IR_PUSH(.type = IR_ALLOC, .alloc = {size, -1, 1}), 8);
-
-	return res;
+struct instruction *ir_allocate_preamble(int size) {
+	return new_variable(IR_PUSH(.type = IR_ALLOC, .alloc = {size, -1, 1}), 8);
 }
 
 void ir_modify_stack_pointer(int change) {
 	IR_PUSH(.type = IR_MODIFY_STACK_POINTER, .modify_stack_pointer = {change});
 }
 
-void ir_store_stack_relative(var_id variable, int offset) {
+void ir_store_stack_relative(struct instruction *variable, int offset) {
 	IR_PUSH(.type = IR_STORE_STACK_RELATIVE, .arguments = {variable}, .store_stack_relative = {offset});
 }
 
-void ir_store_stack_relative_address(var_id variable, int offset, int size) {
+void ir_store_stack_relative_address(struct instruction *variable, int offset, int size) {
 	IR_PUSH(.type = IR_STORE_STACK_RELATIVE_ADDRESS, .arguments = {variable}, .store_stack_relative_address = {offset, size});
 }
 
-var_id ir_load_base_relative(int offset, int size) {
-	var_id res = new_variable(IR_PUSH(.type = IR_LOAD_BASE_RELATIVE, .load_base_relative = {offset}), size);
-	return res;
+struct instruction *ir_load_base_relative(int offset, int size) {
+	return new_variable(IR_PUSH(.type = IR_LOAD_BASE_RELATIVE, .load_base_relative = {offset}), size);
 }
 
-void ir_load_base_relative_address(var_id address, int offset, int size) {
+void ir_load_base_relative_address(struct instruction *address, int offset, int size) {
 	IR_PUSH(.type = IR_LOAD_BASE_RELATIVE_ADDRESS, .arguments = {address}, .load_base_relative_address = {offset, size});
 }
 
-void ir_set_zero_ptr(var_id address, int size) {
+void ir_set_zero_ptr(struct instruction *address, int size) {
 	IR_PUSH(.type = IR_SET_ZERO_PTR, .arguments = {address}, .set_zero_ptr = {size});
 }
 
-var_id ir_load_part_address(var_id address, int offset, int size) {
-	var_id res = new_variable(IR_PUSH(.type = IR_LOAD_PART_ADDRESS, .arguments = {address}, .load_part = {offset}), size);
-	return res;
+struct instruction *ir_load_part_address(struct instruction *address, int offset, int size) {
+	return new_variable(IR_PUSH(.type = IR_LOAD_PART_ADDRESS, .arguments = {address}, .load_part = {offset}), size);
 }
 
-void ir_store_part_address(var_id address, var_id value, int offset) {
+void ir_store_part_address(struct instruction *address, struct instruction *value, int offset) {
 	IR_PUSH(.type = IR_STORE_PART_ADDRESS, .arguments = {address, value}, .store_part = {offset});
 }
 
-void ir_copy_memory(var_id destination, var_id source, int size) {
+void ir_copy_memory(struct instruction *destination, struct instruction *source, int size) {
 	IR_PUSH(.type = IR_COPY_MEMORY, .arguments = {destination, source}, .copy_memory = {size});
 }
 
-var_id ir_phi(var_id var_a, var_id var_b, block_id block_a, block_id block_b) {
-	var_id result = new_variable(IR_PUSH(.type = IR_PHI, .arguments = {var_a, var_b}, .phi = {block_a, block_b}), get_variable_size(var_a));
-
-	return result;
+struct instruction *ir_phi(struct instruction *var_a, struct instruction *var_b, block_id block_a, block_id block_b) {
+	return new_variable(IR_PUSH(.type = IR_PHI, .arguments = {var_a, var_b}, .phi = {block_a, block_b}), var_a->size);
 }

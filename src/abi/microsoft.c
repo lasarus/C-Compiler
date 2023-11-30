@@ -1,7 +1,6 @@
 #include "abi.h"
 #include "arch/x64.h"
 #include "ir/ir.h"
-#include "ir/variables.h"
 #include "parser/expression_to_ir.h"
 #include "types.h"
 
@@ -21,9 +20,9 @@ struct ms_data {
 	int is_variadic;
 
 	int returns_address;
-	var_id ret_address;
+	struct instruction *ret_address;
 
-	var_id rbx_store, rdi_store, rsi_store;
+	struct instruction *rbx_store, *rdi_store, *rsi_store;
 };
 
 static int fits_into_reg(struct type *type) {
@@ -34,7 +33,7 @@ static int fits_into_reg(struct type *type) {
 static struct evaluated_expression ms_expr_call(struct evaluated_expression *callee,
 										   int n, struct evaluated_expression arguments[static n]) {
 	struct type *argument_types[128];
-	var_id arg_addresses[128];
+	struct instruction *arg_addresses[128];
 	struct type *callee_type = type_deref(callee->data_type);
 	struct type *return_type = callee_type->children[0];
 
@@ -43,12 +42,12 @@ static struct evaluated_expression ms_expr_call(struct evaluated_expression *cal
 		argument_types[i] = arguments[i].data_type;
 	}
 
-	var_id registers[4];
+	struct instruction *registers[4];
 	int is_floating[4] = { 0 };
 	int register_idx = 0;
 	int ret_in_register = 0, ret_in_address = 0;
 	
-	var_id callee_var = evaluated_expression_to_var(callee);
+	struct instruction *callee_var = evaluated_expression_to_var(callee);
 
 	if (!type_is_simple(return_type, ST_VOID)) {
 		if (fits_into_reg(return_type)) {
@@ -67,7 +66,7 @@ static struct evaluated_expression ms_expr_call(struct evaluated_expression *cal
 	ir_modify_stack_pointer(-stack_sub - shadow_space);
 	int current_mem = 0;
 	for (int i = 0; i < n; i++) {
-		var_id reg_to_push = arg_addresses[i];
+		struct instruction *reg_to_push = arg_addresses[i];
 
 		if (fits_into_reg(argument_types[i])) {
 			reg_to_push = ir_load(arg_addresses[i],
@@ -94,7 +93,7 @@ static struct evaluated_expression ms_expr_call(struct evaluated_expression *cal
 
 	struct evaluated_expression result;
 	if (ret_in_register) {
-		var_id variable = ir_get_reg(calculate_size(return_type), REG_RAX, type_is_floating(return_type));
+		struct instruction *variable = ir_get_reg(calculate_size(return_type), REG_RAX, type_is_floating(return_type));
 		result = (struct evaluated_expression) {
 			.type = EE_VARIABLE,
 			.data_type = return_type,
@@ -148,7 +147,7 @@ static void ms_expr_function(struct type *function_type, struct symbol_identifie
 
 	int current_mem = 0;
 
-	var_id inputs[128];
+	struct instruction *inputs[128];
 
 	for (int i = 0; i < n_args; i++) {
 		int size = calculate_size(args[i]->parameter.type);
@@ -171,7 +170,7 @@ static void ms_expr_function(struct type *function_type, struct symbol_identifie
 		struct symbol_identifier *symbol = args[i];
 
 		struct type *type = symbol->parameter.type;
-		var_id address = ir_allocate(calculate_size(type));
+		struct instruction *address = ir_allocate(calculate_size(type));
 
 		symbol->type = IDENT_VARIABLE;
 		symbol->variable.type = type;
@@ -192,10 +191,10 @@ static void ms_expr_return(struct function *func, struct evaluated_expression *v
 
 	if (value->type != EE_VOID) {
 		if (abi_data->returns_address) {
-			var_id value_address = evaluated_expression_to_address(value);
+			struct instruction *value_address = evaluated_expression_to_address(value);
 			ir_copy_memory(abi_data->ret_address, value_address, calculate_size(value->data_type));
 		} else {
-			var_id value_var = evaluated_expression_to_var(value);
+			struct instruction *value_var = evaluated_expression_to_var(value);
 			ir_set_reg(value_var, 0, type_is_floating(value->data_type));
 		}
 	}
@@ -217,7 +216,7 @@ static void ms_emit_function_preamble(struct function *func) {
 	asm_ins2("movq", R8(REG_R9), MEM(40, REG_RBP));
 }
 
-static void ms_emit_va_start(var_id result, struct function *func) {
+static void ms_emit_va_start(struct instruction *result, struct function *func) {
 	struct ms_data *abi_data = func->abi_data;
 
 	asm_ins2("leaq", MEM(abi_data->n_args * 8 + 16, REG_RBP), R8(REG_RAX));
@@ -225,7 +224,7 @@ static void ms_emit_va_start(var_id result, struct function *func) {
 	asm_ins2("movq", R8(REG_RAX), MEM(0, REG_RDX));
 }
 
-static void ms_emit_va_arg(var_id address, var_id va_list, struct type *type) {
+static void ms_emit_va_arg(struct instruction *address, struct instruction *va_list, struct type *type) {
 	scalar_to_reg(va_list, REG_RBX); // va_list is a pointer to the actual va_list.
 	asm_ins2("movq", MEM(0, REG_RBX), R8(REG_RAX));
 	asm_ins2("leaq", MEM(8, REG_RAX), R8(REG_RDX));

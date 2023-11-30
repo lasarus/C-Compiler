@@ -8,7 +8,7 @@ void (*abi_expr_function)(struct type *type, struct symbol_identifier **args, co
 void (*abi_expr_return)(struct function *func, struct evaluated_expression *value);
 
 void (*abi_emit_function_preamble)(struct function *func);
-void (*abi_emit_va_start)(var_id result, struct function *func);
-void (*abi_emit_va_arg)(var_id result, var_id va_list, struct type *type);
+void (*abi_emit_va_start)(struct instruction *result, struct function *func);
+void (*abi_emit_va_arg)(struct instruction *result, struct instruction *va_list, struct type *type);
 
 int (*abi_sizeof_simple)(enum simple_type type);

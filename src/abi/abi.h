@@ -2,7 +2,6 @@
 #define ABI_H
 
 #include "parser/symbols.h"
-#include <ir/variables.h>
 #include <ir/ir.h>
 #include <parser/expression_to_ir.h>
 
@@ -27,8 +26,8 @@ extern void (*abi_expr_function)(struct type *type, struct symbol_identifier **a
 extern void (*abi_expr_return)(struct function *func, struct evaluated_expression *value);
 
 extern void (*abi_emit_function_preamble)(struct function *func);
-extern void (*abi_emit_va_start)(var_id result, struct function *func);
-extern void (*abi_emit_va_arg)(var_id address, var_id va_list, struct type *type);
+extern void (*abi_emit_va_start)(struct instruction *result, struct function *func);
+extern void (*abi_emit_va_arg)(struct instruction *address, struct instruction *va_list, struct type *type);
 
 extern int (*abi_sizeof_simple)(enum simple_type type);
 

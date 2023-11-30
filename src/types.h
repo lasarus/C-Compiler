@@ -1,8 +1,6 @@
 #ifndef TYPES_H
 #define TYPES_H
 
-#include <ir/variables.h>
-
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -80,7 +78,7 @@ struct type {
 		} array;
 		struct {
 			int is_evaluated;
-			var_id length_var;
+			struct instruction *length_var;
 			struct expr *length_expr;
 		} variable_length_array;
 		struct {

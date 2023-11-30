@@ -1340,14 +1340,14 @@ static int parse_init_declarator(struct specifiers s, int external, int *was_fun
 		} else {
 			if (type_has_variable_size(type)) {
 				symbol->type = IDENT_VARIABLE;
-				symbol->variable.ptr = allocate_vla(type);
+				symbol->variable.ptr = ir_vla_alloc(expression_to_size_t(type_sizeof(type)));
 				symbol->variable.type = type;
 
 				if (has_init)
 					ERROR(T0->pos, "Variable length array can't have initializer");
 			} else {
 				symbol->type = IDENT_VARIABLE;
-				var_id ptr;
+				struct instruction *ptr;
 				symbol->variable.type = type;
 				if (has_init) {
 					struct initializer init = parse_initializer(&type);
