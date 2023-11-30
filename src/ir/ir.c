@@ -1,13 +1,6 @@
 #include "ir.h"
-#include "arch/x64.h"
-#include "debug.h"
-#include "types.h"
 
 #include <common.h>
-#include <parser/declaration.h>
-#include <parser/expression_to_ir.h>
-#include <arch/calling.h>
-#include <codegen/registers.h>
 #include <abi/abi.h>
 
 #include <assert.h>
@@ -36,10 +29,13 @@ struct block *get_current_block(void) {
 	return func->last;
 }
 
-static struct instruction *ir_push(struct instruction instruction) {
+static struct instruction *ir_new(int type, int size) {
+	struct instruction *next = ALLOC((struct instruction) { .type = type });
 	struct block *block = get_current_block();
 
-	struct instruction *next = ALLOC(instruction);
+	static int counter = 0;
+	next->index = ++counter;
+	next->size = size;
 
 	if (block->last)
 		block->last->next = next;
@@ -51,15 +47,17 @@ static struct instruction *ir_push(struct instruction instruction) {
 	return next;
 }
 
-static struct instruction *ir_push3(int type, struct instruction *op2, struct instruction *op3) {
-	return ir_push((struct instruction) {
-			.type = type,
-			.arguments = { op2, op3 }
-		});
+static struct instruction *ir_new2(int type, struct instruction *op2, struct instruction *op3, int size) {
+	struct instruction *ins = ir_new(type, size);
+
+	ins->arguments[0] = op2;
+	ins->arguments[1] = op3;
+
+	return ins;
 }
 
-static struct instruction *ir_push2(int type, struct instruction *op2) {
-	return ir_push3(type, op2, NULL);
+static struct instruction *ir_new1(int type, struct instruction *op2, int size) {
+	return ir_new2(type, op2, NULL, size);
 }
 
 void ir_block_start(struct block *block) {
@@ -239,185 +237,203 @@ void ir_calculate_block_local_variables(void) {
 	}
 }
 
-#define IR_PUSH(...) ir_push((struct instruction) { __VA_ARGS__ })
-
-struct instruction *new_variable(struct instruction *instruction, int size) {
-	if (size > 8 || size == 0)
-		ICE("Invalid register size: %d", size);
-
-	static int counter = 0;
-
-	instruction->index = ++counter;
-	instruction->size = size;
-	instruction->first_block = NULL;
-	instruction->spans_block = 0;
-
-	return instruction;
-}
-
 void ir_va_start(struct instruction *address) {
-	ir_push3(IR_VA_START, address, NULL);
+	ir_new2(IR_VA_START, address, NULL, 0);
 }
 
 void ir_va_arg(struct instruction *array, struct instruction *result_address, struct type *type) {
-	IR_PUSH(.type = IR_VA_ARG, .arguments = {result_address, array}, .va_arg_ = {type});
+	struct instruction *ins = ir_new2(IR_VA_ARG, result_address, array, 0);
+	ins->va_arg_.type = type;
 }
 
 void ir_store(struct instruction *address, struct instruction *value) {
-	ir_push3(IR_STORE, address, value);
+	ir_new2(IR_STORE, address, value, 0);
 }
 
 struct instruction *ir_load(struct instruction *address, int size) {
-	return new_variable(ir_push2(IR_LOAD, address), size);
+	return ir_new1(IR_LOAD, address, size);
 }
 
 struct instruction *ir_bool_cast(struct instruction *operand) {
-	return new_variable(ir_push2(IR_BOOL_CAST, operand), calculate_size(type_simple(ST_BOOL)));
+	return ir_new1(IR_BOOL_CAST, operand, calculate_size(type_simple(ST_BOOL)));
 }
 
 struct instruction *ir_cast_int(struct instruction *operand, int target_size, int sign_extend) {
-	return new_variable(ir_push2(sign_extend ? IR_INT_CAST_SIGN : IR_INT_CAST_ZERO, operand), target_size);
+	return ir_new1(sign_extend ? IR_INT_CAST_SIGN : IR_INT_CAST_ZERO, operand, target_size);
 }
 
 struct instruction *ir_cast_float(struct instruction *operand, int target_size) {
-	return new_variable(ir_push2(IR_FLOAT_CAST, operand), target_size);
+	return ir_new1(IR_FLOAT_CAST, operand, target_size);
 }
 
 struct instruction *ir_cast_int_to_float(struct instruction *operand, int target_size, int is_signed) {
-	return new_variable(ir_push2(is_signed ? IR_INT_FLOAT_CAST : IR_UINT_FLOAT_CAST, operand), target_size);
+	return ir_new1(is_signed ? IR_INT_FLOAT_CAST : IR_UINT_FLOAT_CAST, operand, target_size);
 }
 
 struct instruction *ir_cast_float_to_int(struct instruction *operand, int target_size) {
-	return new_variable(ir_push2(IR_FLOAT_INT_CAST, operand), target_size);
+	return ir_new1(IR_FLOAT_INT_CAST, operand, target_size);
 }
 
 struct instruction *ir_binary_not(struct instruction *operand) {
-	return new_variable(ir_push2(IR_BINARY_NOT, operand), operand->size);
+	return ir_new1(IR_BINARY_NOT, operand, operand->size);
 }
 
 struct instruction *ir_negate_int(struct instruction *operand) {
-	return new_variable(ir_push2(IR_NEGATE_INT, operand), operand->size);
+	return ir_new1(IR_NEGATE_INT, operand, operand->size);
 }
 
 struct instruction *ir_negate_float(struct instruction *operand) {
-	return new_variable(ir_push2(IR_NEGATE_FLOAT, operand), operand->size);
+	return ir_new1(IR_NEGATE_FLOAT, operand, operand->size);
 }
 
 struct instruction *ir_constant(struct constant constant) {
 	int size = calculate_size(constant.data_type);
 	if (constant.type == CONSTANT_LABEL_POINTER)
 		size = 8;
-	return new_variable(IR_PUSH(.type = IR_CONSTANT, .constant = {constant}), size);
+
+	struct instruction *ins = ir_new(IR_CONSTANT, size);
+	ins->constant.constant = constant;
+	return ins;
 }
 
 void ir_write_constant_to_address(struct constant constant, struct instruction *address) {
-	IR_PUSH(.type = IR_CONSTANT_ADDRESS, .arguments={address}, .constant = {constant});
+	struct instruction *ins = ir_new1(IR_CONSTANT_ADDRESS, address, 0);
+	ins->constant.constant = constant;
 }
 
 struct instruction *ir_binary_and(struct instruction *lhs, struct instruction *rhs) {
-	return new_variable(ir_push3(IR_BAND, lhs, rhs), lhs->size);
+	return ir_new2(IR_BAND, lhs, rhs, lhs->size);
 }
 
 struct instruction *ir_left_shift(struct instruction *lhs, struct instruction *rhs) {
-	return new_variable(ir_push3(IR_LSHIFT, lhs, rhs), lhs->size);
+	return ir_new2(IR_LSHIFT, lhs, rhs, lhs->size);
 }
 
 struct instruction *ir_right_shift(struct instruction *lhs, struct instruction *rhs, int arithmetic) {
-	return new_variable(ir_push3(arithmetic ? IR_IRSHIFT : IR_RSHIFT, lhs, rhs), lhs->size);
+	return ir_new2(arithmetic ? IR_IRSHIFT : IR_RSHIFT, lhs, rhs, lhs->size);
 }
 
 struct instruction *ir_binary_or(struct instruction *lhs, struct instruction *rhs) {
-	return new_variable(ir_push3(IR_BOR, lhs, rhs), lhs->size);
+	return ir_new2(IR_BOR, lhs, rhs, lhs->size);
 }
 
 struct instruction *ir_add(struct instruction *lhs, struct instruction *rhs) {
-	return new_variable(ir_push3(IR_ADD, lhs, rhs), lhs->size);
+	return ir_new2(IR_ADD, lhs, rhs, lhs->size);
 }
 
 struct instruction *ir_sub(struct instruction *lhs, struct instruction *rhs) {
-	return new_variable(ir_push3(IR_SUB, lhs, rhs), lhs->size);
+	return ir_new2(IR_SUB, lhs, rhs, lhs->size);
 }
 
 struct instruction *ir_mul(struct instruction *lhs, struct instruction *rhs) {
-	return new_variable(ir_push3(IR_MUL, lhs, rhs), lhs->size);
+	return ir_new2(IR_MUL, lhs, rhs, lhs->size);
 }
 
 struct instruction *ir_imul(struct instruction *lhs, struct instruction *rhs) {
-	return new_variable(ir_push3(IR_IMUL, lhs, rhs), lhs->size);
+	return ir_new2(IR_IMUL, lhs, rhs, lhs->size);
 }
 
 struct instruction *ir_div(struct instruction *lhs, struct instruction *rhs) {
-	return new_variable(ir_push3(IR_DIV, lhs, rhs), lhs->size);
+	return ir_new2(IR_DIV, lhs, rhs, lhs->size);
 }
 
 struct instruction *ir_idiv(struct instruction *lhs, struct instruction *rhs) {
-	return new_variable(ir_push3(IR_IDIV, lhs, rhs), lhs->size);
+	return ir_new2(IR_IDIV, lhs, rhs, lhs->size);
 }
 
 struct instruction *ir_binary_op(int type, struct instruction *lhs, struct instruction *rhs) {
-	return new_variable(ir_push3(type, lhs, rhs), lhs->size);
+	return ir_new2(type, lhs, rhs, lhs->size);
 }
 
 void ir_call(struct instruction *callee, int non_clobbered_register) {
-	IR_PUSH(.type = IR_CALL, .arguments = {callee}, .call = {non_clobbered_register});
+	struct instruction *ins = ir_new1(IR_CALL, callee, 0);
+	ins->call.non_clobbered_register = non_clobbered_register;
 }
 
 struct instruction *ir_vla_alloc(struct instruction *length) {
-	return new_variable(IR_PUSH(.type = IR_VLA_ALLOC, .arguments = {length}, .vla_alloc = {0}), 8);
+	return ir_new1(IR_VLA_ALLOC, length, 8);
 }
 
 void ir_set_reg(struct instruction *variable, int register_index, int is_sse) {
-	IR_PUSH(.type = IR_SET_REG, .arguments = {variable}, .set_reg = {register_index, is_sse});
+	struct instruction *ins = ir_new1(IR_SET_REG, variable, 8);
+	ins->set_reg.register_index = register_index;
+	ins->set_reg.is_sse = is_sse;
 }
 
 struct instruction *ir_get_reg(int size, int register_index, int is_sse) {
-	return new_variable(IR_PUSH(.type = IR_GET_REG, .get_reg = {register_index, is_sse}), size);
+	struct instruction *ins = ir_new(IR_GET_REG, size);
+	ins->get_reg.register_index = register_index;
+	ins->get_reg.is_sse = is_sse;
+	return ins;
 }
 
 struct instruction *ir_allocate(int size) {
-	return new_variable(IR_PUSH(.type = IR_ALLOC, .alloc = {size, -1, 0}), 8);
+	struct instruction *ins = ir_new(IR_ALLOC, 8);
+	ins->alloc.size = size;
+	ins->alloc.stack_location = -1;
+	return ins;
 }
 
 struct instruction *ir_allocate_preamble(int size) {
-	return new_variable(IR_PUSH(.type = IR_ALLOC, .alloc = {size, -1, 1}), 8);
+	struct instruction *ins = ir_new(IR_ALLOC, 8);
+	ins->alloc.size = size;
+	ins->alloc.stack_location = -1;
+	ins->alloc.save_to_preamble = 1;
+	return ins;
 }
 
 void ir_modify_stack_pointer(int change) {
-	IR_PUSH(.type = IR_MODIFY_STACK_POINTER, .modify_stack_pointer = {change});
+	struct instruction *ins = ir_new(IR_MODIFY_STACK_POINTER, 0);
+	ins->modify_stack_pointer.change = change;
 }
 
 void ir_store_stack_relative(struct instruction *variable, int offset) {
-	IR_PUSH(.type = IR_STORE_STACK_RELATIVE, .arguments = {variable}, .store_stack_relative = {offset});
+	struct instruction *ins = ir_new1(IR_STORE_STACK_RELATIVE, variable, 0);
+	ins->store_stack_relative.offset = offset;
 }
 
 void ir_store_stack_relative_address(struct instruction *variable, int offset, int size) {
-	IR_PUSH(.type = IR_STORE_STACK_RELATIVE_ADDRESS, .arguments = {variable}, .store_stack_relative_address = {offset, size});
+	struct instruction *ins = ir_new1(IR_STORE_STACK_RELATIVE_ADDRESS, variable, 0);
+	ins->store_stack_relative_address.offset = offset;
+	ins->store_stack_relative_address.size = size;
 }
 
 struct instruction *ir_load_base_relative(int offset, int size) {
-	return new_variable(IR_PUSH(.type = IR_LOAD_BASE_RELATIVE, .load_base_relative = {offset}), size);
+	struct instruction *ins = ir_new(IR_LOAD_BASE_RELATIVE, size);
+	ins->load_base_relative.offset = offset;
+	return ins;
 }
 
 void ir_load_base_relative_address(struct instruction *address, int offset, int size) {
-	IR_PUSH(.type = IR_LOAD_BASE_RELATIVE_ADDRESS, .arguments = {address}, .load_base_relative_address = {offset, size});
+	struct instruction *ins = ir_new1(IR_LOAD_BASE_RELATIVE_ADDRESS, address, 0);
+	ins->load_base_relative_address.offset = offset;
+	ins->load_base_relative_address.size = size;
 }
 
 void ir_set_zero_ptr(struct instruction *address, int size) {
-	IR_PUSH(.type = IR_SET_ZERO_PTR, .arguments = {address}, .set_zero_ptr = {size});
+	struct instruction *ins = ir_new1(IR_SET_ZERO_PTR, address, 0);
+	ins->set_zero_ptr.size = size;
 }
 
 struct instruction *ir_load_part_address(struct instruction *address, int offset, int size) {
-	return new_variable(IR_PUSH(.type = IR_LOAD_PART_ADDRESS, .arguments = {address}, .load_part = {offset}), size);
+	struct instruction *ins = ir_new1(IR_LOAD_PART_ADDRESS, address, size);
+	ins->load_part.offset = offset;
+	return ins;
 }
 
 void ir_store_part_address(struct instruction *address, struct instruction *value, int offset) {
-	IR_PUSH(.type = IR_STORE_PART_ADDRESS, .arguments = {address, value}, .store_part = {offset});
+	struct instruction *ins = ir_new2(IR_STORE_PART_ADDRESS, address, value, 0);
+	ins->store_part.offset = offset;
 }
 
 void ir_copy_memory(struct instruction *destination, struct instruction *source, int size) {
-	IR_PUSH(.type = IR_COPY_MEMORY, .arguments = {destination, source}, .copy_memory = {size});
+	struct instruction *ins = ir_new2(IR_COPY_MEMORY, destination, source, 0);
+	ins->copy_memory.size = size;
 }
 
 struct instruction *ir_phi(struct instruction *var_a, struct instruction *var_b, struct block *block_a, struct block *block_b) {
-	return new_variable(IR_PUSH(.type = IR_PHI, .arguments = {var_a, var_b}, .phi = {block_a, block_b}), var_a->size);
+	struct instruction *ins = ir_new2(IR_PHI, var_a, var_b, var_a->size);
+	ins->phi.block_a = block_a;
+	ins->phi.block_b = block_b;
+	return ins;
 }
