@@ -504,12 +504,6 @@ static void codegen_block(struct block *block, struct function *func) {
 		asm_ins0("ret");
 		break;
 
-	case BLOCK_EXIT_RETURN_ZERO:
-		asm_ins2("xorq", R8(REG_RAX), R8(REG_RAX));
-		asm_ins0("leave");
-		asm_ins0("ret");
-		break;
-
 	case BLOCK_EXIT_SWITCH: {
 		asm_comment("SWITCH");
 		struct instruction *control = block_exit->switch_.condition;
@@ -617,8 +611,8 @@ int codegen_get_alloc_preamble(void) {
 }
 
 void codegen(void) {
-	for (unsigned i = 0; i < ir.size; i++)
-		codegen_function(ir.functions + i);
+	for (struct function *func = ir.first; func; func = func->next)
+		codegen_function(func);
 
 	rodata_codegen();
 	data_codegen();

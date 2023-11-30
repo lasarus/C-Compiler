@@ -7,7 +7,12 @@
 
 struct ir ir;
 
+static struct function *current_function;
+static struct block *current_block;
+static struct instruction *current_instruction;
+
 void ir_reset(void) {
+	current_function = NULL;
 	ir = (struct ir) { 0 };
 }
 
@@ -20,13 +25,25 @@ struct block *new_block(void) {
 		});
 }
 
+struct function *new_function(void) {
+	struct function *next = ALLOC((struct function) { 0 });
+
+	if (current_function)
+		current_function->next = next;
+	else
+		ir.first = next;
+
+	current_function = next;
+
+	return next;
+}
+
 struct function *get_current_function(void) {
-	return &ir.functions[ir.size - 1];
+	return current_function;
 }
 
 struct block *get_current_block(void) {
-	struct function *func = get_current_function();
-	return func->last;
+	return current_block;
 }
 
 static struct instruction *ir_new(int type, int size) {
@@ -37,12 +54,12 @@ static struct instruction *ir_new(int type, int size) {
 	next->index = ++counter;
 	next->size = size;
 
-	if (block->last)
-		block->last->next = next;
-	else
+	if (!block->first)
 		block->first = next;
+	else
+		current_instruction->next = next;
 
-	block->last = next;
+	current_instruction = next;
 
 	return next;
 }
@@ -63,12 +80,12 @@ static struct instruction *ir_new1(int type, struct instruction *op2, int size) 
 void ir_block_start(struct block *block) {
 	struct function *func = get_current_function();
 
-	if (func->last)
-		func->last->next = block;
-	else
+	if (!func->first)
 		func->first = block;
+	else
+		current_block->next = block;
 
-	func->last = block;
+	current_block = block;
 }
 
 void ir_if_selection(struct instruction *condition, struct block *block_true, struct block *block_false) {
@@ -210,9 +227,7 @@ static void register_usage(struct block *block, struct instruction *var) {
 }
 
 void ir_calculate_block_local_variables(void) {
-	for (unsigned i = 0; i < ir.size; i++) {
-		struct function *f = &ir.functions[i];
-
+	for (struct function *f = ir.first; f; f = f->next) {
 		for (struct block *b = f->first; b; b = b->next) {
 			for (struct instruction *ins = b->first; ins; ins = ins->next) {
 				register_usage(b, ins);
@@ -229,7 +244,6 @@ void ir_calculate_block_local_variables(void) {
 				break;
 			case BLOCK_EXIT_RETURN:
 			case BLOCK_EXIT_JUMP:
-			case BLOCK_EXIT_RETURN_ZERO:
 			case BLOCK_EXIT_NONE:
 				break;
 			}

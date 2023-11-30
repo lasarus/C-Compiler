@@ -120,7 +120,7 @@ static void ms_expr_function(struct type *function_type, struct symbol_identifie
 	struct type *return_type = function_type->children[0];
 	int n_args = function_type->n - 1;
 
-	struct function *func = &ADD_ELEMENT(ir.size, ir.cap, ir.functions);
+	struct function *func = new_function();
 	*func = (struct function) {
 		.name = name,
 		.is_global = is_global,

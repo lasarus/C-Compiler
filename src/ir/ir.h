@@ -4,8 +4,6 @@
 #include "operators.h"
 #include <codegen/rodata.h>
 
-struct block *new_block(void);
-
 struct instruction {
 	enum {
 		IR_ADD, IR_SUB,
@@ -162,9 +160,11 @@ struct instruction {
 	struct instruction *next;
 };
 
+struct block *new_block(void);
+struct function *new_function(void);
+
 struct ir {
-	size_t size, cap;
-	struct function *functions;
+	struct function *first;
 };
 
 extern struct ir ir;
@@ -175,9 +175,11 @@ struct function {
 
 	int uses_va;
 
-	struct block *first, *last;
+	struct block *first;
 
 	void *abi_data;
+
+	struct function *next;
 };
 
 struct case_labels {
@@ -197,7 +199,6 @@ struct block_exit {
 		BLOCK_EXIT_RETURN,
 		BLOCK_EXIT_JUMP,
 		BLOCK_EXIT_IF,
-		BLOCK_EXIT_RETURN_ZERO,
 		BLOCK_EXIT_SWITCH
 	} type;
 
@@ -219,7 +220,7 @@ struct block_exit {
 struct block {
 	label_id label;
 
-	struct instruction *first, *last;
+	struct instruction *first;
 
 	struct block_exit exit;
 

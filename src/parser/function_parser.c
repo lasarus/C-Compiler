@@ -467,8 +467,11 @@ void parse_function(struct string_view name, struct type *type, int arg_n, struc
 
 	if (sv_string_cmp(name, "main")) {
 		struct block *b = get_current_block();
-		if (b->exit.type == BLOCK_EXIT_NONE)
-			b->exit.type = BLOCK_EXIT_RETURN_ZERO;
+		if (b->exit.type == BLOCK_EXIT_NONE) {
+			ir_return();
+			struct constant c = constant_simple_signed(ST_INT, 0);
+			abi_expr_return(get_current_function(), &(struct evaluated_expression) { .type = EE_CONSTANT, .data_type = c.data_type, .constant = c});
+		}
 	} else if (current_ret_val == type_simple(ST_VOID)) {
 		ir_return();
 		abi_expr_return(get_current_function(), &(struct evaluated_expression) { .type = EE_VOID });

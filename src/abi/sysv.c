@@ -293,7 +293,7 @@ static void sysv_expr_function(struct type *type, struct symbol_identifier **arg
 	int n_args = type->n - 1;
 	struct instruction *reg_variables[sizeof calling_convention / sizeof *calling_convention];
 
-	struct function *func = &ADD_ELEMENT(ir.size, ir.cap, ir.functions);
+	struct function *func = new_function();
 	*func = (struct function) {
 		.name = name,
 		.is_global = is_global,
