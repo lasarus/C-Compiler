@@ -223,9 +223,9 @@ static void codegen_instruction(struct instruction *ins, struct function *func) 
 
 	case IR_STORE:
 		scalar_to_reg(ins->arguments[0], REG_RSI);
-		asm_ins2("leaq", MEM(-variable_info[ins->result].stack_location, REG_RBP), R8(REG_RDI));
+		asm_ins2("leaq", MEM(-variable_info[ins->arguments[1]].stack_location, REG_RBP), R8(REG_RDI));
 
-		codegen_memcpy(get_variable_size(ins->result));
+		codegen_memcpy(get_variable_size(ins->arguments[1]));
 		break;
 
 	case IR_STORE_PART_ADDRESS:
@@ -362,7 +362,7 @@ static void codegen_instruction(struct instruction *ins, struct function *func) 
 	} break;
 
 	case IR_VA_START:
-		abi_emit_va_start(ins->result, func);
+		abi_emit_va_start(ins->arguments[0], func);
 		break;
 
 	case IR_VA_ARG:
@@ -540,12 +540,12 @@ static void codegen_function(struct function *func) {
 	// Allocate variables that spans multiple blocks.
 	for (int i = 0; i < func->var_size; i++) {
 		var_id var = func->vars[i];
-		struct variable_data *data = var_get_data(var);
+		struct instruction *ins = var_get_instruction(var);
 
-		if (!(data->spans_block))
+		if (!(ins->spans_block))
 			continue;
 			
-		perm_stack_count += data->size;
+		perm_stack_count += ins->size;
 
 		variable_info[var].storage = VAR_STOR_STACK;
 		variable_info[var].stack_location = perm_stack_count;
@@ -586,22 +586,19 @@ static void codegen_function(struct function *func) {
 	// Allocate variables that are local to one block.
 	for (int i = 0; i < func->var_size; i++) {
 		var_id var = func->vars[i];
-		struct variable_data *data = var_get_data(var);
+		struct instruction *ins = var_get_instruction(var);
 
-		if (data->spans_block || !data->used)
+		if (ins->spans_block || !ins->used)
 			continue;
 
-		struct block *block = get_block(data->first_block);
+		struct block *block = get_block(ins->first_block);
 
-		block->stack_counter += data->size;
-		//tmp_stack_counter += data->size;
+		block->stack_counter += ins->size;
 
 		variable_info[var].storage = VAR_STOR_STACK;
 		variable_info[var].stack_location = perm_stack_count + block->stack_counter;
-		//variable_info[var].stack_location = perm_stack_count + tmp_stack_counter;
 
 		max_temp_stack = MAX(block->stack_counter, max_temp_stack);
-		//max_temp_stack = MAX(tmp_stack_counter, max_temp_stack);
 	}
 
 	label_id func_label = register_label_name(sv_from_str((char *)func->name));

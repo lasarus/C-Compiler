@@ -10,17 +10,13 @@
 #include <stdlib.h>
 #include <assert.h>
 
-struct variable_data *variable_data;
+struct instruction **variable_instructions;
 static size_t variables_size, variables_cap;
 
 void variables_reset(void) {
 	variables_size = variables_cap = 0;
-	free(variable_data);
-	variable_data = NULL;
-}
-
-var_id new_ptr(void) {
-	return new_variable(8);
+	free(variable_instructions);
+	variable_instructions = NULL;
 }
 
 var_id allocate_vla(struct type *type) {
@@ -30,22 +26,19 @@ var_id allocate_vla(struct type *type) {
 	return ptr;
 }
 
-var_id new_variable(int size) {
-	if (size > 8) {
-		ICE("Too large register");
-	}
-	// A bit of a shortcut.
-	if (size == 0)
-		return VOID_VAR;
+var_id new_variable(struct instruction *instruction, int size) {
+	if (size > 8 || size == 0)
+		ICE("Invalid register size: %d", size);
 
 	var_id id = variables_size;
-	ADD_ELEMENT(variables_size, variables_cap, variable_data) = (struct variable_data) {
-		.size = size,
-		.first_block = -1,
-		.spans_block = 0,
-	};
+	ADD_ELEMENT(variables_size, variables_cap, variable_instructions) = instruction;
 
 	allocate_var(id);
+
+	instruction->result = id;
+	instruction->size = size;
+	instruction->first_block = -1;
+	instruction->spans_block = 0;
 
 	return id;
 }
@@ -55,15 +48,15 @@ int get_n_vars(void) {
 }
 
 int get_variable_size(var_id variable) {
-	return variable_data[variable].size;
+	return variable_instructions[variable]->size;
 }
 
 void init_variables(void) {
 	variables_size = 0;
 	// VOID_VAR
-	ADD_ELEMENT(variables_size, variables_cap, variable_data) = (struct variable_data) { 0 };
+	ADD_ELEMENT(variables_size, variables_cap, variable_instructions) = NULL;
 }
 
-struct variable_data *var_get_data(var_id variable) {
-	return &variable_data[variable];
+struct instruction *var_get_instruction(var_id variable) {
+	return variable_instructions[variable];
 }

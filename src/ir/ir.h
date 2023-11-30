@@ -73,7 +73,6 @@ struct instruction {
 		IR_COUNT
 	} type;
 
-	var_id result;
 	var_id arguments[2];
 
 	union {
@@ -145,6 +144,10 @@ struct instruction {
 			block_id block_a, block_b;
 		} phi;
 	};
+
+	var_id result;
+	int size;
+	int spans_block, first_block, used;
 };
 
 struct ir {

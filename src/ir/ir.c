@@ -54,24 +54,27 @@ struct block *get_current_block(void) {
 	return get_block(func->blocks[func->size - 1]);
 }
 
-void ir_push(struct instruction instruction) {
+static struct instruction *ir_push(struct instruction instruction) {
 	struct block *block = get_current_block();
 
 	ADD_ELEMENT(block->size, block->cap, block->instructions) = ALLOC(instruction);
+
+	return block->instructions[block->size - 1];
 }
 
-void ir_push3(int type, var_id op1, var_id op2, var_id op3) {
+static struct instruction *ir_push3(int type, var_id op2, var_id op3) {
 	struct block *block = get_current_block();
 
 	ADD_ELEMENT(block->size, block->cap, block->instructions) = ALLOC((struct instruction) {
 		.type = type,
-		.result = op1,
 		.arguments = { op2, op3 }
 		});
+
+	return block->instructions[block->size - 1];
 }
 
-static void ir_push2(int type, var_id op1, var_id op2) {
-	ir_push3(type, op1, op2, VOID_VAR);
+static struct instruction *ir_push2(int type, var_id op2) {
+	return ir_push3(type, op2, VOID_VAR);
 }
 
 void ir_block_start(block_id id) {
@@ -216,15 +219,15 @@ static void register_usage(struct block *block, var_id var) {
 	if (var == 0)
 		return;
 
-	struct variable_data *data = var_get_data(var);
+	struct instruction *ins = var_get_instruction(var);
 
-	if (data->first_block == -1) {
-		data->first_block = block->id;
-	} else if (data->first_block != block->id) {
-		data->spans_block = 1;
+	if (ins->first_block == -1) {
+		ins->first_block = block->id;
+	} else if (ins->first_block != block->id) {
+		ins->spans_block = 1;
 	}
 
-	data->used = 1;
+	ins->used = 1;
 }
 
 void ir_calculate_block_local_variables(void) {
@@ -259,71 +262,62 @@ void ir_calculate_block_local_variables(void) {
 	}
 }
 
-#define IR_PUSH(...) do { ir_push((struct instruction) { __VA_ARGS__ }); } while(0)
+#define IR_PUSH(...) ir_push((struct instruction) { __VA_ARGS__ })
 
 void ir_va_start(var_id address) {
-	ir_push3(IR_VA_START, address, VOID_VAR, VOID_VAR);
+	ir_push3(IR_VA_START, address, VOID_VAR);
 }
 
 void ir_va_arg(var_id array, var_id result_address, struct type *type) {
-	IR_PUSH(.type = IR_VA_ARG, .result = result_address, .arguments = {result_address, array}, .va_arg_ = {type});
+	IR_PUSH(.type = IR_VA_ARG, .arguments = {result_address, array}, .va_arg_ = {type});
 }
 
 void ir_store(var_id address, var_id value) {
-	ir_push2(IR_STORE, value, address);
+	ir_push3(IR_STORE, address, value);
 }
 
 var_id ir_load(var_id address, int size) {
-	var_id var = new_variable(size);
-	ir_push2(IR_LOAD, var, address);
+	var_id var = new_variable(ir_push2(IR_LOAD, address), size);
 	return var;
 }
 
 var_id ir_bool_cast(var_id operand) {
-	var_id res = new_variable(calculate_size(type_simple(ST_BOOL)));
-	ir_push2(IR_BOOL_CAST, res, operand);
+	var_id res = new_variable(ir_push2(IR_BOOL_CAST, operand), calculate_size(type_simple(ST_BOOL)));
 	return res;
 }
 
 var_id ir_cast_int(var_id operand, int target_size, int sign_extend) {
-	var_id res = new_variable(target_size);
-	ir_push2(sign_extend ? IR_INT_CAST_SIGN : IR_INT_CAST_ZERO, res, operand);
+	var_id res = new_variable(ir_push2(sign_extend ? IR_INT_CAST_SIGN : IR_INT_CAST_ZERO, operand), target_size);
 	return res;
 }
 
 var_id ir_cast_float(var_id operand, int target_size) {
-	var_id res = new_variable(target_size);
-	ir_push2(IR_FLOAT_CAST, res, operand);
+	var_id res = new_variable(ir_push2(IR_FLOAT_CAST, operand), target_size);
 	return res;
 }
 
 var_id ir_cast_int_to_float(var_id operand, int target_size, int is_signed) {
-	var_id res = new_variable(target_size);
-	ir_push2(is_signed ? IR_INT_FLOAT_CAST : IR_UINT_FLOAT_CAST, res, operand);
+	var_id res = new_variable(ir_push2(is_signed ? IR_INT_FLOAT_CAST : IR_UINT_FLOAT_CAST, operand), target_size);
 	return res;
 }
 
 var_id ir_cast_float_to_int(var_id operand, int target_size) {
-	var_id res = new_variable(target_size);
-	ir_push2(IR_FLOAT_INT_CAST, res, operand);
+	var_id res = new_variable(ir_push2(IR_FLOAT_INT_CAST, operand), target_size);
 	return res;
 }
 
 var_id ir_binary_not(var_id operand) {
-	var_id ret = new_variable(get_variable_size(operand));
-	ir_push2(IR_BINARY_NOT, ret, operand);
+	var_id ret = new_variable(ir_push2(IR_BINARY_NOT, operand), get_variable_size(operand));
 	return ret;
 }
 
 var_id ir_negate_int(var_id operand) {
-	var_id ret = new_variable(get_variable_size(operand));
-	ir_push2(IR_NEGATE_INT, ret, operand);
+	var_id ret = new_variable(ir_push2(IR_NEGATE_INT, operand), get_variable_size(operand));
 	return ret;
 }
 
 var_id ir_negate_float(var_id operand) {
-	var_id ret = new_variable(get_variable_size(operand));
-	ir_push2(IR_NEGATE_FLOAT, ret, operand);
+	var_id ret = new_variable(ir_push2(IR_NEGATE_FLOAT, operand), get_variable_size(operand));
 	return ret;
 }
 
@@ -331,8 +325,7 @@ var_id ir_constant(struct constant constant) {
 	int size = calculate_size(constant.data_type);
 	if (constant.type == CONSTANT_LABEL_POINTER)
 		size = 8;
-	var_id var = new_variable(size);
-	IR_PUSH(.type = IR_CONSTANT, .result=var, .constant = {constant});
+	var_id var = new_variable(IR_PUSH(.type = IR_CONSTANT, .constant = {constant}), size);
 	return var;
 }
 
@@ -341,68 +334,57 @@ void ir_write_constant_to_address(struct constant constant, var_id address) {
 }
 
 var_id ir_binary_and(var_id lhs, var_id rhs) {
-	var_id var = new_variable(get_variable_size(lhs));
-	ir_push3(IR_BAND, var, lhs, rhs);
+	var_id var = new_variable(ir_push3(IR_BAND, lhs, rhs), get_variable_size(lhs));
 	return var;
 }
 
 var_id ir_left_shift(var_id lhs, var_id rhs) {
-	var_id var = new_variable(get_variable_size(lhs));
-	ir_push3(IR_LSHIFT, var, lhs, rhs);
+	var_id var = new_variable(ir_push3(IR_LSHIFT, lhs, rhs), get_variable_size(lhs));
 	return var;
 }
 
 var_id ir_right_shift(var_id lhs, var_id rhs, int arithmetic) {
-	var_id var = new_variable(get_variable_size(lhs));
-	ir_push3(arithmetic ? IR_IRSHIFT : IR_RSHIFT, var, lhs, rhs);
+	var_id var = new_variable(ir_push3(arithmetic ? IR_IRSHIFT : IR_RSHIFT, lhs, rhs), get_variable_size(lhs));
 	return var;
 }
 
 var_id ir_binary_or(var_id lhs, var_id rhs) {
-	var_id var = new_variable(get_variable_size(lhs));
-	ir_push3(IR_BOR, var, lhs, rhs);
+	var_id var = new_variable(ir_push3(IR_BOR, lhs, rhs), get_variable_size(lhs));
 	return var;
 }
 
 var_id ir_add(var_id lhs, var_id rhs) {
-	var_id var = new_variable(get_variable_size(lhs));
-	ir_push3(IR_ADD, var, lhs, rhs);
+	var_id var = new_variable(ir_push3(IR_ADD, lhs, rhs), get_variable_size(lhs));
 	return var;
 }
 
 var_id ir_sub(var_id lhs, var_id rhs) {
-	var_id var = new_variable(get_variable_size(lhs));
-	ir_push3(IR_SUB, var, lhs, rhs);
+	var_id var = new_variable(ir_push3(IR_SUB, lhs, rhs), get_variable_size(lhs));
 	return var;
 }
 
 var_id ir_mul(var_id lhs, var_id rhs) {
-	var_id var = new_variable(get_variable_size(lhs));
-	ir_push3(IR_MUL, var, lhs, rhs);
+	var_id var = new_variable(ir_push3(IR_MUL, lhs, rhs), get_variable_size(lhs));
 	return var;
 }
 
 var_id ir_imul(var_id lhs, var_id rhs) {
-	var_id var = new_variable(get_variable_size(lhs));
-	ir_push3(IR_IMUL, var, lhs, rhs);
+	var_id var = new_variable(ir_push3(IR_IMUL, lhs, rhs), get_variable_size(lhs));
 	return var;
 }
 
 var_id ir_div(var_id lhs, var_id rhs) {
-	var_id var = new_variable(get_variable_size(lhs));
-	ir_push3(IR_DIV, var, lhs, rhs);
+	var_id var = new_variable(ir_push3(IR_DIV, lhs, rhs), get_variable_size(lhs));
 	return var;
 }
 
 var_id ir_idiv(var_id lhs, var_id rhs) {
-	var_id var = new_variable(get_variable_size(lhs));
-	ir_push3(IR_IDIV, var, lhs, rhs);
+	var_id var = new_variable(ir_push3(IR_IDIV, lhs, rhs), get_variable_size(lhs));
 	return var;
 }
 
 var_id ir_binary_op(int type, var_id lhs, var_id rhs) {
-	var_id var = new_variable(get_variable_size(lhs));
-	ir_push3(type, var, lhs, rhs);
+	var_id var = new_variable(ir_push3(type, lhs, rhs), get_variable_size(lhs));
 	return var;
 }
 
@@ -411,8 +393,7 @@ void ir_call(var_id callee, int non_clobbered_register) {
 }
 
 var_id ir_vla_alloc(var_id length) {
-	var_id result = new_ptr();
-	IR_PUSH(.type = IR_VLA_ALLOC, .result = result, .arguments = {length}, .vla_alloc = {0});
+	var_id result = new_variable(IR_PUSH(.type = IR_VLA_ALLOC, .arguments = {length}, .vla_alloc = {0}), 8);
 	return result;
 }
 
@@ -421,23 +402,18 @@ void ir_set_reg(var_id variable, int register_index, int is_sse) {
 }
 
 var_id ir_get_reg(int size, int register_index, int is_sse) {
-	var_id reg = new_variable(size);
-	IR_PUSH(.type = IR_GET_REG, .result = reg, .get_reg = {register_index, is_sse});
+	var_id reg = new_variable(IR_PUSH(.type = IR_GET_REG, .get_reg = {register_index, is_sse}), size);
 	return reg;
 }
 
 var_id ir_allocate(int size) {
-	var_id res = new_ptr();
-
-	IR_PUSH(.type = IR_ALLOC, .result = res, .alloc = {size, -1, 0});
+	var_id res = new_variable(IR_PUSH(.type = IR_ALLOC, .alloc = {size, -1, 0}), 8);
 
 	return res;
 }
 
 var_id ir_allocate_preamble(int size) {
-	var_id res = new_ptr();
-
-	IR_PUSH(.type = IR_ALLOC, .result = res, .alloc = {size, -1, 1});
+	var_id res = new_variable(IR_PUSH(.type = IR_ALLOC, .alloc = {size, -1, 1}), 8);
 
 	return res;
 }
@@ -455,8 +431,7 @@ void ir_store_stack_relative_address(var_id variable, int offset, int size) {
 }
 
 var_id ir_load_base_relative(int offset, int size) {
-	var_id res = new_variable(size);
-	IR_PUSH(.type = IR_LOAD_BASE_RELATIVE, .result = res, .load_base_relative = {offset});
+	var_id res = new_variable(IR_PUSH(.type = IR_LOAD_BASE_RELATIVE, .load_base_relative = {offset}), size);
 	return res;
 }
 
@@ -469,8 +444,7 @@ void ir_set_zero_ptr(var_id address, int size) {
 }
 
 var_id ir_load_part_address(var_id address, int offset, int size) {
-	var_id res = new_variable(size);
-	IR_PUSH(.type = IR_LOAD_PART_ADDRESS, .result = res, .arguments = {address}, .load_part = {offset});
+	var_id res = new_variable(IR_PUSH(.type = IR_LOAD_PART_ADDRESS, .arguments = {address}, .load_part = {offset}), size);
 	return res;
 }
 
@@ -483,9 +457,7 @@ void ir_copy_memory(var_id destination, var_id source, int size) {
 }
 
 var_id ir_phi(var_id var_a, var_id var_b, block_id block_a, block_id block_b) {
-	var_id result = new_variable(get_variable_size(var_a));
-
-	IR_PUSH(.type = IR_PHI, .result = result, .arguments = {var_a, var_b}, .phi = {block_a, block_b});
+	var_id result = new_variable(IR_PUSH(.type = IR_PHI, .arguments = {var_a, var_b}, .phi = {block_a, block_b}), get_variable_size(var_a));
 
 	return result;
 }
