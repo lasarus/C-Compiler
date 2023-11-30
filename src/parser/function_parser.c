@@ -27,14 +27,14 @@ static struct function_scope {
 
 	struct function_scope_label {
 		struct string_view label;
-		struct block *block;
+		struct block *block, *end_block;
 		int used;
 	} *labels;
 } function_scope;
 
-static void add_function_scope_label(struct string_view label, struct block *block, int used) {
+static void add_function_scope_label(struct string_view label, struct block *block, struct block *end_block, int used) {
 	ADD_ELEMENT(function_scope.size, function_scope.cap, function_scope.labels) =
-		(struct function_scope_label) { label, block, used };
+		(struct function_scope_label) { label, block, end_block, used };
 }
 
 // See section 6.8 of standard.
@@ -60,7 +60,7 @@ int parse_labeled_statement(struct jump_blocks *jump_blocks) {
 				if (function_scope.labels[i].used)
 					ERROR(T0->pos, "Label declared more than once %.*s", label.len, label.str);
 
-				goto_block = function_scope.labels[i].block;
+				goto_block = function_scope.labels[i].end_block;
 				function_scope.labels[i].used = 1;
 				break;
 			}
@@ -68,7 +68,7 @@ int parse_labeled_statement(struct jump_blocks *jump_blocks) {
 
 		if (!goto_block) {
 			goto_block = new_block();
-			add_function_scope_label(label, goto_block, 1);
+			add_function_scope_label(label, goto_block, goto_block, 1);
 		}
 
 		ir_goto(goto_block);
@@ -303,7 +303,8 @@ static int parse_while_statement(struct jump_blocks *jump_blocks) {
 	new_jump_blocks.block_continue = block_control;
 	parse_statement(&new_jump_blocks);
 
-	ir_goto(block_control);
+	ir_goto(new_jump_blocks.block_continue);
+
 	ir_block_start(block_end);
 
 	return 1;
@@ -405,25 +406,42 @@ int parse_jump_statement(struct jump_blocks *jump_blocks) {
 		TEXPECT(T_SEMI_COLON);
 		for (unsigned i = 0; i < function_scope.size; i++) {
 			if (sv_cmp(label, function_scope.labels[i].label)) {
+				// Necessary to avoid more than 2 predecessors
+				// to each block.
+				struct block *step = new_block();
+				ir_goto(step);
+				ir_block_start(step);
 				ir_goto(function_scope.labels[i].block);
 				ir_block_start(new_block());
+				function_scope.labels[i].block = step;
 				return 1;
 			}
 		}
 
-		struct block *id = new_block();
-		add_function_scope_label(label, id, 0);
-		ir_goto(id);
+		struct block *end_block = new_block();
+		struct block *step = new_block();
+		add_function_scope_label(label, step, end_block, 0);
+		ir_goto(step);
+		ir_block_start(step);
+		ir_goto(end_block);
 		ir_block_start(new_block());
 		return 1;
 	} else if (TACCEPT(T_KCONTINUE)) {
+		struct block *step = new_block();
+		ir_goto(step);
+		ir_block_start(step);
 		ir_goto(jump_blocks->block_continue);
 		ir_block_start(new_block());
+		jump_blocks->block_continue = step;
 		TEXPECT(T_SEMI_COLON);
 		return 1;
 	} else if (TACCEPT(T_KBREAK)) {
+		struct block *step = new_block();
+		ir_goto(step);
+		ir_block_start(step);
 		ir_goto(jump_blocks->block_break);
 		ir_block_start(new_block());
+		jump_blocks->block_break = step;
 		TEXPECT(T_SEMI_COLON);
 		return 1;
 	} else if (TACCEPT(T_KRETURN)) {
