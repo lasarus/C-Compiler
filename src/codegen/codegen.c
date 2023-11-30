@@ -453,14 +453,14 @@ static void codegen_phi_node(struct block *current_block, struct block *next_blo
 
 		struct instruction *source_var;
 
-		if (current_block->id == ins->phi.block_a) {
+		if (current_block == ins->phi.block_a) {
 			source_var = ins->arguments[0];
-		} else if (current_block->id == ins->phi.block_b) {
+		} else if (current_block == ins->phi.block_b) {
 			source_var = ins->arguments[1];
 		} else {
 			ICE("Phi node in %d reachable from invalid block %d (not %d or %d)",
-				next_block->id,
-				current_block->id,
+				next_block,
+				current_block,
 				ins->phi.block_a, ins->phi.block_b);
 		}
 
@@ -479,7 +479,7 @@ static void codegen_block(struct block *block, struct function *func) {
 	asm_comment("EXIT IS OF TYPE : %d", block_exit->type);
 	switch (block_exit->type) {
 	case BLOCK_EXIT_JUMP: {
-		struct block *target = get_block(block_exit->jump);
+		struct block *target = block_exit->jump;
 		codegen_phi_node(block, target);
 		asm_ins1("jmp", IMML_ABS(target->label, 0));
 	} break;
@@ -495,8 +495,8 @@ static void codegen_block(struct block *block, struct function *func) {
 		case 8: asm_ins2("testq", R8(REG_RDI), R8(REG_RDI)); break;
 		default: ICE("Invalid argument to if selection.");
 		}
-		asm_ins1("je", IMML_ABS(get_block(block_exit->if_.block_false)->label, 0));
-		asm_ins1("jmp", IMML_ABS(get_block(block_exit->if_.block_true)->label, 0));
+		asm_ins1("je", IMML_ABS(block_exit->if_.block_false->label, 0));
+		asm_ins1("jmp", IMML_ABS(block_exit->if_.block_true->label, 0));
 	} break;
 
 	case BLOCK_EXIT_RETURN:
@@ -516,10 +516,10 @@ static void codegen_block(struct block *block, struct function *func) {
 		scalar_to_reg(control, REG_RDI);
 		for (unsigned i = 0; i < block_exit->switch_.labels.size; i++) {
 			asm_ins2("cmpl", IMM(block_exit->switch_.labels.labels[i].value.int_d), R4(REG_RDI));
-			asm_ins1("je", IMML_ABS(get_block(block_exit->switch_.labels.labels[i].block)->label, 0));
+			asm_ins1("je", IMML_ABS(block_exit->switch_.labels.labels[i].block->label, 0));
 		}
 		if (block_exit->switch_.labels.default_) {
-			asm_ins1("jmp", IMML_ABS(get_block(block_exit->switch_.labels.default_)->label, 0));
+			asm_ins1("jmp", IMML_ABS(block_exit->switch_.labels.default_->label, 0));
 		}
 	} break;
 
@@ -534,9 +534,7 @@ static void codegen_function(struct function *func) {
 	int max_temp_stack = 0;
 
 	// Allocate variables that spans multiple blocks.
-	for (unsigned i = 0; i < func->size; i++) {
-		struct block *block = get_block(func->blocks[i]);
-
+	for (struct block *block = func->first; block; block = block->next) {
 		for (struct instruction *ins = block->first; ins; ins = ins->next) {
 			if (!(ins->spans_block))
 				continue;
@@ -550,8 +548,7 @@ static void codegen_function(struct function *func) {
 
 	// Allocate VLAs, a bit tricky, but works.
 	vla_info.count = 0;
-	for (unsigned i = 0; i < func->size; i++) {
-		struct block *block = get_block(func->blocks[i]);
+	for (struct block *block = func->first; block; block = block->next) {
 		for (struct instruction *ins = block->first; ins; ins = ins->next) {
 
 			if (ins->type == IR_VLA_ALLOC)
@@ -563,9 +560,7 @@ static void codegen_function(struct function *func) {
 	vla_info.vla_slot_buffer_offset = perm_stack_count;
 
 	// Allocate IR_ALLOC instructions.
-	for (unsigned i = 0; i < func->size; i++) {
-		struct block *block = get_block(func->blocks[i]);
-
+	for (struct block *block = func->first; block; block = block->next) {
 		for (struct instruction *ins = block->first; ins; ins = ins->next) {
 			if (ins->type == IR_ALLOC) {
 				perm_stack_count += ins->alloc.size;
@@ -578,14 +573,13 @@ static void codegen_function(struct function *func) {
 	}
 
 	// Allocate variables that are local to one block.
-	for (unsigned i = 0; i < func->size; i++) {
-		struct block *block = get_block(func->blocks[i]);
-
+	
+	for (struct block *block = func->first; block; block = block->next) {
 		for (struct instruction *ins = block->first; ins; ins = ins->next) {
 			if (ins->spans_block || !ins->used)
 				continue;
 
-			struct block *block = get_block(ins->first_block);
+			struct block *block = ins->first_block;
 
 			block->stack_counter += ins->size;
 
@@ -610,8 +604,8 @@ static void codegen_function(struct function *func) {
 	for (int i = 0; i < vla_info.count; i++)
 		asm_ins2("movq", IMM(0), MEM(-vla_info.vla_slot_buffer_offset + i * 8, REG_RBP));
 
-	for (unsigned i = 0; i < func->size; i++)
-		codegen_block(get_block(func->blocks[i]), func);
+	for (struct block *block = func->first; block; block = block->next)
+		codegen_block(block, func);
 
 	int total_stack_usage = max_temp_stack + perm_stack_count;
 	if (codegen_flags.debug_stack_size && total_stack_usage >= codegen_flags.debug_stack_min)

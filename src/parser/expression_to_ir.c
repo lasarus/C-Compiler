@@ -540,9 +540,9 @@ static struct evaluated_expression evaluate_conditional(struct expr *expr) {
 	int is_void = type_is_simple(expr->data_type, ST_VOID);
 
 	if (is_void) {
-		block_id block_true = new_block(),
-			block_false = new_block(),
-			block_end = new_block();
+		struct block *block_true = new_block(),
+			*block_false = new_block(),
+			*block_end = new_block();
 
 		ir_if_selection(condition_var, block_true, block_false);
 
@@ -561,9 +561,9 @@ static struct evaluated_expression evaluate_conditional(struct expr *expr) {
 		};
 	} else {
 
-		block_id block_true = new_block(),
-			block_false = new_block(),
-			block_end = new_block();
+		struct block *block_true = new_block(),
+			*block_false = new_block(),
+			*block_end = new_block();
 
 		ir_if_selection(condition_var, block_true, block_false);
 
@@ -571,14 +571,14 @@ static struct evaluated_expression evaluate_conditional(struct expr *expr) {
 		struct evaluated_expression true_ = expression_evaluate(expr->args[1]);
 		struct instruction *true_address = evaluated_expression_to_address(&true_);
 
-		block_true = get_current_block()->id; // Current block might have changed.
+		block_true = get_current_block(); // Current block might have changed.
 		ir_goto(block_end);
 
 		ir_block_start(block_false);
 		struct evaluated_expression false_ = expression_evaluate(expr->args[2]);
 		struct instruction *false_address = evaluated_expression_to_address(&false_);
 
-		block_false = get_current_block()->id;
+		block_false = get_current_block();
 		ir_goto(block_end);
 
 		ir_block_start(block_end);

@@ -12,34 +12,19 @@
 
 #include <assert.h>
 
-static size_t block_size, block_cap;
-static struct block *blocks;
-
 struct ir ir;
 
 void ir_reset(void) {
-	block_size = block_cap = 0;
-	free(blocks);
-	blocks = NULL;
-
 	ir = (struct ir) { 0 };
 }
 
-block_id new_block(void) {
-	int id = (int)block_size;
-	ADD_ELEMENT(block_size, block_cap, blocks) = (struct block) {
-		.id = id,
-		.label = register_label(),
-		.exit.type = BLOCK_EXIT_NONE,
+struct block *new_block(void) {
+	return ALLOC((struct block) {
+			.label = register_label(),
+			.exit.type = BLOCK_EXIT_NONE,
 
-		.stack_counter = 0,
-	};
-
-	return id;
-}
-
-struct block *get_block(block_id id) {
-	return blocks + id;
+			.stack_counter = 0,
+		});
 }
 
 struct function *get_current_function(void) {
@@ -48,7 +33,7 @@ struct function *get_current_function(void) {
 
 struct block *get_current_block(void) {
 	struct function *func = get_current_function();
-	return get_block(func->blocks[func->size - 1]);
+	return func->last;
 }
 
 static struct instruction *ir_push(struct instruction instruction) {
@@ -56,13 +41,12 @@ static struct instruction *ir_push(struct instruction instruction) {
 
 	struct instruction *next = ALLOC(instruction);
 
-	if (!block->last) {
-		block->first = next;
-		block->last = next;
-	} else {
+	if (block->last)
 		block->last->next = next;
-		block->last = next;
-	}
+	else
+		block->first = next;
+
+	block->last = next;
 
 	return next;
 }
@@ -78,13 +62,18 @@ static struct instruction *ir_push2(int type, struct instruction *op2) {
 	return ir_push3(type, op2, NULL);
 }
 
-void ir_block_start(block_id id) {
+void ir_block_start(struct block *block) {
 	struct function *func = get_current_function();
 
-	ADD_ELEMENT(func->size, func->cap, func->blocks) = id;
+	if (func->last)
+		func->last->next = block;
+	else
+		func->first = block;
+
+	func->last = block;
 }
 
-void ir_if_selection(struct instruction *condition, block_id block_true, block_id block_false) {
+void ir_if_selection(struct instruction *condition, struct block *block_true, struct block *block_false) {
 	struct block *block = get_current_block();
 	assert(block->exit.type == BLOCK_EXIT_NONE);
 
@@ -103,7 +92,7 @@ void ir_switch_selection(struct instruction *condition, struct case_labels label
 	block->exit.switch_.labels = labels;
 }
 
-void ir_goto(block_id jump) {
+void ir_goto(struct block *jump) {
 	struct block *block = get_current_block();
 	assert(block->exit.type == BLOCK_EXIT_NONE);
 
@@ -213,9 +202,9 @@ static void register_usage(struct block *block, struct instruction *var) {
 	if (!var)
 		return;
 
-	if (var->first_block == -1) {
-		var->first_block = block->id;
-	} else if (var->first_block != block->id) {
+	if (!var->first_block) {
+		var->first_block = block;
+	} else if (var->first_block != block) {
 		var->spans_block = 1;
 	}
 
@@ -226,9 +215,7 @@ void ir_calculate_block_local_variables(void) {
 	for (unsigned i = 0; i < ir.size; i++) {
 		struct function *f = &ir.functions[i];
 
-		for (unsigned j = 0; j < f->size; j++) {
-			struct block *b = get_block(f->blocks[j]);
-
+		for (struct block *b = f->first; b; b = b->next) {
 			for (struct instruction *ins = b->first; ins; ins = ins->next) {
 				register_usage(b, ins);
 				register_usage(b, ins->arguments[0]);
@@ -262,7 +249,7 @@ struct instruction *new_variable(struct instruction *instruction, int size) {
 
 	instruction->index = ++counter;
 	instruction->size = size;
-	instruction->first_block = -1;
+	instruction->first_block = NULL;
 	instruction->spans_block = 0;
 
 	return instruction;
@@ -431,6 +418,6 @@ void ir_copy_memory(struct instruction *destination, struct instruction *source,
 	IR_PUSH(.type = IR_COPY_MEMORY, .arguments = {destination, source}, .copy_memory = {size});
 }
 
-struct instruction *ir_phi(struct instruction *var_a, struct instruction *var_b, block_id block_a, block_id block_b) {
+struct instruction *ir_phi(struct instruction *var_a, struct instruction *var_b, struct block *block_a, struct block *block_b) {
 	return new_variable(IR_PUSH(.type = IR_PHI, .arguments = {var_a, var_b}, .phi = {block_a, block_b}), var_a->size);
 }

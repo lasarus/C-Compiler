@@ -14,8 +14,8 @@
 #include <assert.h>
 
 struct jump_blocks {
-	block_id block_break,
-		block_continue;
+	struct block *block_break,
+		*block_continue;
 
 	struct case_labels *case_labels;
 };
@@ -25,14 +25,14 @@ static struct function_scope {
 
 	struct function_scope_label {
 		struct string_view label;
-		block_id id;
+		struct block *block;
 		int used;
 	} *labels;
 } function_scope;
 
-static void add_function_scope_label(struct string_view label, block_id id, int used) {
+static void add_function_scope_label(struct string_view label, struct block *block, int used) {
 	ADD_ELEMENT(function_scope.size, function_scope.cap, function_scope.labels) =
-		(struct function_scope_label) { label, id, used };
+		(struct function_scope_label) { label, block, used };
 }
 
 // See section 6.8 of standard.
@@ -51,14 +51,14 @@ int parse_labeled_statement(struct jump_blocks jump_blocks) {
 		TNEXT();
 		TNEXT();
 
-		block_id goto_block = 0;
+		struct block *goto_block = 0;
 
 		for (unsigned i = 0; i < function_scope.size; i++) {
 			if (sv_cmp(label, function_scope.labels[i].label)) {
 				if (function_scope.labels[i].used)
 					ERROR(T0->pos, "Label declared more than once %.*s", label.len, label.str);
 
-				goto_block = function_scope.labels[i].id;
+				goto_block = function_scope.labels[i].block;
 				function_scope.labels[i].used = 1;
 				break;
 			}
@@ -87,7 +87,7 @@ int parse_labeled_statement(struct jump_blocks jump_blocks) {
 		if (!labels)
 			ERROR(T0->pos, "Not currently in a switch statement");
 
-		block_id block_case = new_block();
+		struct block *block_case = new_block();
 		ir_goto(block_case);
 		ir_block_start(block_case);
 
@@ -98,7 +98,7 @@ int parse_labeled_statement(struct jump_blocks jump_blocks) {
 		return 1;
 	} else if (TACCEPT(T_KDEFAULT)) {
 		TEXPECT(T_COLON);
-		block_id block_default = new_block();
+		struct block *block_default = new_block();
 		ir_goto(block_default);
 		ir_block_start(block_default);
 		if (!jump_blocks.case_labels)
@@ -142,9 +142,9 @@ static int parse_switch(struct jump_blocks jump_blocks) {
 		ERROR(T0->pos, "Expected expression");
 	TEXPECT(T_RPAR);
 
-	int block_body = new_block(),
-		block_control = new_block(),
-		block_end = new_block();
+	struct block *block_body = new_block(),
+		*block_control = new_block(),
+		*block_end = new_block();
 
 	ir_goto(block_control);
 	ir_block_start(block_body);
@@ -176,8 +176,8 @@ int parse_selection_statement(struct jump_blocks jump_blocks) {
 		struct instruction *condition = expression_to_ir(expr);
 
 		TEXPECT(T_RPAR);
-		block_id block_true = new_block(),
-			block_false = new_block();
+		struct block *block_true = new_block(),
+			*block_false = new_block();
 
 		ir_if_selection(condition, block_true, block_false);
 
@@ -186,7 +186,7 @@ int parse_selection_statement(struct jump_blocks jump_blocks) {
 		parse_statement(jump_blocks);
 
 		if (TACCEPT(T_KELSE)) {
-			int block_end = new_block();
+			struct block *block_end = new_block();
 			ir_goto(block_end);
 			ir_block_start(block_false);
 
@@ -211,9 +211,9 @@ static int parse_do_while_statement(struct jump_blocks jump_blocks) {
 	if (!TACCEPT(T_KDO))
 		return 0;
 
-	block_id block_body = new_block(),
-		block_control = new_block(),
-		block_end = new_block();
+	struct block *block_body = new_block(),
+		*block_control = new_block(),
+		*block_end = new_block();
 
 	ir_goto(block_body);
 	ir_block_start(block_body);
@@ -260,9 +260,9 @@ static int parse_while_statement(struct jump_blocks jump_blocks) {
 
 	// end:
 
-	block_id block_body = new_block(),
-		block_control = new_block(),
-		block_end = new_block();
+	struct block *block_body = new_block(),
+		*block_control = new_block(),
+		*block_end = new_block();
 
 	ir_goto(block_control);
 	ir_block_start(block_control);
@@ -315,11 +315,11 @@ static int parse_for_statement(struct jump_blocks jump_blocks) {
 
 	// end:
 
-	block_id block_init = new_block(),
-		block_control = new_block(),
-		block_advance = new_block(),
-		block_body = new_block(),
-		block_end = new_block();
+	struct block *block_init = new_block(),
+		*block_control = new_block(),
+		*block_advance = new_block(),
+		*block_body = new_block(),
+		*block_end = new_block();
 
 	ir_goto(block_init);
 	ir_block_start(block_init); // not really necessary?
@@ -384,13 +384,13 @@ int parse_jump_statement(struct jump_blocks jump_blocks) {
 		TEXPECT(T_SEMI_COLON);
 		for (unsigned i = 0; i < function_scope.size; i++) {
 			if (sv_cmp(label, function_scope.labels[i].label)) {
-				ir_goto(function_scope.labels[i].id);
+				ir_goto(function_scope.labels[i].block);
 				ir_block_start(new_block());
 				return 1;
 			}
 		}
 
-		block_id id = new_block();
+		struct block *id = new_block();
 		add_function_scope_label(label, id, 0);
 		ir_goto(id);
 		ir_block_start(new_block());

@@ -4,8 +4,7 @@
 #include "operators.h"
 #include <codegen/rodata.h>
 
-typedef int block_id;
-block_id new_block(void);
+struct block *new_block(void);
 
 struct instruction {
 	enum {
@@ -140,14 +139,16 @@ struct instruction {
 		} copy_memory;
 
 		struct {
-			block_id block_a, block_b;
+			struct block *block_a, *block_b;
 		} phi;
 	};
 
 	int index;
 
 	int size;
-	int spans_block, first_block, used;
+	int spans_block;
+	struct block *first_block;
+	int used;
 
 	struct codegen_info {
 		enum {
@@ -174,23 +175,20 @@ struct function {
 
 	int uses_va;
 
-	size_t size, cap;
-	block_id *blocks;
+	struct block *first, *last;
 
 	void *abi_data;
 };
-
-struct block *get_block(block_id id);
 
 struct case_labels {
 	size_t size, cap;
 
 	struct case_label {
-		block_id block;
+		struct block *block;
 		struct constant value;
 	} *labels;
 
-	block_id default_;
+	struct block *default_;
 };
 
 struct block_exit {
@@ -211,15 +209,14 @@ struct block_exit {
 
 		struct {
 			struct instruction *condition;
-			block_id block_true, block_false;
+			struct block *block_true, *block_false;
 		} if_;
 
-		block_id jump;
+		struct block *jump;
 	};
 };
 
 struct block {
-	block_id id;
 	label_id label;
 
 	struct instruction *first, *last;
@@ -227,13 +224,15 @@ struct block {
 	struct block_exit exit;
 
 	int stack_counter; // Used in codegen for allocating variables local to block.
+
+	struct block *next;
 };
 
-void ir_block_start(block_id id);
+void ir_block_start(struct block *block);
 
-void ir_if_selection(struct instruction *condition, block_id block_true, block_id block_false);
+void ir_if_selection(struct instruction *condition, struct block *block_true, struct block *block_false);
 void ir_switch_selection(struct instruction *condition, struct case_labels labels);
-void ir_goto(block_id jump);
+void ir_goto(struct block *jump);
 void ir_return(void);
 
 void ir_init_ptr(struct initializer *init, struct type *type, struct instruction *ptr);
@@ -251,7 +250,7 @@ void ir_va_arg(struct instruction *array, struct instruction *result_address, st
 
 void ir_store(struct instruction *address, struct instruction *value);
 struct instruction *ir_load(struct instruction *address, int size);
-struct instruction *ir_phi(struct instruction *var_a, struct instruction *var_b, block_id block_a, block_id block_b);
+struct instruction *ir_phi(struct instruction *var_a, struct instruction *var_b, struct block *block_a, struct block *block_b);
 struct instruction *ir_bool_cast(struct instruction *operand);
 struct instruction *ir_cast_int(struct instruction *operand, int target_size, int sign_extend);
 struct instruction *ir_cast_float(struct instruction *operand, int target_size);
