@@ -446,7 +446,7 @@ static void codegen_instruction(struct instruction *ins, struct function *func) 
 
 static void codegen_phi_node(struct block *current_block, struct block *next_block) {
 	// Assume the phi nodes come at the beginning of a block.
-	for (int i = 0; i < next_block->size; i++) {
+	for (unsigned i = 0; i < next_block->size; i++) {
 		struct instruction *ins = next_block->instructions[i];
 
 		if (ins->type != IR_PHI)
@@ -473,7 +473,7 @@ static void codegen_phi_node(struct block *current_block, struct block *next_blo
 static void codegen_block(struct block *block, struct function *func) {
 	asm_label(0, block->label);
 
-	for (int i = 0; i < block->size; i++)
+	for (unsigned i = 0; i < block->size; i++)
 		codegen_instruction(block->instructions[i], func);
 
 	struct block_exit *block_exit = &block->exit;
@@ -515,7 +515,7 @@ static void codegen_block(struct block *block, struct function *func) {
 		asm_comment("SWITCH");
 		struct instruction *control = block_exit->switch_.condition;
 		scalar_to_reg(control, REG_RDI);
-		for (int i = 0; i < block_exit->switch_.labels.size; i++) {
+		for (unsigned i = 0; i < block_exit->switch_.labels.size; i++) {
 			asm_ins2("cmpl", IMM(block_exit->switch_.labels.labels[i].value.int_d), R4(REG_RDI));
 			asm_ins1("je", IMML_ABS(get_block(block_exit->switch_.labels.labels[i].block)->label, 0));
 		}
@@ -535,10 +535,10 @@ static void codegen_function(struct function *func) {
 	int max_temp_stack = 0;
 
 	// Allocate variables that spans multiple blocks.
-	for (int i = 0; i < func->size; i++) {
+	for (unsigned i = 0; i < func->size; i++) {
 		struct block *block = get_block(func->blocks[i]);
 
-		for (int j = 0; j < block->size; j++) {
+		for (unsigned j = 0; j < block->size; j++) {
 			struct instruction *ins = block->instructions[j];
 
 			if (!(ins->spans_block))
@@ -553,10 +553,10 @@ static void codegen_function(struct function *func) {
 
 	// Allocate VLAs, a bit tricky, but works.
 	vla_info.count = 0;
-	for (int i = 0; i < func->size; i++) {
+	for (unsigned i = 0; i < func->size; i++) {
 		struct block *block = get_block(func->blocks[i]);
 
-		for (int j = 0; j < block->size; j++) {
+		for (unsigned j = 0; j < block->size; j++) {
 			struct instruction *ins = block->instructions[j];
 
 			if (ins->type == IR_VLA_ALLOC)
@@ -568,10 +568,10 @@ static void codegen_function(struct function *func) {
 	vla_info.vla_slot_buffer_offset = perm_stack_count;
 
 	// Allocate IR_ALLOC instructions.
-	for (int i = 0; i < func->size; i++) {
+	for (unsigned i = 0; i < func->size; i++) {
 		struct block *block = get_block(func->blocks[i]);
 
-		for (int j = 0; j < block->size; j++) {
+		for (unsigned j = 0; j < block->size; j++) {
 			struct instruction *ins = block->instructions[j];
 			if (ins->type == IR_ALLOC) {
 				perm_stack_count += ins->alloc.size;
@@ -584,10 +584,10 @@ static void codegen_function(struct function *func) {
 	}
 
 	// Allocate variables that are local to one block.
-	for (int i = 0; i < func->size; i++) {
+	for (unsigned i = 0; i < func->size; i++) {
 		struct block *block = get_block(func->blocks[i]);
 
-		for (int j = 0; j < block->size; j++) {
+		for (unsigned j = 0; j < block->size; j++) {
 			struct instruction *ins = block->instructions[j];
 
 			if (ins->spans_block || !ins->used)
@@ -618,7 +618,7 @@ static void codegen_function(struct function *func) {
 	for (int i = 0; i < vla_info.count; i++)
 		asm_ins2("movq", IMM(0), MEM(-vla_info.vla_slot_buffer_offset + i * 8, REG_RBP));
 
-	for (int i = 0; i < func->size; i++)
+	for (unsigned i = 0; i < func->size; i++)
 		codegen_block(get_block(func->blocks[i]), func);
 
 	int total_stack_usage = max_temp_stack + perm_stack_count;
@@ -631,7 +631,7 @@ int codegen_get_alloc_preamble(void) {
 }
 
 void codegen(void) {
-	for (int i = 0; i < ir.size; i++)
+	for (unsigned i = 0; i < ir.size; i++)
 		codegen_function(ir.functions + i);
 
 	rodata_codegen();

@@ -36,7 +36,7 @@ static struct hash_table {
 } hash_table;
 
 static struct table {
-	int size, cap;
+	size_t size, cap;
 	struct table_entry *entries;
 } table;
 

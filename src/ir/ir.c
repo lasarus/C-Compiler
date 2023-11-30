@@ -219,13 +219,13 @@ static void register_usage(struct block *block, struct instruction *var) {
 }
 
 void ir_calculate_block_local_variables(void) {
-	for (int i = 0; i < ir.size; i++) {
+	for (unsigned i = 0; i < ir.size; i++) {
 		struct function *f = &ir.functions[i];
 
-		for (int j = 0; j < f->size; j++) {
+		for (unsigned j = 0; j < f->size; j++) {
 			struct block *b = get_block(f->blocks[j]);
 
-			for (int k = 0; k < b->size; k++) {
+			for (unsigned k = 0; k < b->size; k++) {
 				struct instruction *ins = b->instructions[k];
 
 				register_usage(b, ins);

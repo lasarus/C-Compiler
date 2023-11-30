@@ -160,7 +160,7 @@ struct instruction {
 };
 
 struct ir {
-	int size, cap;
+	size_t size, cap;
 	struct function *functions;
 };
 
@@ -172,7 +172,7 @@ struct function {
 
 	int uses_va;
 
-	int size, cap;
+	size_t size, cap;
 	block_id *blocks;
 
 	void *abi_data;
@@ -181,7 +181,7 @@ struct function {
 struct block *get_block(block_id id);
 
 struct case_labels {
-	int size, cap;
+	size_t size, cap;
 
 	struct case_label {
 		block_id block;
@@ -220,7 +220,7 @@ struct block {
 	block_id id;
 	label_id label;
 
-	int size, cap;
+	size_t size, cap;
 	struct instruction **instructions;
 
 	struct block_exit exit;

@@ -21,7 +21,7 @@ struct jump_blocks {
 };
 
 static struct function_scope {
-	int size, cap;
+	size_t size, cap;
 
 	struct function_scope_label {
 		struct string_view label;
@@ -53,7 +53,7 @@ int parse_labeled_statement(struct jump_blocks jump_blocks) {
 
 		block_id goto_block = 0;
 
-		for (int i = 0; i < function_scope.size; i++) {
+		for (unsigned i = 0; i < function_scope.size; i++) {
 			if (sv_cmp(label, function_scope.labels[i].label)) {
 				if (function_scope.labels[i].used)
 					ERROR(T0->pos, "Label declared more than once %.*s", label.len, label.str);
@@ -382,7 +382,7 @@ int parse_jump_statement(struct jump_blocks jump_blocks) {
 		struct string_view label = T0->str;
 		TNEXT();
 		TEXPECT(T_SEMI_COLON);
-		for (int i = 0; i < function_scope.size; i++) {
+		for (unsigned i = 0; i < function_scope.size; i++) {
 			if (sv_cmp(label, function_scope.labels[i].label)) {
 				ir_goto(function_scope.labels[i].id);
 				ir_block_start(new_block());
