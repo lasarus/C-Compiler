@@ -504,19 +504,6 @@ static void codegen_block(struct block *block, struct function *func) {
 		asm_ins0("ret");
 		break;
 
-	case BLOCK_EXIT_SWITCH: {
-		asm_comment("SWITCH");
-		struct instruction *control = block_exit->switch_.condition;
-		scalar_to_reg(control, REG_RDI);
-		for (unsigned i = 0; i < block_exit->switch_.labels.size; i++) {
-			asm_ins2("cmpl", IMM(block_exit->switch_.labels.labels[i].value.int_d), R4(REG_RDI));
-			asm_ins1("je", IMML_ABS(block_exit->switch_.labels.labels[i].block->label, 0));
-		}
-		if (block_exit->switch_.labels.default_) {
-			asm_ins1("jmp", IMML_ABS(block_exit->switch_.labels.default_->label, 0));
-		}
-	} break;
-
 	case BLOCK_EXIT_NONE:
 		asm_ins0("ud2");
 		break;

@@ -8,7 +8,7 @@
 struct ir ir;
 
 static struct function *current_function;
-static struct block *current_block;
+static struct block *current_block, *last_block;
 static struct instruction *current_instruction;
 
 void ir_reset(void) {
@@ -17,12 +17,20 @@ void ir_reset(void) {
 }
 
 struct block *new_block(void) {
-	return ALLOC((struct block) {
-			.label = register_label(),
-			.exit.type = BLOCK_EXIT_NONE,
+	struct function *func = get_current_function();
 
-			.stack_counter = 0,
+	struct block *block = ALLOC((struct block) {
+			.label = register_label(),
 		});
+
+	if (!func->first)
+		func->first = block;
+	else
+		last_block->next = block;
+
+	last_block = block;
+
+	return block;
 }
 
 struct function *new_function(void) {
@@ -78,13 +86,6 @@ static struct instruction *ir_new1(int type, struct instruction *op2, int size) 
 }
 
 void ir_block_start(struct block *block) {
-	struct function *func = get_current_function();
-
-	if (!func->first)
-		func->first = block;
-	else
-		current_block->next = block;
-
 	current_block = block;
 }
 
@@ -98,21 +99,19 @@ void ir_if_selection(struct instruction *condition, struct block *block_true, st
 	block->exit.if_.block_false = block_false;
 }
 
-void ir_switch_selection(struct instruction *condition, struct case_labels labels) {
-	struct block *block = get_current_block();
-	assert(block->exit.type == BLOCK_EXIT_NONE);
-
-	block->exit.type = BLOCK_EXIT_SWITCH;
-	block->exit.switch_.condition = condition;
-	block->exit.switch_.labels = labels;
-}
-
 void ir_goto(struct block *jump) {
 	struct block *block = get_current_block();
 	assert(block->exit.type == BLOCK_EXIT_NONE);
 
 	block->exit.type = BLOCK_EXIT_JUMP;
 	block->exit.jump = jump;
+}
+
+void ir_connect(struct block *start, struct block *end) {
+	assert(start->exit.type == BLOCK_EXIT_NONE);
+
+	start->exit.type = BLOCK_EXIT_JUMP;
+	start->exit.jump = end;
 }
 
 void ir_return(void) {
@@ -236,9 +235,6 @@ void ir_calculate_block_local_variables(void) {
 			}
 
 			switch (b->exit.type) {
-			case BLOCK_EXIT_SWITCH:
-				register_usage(b, b->exit.switch_.condition);
-				break;
 			case BLOCK_EXIT_IF:
 				register_usage(b, b->exit.if_.condition);
 				break;
@@ -353,6 +349,10 @@ struct instruction *ir_div(struct instruction *lhs, struct instruction *rhs) {
 
 struct instruction *ir_idiv(struct instruction *lhs, struct instruction *rhs) {
 	return ir_new2(IR_IDIV, lhs, rhs, lhs->size);
+}
+
+struct instruction *ir_equal(struct instruction *lhs, struct instruction *rhs) {
+	return ir_new2(IR_EQUAL, lhs, rhs, lhs->size);
 }
 
 struct instruction *ir_binary_op(int type, struct instruction *lhs, struct instruction *rhs) {

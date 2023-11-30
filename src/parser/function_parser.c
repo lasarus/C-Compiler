@@ -1,5 +1,6 @@
 #include "function_parser.h"
 #include "expression_to_ir.h"
+#include "ir/ir.h"
 #include "symbols.h"
 #include "expression.h"
 #include "declaration.h"
@@ -17,7 +18,8 @@ struct jump_blocks {
 	struct block *block_break,
 		*block_continue;
 
-	struct case_labels *case_labels;
+	struct block *block_entry, *block_default;
+	struct instruction *case_control;
 };
 
 static struct function_scope {
@@ -36,15 +38,15 @@ static void add_function_scope_label(struct string_view label, struct block *blo
 }
 
 // See section 6.8 of standard.
-int parse_statement(struct jump_blocks jump_blocks);
-int parse_labeled_statement(struct jump_blocks jump_blocks);
-int parse_compound_statement(struct jump_blocks jump_blocks);
+int parse_statement(struct jump_blocks *jump_blocks);
+int parse_labeled_statement(struct jump_blocks *jump_blocks);
+int parse_compound_statement(struct jump_blocks *jump_blocks);
 int parse_expression_statement(void);
-int parse_selection_statement(struct jump_blocks jump_blocks);
-int parse_iteration_statement(struct jump_blocks jump_blocks);
-int parse_jump_statement(struct jump_blocks jump_blocks);
+int parse_selection_statement(struct jump_blocks *jump_blocks);
+int parse_iteration_statement(struct jump_blocks *jump_blocks);
+int parse_jump_statement(struct jump_blocks *jump_blocks);
 
-int parse_labeled_statement(struct jump_blocks jump_blocks) {
+int parse_labeled_statement(struct jump_blocks *jump_blocks) {
 	if (T0->type == T_IDENT &&
 		T1->type == T_COLON) {
 		struct string_view label = T0->str;
@@ -83,16 +85,23 @@ int parse_labeled_statement(struct jump_blocks jump_blocks) {
 		if (!constant)
 			ERROR(T0->pos, "Expression not constant, is of type %d", value->type);
 
-		struct case_labels *labels = jump_blocks.case_labels;
-		if (!labels)
+		struct instruction *case_control = jump_blocks->case_control;
+		if (!case_control)
 			ERROR(T0->pos, "Not currently in a switch statement");
 
-		struct block *block_case = new_block();
+		struct block *block_case = new_block(),
+			*new_entry = new_block();
+
 		ir_goto(block_case);
+		ir_block_start(jump_blocks->block_entry);
+		struct instruction *comparison = ir_equal(case_control,
+												  ir_constant(*constant));
+
+		ir_if_selection(comparison, block_case, new_entry);
+
 		ir_block_start(block_case);
 
-		ADD_ELEMENT(labels->size, labels->cap, labels->labels) =
-			(struct case_label) { block_case, *constant };
+		jump_blocks->block_entry = new_entry;
 
 		parse_statement(jump_blocks);
 		return 1;
@@ -101,16 +110,16 @@ int parse_labeled_statement(struct jump_blocks jump_blocks) {
 		struct block *block_default = new_block();
 		ir_goto(block_default);
 		ir_block_start(block_default);
-		if (!jump_blocks.case_labels)
+		if (!jump_blocks->block_entry)
 			ERROR(T0->pos, "Not currently in a switch statement");
-		jump_blocks.case_labels->default_ = block_default;
+		jump_blocks->block_default = block_default;
 
 		parse_statement(jump_blocks);
 	}
 	return 0;
 }
 
-int parse_compound_statement(struct jump_blocks jump_blocks) {
+int parse_compound_statement(struct jump_blocks *jump_blocks) {
 	if (!TACCEPT(T_LBRACE))
 		return 0;
 
@@ -132,41 +141,50 @@ int parse_expression_statement(void) {
 	return 1;
 }
 
-static int parse_switch(struct jump_blocks jump_blocks) {
+static int parse_switch(struct jump_blocks *jump_blocks) {
 	if (!TACCEPT(T_KSWITCH))
 		return 0;
 
 	TEXPECT(T_LPAR);
 	struct expr *condition = parse_expression();
+
 	if (!condition)
 		ERROR(T0->pos, "Expected expression");
+
+	struct instruction *case_control = expression_to_int(condition);
+
 	TEXPECT(T_RPAR);
 
 	struct block *block_body = new_block(),
-		*block_control = new_block(),
+		*block_entry = new_block(),
 		*block_end = new_block();
 
-	ir_goto(block_control);
+	ir_goto(block_entry);
 	ir_block_start(block_body);
 
-	struct case_labels labels = { 0 };
-	jump_blocks.case_labels = &labels;
-	jump_blocks.block_break = block_end;
+	struct jump_blocks new_jump_blocks = *jump_blocks;
+
+	new_jump_blocks.block_entry = block_entry;
+	new_jump_blocks.block_break = block_end;
+	new_jump_blocks.case_control = case_control;
+	new_jump_blocks.block_default = NULL;
 
 	// Parse body
-	parse_statement(jump_blocks);
+	parse_statement(&new_jump_blocks);
+
+	if (new_jump_blocks.block_default)
+		ir_connect(new_jump_blocks.block_entry, new_jump_blocks.block_default);
+	else
+		ir_connect(new_jump_blocks.block_entry, new_jump_blocks.block_break);
 
 	ir_goto(block_end);
-	ir_block_start(block_control);
-
-	ir_switch_selection(expression_to_int(condition), labels);
 
 	ir_block_start(block_end);
 
 	return 1;
 }
 
-int parse_selection_statement(struct jump_blocks jump_blocks) {
+int parse_selection_statement(struct jump_blocks *jump_blocks) {
 	if (TACCEPT(T_KIF)) {
 		TEXPECT(T_LPAR);
 		struct expr *expr = parse_expression();
@@ -207,7 +225,7 @@ int parse_selection_statement(struct jump_blocks jump_blocks) {
 	}
 }
 
-static int parse_do_while_statement(struct jump_blocks jump_blocks) {
+static int parse_do_while_statement(struct jump_blocks *jump_blocks) {
 	if (!TACCEPT(T_KDO))
 		return 0;
 
@@ -218,9 +236,10 @@ static int parse_do_while_statement(struct jump_blocks jump_blocks) {
 	ir_goto(block_body);
 	ir_block_start(block_body);
 
-	jump_blocks.block_break = block_end;
-	jump_blocks.block_continue = block_control;
-	parse_statement(jump_blocks);
+	struct jump_blocks new_jump_blocks = *jump_blocks;
+	new_jump_blocks.block_break = block_end;
+	new_jump_blocks.block_continue = block_control;
+	parse_statement(&new_jump_blocks);
 
 	ir_goto(block_control);
 	ir_block_start(block_control);
@@ -245,7 +264,7 @@ static int parse_do_while_statement(struct jump_blocks jump_blocks) {
 	return 1;
 }
 
-static int parse_while_statement(struct jump_blocks jump_blocks) {
+static int parse_while_statement(struct jump_blocks *jump_blocks) {
 	if (!TACCEPT(T_KWHILE))
 		return 0;
 
@@ -279,9 +298,10 @@ static int parse_while_statement(struct jump_blocks jump_blocks) {
 
 	ir_block_start(block_body);
 
-	jump_blocks.block_break = block_end;
-	jump_blocks.block_continue = block_control;
-	parse_statement(jump_blocks);
+	struct jump_blocks new_jump_blocks = *jump_blocks;
+	new_jump_blocks.block_break = block_end;
+	new_jump_blocks.block_continue = block_control;
+	parse_statement(&new_jump_blocks);
 
 	ir_goto(block_control);
 	ir_block_start(block_end);
@@ -289,7 +309,7 @@ static int parse_while_statement(struct jump_blocks jump_blocks) {
 	return 1;
 }
 
-static int parse_for_statement(struct jump_blocks jump_blocks) {
+static int parse_for_statement(struct jump_blocks *jump_blocks) {
 	if (!TACCEPT(T_KFOR))
 		return 0;
 
@@ -354,9 +374,10 @@ static int parse_for_statement(struct jump_blocks jump_blocks) {
 
 	TEXPECT(T_RPAR);
 
-	jump_blocks.block_break = block_end;
-	jump_blocks.block_continue = block_advance;
-	parse_statement(jump_blocks);
+	struct jump_blocks new_jump_blocks = *jump_blocks;
+	new_jump_blocks.block_break = block_end;
+	new_jump_blocks.block_continue = block_advance;
+	parse_statement(&new_jump_blocks);
 
 	ir_goto(block_advance);
 	ir_block_start(block_end);
@@ -365,7 +386,7 @@ static int parse_for_statement(struct jump_blocks jump_blocks) {
 	return 1;
 }
 
-int parse_iteration_statement(struct jump_blocks jump_blocks) {
+int parse_iteration_statement(struct jump_blocks *jump_blocks) {
 	if (parse_for_statement(jump_blocks) ||
 			   parse_do_while_statement(jump_blocks) ||
 			   parse_while_statement(jump_blocks)) {
@@ -377,7 +398,7 @@ int parse_iteration_statement(struct jump_blocks jump_blocks) {
 
 struct type *current_ret_val = NULL;
 
-int parse_jump_statement(struct jump_blocks jump_blocks) {
+int parse_jump_statement(struct jump_blocks *jump_blocks) {
 	if (TACCEPT(T_KGOTO)) {
 		struct string_view label = T0->str;
 		TNEXT();
@@ -396,12 +417,12 @@ int parse_jump_statement(struct jump_blocks jump_blocks) {
 		ir_block_start(new_block());
 		return 1;
 	} else if (TACCEPT(T_KCONTINUE)) {
-		ir_goto(jump_blocks.block_continue);
+		ir_goto(jump_blocks->block_continue);
 		ir_block_start(new_block());
 		TEXPECT(T_SEMI_COLON);
 		return 1;
 	} else if (TACCEPT(T_KBREAK)) {
-		ir_goto(jump_blocks.block_break);
+		ir_goto(jump_blocks->block_break);
 		ir_block_start(new_block());
 		TEXPECT(T_SEMI_COLON);
 		return 1;
@@ -423,7 +444,7 @@ int parse_jump_statement(struct jump_blocks jump_blocks) {
 	}
 }
 
-int parse_statement(struct jump_blocks jump_blocks) {
+int parse_statement(struct jump_blocks *jump_blocks) {
 	return parse_labeled_statement(jump_blocks) ||
 		parse_compound_statement(jump_blocks) ||
 		parse_expression_statement() ||
@@ -463,7 +484,7 @@ void parse_function(struct string_view name, struct type *type, int arg_n, struc
 	type_evaluate_vla(type);
 
 	struct jump_blocks jump_blocks = { 0 };
-	parse_compound_statement(jump_blocks);
+	parse_compound_statement(&jump_blocks);
 
 	if (sv_string_cmp(name, "main")) {
 		struct block *b = get_current_block();

@@ -182,32 +182,15 @@ struct function {
 	struct function *next;
 };
 
-struct case_labels {
-	size_t size, cap;
-
-	struct case_label {
-		struct block *block;
-		struct constant value;
-	} *labels;
-
-	struct block *default_;
-};
-
 struct block_exit {
 	enum {
 		BLOCK_EXIT_NONE,
 		BLOCK_EXIT_RETURN,
 		BLOCK_EXIT_JUMP,
 		BLOCK_EXIT_IF,
-		BLOCK_EXIT_SWITCH
 	} type;
 
 	union {
-		struct {
-			struct instruction *condition;
-			struct case_labels labels;
-		} switch_;
-
 		struct {
 			struct instruction *condition;
 			struct block *block_true, *block_false;
@@ -232,8 +215,8 @@ struct block {
 void ir_block_start(struct block *block);
 
 void ir_if_selection(struct instruction *condition, struct block *block_true, struct block *block_false);
-void ir_switch_selection(struct instruction *condition, struct case_labels labels);
 void ir_goto(struct block *jump);
+void ir_connect(struct block *start, struct block *end);
 void ir_return(void);
 
 void ir_init_ptr(struct initializer *init, struct type *type, struct instruction *ptr);
@@ -272,6 +255,7 @@ struct instruction *ir_mul(struct instruction *lhs, struct instruction *rhs);
 struct instruction *ir_imul(struct instruction *lhs, struct instruction *rhs);
 struct instruction *ir_div(struct instruction *lhs, struct instruction *rhs);
 struct instruction *ir_idiv(struct instruction *lhs, struct instruction *rhs);
+struct instruction *ir_equal(struct instruction *lhs, struct instruction *rhs);
 struct instruction *ir_binary_op(int type, struct instruction *lhs, struct instruction *rhs);
 
 struct instruction *ir_set_bits(struct instruction *field, struct instruction *value, int offset, int length);
