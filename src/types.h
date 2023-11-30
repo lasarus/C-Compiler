@@ -78,7 +78,7 @@ struct type {
 		} array;
 		struct {
 			int is_evaluated;
-			struct instruction *length_var;
+			struct node *length_var;
 			struct expr *length_expr;
 		} variable_length_array;
 		struct {

@@ -91,7 +91,7 @@ const char *dbg_type(struct type *type) {
 	return buffer;
 }
 
-const char *dbg_instruction(struct instruction *ins) {
+const char *dbg_instruction(struct node *ins) {
 	static int char_buffer_size = 100;
 	static char *buffer = NULL;
 

@@ -26,8 +26,8 @@ extern void (*abi_expr_function)(struct type *type, struct symbol_identifier **a
 extern void (*abi_expr_return)(struct function *func, struct evaluated_expression *value);
 
 extern void (*abi_emit_function_preamble)(struct function *func);
-extern void (*abi_emit_va_start)(struct instruction *result, struct function *func);
-extern void (*abi_emit_va_arg)(struct instruction *address, struct instruction *va_list, struct type *type);
+extern void (*abi_emit_va_start)(struct node *result, struct function *func);
+extern void (*abi_emit_va_arg)(struct node *address, struct node *va_list, struct type *type);
 
 extern int (*abi_sizeof_simple)(enum simple_type type);
 

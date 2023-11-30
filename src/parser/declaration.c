@@ -1347,7 +1347,7 @@ static int parse_init_declarator(struct specifiers s, int external, int *was_fun
 					ERROR(T0->pos, "Variable length array can't have initializer");
 			} else {
 				symbol->type = IDENT_VARIABLE;
-				struct instruction *ptr;
+				struct node *ptr;
 				symbol->variable.type = type;
 				if (has_init) {
 					struct initializer init = parse_initializer(&type);

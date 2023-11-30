@@ -32,7 +32,7 @@ struct symbol_identifier {
 		} parameter;
 		struct {
 			struct type *type;
-			struct instruction *ptr;
+			struct node *ptr;
 		} variable;
 		struct {
 			struct type *type;

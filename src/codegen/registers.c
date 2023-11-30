@@ -38,7 +38,7 @@ const char *get_reg_name(int id, int size) {
 	return registers[id][size_to_idx(size)];
 }
 
-void scalar_to_reg(struct instruction *scalar, int reg) {
+void scalar_to_reg(struct node *scalar, int reg) {
 	int size = scalar->size;
 	struct operand mem = MEM(-scalar->cg_info.stack_location, REG_RBP);
 	switch (size) {
@@ -63,7 +63,7 @@ void scalar_to_reg(struct instruction *scalar, int reg) {
 	}
 }
 
-void reg_to_scalar(int reg, struct instruction *scalar) {
+void reg_to_scalar(int reg, struct node *scalar) {
 	int size = scalar->size;
 	int msize = 0;
 	for (int i = 0; i < size;) {
