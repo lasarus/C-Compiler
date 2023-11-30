@@ -560,7 +560,6 @@ static struct evaluated_expression evaluate_conditional(struct expr *expr) {
 			.type = EE_VOID
 		};
 	} else {
-
 		struct node *block_true = new_block(),
 			*block_false = new_block(),
 			*block_end = new_block();

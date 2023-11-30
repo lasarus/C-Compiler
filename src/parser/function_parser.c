@@ -506,7 +506,7 @@ void parse_function(struct string_view name, struct type *type, int arg_n, struc
 
 	if (sv_string_cmp(name, "main")) {
 		struct node *b = get_current_block();
-		if (b->block.exit.type == BLOCK_EXIT_NONE) {
+		if (!b->block_info.jump_to && !b->block_info.return_) {
 			ir_return();
 			struct constant c = constant_simple_signed(ST_INT, 0);
 			abi_expr_return(get_current_function(), &(struct evaluated_expression) { .type = EE_CONSTANT, .data_type = c.data_type, .constant = c});

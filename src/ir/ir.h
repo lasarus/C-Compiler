@@ -6,24 +6,6 @@
 
 struct node;
 
-struct block_exit {
-	enum {
-		BLOCK_EXIT_NONE,
-		BLOCK_EXIT_RETURN,
-		BLOCK_EXIT_JUMP,
-		BLOCK_EXIT_IF,
-	} type;
-
-	union {
-		struct {
-			struct node *condition;
-			struct node *block_true, *block_false;
-		} if_;
-
-		struct node *jump;
-	};
-};
-
 struct node {
 	enum {
 		IR_ADD, IR_SUB,
@@ -85,8 +67,8 @@ struct node {
 		IR_LOAD_BASE_RELATIVE_ADDRESS,
 
 		IR_PHI,
-
 		IR_BLOCK,
+		IR_IF,
 
 		IR_COUNT
 	} type;
@@ -164,7 +146,6 @@ struct node {
 
 		struct {
 			label_id label;
-			struct block_exit exit;
 		} block;
 	};
 
@@ -186,7 +167,13 @@ struct node {
 		} cg_info;
 
 		struct {
+			struct node *block_true, *block_false;
+		} if_info;
+
+		struct {
 			int stack_counter; // Used in codegen for allocating variables local to block.
+			struct node *jump_to;
+			int return_;
 		} block_info;
 	};
 

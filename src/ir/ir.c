@@ -91,35 +91,23 @@ void ir_block_start(struct node *block) {
 }
 
 void ir_if_selection(struct node *condition, struct node *block_true, struct node *block_false) {
-	struct node *block = get_current_block();
-	assert(block->block.exit.type == BLOCK_EXIT_NONE);
-
-	block->block.exit.type = BLOCK_EXIT_IF;
-	block->block.exit.if_.condition = condition;
-	block->block.exit.if_.block_true = block_true;
-	block->block.exit.if_.block_false = block_false;
+	struct node *if_node = ir_new1(IR_IF, condition, 0);
+	if_node->if_info.block_false = block_false;
+	if_node->if_info.block_true = block_true;
 }
 
 void ir_goto(struct node *jump) {
 	struct node *block = get_current_block();
-	assert(block->block.exit.type == BLOCK_EXIT_NONE);
-
-	block->block.exit.type = BLOCK_EXIT_JUMP;
-	block->block.exit.jump = jump;
+	block->block_info.jump_to = jump;
 }
 
 void ir_connect(struct node *start, struct node *end) {
-	assert(start->block.exit.type == BLOCK_EXIT_NONE);
-
-	start->block.exit.type = BLOCK_EXIT_JUMP;
-	start->block.exit.jump = end;
+	start->block_info.jump_to = end;
 }
 
 void ir_return(void) {
 	struct node *block = get_current_block();
-	assert(block->block.exit.type == BLOCK_EXIT_NONE);
-
-	block->block.exit.type = BLOCK_EXIT_RETURN;
+	block->block_info.return_ = 1;
 }
 
 struct node *ir_get_offset(struct node *base_address, int offset) {
@@ -233,16 +221,6 @@ void ir_calculate_block_local_variables(void) {
 				register_usage(b, ins);
 				register_usage(b, ins->arguments[0]);
 				register_usage(b, ins->arguments[1]);
-			}
-
-			switch (b->block.exit.type) {
-			case BLOCK_EXIT_IF:
-				register_usage(b, b->block.exit.if_.condition);
-				break;
-			case BLOCK_EXIT_RETURN:
-			case BLOCK_EXIT_JUMP:
-			case BLOCK_EXIT_NONE:
-				break;
 			}
 		}
 	}

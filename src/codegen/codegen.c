@@ -435,6 +435,14 @@ static void codegen_instruction(struct node *ins, struct function *func) {
 		codegen_memcpy(ins->copy_memory.size);
 		break;
 
+	case IR_IF: {
+		struct node *cond = ins->arguments[0];
+		scalar_to_reg(cond, REG_RDI);
+		asm_ins2("testq", R8(REG_RDI), R8(REG_RDI));
+		asm_ins1("je", IMML_ABS(ins->if_info.block_false->block.label, 0));
+		asm_ins1("jmp", IMML_ABS(ins->if_info.block_true->block.label, 0));
+	} break;
+
 	case IR_PHI:
 		break;
 
@@ -475,38 +483,16 @@ static void codegen_block(struct node *block, struct function *func) {
 	for (struct node *ins = block->child; ins; ins = ins->next)
 		codegen_instruction(ins, func);
 
-	struct block_exit *block_exit = &block->block.exit;
-	asm_comment("EXIT IS OF TYPE : %d", block_exit->type);
-	switch (block_exit->type) {
-	case BLOCK_EXIT_JUMP: {
-		struct node *target = block_exit->jump;
-		codegen_phi_node(block, target);
-		asm_ins1("jmp", IMML_ABS(target->block.label, 0));
-	} break;
-
-	case BLOCK_EXIT_IF: {
-		struct node *cond = block_exit->if_.condition;
-		int size = cond->size;
-		scalar_to_reg(cond, REG_RDI);
-		switch (size) {
-		case 1: asm_ins2("testb", R1(REG_RDI), R1(REG_RDI)); break;
-		case 2: asm_ins2("testw", R2(REG_RDI), R2(REG_RDI)); break;
-		case 4: asm_ins2("testl", R4(REG_RDI), R4(REG_RDI)); break;
-		case 8: asm_ins2("testq", R8(REG_RDI), R8(REG_RDI)); break;
-		default: ICE("Invalid argument to if selection.");
-		}
-		asm_ins1("je", IMML_ABS(block_exit->if_.block_false->block.label, 0));
-		asm_ins1("jmp", IMML_ABS(block_exit->if_.block_true->block.label, 0));
-	} break;
-
-	case BLOCK_EXIT_RETURN:
+	if (block->block_info.return_) {
+		asm_comment("Block return.");
 		asm_ins0("leave");
 		asm_ins0("ret");
-		break;
-
-	case BLOCK_EXIT_NONE:
+	} else if (block->block_info.jump_to) {
+		asm_comment("Block jump");
+		codegen_phi_node(block, block->block_info.jump_to);
+		asm_ins1("jmp", IMML_ABS(block->block_info.jump_to->block.label, 0));
+	} else {
 		asm_ins0("ud2");
-		break;
 	}
 }
 
@@ -517,7 +503,7 @@ static void codegen_function(struct function *func) {
 	// Allocate variables that spans multiple blocks.
 	for (struct node *block = func->first; block; block = block->next) {
 		for (struct node *ins = block->child; ins; ins = ins->next) {
-			if (!(ins->spans_block))
+			if (!ins->spans_block || ins->size == 0)
 				continue;
 			
 			perm_stack_count += ins->size;
@@ -557,7 +543,7 @@ static void codegen_function(struct function *func) {
 	
 	for (struct node *block = func->first; block; block = block->next) {
 		for (struct node *ins = block->child; ins; ins = ins->next) {
-			if (ins->spans_block || !ins->used)
+			if (ins->spans_block || !ins->used || ins->size == 0)
 				continue;
 
 			struct node *block = ins->first_block;
