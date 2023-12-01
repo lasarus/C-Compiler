@@ -10,20 +10,19 @@
 #include <assert.h>
 
 struct tokenized_file {
-	struct input *input;
-
 	int token_idx;
 	struct token_list tokens;
 
 	int pushed_idx;
 	struct token pushed[3];
 
+	const char *path;
 	struct tokenized_file *parent;
 };
 
 static struct tokenized_file *current_file;
 
-static const char *new_filename = NULL;
+static const char *new_path = NULL;
 static int line_diff = 0;
 
 struct macro_stack {
@@ -57,7 +56,7 @@ void directiver_finish_writing_dependencies(const char *mt, const char *mf) {
 
 // Resets all global state. Not very elegant.
 void directiver_reset(void) {
-	new_filename = NULL;
+	new_path = NULL;
 	line_diff = 0;
 	current_file = NULL;
 
@@ -73,21 +72,22 @@ void directiver_reset(void) {
 }
 
 void directiver_push_input(const char *path, int system) {
-	struct input *prev_input = current_file ? current_file->input : NULL;
-	struct input *new_input = input_open(prev_input, path, system);
+	const char *parent_path = current_file ? current_file->path : ".";
+	struct input *new_input = input_open(parent_path, path, system);
 
 	if (write_dependencies)
-		ADD_ELEMENT(dep_size, dep_cap, deps) = strdup(new_input->filename);
+		ADD_ELEMENT(dep_size, dep_cap, deps) = strdup(new_input->path);
 
 	if (!new_input)
 		return;
 
 	current_file = ALLOC((struct tokenized_file) {
-			.input = new_input,
 			.parent = current_file,
 			.token_idx = 0,
-			.tokens = tokenize_input(new_input),
+			.tokens = tokenize_input(new_input->contents, new_input->path),
+			.path = strdup(new_input->path),
 		});
+	input_free(new_input);
 }
 
 static struct token next(void);
@@ -95,7 +95,6 @@ static struct token next(void);
 static struct token next_from_stack(void) {
 	if (current_file->token_idx == current_file->tokens.size) {
 		if (current_file->parent) {
-			input_free(current_file->input);
 			token_list_free(&current_file->tokens);
 			current_file = current_file->parent;
 			return next();
@@ -122,8 +121,8 @@ static struct token next(void) {
 		t = next_from_stack();
 	}
 	t.pos.line += line_diff;
-	if (new_filename)
-		t.pos.path = new_filename;
+	if (new_path)
+		t.pos.path = new_path;
 	return t;
 }
 
@@ -444,7 +443,7 @@ static int directiver_handle_pragma(void) {
 	struct token command = next();
 
 	if (sv_string_cmp(command.str, "once")) {
-		input_disable_path(current_file->input->filename);
+		input_disable_path(current_file->path);
 	} else if (sv_string_cmp(command.str, "push_macro")) {
 		struct token lpar = next();
 		if (lpar.type != T_LPAR)
@@ -550,7 +549,7 @@ struct token directiver_next(void) {
 			} else if (sv_string_cmp(name, "include")) {
 				// There is an issue with just resetting after include. But
 				// I'm interpreting the standard liberally to allow for this.
-				new_filename = NULL;
+				new_path = NULL;
 				line_diff = 0;
 				struct string_view path;
 				struct token path_tok = next();
@@ -622,7 +621,7 @@ struct token directiver_next(void) {
 						ERROR(s_char_seq.pos, "Expected s char sequence as second argument to #line");
 					s_char_seq.str.len -= 2;
 					s_char_seq.str.str++;
-					new_filename = sv_to_str(s_char_seq.str);
+					new_path = sv_to_str(s_char_seq.str);
 				}
 			} else {
 				ERROR(directive.pos, "#%s not implemented", dbg_token(&directive));

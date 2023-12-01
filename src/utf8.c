@@ -63,7 +63,7 @@ uint32_t utf8_decode(const char **start) {
 		codepoint |= (s[3] & ~0xC0) << (6 * 0);
 		advance = 4;
 	} else {
-		ICE("Incorrectly encoded UTF-8, starting with %.16s\n", *start);
+		ICE("Incorrectly encoded UTF-8, starting with %.16s, %X\n", *start);
 	}
 
 	*start += advance;

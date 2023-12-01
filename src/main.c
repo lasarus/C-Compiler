@@ -322,7 +322,7 @@ int main(int argc, char **argv) {
 				NOTIMP();
 			ADD_ELEMENT(object_size, object_cap, objects) = *object;
 		} else {
-			printf("Not implemented filename: %.*s", basename.len, basename.str);
+			printf("Not implemented path: %.*s", basename.len, basename.str);
 			NOTIMP();
 		}
 	}

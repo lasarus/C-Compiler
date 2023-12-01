@@ -103,8 +103,7 @@ static int get_param(struct define *def, struct token tok) {
 
 void define_string(char *name, char *value) {
 	struct define def = define_init(sv_from_str(strdup(name)));
-	struct input input = input_open_string(value);
-	def.def = tokenize_input(&input);
+	def.def = tokenize_input(value, "<string>");
 	define_map_add(def);
 }
 
@@ -172,6 +171,10 @@ static void stringify_start(void) {
 	ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = '\"';
 }
 
+static void stringify_add_char(char c) {
+	ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = c;
+}
+
 static struct string_view stringify_end(void) {
 	ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = '\"';
 	
@@ -183,8 +186,9 @@ static struct string_view stringify_end(void) {
 
 static void stringify_add(struct token *t, int start) {
 	if (!start && (t->whitespace || stringify_whitespace))
-		ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = ' ';
+		stringify_add_char(' ');
 	stringify_whitespace = t->whitespace_after;
+	const char *str = NULL;
 	switch (t->type) {
 	case T_STRING:
 	case T_CHARACTER_CONSTANT:
@@ -192,13 +196,35 @@ static void stringify_add(struct token *t, int start) {
 			char escape_seq[5];
 			character_to_escape_sequence(t->str.str[i], escape_seq, 1);
 			for (int j = 0; escape_seq[j]; j++)
-				ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = escape_seq[j];
+				stringify_add_char(escape_seq[j]);
 		}
+		break;
+
+#define KEY(A, B)
+#define X(A, B)
+#define SYM(TOKEN, STR) case TOKEN: str = STR; break;
+		#include "tokens.h"
+#undef KEY
+#undef X
+#undef SYM
+
+	case PP_HASH:
+	case PP_DIRECTIVE:
+		str = "#";
+		break;
+
+	case PP_HHASH:
+		str = "##";
 		break;
 
 	default:
 		for (int i = 0; i < t->str.len; i++)
-			ADD_ELEMENT(stringify_size, stringify_cap, stringify_buffer) = t->str.str[i];
+			stringify_add_char(t->str.str[i]);
+	}
+
+	if (str) {
+		for (int i = 0; str[i]; i++)
+			stringify_add_char(str[i]);
 	}
 }
 

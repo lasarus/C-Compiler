@@ -4,6 +4,7 @@
 
 #include <errno.h>
 #include <assert.h>
+#include <limits.h>
 
 static size_t paths_size = 0, paths_cap;
 static const char **paths = NULL;
@@ -18,102 +19,20 @@ void input_reset(void) {
 	disabled_headers = (struct string_set) { 0 };
 }
 
-static void read_contents(struct input *input, FILE *fp) {
-	int c;
-	while ((c = fgetc(fp)) != EOF) {
-		ADD_ELEMENT(input->contents_size, input->contents_cap, input->contents) = c;
-	}
-	ADD_ELEMENT(input->contents_size, input->contents_cap, input->contents) = '\0';
-}
-
-static struct input *input_create(const char *filename, FILE *fp) {
+static struct input *input_create(const char *path, FILE *fp) {
 	struct input input = {
-		.filename = filename,
-		.iline = 1, .icol = 1,
+		.path = path,
 	};
 
-	read_contents(&input, fp);
+	fseek(fp, 0, SEEK_END);
+	size_t size = ftell(fp);
+	rewind(fp);
 
-	// Read, and ignore, BOM (byte order mark).
-	// BOM signifies that the text file is utf-8.
-	// It has the form: 0xef 0xbb 0xbf.
-	if ((unsigned char)input.contents[0] == 0xef &&
-		(unsigned char)input.contents[1] == 0xbb &&
-		(unsigned char)input.contents[2] == 0xbf) {
-		for (int i = 0; i < 3; i++)
-			input_next(&input);
-	}
-
-	// Buffer should be initialized at the start.
-	for (int i = 0; i < N_BUFF - 1; i++)
-		input_next(&input);
-	input.c[0] = '\n'; // Needs to start with newline.
+	input.contents = cc_malloc(size + 1);
+	fread(input.contents, size, 1, fp);
+	input.contents[size] = '\0';
 
 	return ALLOC(input);
-}
-
-struct input input_open_string(char *str) {
-	size_t len = strlen(str);
-	struct input input = {
-		.filename = "<string>",
-		.iline = 1, .icol = 1,
-		.contents_cap = len,
-		.contents_size = len,
-		.contents = str
-	};
-
-	// Buffer should be initialized at the start.
-	for (int i = 0; i < N_BUFF - 1; i++)
-		input_next(&input);
-	input.c[0] = '\n'; // Needs to start with newline.
-
-	return input;
-}
-
-static char next_char(struct input *input) {
-	// Replace "\\\n" with "", "\\\r\n" with "", and "\r\n" with "\n".
-	for (;;) {
-		if (input->c_ptr >= input->contents_size) {
-			return '\0';
-		} else if (input->contents[input->c_ptr] == '\\' &&
-			   input->contents[input->c_ptr + 1] == '\n') {
-			input->c_ptr += 2;
-			input->iline++;
-			input->icol = 0;
-		} else if (input->contents[input->c_ptr] == '\\' &&
-			   input->contents[input->c_ptr + 1] == '\r' &&
-			   input->contents[input->c_ptr + 2] == '\n') {
-			input->c_ptr += 3;
-			input->iline++;
-			input->icol = 0;
-		} else if (input->contents[input->c_ptr] == '\r' &&
-			   input->contents[input->c_ptr + 1] == '\n') {
-			input->c_ptr += 1;
-		} else {
-			break;
-		}
-	}
-
-	if (input->contents[input->c_ptr] == '\n') {
-		input->iline++;
-		input->icol = 0;
-	}
-
-	input->icol++;
-
-	return input->contents[input->c_ptr++];
-}
-
-void input_next(struct input *input) {
-	for (int i = 0; i < N_BUFF - 1; i++) {
-		input->c[i] = input->c[i + 1];
-		input->pos[i] = input->pos[i + 1];
-	}
-
-	input->c[N_BUFF - 1] = next_char(input);
-	input->pos[N_BUFF - 1] = (struct position) {
-		input->filename, input->iline, input->icol
-	};
 }
 
 void input_add_include_path(const char *path) {
@@ -140,39 +59,33 @@ static FILE *try_open_file(const char *path) {
 
 #define BUFFER_SIZE 256
 
-static FILE *try_open_local_path(struct input *input, const char *path, char *path_buffer) {
-	int last_slash = last_slash_pos(input->filename);
+static FILE *try_open_local_path(const char *parent_path, const char *path, char *path_buffer) {
+	int last_slash = last_slash_pos(parent_path);
 	if (last_slash && path[0] != '/')
-		assert(snprintf(path_buffer, BUFFER_SIZE, "%.*s/%s", last_slash, input->filename, path) < BUFFER_SIZE);
+		assert(snprintf(path_buffer, BUFFER_SIZE, "%.*s/%s", last_slash, parent_path, path) < BUFFER_SIZE);
 	else
 		assert(snprintf(path_buffer, BUFFER_SIZE, "%s", path) < BUFFER_SIZE);
 	return try_open_file(path_buffer);
 }
 
-struct input *input_open(struct input *parent_input, const char *path, int system) {
+struct input *input_open(const char *parent_path, const char *path, int system) {
 	FILE *fp = NULL;
 
 	char path_buffer[BUFFER_SIZE]; // TODO: Remove arbitrary limit.
 
-	if (parent_input) {
-		if (!system)
-			fp = try_open_local_path(parent_input, path, path_buffer);
+	if (!system)
+		fp = try_open_local_path(parent_path, path, path_buffer);
 
-		for (unsigned i = 0; !fp && i < paths_size; i++) {
-			assert(snprintf(path_buffer, BUFFER_SIZE, "%s/%s", paths[i], path) < BUFFER_SIZE);
-			fp = try_open_file(path_buffer);
-		}
-
-		if (!fp && system)
-			fp = try_open_local_path(parent_input, path, path_buffer);
-	} else {
-		assert(snprintf(path_buffer, BUFFER_SIZE, "%s", path) < BUFFER_SIZE);
+	for (unsigned i = 0; !fp && i < paths_size; i++) {
+		assert(snprintf(path_buffer, BUFFER_SIZE, "%s/%s", paths[i], path) < BUFFER_SIZE);
 		fp = try_open_file(path_buffer);
 	}
 
-	if (!fp) {
-		ICE("\"%s\" not found in search path, with origin %s", path, parent_input ? parent_input->filename : (const char *)".");
-	}
+	if (!fp && system)
+		fp = try_open_local_path(parent_path, path, path_buffer);
+
+	if (!fp)
+		ICE("\"%s\" not found in search path, with origin %s", path, parent_path ? parent_path : (const char *)".");
 
 	if (string_set_contains(disabled_headers, sv_from_str(path_buffer))) {
 		fclose(fp);
@@ -191,6 +104,6 @@ void input_disable_path(const char *path) {
 }
 
 void input_free(struct input *input) {
-	free(input->contents);
+	// TODO: Handle the freeing of tokens somehow.
 	free(input);
 }
