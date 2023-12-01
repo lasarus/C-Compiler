@@ -25,6 +25,22 @@ char *allocate_printf(const char *fmt, ...) {
 	return str;
 }
 
+void expand_printf(char **buffer, size_t *capacity, const char *fmt, ...) {
+	va_list args1, args2;
+	va_start(args1, fmt);
+	va_copy(args2, args1);
+	size_t size = vsnprintf(NULL, 0, fmt, args1) + 1;
+
+	if (size > *capacity) {
+		*buffer = cc_realloc(*buffer, size);
+		*capacity = size;
+	}
+
+	vsprintf(*buffer, fmt, args2);
+	va_end(args1);
+	va_end(args2);
+}
+
 int round_up_to_nearest(int num, int div) {
 	int r = num % div;
 	if (r)

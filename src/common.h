@@ -34,6 +34,7 @@ void impl_warning(struct position pos, const char *fmt, ...);
 uint32_t hash32(uint32_t a);
 
 char *allocate_printf(const char *fmt, ...);
+void expand_printf(char **buffer, size_t *capacity, const char *fmt, ...);
 
 int round_up_to_nearest(int num, int div);
 

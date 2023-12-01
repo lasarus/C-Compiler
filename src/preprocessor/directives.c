@@ -73,21 +73,20 @@ void directiver_reset(void) {
 
 void directiver_push_input(const char *path, int system) {
 	const char *parent_path = current_file ? current_file->path : ".";
-	struct input *new_input = input_open(parent_path, path, system);
+	struct input new_input = input_open(parent_path, path, system);
+
+	if (!new_input.path)
+		return;
 
 	if (write_dependencies)
-		ADD_ELEMENT(dep_size, dep_cap, deps) = strdup(new_input->path);
-
-	if (!new_input)
-		return;
+		ADD_ELEMENT(dep_size, dep_cap, deps) = strdup(new_input.path);
 
 	current_file = ALLOC((struct tokenized_file) {
 			.parent = current_file,
 			.token_idx = 0,
-			.tokens = tokenize_input(new_input->contents, new_input->path),
-			.path = strdup(new_input->path),
+			.tokens = tokenize_input(new_input.contents, new_input.path),
+			.path = strdup(new_input.path),
 		});
-	input_free(new_input);
 }
 
 static struct token next(void);
