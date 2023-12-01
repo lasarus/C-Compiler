@@ -19,7 +19,7 @@ static const int precedence_table[T_COUNT] = {
 	[T_COMMA] = 1,
 };
 
-int precedence_get(enum ttype token_type, int loop) {
+int precedence_get(ttype token_type, int loop) {
 	int prec = precedence_table[token_type];
 	if (!loop && prec == ASSIGNMENT_PREC + 1)
 		return ASSIGNMENT_PREC;

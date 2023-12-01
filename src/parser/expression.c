@@ -354,7 +354,6 @@ static void fix_assignment_operators(struct expr *expr) {
 		if (expr->args[0]->cast.arg->type == E_CAST)
 			expr->args[0]->cast.arg = expr->args[0]->cast.arg->cast.arg;
 
-		//expr->assignment_op.cast = expr->args[0]->cast.target;
 		expr->args[0] = expr->args[0]->cast.arg;
 	}
 	int lhs_ptr = type_is_pointer(expr->args[0]->data_type);

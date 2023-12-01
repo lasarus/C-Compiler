@@ -63,7 +63,7 @@ static struct evaluated_expression ms_expr_call(struct evaluated_expression *cal
 
 	int stack_sub = MAX(32, round_up_to_nearest(n * 8, 16));
 
-	ir_modify_stack_pointer(-stack_sub - shadow_space);
+	struct node *call_stack = ir_allocate_call_stack(-stack_sub - shadow_space);
 	int current_mem = 0;
 	for (int i = 0; i < n; i++) {
 		struct node *reg_to_push = arg_addresses[i];
@@ -77,23 +77,25 @@ static struct evaluated_expression ms_expr_call(struct evaluated_expression *cal
 			is_floating[register_idx] = (i < callee_type->n - 1) ? type_is_floating(argument_types[i]) : 0;
 			registers[register_idx++] = reg_to_push;
 		} else {
-			ir_store_stack_relative(reg_to_push, current_mem + shadow_space);
+			call_stack = ir_store_stack_relative(call_stack, reg_to_push, current_mem + shadow_space);
 			current_mem += 8;
 		}
 	}
 
+	struct node *reg_state = NULL;
 	for (int i = 0; i < register_idx; i++) {
 		if (is_floating[i])
-			ir_set_reg(registers[i], i, 1);
+			reg_state = ir_set_reg(registers[i], reg_state, i, 1);
 		else
-			ir_set_reg(registers[i], calling_convention[i], 0);
+			reg_state = ir_set_reg(registers[i], reg_state, calling_convention[i], 0);
 	}
 
-	ir_call(callee_var, REG_RBX);
+	struct node *reg_source = NULL;
+	ir_call(callee_var, reg_state, call_stack, REG_RBX, &reg_source);
 
 	struct evaluated_expression result;
 	if (ret_in_register) {
-		struct node *variable = ir_get_reg(calculate_size(return_type), REG_RAX, type_is_floating(return_type));
+		struct node *variable = ir_get_reg(reg_source, calculate_size(return_type), REG_RAX, type_is_floating(return_type));
 		result = (struct evaluated_expression) {
 			.type = EE_VARIABLE,
 			.data_type = return_type,
@@ -111,29 +113,29 @@ static struct evaluated_expression ms_expr_call(struct evaluated_expression *cal
 		};
 	}
 
-	ir_modify_stack_pointer(+stack_sub + shadow_space);
+	ir_allocate_call_stack(+stack_sub + shadow_space);
 
 	return result;
 }
 
-static void ms_expr_function(struct type *function_type, struct symbol_identifier **args, const char *name, int is_global) {
+static void ms_expr_function(struct node *func, struct type *function_type, struct symbol_identifier **args) {
 	struct type *return_type = function_type->children[0];
 	int n_args = function_type->n - 1;
 
-	struct function *func = new_function();
-	*func = (struct function) {
-		.name = name,
-		.is_global = is_global,
-	};
-
 	struct ms_data abi_data = { 0 };
 
-	ir_block_start(new_block());
+	struct node *first_block = new_block();
+	first_block->type = IR_PROJECT;
+	first_block->index = 0;
+	node_set_argument(first_block, 0, func);
+	ir_block_start(first_block);
+	struct node *reg_source = ir_project(func, 1, 0);
+	struct node *call_stack = ir_project(func, 2, 0);
 
 	int register_idx = 0;
 	if (!type_is_simple(return_type, ST_VOID) && !fits_into_reg(return_type)) {
 		abi_data.returns_address = 1;
-		abi_data.ret_address = ir_get_reg(8, calling_convention[register_idx++], type_is_floating(return_type));
+		abi_data.ret_address = ir_get_reg(reg_source, 8, calling_convention[register_idx++], type_is_floating(return_type));
 	}
 
 	if (function_type->function.is_variadic) {
@@ -141,9 +143,9 @@ static void ms_expr_function(struct type *function_type, struct symbol_identifie
 		abi_data.n_args = n_args;
 	}
 
-	abi_data.rbx_store = ir_get_reg(8, REG_RBX, 0);
-	abi_data.rdi_store = ir_get_reg(8, REG_RDI, 0);
-	abi_data.rsi_store = ir_get_reg(8, REG_RSI, 0);
+	abi_data.rbx_store = ir_get_reg(reg_source, 8, REG_RBX, 0);
+	abi_data.rdi_store = ir_get_reg(reg_source, 8, REG_RDI, 0);
+	abi_data.rsi_store = ir_get_reg(reg_source, 8, REG_RSI, 0);
 
 	int current_mem = 0;
 
@@ -156,12 +158,12 @@ static void ms_expr_function(struct type *function_type, struct symbol_identifie
 
 		if (register_idx < 4) {
 			if (type_is_floating(function_type->children[i + 1])) {
-				inputs[i] = ir_get_reg(size, register_idx++, 1);
+				inputs[i] = ir_get_reg(reg_source, size, register_idx++, 1);
 			} else {
-				inputs[i] = ir_get_reg(size, calling_convention[register_idx++], 0);
+				inputs[i] = ir_get_reg(reg_source, size, calling_convention[register_idx++], 0);
 			}
 		} else {
-			inputs[i] = ir_load_base_relative(current_mem + 16 + shadow_space, size);
+			inputs[i] = ir_load_base_relative(call_stack, current_mem + 16 + shadow_space, size);
 			current_mem += 8;
 		}
 	}
@@ -183,29 +185,30 @@ static void ms_expr_function(struct type *function_type, struct symbol_identifie
 		}
 	}
 
-	func->abi_data = ALLOC(abi_data);
+	func->function.abi_data = ALLOC(abi_data);
 }
 
-static void ms_expr_return(struct function *func, struct evaluated_expression *value) {
-	struct ms_data *abi_data = func->abi_data;
+static void ms_expr_return(struct node *func, struct evaluated_expression *value, struct node **reg_state) {
+	struct ms_data *abi_data = func->function.abi_data;
 
+	*reg_state = NULL;
 	if (value->type != EE_VOID) {
 		if (abi_data->returns_address) {
 			struct node *value_address = evaluated_expression_to_address(value);
 			ir_copy_memory(abi_data->ret_address, value_address, calculate_size(value->data_type));
 		} else {
 			struct node *value_var = evaluated_expression_to_var(value);
-			ir_set_reg(value_var, 0, type_is_floating(value->data_type));
+			*reg_state = ir_set_reg(value_var, *reg_state, 0, type_is_floating(value->data_type));
 		}
 	}
 
-	ir_set_reg(abi_data->rbx_store, REG_RBX, 0);
-	ir_set_reg(abi_data->rdi_store, REG_RDI, 0);
-	ir_set_reg(abi_data->rsi_store, REG_RSI, 0);
+	*reg_state = ir_set_reg(abi_data->rbx_store, *reg_state, REG_RBX, 0);
+	*reg_state = ir_set_reg(abi_data->rdi_store, *reg_state, REG_RDI, 0);
+	*reg_state = ir_set_reg(abi_data->rsi_store, *reg_state, REG_RSI, 0);
 }
 
-static void ms_emit_function_preamble(struct function *func) {
-	struct ms_data *abi_data = func->abi_data;
+static void ms_emit_function_preamble(struct node *func) {
+	struct ms_data *abi_data = func->function.abi_data;
 
 	if (!abi_data->is_variadic)
 		return;
@@ -216,8 +219,8 @@ static void ms_emit_function_preamble(struct function *func) {
 	asm_ins2("movq", R8(REG_R9), MEM(40, REG_RBP));
 }
 
-static void ms_emit_va_start(struct node *result, struct function *func) {
-	struct ms_data *abi_data = func->abi_data;
+static void ms_emit_va_start(struct node *result, struct node *func) {
+	struct ms_data *abi_data = func->function.abi_data;
 
 	asm_ins2("leaq", MEM(abi_data->n_args * 8 + 16, REG_RBP), R8(REG_RAX));
 	scalar_to_reg(result, REG_RDX);

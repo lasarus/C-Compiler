@@ -26,6 +26,20 @@ void utf8_encode(uint32_t codepoint, char output[4]) {
 	}
 }
 
+int utf8_code_point_length(unsigned char s) {
+	if ((s & 0x80) == 0) {
+		return 1;
+	} else if ((s & 0xE0) == 0xC0) {
+		return 2;
+	} else if ((s & 0xF0) == 0xE0) {
+		return 3;
+	} else if ((s & 0xF8) == 0xF0) {
+		return 4;
+	} else {
+		ICE("Incorrectly encoded UTF-8, starting with %c\n", s);
+	}
+}
+
 uint32_t utf8_decode(const char **start) {
 	const unsigned char *s = (unsigned char *)*start;
 	int advance = 0;
@@ -50,7 +64,6 @@ uint32_t utf8_decode(const char **start) {
 		advance = 4;
 	} else {
 		ICE("Incorrectly encoded UTF-8, starting with %.16s\n", *start);
-		exit(1);
 	}
 
 	*start += advance;

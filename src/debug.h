@@ -11,6 +11,6 @@ struct type;
 const char *dbg_type(struct type *type);
 const char *dbg_instruction(struct node *ins);
 const char *dbg_token(struct token *t);
-const char *dbg_token_type(enum ttype tt);
+const char *dbg_token_type(ttype tt);
 
 #endif

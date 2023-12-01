@@ -97,7 +97,11 @@ int parse_labeled_statement(struct jump_blocks *jump_blocks) {
 		struct node *comparison = ir_equal(case_control,
 												  ir_constant(*constant));
 
-		ir_if_selection(comparison, block_case, new_entry);
+		struct node *block_true, *block_false;
+		ir_if_selection(comparison, &block_true, &block_false);
+
+		ir_connect(block_true, block_case);
+		ir_connect(block_false, new_entry);
 
 		ir_block_start(block_case);
 
@@ -194,10 +198,8 @@ int parse_selection_statement(struct jump_blocks *jump_blocks) {
 		struct node *condition = expression_to_ir(expr);
 
 		TEXPECT(T_RPAR);
-		struct node *block_true = new_block(),
-			*block_false = new_block();
-
-		ir_if_selection(condition, block_true, block_false);
+		struct node *block_true, *block_false;
+		ir_if_selection(condition, &block_true, &block_false);
 
 		ir_block_start(block_true);
 
@@ -213,8 +215,12 @@ int parse_selection_statement(struct jump_blocks *jump_blocks) {
 			ir_goto(block_end);
 			ir_block_start(block_end);
 		} else {
-			ir_goto(block_false);
+			struct node *block_end = new_block();
+			ir_goto(block_end);
 			ir_block_start(block_false);
+
+			ir_goto(block_end);
+			ir_block_start(block_end);
 		}
 
 		return 1;
@@ -255,7 +261,10 @@ static int parse_do_while_statement(struct jump_blocks *jump_blocks) {
 
 	TEXPECT(T_RPAR);
 
-	ir_if_selection(control_variable, block_body, block_end);
+	struct node *block_true, *block_false;
+	ir_if_selection(control_variable, &block_true, &block_false);
+	ir_connect(block_true, block_body);
+	ir_connect(block_false, block_end);
 
 	ir_block_start(block_end);
 
@@ -294,7 +303,11 @@ static int parse_while_statement(struct jump_blocks *jump_blocks) {
 
 	struct node *control_variable = expression_to_int(control_expression);
 
-	ir_if_selection(control_variable, block_body, block_end);
+	struct node *block_true, *block_false;
+	ir_if_selection(control_variable, &block_true, &block_false);
+
+	ir_connect(block_true, block_body);
+	ir_connect(block_false, block_end);
 
 	ir_block_start(block_body);
 
@@ -357,7 +370,10 @@ static int parse_for_statement(struct jump_blocks *jump_blocks) {
 	if (condition) {
 		struct node *condition_variable = expression_to_int(condition);
 
-		ir_if_selection(condition_variable, block_body, block_end);
+		struct node *block_true, *block_false;
+		ir_if_selection(condition_variable, &block_true, &block_false);
+		ir_connect(block_true, block_body);
+		ir_connect(block_false, block_end);
 	} else {
 		ir_goto(block_body);
 	}
@@ -453,8 +469,9 @@ int parse_jump_statement(struct jump_blocks *jump_blocks) {
 		if (expr)
 			value = expression_evaluate(expression_cast(expr, current_ret_val));
 
-		abi_expr_return(get_current_function(), &value);
-		ir_return();
+		struct node *reg_state = NULL;
+		abi_expr_return(get_current_function(), &value, &reg_state);
+		ir_return(reg_state);
 		ir_block_start(new_block());
 		return 1;
 	} else {
@@ -497,7 +514,8 @@ void parse_function(struct string_view name, struct type *type, int arg_n, struc
 
 	assert(type->type == TY_FUNCTION);
 
-	abi_expr_function(type, args, sv_to_str(name), global);
+	struct node *func = new_function(sv_to_str(name), global);
+	abi_expr_function(func, type, args);
 
 	type_evaluate_vla(type);
 
@@ -506,14 +524,16 @@ void parse_function(struct string_view name, struct type *type, int arg_n, struc
 
 	if (sv_string_cmp(name, "main")) {
 		struct node *b = get_current_block();
-		if (!b->block_info.jump_to && !b->block_info.return_) {
-			ir_return();
+		if (!b->block_info.end) {
+			struct node *reg_state = NULL;
 			struct constant c = constant_simple_signed(ST_INT, 0);
-			abi_expr_return(get_current_function(), &(struct evaluated_expression) { .type = EE_CONSTANT, .data_type = c.data_type, .constant = c});
+			abi_expr_return(get_current_function(), &(struct evaluated_expression) { .type = EE_CONSTANT, .data_type = c.data_type, .constant = c}, &reg_state);
+			ir_return(reg_state);
 		}
 	} else if (current_ret_val == type_simple(ST_VOID)) {
-		ir_return();
-		abi_expr_return(get_current_function(), &(struct evaluated_expression) { .type = EE_VOID });
+		struct node *reg_state = NULL;
+		abi_expr_return(get_current_function(), &(struct evaluated_expression) { .type = EE_VOID }, &reg_state);
+		ir_return(reg_state);
 	}
 	
 	symbols_pop_scope();

@@ -234,25 +234,27 @@ static struct evaluated_expression sysv_expr_call(struct evaluated_expression *c
 	}
 	int stack_sub = round_up_to_nearest(total_mem_needed, 16);
 
-	ir_modify_stack_pointer(-stack_sub - c.shadow_space);
+	struct node *call_stack = ir_allocate_call_stack(-stack_sub - c.shadow_space);
 
 	int current_mem = 0;
 	for (int i = 0; i < c.stack_variables_size; i++) {
 		int size = calculate_size(argument_types[c.stack_variables[i]]);
-		ir_store_stack_relative_address(arg_addresses[c.stack_variables[i]], current_mem + c.shadow_space, size);
+		call_stack = ir_store_stack_relative_address(call_stack, arg_addresses[c.stack_variables[i]], current_mem + c.shadow_space, size);
 		current_mem += round_up_to_nearest(size, 8);
 	}
 
+	struct node *reg_state = NULL;
 	for (int i = 0; i < c.regs_size; i++)
-		ir_set_reg(reg_variables[i], c.regs[i].register_idx, c.regs[i].is_sse);
+		reg_state = ir_set_reg(reg_variables[i], reg_state, c.regs[i].register_idx, c.regs[i].is_sse);
 
 	if (c.rax != -1)
-		ir_set_reg(rax_constant, REG_RAX, 0);
+		reg_state = ir_set_reg(rax_constant, reg_state, REG_RAX, 0);
 
-	ir_call(callee_var, REG_RBX);
+	struct node *reg_source = NULL;
+	ir_call(callee_var, reg_state, call_stack, REG_RBX, &reg_source);
 
 	for (int i = 0; i < c.ret_regs_size; i++)
-		ret_reg_variables[i] = ir_get_reg(c.ret_regs[i].size, c.ret_regs[i].register_idx, c.ret_regs[i].is_sse);
+		ret_reg_variables[i] = ir_get_reg(reg_source, c.ret_regs[i].size, c.ret_regs[i].register_idx, c.ret_regs[i].is_sse);
 
 	struct evaluated_expression result;
 
@@ -284,31 +286,29 @@ static struct evaluated_expression sysv_expr_call(struct evaluated_expression *c
 		};
 	}
 
-	ir_modify_stack_pointer(+stack_sub + c.shadow_space);
-
 	return result;
 }
 
-static void sysv_expr_function(struct type *type, struct symbol_identifier **args, const char *name, int is_global) {
+static void sysv_expr_function(struct node *func, struct type *type, struct symbol_identifier **args) {
 	int n_args = type->n - 1;
 	struct node *reg_variables[sizeof calling_convention / sizeof *calling_convention];
 
-	struct function *func = new_function();
-	*func = (struct function) {
-		.name = name,
-		.is_global = is_global,
-	};
-
 	struct sysv_data abi_data = { 0 };
 
-	ir_block_start(new_block());
+	struct node *first_block = new_block();
+	first_block->type = IR_PROJECT;
+	first_block->project.index = 0;
+	node_set_argument(first_block, 0, func);
+	ir_block_start(first_block);
+	struct node *reg_source = ir_project(func, 1, 0);
+	struct node *call_stack = ir_project(func, 2, 0);
 
 	struct call_info c = get_calling_convention(type, n_args, type->children + 1);
 
-	abi_data.rbx_store = ir_get_reg(8, REG_RBX, 0);
+	abi_data.rbx_store = ir_get_reg(reg_source, 8, REG_RBX, 0);
 
 	for (int i = 0; i < c.regs_size; i++)
-		reg_variables[i] = ir_get_reg(c.regs[i].size, c.regs[i].register_idx, c.regs[i].is_sse);
+		reg_variables[i] = ir_get_reg(reg_source, c.regs[i].size, c.regs[i].register_idx, c.regs[i].is_sse);
 	
 	if (c.returns_address) {
 		abi_data.ret_address = reg_variables[c.ret_address_index];
@@ -338,7 +338,7 @@ static void sysv_expr_function(struct type *type, struct symbol_identifier **arg
 		struct type *arg_type = type->children[idx + 1];
 		int size = calculate_size(arg_type);
 
-		ir_load_base_relative_address(address, current_mem + 16 + c.shadow_space, size);
+		ir_load_base_relative_address(call_stack, address, current_mem + 16 + c.shadow_space, size);
 		current_mem += round_up_to_nearest(size, 8);
 		total_mem_needed += round_up_to_nearest(size, 8);
 	}
@@ -360,12 +360,12 @@ static void sysv_expr_function(struct type *type, struct symbol_identifier **arg
 		abi_data.overflow_position = total_mem_needed + 16;
 	}
 
-	func->abi_data = ALLOC(abi_data);
+	func->function.abi_data = ALLOC(abi_data);
 }
 
-static void sysv_expr_return(struct function *func, struct evaluated_expression *value) {
+static void sysv_expr_return(struct node *func, struct evaluated_expression *value, struct node **reg_state) {
 	enum parameter_class classes[4];
-	struct sysv_data *abi_data = func->abi_data;
+	struct sysv_data *abi_data = func->function.abi_data;
 	int n_parts = 0;
 
 	if (value->type == EE_VOID)
@@ -373,32 +373,33 @@ static void sysv_expr_return(struct function *func, struct evaluated_expression 
 
 	classify(value->data_type, &n_parts, classes);
 
+	*reg_state = NULL;
 	if (n_parts == 1 && classes[0] == CLASS_MEMORY) {
 		struct node *value_address = evaluated_expression_to_address(value);
 		ir_copy_memory(abi_data->ret_address, value_address, calculate_size(value->data_type));
 	} else if (n_parts == 1 && classes[0] == CLASS_INTEGER) {
 		struct node *value_var = evaluated_expression_to_var(value);
-		ir_set_reg(value_var, return_convention[0], 0);
+		*reg_state = ir_set_reg(value_var, *reg_state, return_convention[0], 0);
 	} else if (n_parts == 2 && classes[0] == CLASS_INTEGER) {
 		struct node *value_address = evaluated_expression_to_address(value);
 		struct node *parts[2];
 		split_variable(value_address, 2, parts);
 		
-		ir_set_reg(parts[0], return_convention[0], 0);
-		ir_set_reg(parts[1], return_convention[1], 0);
+		*reg_state = ir_set_reg(parts[0], *reg_state, return_convention[0], 0);
+		*reg_state = ir_set_reg(parts[1], *reg_state, return_convention[1], 0);
 	} else if (n_parts == 1 && classes[0] == CLASS_SSE) {
 		struct node *value_var = evaluated_expression_to_var(value);
-		ir_set_reg(value_var, 0, 1);
+		*reg_state = ir_set_reg(value_var, *reg_state, 0, 1);
 	} else {
 		NOTIMP();
 	}
 
 unclobber:
-	ir_set_reg(abi_data->rbx_store, REG_RBX, 0);
+	*reg_state = ir_set_reg(abi_data->rbx_store, *reg_state, REG_RBX, 0);
 }
 
-static void sysv_emit_function_preamble(struct function *func) {
-	struct sysv_data *abi_data = func->abi_data;
+static void sysv_emit_function_preamble(struct node *func) {
+	struct sysv_data *abi_data = func->function.abi_data;
 
 	if (!abi_data->is_variadic)
 		return;
@@ -412,8 +413,8 @@ static void sysv_emit_function_preamble(struct function *func) {
 	asm_ins2("movq", R8(REG_R9), MEM(40 - position, REG_RBP));
 }
 
-static void sysv_emit_va_start(struct node *result, struct function *func) {
-	struct sysv_data *abi_data = func->abi_data;
+static void sysv_emit_va_start(struct node *result, struct node *func) {
+	struct sysv_data *abi_data = func->function.abi_data;
 	int gp_offset_offset = builtin_va_list->fields[0].offset;
 	int fp_offset_offset = builtin_va_list->fields[1].offset;
 	int overflow_arg_area_offset = builtin_va_list->fields[2].offset;
@@ -530,7 +531,7 @@ void abi_init_sysv(void) {
 	abi_info.ptrdiff_type = ST_LONG;
 
 	abi_expr_call = sysv_expr_call;
-	abi_expr_function= sysv_expr_function;
+	abi_expr_function = sysv_expr_function;
 
 	abi_expr_return = sysv_expr_return;
 	abi_emit_function_preamble = sysv_emit_function_preamble;

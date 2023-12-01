@@ -6,6 +6,6 @@
 #define PREFIX_PREC 13
 #define ASSIGNMENT_PREC 1
 
-int precedence_get(enum ttype token_type, int loop);
+int precedence_get(ttype token_type, int loop);
 
 #endif

@@ -45,4 +45,8 @@ int main(void) {
 		int 𒈓 = 0;
 		char *𒈔 = 0;
 	}
+
+	assert(func\U00012213(2) == 2);
+	assert(func\\
+U00012213(2) == 2);
 }

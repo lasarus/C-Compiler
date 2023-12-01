@@ -10,7 +10,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-enum ttype {
+typedef unsigned char ttype;
+
+enum {
 #define X(A, B) A,
 #define KEY(A, B) A,
 #define SYM(A, B) A,
@@ -22,7 +24,7 @@ enum ttype {
 };
 
 struct token {
-    enum ttype type;
+    ttype type;
 
 	struct string_view str;
 

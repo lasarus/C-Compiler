@@ -8,7 +8,7 @@
 
 #include <assert.h>
 
-static enum ttype get_ident(struct string_view str) {
+static ttype get_ident(struct string_view str) {
 #define X(A, B)
 #define SYM(A, B)
 #define KEY(A, B) if(sv_string_cmp(str, B)) { return A; }

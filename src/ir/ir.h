@@ -4,38 +4,55 @@
 #include "operators.h"
 #include <codegen/rodata.h>
 
-struct node;
+// Extra variables:
+// state (memory, registers)
+
+#define IR_MAX 4
 
 struct node {
 	enum {
-		IR_ADD, IR_SUB,
-		IR_MUL, IR_IMUL,
-		IR_DIV, IR_IDIV,
-		IR_MOD, IR_IMOD,
-		IR_LSHIFT, IR_RSHIFT, IR_IRSHIFT,
-		IR_BXOR, IR_BOR, IR_BAND,
-		IR_LESS, IR_ILESS,
-		IR_GREATER, IR_IGREATER,
-		IR_LESS_EQ, IR_ILESS_EQ,
-		IR_GREATER_EQ, IR_IGREATER_EQ,
-		IR_EQUAL, IR_NOT_EQUAL,
-
-		IR_FLT_ADD, IR_FLT_SUB,
-		IR_FLT_MUL, IR_FLT_DIV,
-		IR_FLT_LESS, IR_FLT_GREATER,
+		IR_ADD,
+		IR_SUB,
+		IR_MUL,
+		IR_IMUL,
+		IR_DIV,
+		IR_IDIV,
+		IR_MOD,
+		IR_IMOD,
+		IR_LSHIFT,
+		IR_RSHIFT,
+		IR_IRSHIFT,
+		IR_BXOR,
+		IR_BOR,
+		IR_BAND,
+		IR_LESS,
+		IR_ILESS,
+		IR_GREATER,
+		IR_IGREATER,
+		IR_LESS_EQ,
+		IR_ILESS_EQ,
+		IR_GREATER_EQ,
+		IR_IGREATER_EQ,
+		IR_EQUAL,
+		IR_NOT_EQUAL,
+		IR_FLT_ADD,
+		IR_FLT_SUB,
+		IR_FLT_MUL,
+		IR_FLT_DIV,
+		IR_FLT_LESS,
+		IR_FLT_GREATER,
 		IR_FLT_LESS_EQ,
 		IR_FLT_GREATER_EQ,
 		IR_FLT_EQUAL,
 		IR_FLT_NOT_EQUAL,
-
 		IR_NEGATE_INT,
 		IR_NEGATE_FLOAT,
 		IR_BINARY_NOT,
 		IR_ALLOC,
+		IR_LOAD_VOLATILE,
 		IR_LOAD,
 		IR_STORE,
 		IR_CONSTANT,
-		IR_CONSTANT_ADDRESS,
 		IR_CALL,
 		IR_BOOL_CAST,
 		IR_INT_CAST_ZERO,
@@ -46,34 +63,33 @@ struct node {
 		IR_UINT_FLOAT_CAST,
 		IR_SET_ZERO_PTR,
 		IR_VA_START,
-		IR_VA_ARG, //IR_VA_COPY,
+		IR_VA_ARG,
 		IR_VLA_ALLOC,
 		IR_COPY_MEMORY,
-
 		IR_LOAD_PART_ADDRESS,
 		IR_STORE_PART_ADDRESS,
-
-		// You should be careful with these instructions.
-		// They are here to allow for easier implementation
-		// of different calling conventions.
-		// Registers might be overwritten by other instructions.
 		IR_SET_REG,
 		IR_GET_REG,
-		IR_MODIFY_STACK_POINTER,
+		IR_ALLOCATE_CALL_STACK,
 		IR_STORE_STACK_RELATIVE,
-		IR_LOAD_BASE_RELATIVE,
-
 		IR_STORE_STACK_RELATIVE_ADDRESS,
+		IR_LOAD_BASE_RELATIVE,
 		IR_LOAD_BASE_RELATIVE_ADDRESS,
-
 		IR_PHI,
-		IR_BLOCK,
+		IR_REGION,
+		IR_PROJECT,
 		IR_IF,
+		IR_RETURN,
+		IR_FUNCTION,
+		IR_ZERO,
+		IR_DEAD,
+		IR_UNDEFINED,
 
 		IR_COUNT
 	} type;
 
-	struct node *arguments[2];
+	struct node *arguments[IR_MAX];
+	struct node *projects[4];
 
 	union {
 		struct {
@@ -102,7 +118,7 @@ struct node {
 
 		struct {
 			int change;
-		} modify_stack_pointer;
+		} allocate_call_stack;
 
 		struct {
 			int offset;
@@ -121,7 +137,7 @@ struct node {
 		} load_base_relative_address;
 
 		struct {
-			int size, stack_location, save_to_preamble;
+			int size, stack_location;
 		} alloc;
 
 		struct {
@@ -141,12 +157,18 @@ struct node {
 		} copy_memory;
 
 		struct {
-			struct node *block_a, *block_b;
-		} phi;
+			int index;
+		} project;
 
 		struct {
-			label_id label;
-		} block;
+			int is_global;
+			const char *name;
+			int preamble_alloc;
+
+			int uses_va;
+
+			void *abi_data;
+		} function;
 	};
 
 	int index;
@@ -155,6 +177,10 @@ struct node {
 	int spans_block;
 	struct node *first_block;
 	int used;
+	int visited;
+	struct node *parent_function, *block;
+
+	struct node *scratch;
 
 	union {
 		struct {
@@ -172,42 +198,47 @@ struct node {
 
 		struct {
 			int stack_counter; // Used in codegen for allocating variables local to block.
-			struct node *jump_to;
-			int return_;
+			struct node *end;
+			struct node *state, *incomplete_phi;
+			int is_sealed;
+			label_id label;
+
+			size_t children_size, children_cap;
+			struct node **children;
+
+			int post_idx, dom_depth;
+			struct node *idom; // Immediate dominator of block.
 		} block_info;
 	};
 
 	struct node *next, *child;
+
+	size_t use_size, use_cap;
+	struct node **uses;
 };
+
+int node_is_control(struct node *node);
+int node_argument_count(struct node *node);
+int node_is_instruction(struct node *node);
+int node_is_tuple(struct node *node);
 
 struct node *new_block(void);
-struct function *new_function(void);
+struct node *new_function(const char *name, int is_global);
 
-extern struct function *first_function;
-
-struct function {
-	int is_global;
-	const char *name;
-
-	int uses_va;
-
-	struct node *first;
-
-	void *abi_data;
-
-	struct function *next;
-};
+extern struct node *first_function;
 
 void ir_block_start(struct node *block);
 
-void ir_if_selection(struct node *condition, struct node *block_true, struct node *block_false);
+void ir_if_selection(struct node *condition, struct node **block_true, struct node **block_false);
 void ir_goto(struct node *jump);
 void ir_connect(struct node *start, struct node *end);
-void ir_return(void);
+struct node *ir_region(struct node *a, struct node *b);
+void ir_return(struct node *reg_state);
 
 void ir_init_ptr(struct initializer *init, struct type *type, struct node *ptr);
 
-struct function *get_current_function(void);
+struct node *get_current_function(void);
+void set_current_function(struct node *function);
 struct node *get_current_block(void);
 
 void ir_reset(void);
@@ -220,7 +251,7 @@ void ir_va_arg(struct node *array, struct node *result_address, struct type *typ
 
 void ir_store(struct node *address, struct node *value);
 struct node *ir_load(struct node *address, int size);
-struct node *ir_phi(struct node *var_a, struct node *var_b, struct node *block_a, struct node *block_b);
+struct node *ir_phi(struct node *var_a, struct node *var_b);
 struct node *ir_bool_cast(struct node *operand);
 struct node *ir_cast_int(struct node *operand, int target_size, int sign_extend);
 struct node *ir_cast_float(struct node *operand, int target_size);
@@ -250,22 +281,23 @@ struct node *ir_get_bits(struct node *field, int offset, int length, int sign_ex
 struct node *ir_get_offset(struct node *base_address, int offset);
 
 struct node *ir_constant(struct constant constant);
-void ir_write_constant_to_address(struct constant constant, struct node *address);
 
-void ir_call(struct node *callee, int non_clobbered_register);
+void ir_call(struct node *callee, struct node *reg_state, struct node *call_stack,
+			 int non_clobbered_register,
+			 struct node **reg_source);
 struct node *ir_vla_alloc(struct node *length);
 
-void ir_set_reg(struct node *variable, int register_index, int is_sse);
-struct node *ir_get_reg(int size, int register_index, int is_sse);
+struct node *ir_set_reg(struct node *variable, struct node *reg_state, int register_index, int is_sse);
+struct node *ir_get_reg(struct node *source, int size, int register_index, int is_sse);
 
 struct node *ir_allocate(int size);
-struct node *ir_allocate_preamble(int size);
+void ir_allocate_preamble(int size);
 
-void ir_modify_stack_pointer(int change);
-void ir_store_stack_relative(struct node *variable, int offset);
-void ir_store_stack_relative_address(struct node *variable, int offset, int size);
-struct node *ir_load_base_relative(int offset, int size);
-void ir_load_base_relative_address(struct node *address, int offset, int size);
+struct node *ir_allocate_call_stack(int change);
+struct node *ir_store_stack_relative(struct node *call_stack, struct node *variable, int offset);
+struct node *ir_store_stack_relative_address(struct node *call_stack, struct node *variable, int offset, int size);
+struct node *ir_load_base_relative(struct node *call_stack, int offset, int size);
+void ir_load_base_relative_address(struct node *call_stack, struct node *address, int offset, int size);
 
 void ir_set_zero_ptr(struct node *address, int size);
 
@@ -273,5 +305,24 @@ struct node *ir_load_part_address(struct node *address, int offset, int size);
 void ir_store_part_address(struct node *address, struct node *value, int offset);
 
 void ir_copy_memory(struct node *destination, struct node *source, int size);
+
+void node_set_argument(struct node *node, int index, struct node *argument);
+struct node *ir_project(struct node *node, int index, int size);
+struct node *ir_zero(int size);
+
+void ir_schedule_blocks(void);
+void ir_local_schedule(void);
+void ir_seal_blocks(void);
+
+void ir_get_node_list(struct node ***nodes, size_t *size);
+
+void ir_replace_node(struct node *original, struct node *replacement);
+
+struct node *node_get_prev_state(struct node *node);
+
+struct node *ir_new(int type, int size);
+struct node *ir_new1(int type, struct node *op, int size);
+struct node *ir_new2(int type, struct node *op1, struct node *op2, int size);
+struct node *ir_new3(int type, struct node *op1, struct node *op2, struct node *op3, int size);
 
 #endif

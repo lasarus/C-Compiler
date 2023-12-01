@@ -112,7 +112,7 @@ void define_string(char *name, char *value) {
 // combining two token types to
 // get another. The strings are simply
 // concatenated in all these cases.
-enum ttype paste_table[][3] = {
+ttype paste_table[][3] = {
 	{T_IDENT, T_IDENT, T_IDENT},
 	{T_IDENT, T_NUM, T_IDENT},
 	{T_IDENT, T_IDENT, T_IDENT},

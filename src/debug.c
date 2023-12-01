@@ -1,4 +1,5 @@
 #include "debug.h"
+#include "ir/ir.h"
 
 #include <common.h>
 #include <codegen/registers.h>
@@ -101,124 +102,163 @@ const char *dbg_instruction(struct node *ins) {
 
 	int curr_pos = 0;
 
+	DBG_PRINT("%d = ", ins->index);
+
+	int n_args = node_argument_count(ins);
+	const char *str = NULL;
+
 	switch (ins->type) {
-	case IR_CONSTANT:
-		DBG_PRINT("%d = constant", ins->index);
+	case IR_BINARY_NOT: str = "~%d"; break;
+	case IR_NEGATE_INT: str = "-%d"; break;
+	case IR_NEGATE_FLOAT: str = "-%d (float)"; break;
+	case IR_LOAD_VOLATILE: str = "load_volatile %d, state: %d"; break;
+	case IR_LOAD: str = "load %d, state: %d"; break;
+	case IR_STORE: str = "store %d %d, state: %d"; break;
+	case IR_INT_CAST_ZERO: str = "int_cast_zero %d"; break;
+	case IR_INT_CAST_SIGN: str = "int_cast_zero %d"; break;
+	case IR_BOOL_CAST: str = "bool_cast %d"; break;
+	case IR_FLOAT_CAST: str = "float_cast %d"; break;
+	case IR_INT_FLOAT_CAST: str = "int_float_cast %d"; break;
+	case IR_UINT_FLOAT_CAST: str = "uint_float_cast %d"; break;
+	case IR_FLOAT_INT_CAST: str = "float_int_cast %d"; break;
+	case IR_VA_START: str = "va_start %d"; break;
+	case IR_ADD: str = "%d + %d"; break;
+	case IR_SUB: str = "%d - %d"; break;
+	case IR_MUL: str = "%d * %d"; break;
+	case IR_IMUL: str = "%d * %d (signed)"; break;
+	case IR_DIV: str = "%d / %d"; break;
+	case IR_IDIV: str = "%d / %d (signed)"; break;
+	case IR_MOD: str = "%d %% %d"; break;
+	case IR_IMOD: str = "%d %% %d (signed)"; break;
+	case IR_LSHIFT: str = "%d << %d"; break;
+	case IR_RSHIFT: str = "%d >> %d"; break;
+	case IR_IRSHIFT: str = "%d >> %d (signed)"; break;
+	case IR_BXOR: str = "%d ^ %d"; break;
+	case IR_BOR: str = "%d | %d"; break;
+	case IR_BAND: str = "%d & %d"; break;
+	case IR_LESS: str = "%d < %d"; break;
+	case IR_ILESS: str = "%d < %d (signed)"; break;
+	case IR_GREATER: str = "%d > %d"; break;
+	case IR_IGREATER: str = "%d > %d (signed)"; break;
+	case IR_LESS_EQ: str = "%d <= %d"; break;
+	case IR_ILESS_EQ: str = "%d <= %d (signed)"; break;
+	case IR_GREATER_EQ: str = "%d >= %d"; break;
+	case IR_IGREATER_EQ: str = "%d >= %d (signed)"; break;
+	case IR_EQUAL: str = "%d == %d"; break;
+	case IR_NOT_EQUAL: str = "%d != %d"; break;
+	case IR_FLT_ADD: str = "%d + %d (float)"; break;
+	case IR_FLT_SUB: str = "%d - %d (float)"; break;
+	case IR_FLT_DIV: str = "%d / %d (float)"; break;
+	case IR_FLT_MUL: str = "%d * %d (float)"; break;
+	case IR_FLT_LESS: str = "%d < %d (float)"; break;
+	case IR_FLT_GREATER: str = "%d > %d (float)"; break;
+	case IR_FLT_LESS_EQ: str = "%d <= %d (float)"; break;
+	case IR_FLT_GREATER_EQ: str = "%d >= %d (float)"; break;
+	case IR_FLT_EQUAL: str = "%d == %d (float)"; break;
+	case IR_FLT_NOT_EQUAL: str = "%d != %d (float)"; break;
+	case IR_IF: str = "if %d %d"; break;
+	case IR_ZERO: str = "zero"; break;
+	case IR_DEAD: str = "dead"; break;
+	case IR_UNDEFINED: str = "undefined"; break;
+	case IR_PHI: {
+		DBG_PRINT("phi (region: %d)", ins->arguments[0]->index);
+
+		if (ins->arguments[1])
+			DBG_PRINT(" %d", ins->arguments[1]->index);
+		else
+			DBG_PRINT(" (NULL)");
+
+		if (ins->arguments[2])
+			DBG_PRINT(" %d", ins->arguments[2]->index);
+		else
+			DBG_PRINT(" (NULL)");
+	} break;
+	case IR_REGION:
+		if (n_args == 2) {
+			str = "region %d %d";
+		} else if (n_args == 1) {
+			str = "region %d";
+		} else {
+			str = "region";
+		}
+		break;
+	case IR_VLA_ALLOC: str = "vla_alloc %d"; break;
+	case IR_RETURN: str = "return %d, %d, %d"; break;
+
+	case IR_CONSTANT: // TODO: Print the constant.
+		DBG_PRINT("constant(%li)", ins->constant.constant.int_d);
 		break;
 
-	case IR_BINARY_NOT:
-		DBG_PRINT("%d = bnot(%d)", ins->index, ins->arguments[0]->index);
+	case IR_CALL: // TODO: Print non_clobbered_register.
+		str = "call %d";
 		break;
 
-	case IR_NEGATE_INT:
-		DBG_PRINT("%d = negate int(%d)", ins->index, ins->arguments[0]->index);
+	case IR_VA_ARG: // TODO: Print type.
+		str = "v_arg %d %d";
 		break;
 
-	case IR_NEGATE_FLOAT:
-		DBG_PRINT("%d = negate float(%d)", ins->index, ins->arguments[0]->index);
-		break;
+	case IR_LOAD_BASE_RELATIVE: str = "load %d relative to base"; break;
+	case IR_LOAD_BASE_RELATIVE_ADDRESS: str = "load %d relative to base"; break;
+	case IR_STORE_STACK_RELATIVE: str = "store %d into %d relative to stack"; break;
+	case IR_STORE_STACK_RELATIVE_ADDRESS: str = "store address %d into %d relative to stack"; break;
 
-	case IR_CALL:
-		DBG_PRINT("call %d ( ... args ... )", ins->index);
-		break;
-
-	case IR_LOAD:
-		DBG_PRINT("%d = load %d", ins->index, ins->arguments[0]->index);
-		break;
-
-	case IR_LOAD_BASE_RELATIVE:
-		DBG_PRINT("%d = load %d relative to base", ins->index, ins->load_base_relative.offset);
-		break;
-
-	case IR_LOAD_BASE_RELATIVE_ADDRESS:
-		DBG_PRINT("*%d = load %d relative to base", ins->index, ins->load_base_relative.offset);
-		break;
-
-	case IR_STORE:
-		DBG_PRINT("store %d into %d", ins->index, ins->arguments[0]->index);
-		break;
-
-	case IR_STORE_STACK_RELATIVE:
-		DBG_PRINT("store %d into %d relative to stack", ins->index, ins->store_stack_relative.offset);
-		break;
-
-	case IR_INT_CAST_ZERO:
-		DBG_PRINT("%d = int_cast_zero %d", ins->index, ins->arguments[0]->index);
-		break;
-
-	case IR_INT_CAST_SIGN:
-		DBG_PRINT("%d = int_cast_zero %d", ins->index, ins->arguments[0]->index);
-		break;
-
-	case IR_BOOL_CAST:
-		DBG_PRINT("%d = bool_cast %d", ins->index, ins->arguments[0]->index);
-		break;
-
-	case IR_FLOAT_CAST:
-		DBG_PRINT("%d = float_cast %d", ins->index, ins->arguments[0]->index);
-		break;
-
-	case IR_INT_FLOAT_CAST:
-		DBG_PRINT("%d = int_float_cast %d", ins->index, ins->arguments[0]->index);
-		break;
-
-	case IR_UINT_FLOAT_CAST:
-		DBG_PRINT("%d = uint_float_cast %d", ins->index, ins->arguments[0]->index);
-		break;
-
-	case IR_FLOAT_INT_CAST:
-		DBG_PRINT("%d = float_int_cast %d", ins->index, ins->arguments[0]->index);
-		break;
-
-	case IR_VA_ARG:
-		DBG_PRINT("%d = v_arg", ins->index);
-		break;
-
-	case IR_VA_START:
-		DBG_PRINT("%d = v_start", ins->index);
+	case IR_GET_REG:
+		DBG_PRINT("%s", get_reg_name(ins->get_reg.register_index, 8));
 		break;
 
 	case IR_SET_ZERO_PTR:
-		DBG_PRINT("zero ptr %d, size: %d", ins->index, ins->set_zero_ptr.size);
-		break;
-
-	case IR_VLA_ALLOC:
-		DBG_PRINT("%d = allocate vla of length %d", ins->index,
-				  ins->arguments[0]->index);
-		break;
-
-	case IR_GET_REG:
-		DBG_PRINT("%d <- %s", ins->index, get_reg_name(ins->get_reg.register_index, 8));
+		DBG_PRINT("set_zero_ptr %d, size: %d", ins->arguments[0]->index, ins->set_zero_ptr.size);
 		break;
 
 	case IR_SET_REG:
-		DBG_PRINT("set_reg %s %d", get_reg_name(ins->set_reg.register_index, 8), ins->index);
+		if (n_args == 1)
+			DBG_PRINT("set_reg %s %d", get_reg_name(ins->set_reg.register_index, 8), ins->arguments[0]->index);
+		else
+			DBG_PRINT("set_reg %s %d state: %d", get_reg_name(ins->set_reg.register_index, 8), ins->arguments[0]->index, ins->arguments[1]->index);
 		break;
 
-	case IR_MODIFY_STACK_POINTER:
-		DBG_PRINT("modify stack pointer by %d", ins->modify_stack_pointer.change);
+	case IR_ALLOCATE_CALL_STACK:
+		DBG_PRINT("allocate_call_stack %d", ins->allocate_call_stack.change);
 		break;
 
 	case IR_LOAD_PART_ADDRESS:
-		DBG_PRINT("%d = load part address of %d with offset %d", ins->index, ins->arguments[0]->index, ins->load_part.offset);
+		DBG_PRINT("load part address of %d with offset %d", ins->arguments[0]->index, ins->load_part.offset);
 		break;
 
 	case IR_STORE_PART_ADDRESS:
-		DBG_PRINT("*%d = store part of %d with offset %d", ins->index, ins->arguments[0]->index, ins->load_part.offset);
+		DBG_PRINT("store part of %d with offset %d", ins->arguments[0]->index, ins->load_part.offset);
 		break;
 
 	case IR_ALLOC:
-		DBG_PRINT("%d = alloc with size %d (save to preamble: %d)", ins->index, ins->alloc.size, ins->alloc.save_to_preamble);
+		DBG_PRINT("alloc with size %d", ins->alloc.size);
 		break;
 
-	default:
-		DBG_PRINT("%d <- %d op(%d) %d", ins->index, ins->arguments[0] ? ins->arguments[0]->index : 0,
-				  ins->type, ins->arguments[1] ? ins->arguments[1]->index : 0);
+	case IR_COPY_MEMORY:
+		DBG_PRINT("memcpy from %d to %d", ins->arguments[0]->index, ins->arguments[1]->index);
 		break;
 
-	/* default: */
-	/* 	printf("%d", ins.type); */
-	/* 	NOTIMP(); */
+	case IR_PROJECT:
+		DBG_PRINT("proj%d %d", ins->project.index, ins->arguments[0]->index);
+		break;
+
+	case IR_FUNCTION:
+		DBG_PRINT("function %s", ins->function.name);
+		break;
+
+	case IR_COUNT:
+		ICE("Invalid node type\n");
+	}
+
+	if (str) {
+		if (n_args == 0) {
+			DBG_PRINT("%s", str);
+		} else {
+			int index_0 = ins->arguments[0] ? ins->arguments[0]->index : -1;
+			int index_1 = ins->arguments[1] ? ins->arguments[1]->index : -1;
+			int index_2 = ins->arguments[2] ? ins->arguments[2]->index : -1;
+			int index_3 = ins->arguments[3] ? ins->arguments[3]->index : -1;
+			DBG_PRINT(str, index_0, index_1, index_2, index_3);
+		}
 	}
 
 	return buffer;
@@ -247,7 +287,7 @@ const char *dbg_token(struct token *t) {
 	return buffer;
 }
 
-const char *dbg_token_type(enum ttype tt) {
+const char *dbg_token_type(ttype tt) {
 	switch(tt) {
 #define PRINT(A, B) case A: return B;
 #define X(A, B) PRINT(A, B)

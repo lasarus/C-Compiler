@@ -1,4 +1,5 @@
 #include "ir/ir.h"
+#include "ir/export_dot.h"
 #include "preprocessor/preprocessor.h"
 #include "parser/parser.h"
 #include "parser/symbols.h"
@@ -17,10 +18,16 @@
 #include "../config.h"
 #endif
 
+#include "optimize/mem2reg.h"
+#include "optimize/remove_dead.h"
+#include "optimize/peephole.h"
+
 #include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+
+static const char *dump_ir_path = NULL;
 
 static void add_implementation_defs(void) {
 	define_string("NULL", "(void*)0");
@@ -79,8 +86,6 @@ static void add_definition(const char *str) {
 	}
 
 	define_string(name, value ? value : "1");
-
-	free(buffer);
 }
 
 static void set_flags(struct arguments *arguments) {
@@ -103,6 +108,9 @@ static void set_flags(struct arguments *arguments) {
 			abi = ABI_SYSV;
 		} else if (strcmp(flag, "mingw-workarounds") == 0) {
 			mingw_workarounds = 1;
+		} else if (strncmp(flag, "dump-ir=", 8) == 0) {
+			dump_ir_path = strdup(flag + 8);
+			printf("Dumping to %s\n", dump_ir_path);
 		}
 	}
 }
@@ -147,6 +155,17 @@ static void compile_file(const char *path,
 
 	preprocessor_init(path);
 	parse_into_ir();
+
+	optimize_mem2reg();
+	optimize_peephole();
+	optimize_remove_dead();
+
+	if (dump_ir_path)
+		export_dot(dump_ir_path);
+
+	ir_schedule_blocks();
+	ir_local_schedule();
+
 	ir_calculate_block_local_variables();
 
 	struct object out_object = { 0 };

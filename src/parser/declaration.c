@@ -899,13 +899,13 @@ static struct initializer *initializer_add_entry(struct initializer *init, int i
 	return init->brace.entries + index;
 }
 
-static int is_string_type(enum ttype token_type) {
+static int is_string_type(ttype token_type) {
 	return token_type == T_STRING || token_type == T_STRING_WCHAR ||
 		token_type == T_STRING_CHAR16 || token_type == T_STRING_CHAR32;
 }
 
 static int match_specific_string(struct type **type, struct initializer *init, struct token string_token,
-								 enum simple_type char_type, enum ttype token_type) {
+								 enum simple_type char_type, ttype token_type) {
 	if (string_token.type != token_type)
 		return 0;
 

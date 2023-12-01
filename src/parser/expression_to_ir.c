@@ -77,7 +77,7 @@ struct node *evaluated_expression_to_address(struct evaluated_expression *evalua
 		} else {
 			// Allocate memory, and push the constant to it.
 			struct node *address = ir_allocate(calculate_size(evaluated_expression->data_type));
-			ir_write_constant_to_address(constant, address);
+			ir_store(address, ir_constant(constant));
 			return address;
 		}
 	}
@@ -540,11 +540,10 @@ static struct evaluated_expression evaluate_conditional(struct expr *expr) {
 	int is_void = type_is_simple(expr->data_type, ST_VOID);
 
 	if (is_void) {
-		struct node *block_true = new_block(),
-			*block_false = new_block(),
-			*block_end = new_block();
+		struct node *block_end = new_block();
 
-		ir_if_selection(condition_var, block_true, block_false);
+		struct node *block_true, *block_false;
+		ir_if_selection(condition_var, &block_true, &block_false);
 
 		ir_block_start(block_true);
 		expression_evaluate(expr->args[1]);
@@ -560,29 +559,25 @@ static struct evaluated_expression evaluate_conditional(struct expr *expr) {
 			.type = EE_VOID
 		};
 	} else {
-		struct node *block_true = new_block(),
-			*block_false = new_block(),
-			*block_end = new_block();
-
-		ir_if_selection(condition_var, block_true, block_false);
+		struct node *block_true, *block_false;
+		ir_if_selection(condition_var, &block_true, &block_false);
 
 		ir_block_start(block_true);
 		struct evaluated_expression true_ = expression_evaluate(expr->args[1]);
 		struct node *true_address = evaluated_expression_to_address(&true_);
 
 		block_true = get_current_block(); // Current block might have changed.
-		ir_goto(block_end);
 
 		ir_block_start(block_false);
 		struct evaluated_expression false_ = expression_evaluate(expr->args[2]);
 		struct node *false_address = evaluated_expression_to_address(&false_);
 
 		block_false = get_current_block();
-		ir_goto(block_end);
 
+		struct node *block_end = ir_region(block_true, block_false);
 		ir_block_start(block_end);
 
-		struct node *res_address = ir_phi(true_address, false_address, block_true, block_false);
+		struct node *res_address = ir_phi(true_address, false_address);
 
 		return (struct evaluated_expression) {
 			.type = EE_POINTER,
@@ -624,7 +619,7 @@ static struct evaluated_expression evaluate_assignment_pointer(struct expr *expr
 }
 
 static struct evaluated_expression evaluate_va_start(struct expr *expr) {
-	get_current_function()->uses_va = 1;
+	get_current_function()->function.uses_va = 1;
 	struct evaluated_expression arr = expression_evaluate(expr->va_start_.array);
 	struct node *address = evaluated_expression_to_address(&arr);
 

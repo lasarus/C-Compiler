@@ -1,5 +1,6 @@
 #include "parser.h"
 #include "declaration.h"
+#include "ir/ir.h"
 #include "symbols.h"
 
 #include <common.h>
@@ -91,4 +92,5 @@ void parse_into_ir(void) {
 	TEXPECT(T_EOI);
 
 	generate_tentative_definitions();
+	ir_seal_blocks();
 }

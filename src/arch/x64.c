@@ -201,6 +201,7 @@ int calculate_offset(struct type *type, int index) {
 		return calculate_size(type->children[0]) * index;
 		break;
 	default:
+		printf("%d %d\n", type->type, index);
 		NOTIMP();
 	}
 }

@@ -142,7 +142,8 @@ struct type *type_simple(enum simple_type type) {
 }
 
 struct type *type_pointer(struct type *type) {
-	return type_create(&(struct type) { .type = TY_POINTER, .n = 1 }, &type);
+	struct type *rtype = type_create(&(struct type) { .type = TY_POINTER, .n = 1 }, &type);
+	return rtype;
 }
 
 struct type *type_struct(struct struct_data *struct_data) {

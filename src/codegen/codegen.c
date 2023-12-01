@@ -129,12 +129,83 @@ static void codegen_constant_to_rdi(struct constant *constant) {
 	}
 }
 
-static void codegen_instruction(struct node *ins, struct function *func) {
+static void codegen_set_reg_chain(struct node *start) {
+	while (start) {
+		if (start->set_reg.is_sse) {
+			asm_ins2("movsd", MEM(-start->arguments[0]->cg_info.stack_location, REG_RBP),
+					 XMM(start->set_reg.register_index));
+		} else {
+			scalar_to_reg(start->arguments[0], start->set_reg.register_index);
+		}
+
+		start = start->arguments[1];
+	}
+}
+
+static int codegen_call_stack_chain(struct node *start) {
+	int change = 0;
+	struct node *allocation = start;
+	while (allocation->type != IR_ALLOCATE_CALL_STACK) {
+		allocation = allocation->arguments[1];
+	}
+
+	change = allocation->allocate_call_stack.change;
+	asm_ins2("addq", IMM(change), R8(REG_RSP));
+
+	struct node *ins = start;
+	while (ins->type != IR_ALLOCATE_CALL_STACK) {
+		if (ins->type == IR_STORE_STACK_RELATIVE) {
+			asm_ins2("leaq", MEM(ins->store_stack_relative.offset, REG_RSP), R8(REG_RSI));
+			asm_ins2("leaq", MEM(-ins->arguments[0]->cg_info.stack_location, REG_RBP), R8(REG_RDI));
+
+			codegen_memcpy(ins->arguments[0]->size);
+		} else if (ins->type == IR_STORE_STACK_RELATIVE_ADDRESS) {
+			asm_ins2("leaq", MEM(ins->store_stack_relative_address.offset, REG_RSP), R8(REG_RSI));
+			scalar_to_reg(ins->arguments[0], REG_RDI);
+
+			codegen_memcpy(ins->store_stack_relative_address.size);
+		}
+
+		ins = ins->arguments[1];
+	}
+
+	return change;
+}
+
+static void codegen_get_reg_uses(struct node *reg_source) {
+	for (unsigned i = 0; i < reg_source->use_size; i++) {
+		struct node *ins = reg_source->uses[i];
+
+		if (ins->type != IR_GET_REG || ins->block == NULL)
+			continue;
+
+		if (ins->get_reg.is_sse) {
+			if (ins->size == 4) {
+				asm_ins2("movss", XMM(ins->get_reg.register_index),
+						 MEM(-ins->cg_info.stack_location, REG_RBP));
+			} else {
+				asm_ins2("movsd", XMM(ins->get_reg.register_index),
+						 MEM(-ins->cg_info.stack_location, REG_RBP));
+			}
+		} else {
+			reg_to_scalar(ins->get_reg.register_index, ins);
+		}
+	}
+}
+
+static void codegen_instruction(struct node *ins, struct node *func) {
 	const char *ins_str = dbg_instruction(ins);
 	asm_comment("instruction start \"%s\":", ins_str);
 
 	struct asm_instruction (*asm_entry)[2][5] = codegen_asm_table[ins->type];
 	if (asm_entry) {
+		struct node *output = ins;
+		if (ins->type == IR_DIV ||
+			ins->type == IR_IDIV ||
+			ins->type == IR_MOD ||
+			ins->type == IR_IMOD)
+			output = ins->projects[0];
+
 		scalar_to_reg(ins->arguments[0], REG_RAX);
 		scalar_to_reg(ins->arguments[1], REG_RCX);
 
@@ -146,18 +217,13 @@ static void codegen_instruction(struct node *ins, struct function *func) {
 		for (int i = 0; i < 5 && asms[i].mnemonic; i++)
 			asm_ins(&asms[i]);
 
-		reg_to_scalar(REG_RAX, ins);
+		reg_to_scalar(REG_RAX, output);
 		return;
 	}
 
 	switch (ins->type) {
 	case IR_CONSTANT:
 		asm_ins2("leaq", MEM(-ins->cg_info.stack_location, REG_RBP), R8(REG_RDI));
-		codegen_constant_to_rdi(&ins->constant.constant);
-		break;
-
-	case IR_CONSTANT_ADDRESS:
-		scalar_to_reg(ins->arguments[0], REG_RDI);
 		codegen_constant_to_rdi(&ins->constant.constant);
 		break;
 
@@ -185,38 +251,40 @@ static void codegen_instruction(struct node *ins, struct function *func) {
 		reg_to_scalar(REG_RAX, ins);
 		break;
 
-	case IR_CALL:
+	case IR_CALL: {
+		int change = codegen_call_stack_chain(ins->arguments[3]);
+		codegen_set_reg_chain(ins->arguments[2]);
 		codegen_call(ins->arguments[0], ins->call.non_clobbered_register);
-		break;
+		asm_ins2("addq", IMM(change), R8(REG_RSP));
+		struct node *reg_source = ins->projects[1];
+		if (reg_source)
+			codegen_get_reg_uses(reg_source);
+	} break;
 
-	case IR_LOAD:
+	case IR_LOAD: {
+		struct node *value = ins;
 		scalar_to_reg(ins->arguments[0], REG_RDI);
-		asm_ins2("leaq", MEM(-ins->cg_info.stack_location, REG_RBP), R8(REG_RSI));
+		asm_ins2("leaq", MEM(-value->cg_info.stack_location, REG_RBP), R8(REG_RSI));
 
-		codegen_memcpy(ins->size);
-		break;
+		codegen_memcpy(value->size);
+	} break;
 
-	case IR_LOAD_PART_ADDRESS:
+	case IR_LOAD_VOLATILE: {
+		struct node *value = ins->projects[1];
+		scalar_to_reg(ins->arguments[0], REG_RDI);
+		asm_ins2("leaq", MEM(-value->cg_info.stack_location, REG_RBP), R8(REG_RSI));
+
+		codegen_memcpy(value->size);
+	} break;
+
+	case IR_LOAD_PART_ADDRESS: {
+		struct node *value = ins->projects[1];
 		scalar_to_reg(ins->arguments[0], REG_RDI);
 		asm_ins2("leaq", MEM(ins->load_part.offset, REG_RDI), R8(REG_RDI));
-		asm_ins2("leaq", MEM(-ins->cg_info.stack_location, REG_RBP), R8(REG_RSI));
+		asm_ins2("leaq", MEM(-value->cg_info.stack_location, REG_RBP), R8(REG_RSI));
 
-		codegen_memcpy(ins->size);
-		break;
-
-	case IR_LOAD_BASE_RELATIVE:
-		asm_ins2("leaq", MEM(ins->load_base_relative.offset, REG_RBP), R8(REG_RDI));
-		asm_ins2("leaq", MEM(-ins->cg_info.stack_location, REG_RBP), R8(REG_RSI));
-
-		codegen_memcpy(ins->size);
-		break;
-
-	case IR_LOAD_BASE_RELATIVE_ADDRESS:
-		asm_ins2("leaq", MEM(ins->load_base_relative_address.offset, REG_RBP), R8(REG_RDI));
-		scalar_to_reg(ins->arguments[0], REG_RSI);
-
-		codegen_memcpy(ins->load_base_relative_address.size);
-		break;
+		codegen_memcpy(value->size);
+	} break;
 
 	case IR_STORE:
 		scalar_to_reg(ins->arguments[0], REG_RSI);
@@ -232,20 +300,6 @@ static void codegen_instruction(struct node *ins, struct function *func) {
 
 		codegen_memcpy(ins->arguments[1]->size);
 		break;
-
-	case IR_STORE_STACK_RELATIVE: {
-		asm_ins2("leaq", MEM(ins->store_stack_relative.offset, REG_RSP), R8(REG_RSI));
-		asm_ins2("leaq", MEM(-ins->arguments[0]->cg_info.stack_location, REG_RBP), R8(REG_RDI));
-
-		codegen_memcpy(ins->arguments[0]->size);
-	} break;
-
-	case IR_STORE_STACK_RELATIVE_ADDRESS: {
-		asm_ins2("leaq", MEM(ins->store_stack_relative_address.offset, REG_RSP), R8(REG_RSI));
-		scalar_to_reg(ins->arguments[0], REG_RDI);
-
-		codegen_memcpy(ins->store_stack_relative_address.size);
-	} break;
 
 	case IR_INT_CAST_ZERO:
 		scalar_to_reg(ins->arguments[0], REG_RAX);
@@ -371,6 +425,11 @@ static void codegen_instruction(struct node *ins, struct function *func) {
 		codegen_memzero(ins->set_zero_ptr.size);
 		break;
 
+	case IR_UNDEFINED:
+		asm_ins2("xorl", R4(REG_RAX), R4(REG_RAX));
+		reg_to_scalar(REG_RAX, ins);
+		break;
+
 	case IR_VLA_ALLOC: {
 		int slot_offset = ins->vla_alloc.dominance * 8;
 		for (int i = ins->vla_alloc.dominance + 1; i < vla_info.count; i++)
@@ -395,33 +454,6 @@ static void codegen_instruction(struct node *ins, struct function *func) {
 		asm_ins2("andq", IMM(-16), R8(REG_RSP));
 	} break;
 
-	case IR_SET_REG:
-		if (ins->set_reg.is_sse) {
-			asm_ins2("movsd", MEM(-ins->arguments[0]->cg_info.stack_location, REG_RBP),
-					 XMM(ins->set_reg.register_index));
-		} else {
-			scalar_to_reg(ins->arguments[0], ins->set_reg.register_index);
-		}
-		break;
-
-	case IR_GET_REG:
-		if (ins->get_reg.is_sse) {
-			if (ins->size == 4) {
-				asm_ins2("movss", XMM(ins->get_reg.register_index),
-						 MEM(-ins->cg_info.stack_location, REG_RBP));
-			} else {
-				asm_ins2("movsd", XMM(ins->get_reg.register_index),
-						 MEM(-ins->cg_info.stack_location, REG_RBP));
-			}
-		} else {
-			reg_to_scalar(ins->get_reg.register_index, ins);
-		}
-		break;
-
-	case IR_MODIFY_STACK_POINTER:
-		asm_ins2("addq", IMM(ins->modify_stack_pointer.change), R8(REG_RSP));
-		break;
-
 	case IR_ALLOC:
 		assert(ins->alloc.stack_location != -1);
 		asm_ins2("leaq", MEM(-ins->alloc.stack_location, REG_RBP), R8(REG_RSI));
@@ -435,75 +467,123 @@ static void codegen_instruction(struct node *ins, struct function *func) {
 		codegen_memcpy(ins->copy_memory.size);
 		break;
 
-	case IR_IF: {
-		struct node *cond = ins->arguments[0];
-		scalar_to_reg(cond, REG_RDI);
-		asm_ins2("testq", R8(REG_RDI), R8(REG_RDI));
-		asm_ins1("je", IMML_ABS(ins->if_info.block_false->block.label, 0));
-		asm_ins1("jmp", IMML_ABS(ins->if_info.block_true->block.label, 0));
-	} break;
+	case IR_LOAD_BASE_RELATIVE:
+		asm_ins2("leaq", MEM(ins->load_base_relative.offset, REG_RBP), R8(REG_RDI));
+		asm_ins2("leaq", MEM(-ins->cg_info.stack_location, REG_RBP), R8(REG_RSI));
 
+		codegen_memcpy(ins->size);
+		break;
+
+	case IR_LOAD_BASE_RELATIVE_ADDRESS:
+		asm_ins2("leaq", MEM(ins->load_base_relative_address.offset, REG_RBP), R8(REG_RDI));
+		scalar_to_reg(ins->arguments[0], REG_RSI);
+
+		codegen_memcpy(ins->load_base_relative_address.size);
+		break;
+		
+	case IR_ALLOCATE_CALL_STACK:
+	case IR_STORE_STACK_RELATIVE:
+	case IR_STORE_STACK_RELATIVE_ADDRESS:
+	case IR_GET_REG:
+	case IR_SET_REG:
+	case IR_IF:
+	case IR_RETURN:
 	case IR_PHI:
+	case IR_PROJECT:
 		break;
 
 	default:
-		printf("%d\n", ins->type);
+		printf("%d %d\n", ins->type, ins->index);
 		NOTIMP();
 	}
 }
 
 static void codegen_phi_node(struct node *current_block, struct node *next_block) {
-	// Assume the phi nodes come at the beginning of a block.
-	for (struct node *ins = next_block->child; ins; ins = ins->next) {
+	if (next_block->type != IR_REGION)
+		return;
 
-		if (ins->type != IR_PHI)
-			break;
+	for (unsigned i = 0; i < next_block->use_size; i++) {
+		struct node *ins = next_block->uses[i];
+
+		if (ins->type != IR_PHI || ins->size == 0)
+			continue;
 
 		struct node *source_var;
 
-		if (current_block == ins->phi.block_a) {
-			source_var = ins->arguments[0];
-		} else if (current_block == ins->phi.block_b) {
+		if (current_block == next_block->arguments[0]) {
 			source_var = ins->arguments[1];
+		} else if (current_block == next_block->arguments[1]) {
+			source_var = ins->arguments[2];
 		} else {
 			ICE("Phi node in %d reachable from invalid block %d (not %d or %d)",
 				next_block,
 				current_block,
-				ins->phi.block_a, ins->phi.block_b);
+				next_block->arguments[0], next_block->arguments[1]);
 		}
 
+		if (!source_var)
+			continue;
+
+		asm_comment("Phi node to %d (%d %d %d)", ins->index,
+					ins->arguments[0] ? ins->arguments[0]->index : -1,
+					ins->arguments[1] ? ins->arguments[1]->index : -1,
+					ins->arguments[2] ? ins->arguments[2]->index : -1
+			);
 		scalar_to_reg(source_var, REG_RAX);
 		reg_to_scalar(REG_RAX, ins);
 	}
 }
 
-static void codegen_block(struct node *block, struct function *func) {
-	asm_label(0, block->block.label);
+static void codegen_block(struct node *block, struct node *func) {
+	asm_label(0, block->block_info.label);
 
 	for (struct node *ins = block->child; ins; ins = ins->next)
 		codegen_instruction(ins, func);
 
-	if (block->block_info.return_) {
+	struct node *end = block->block_info.end;
+	if (!end || end->type == IR_DEAD) {
+		// TODO: This should actually be a normal ret.
+		asm_ins0("ud2");
+	} else if (end->type == IR_RETURN) {
+		codegen_set_reg_chain(end->arguments[1]);
 		asm_comment("Block return.");
 		asm_ins0("leave");
 		asm_ins0("ret");
-	} else if (block->block_info.jump_to) {
-		asm_comment("Block jump");
-		codegen_phi_node(block, block->block_info.jump_to);
-		asm_ins1("jmp", IMML_ABS(block->block_info.jump_to->block.label, 0));
+	} else if (node_is_control(end)) {
+		codegen_phi_node(block, end);
+		if (end == block->next) {
+			asm_comment("Block jump elided");
+		} else {
+			asm_comment("Block jump");
+			asm_ins1("jmp", IMML_ABS(end->block_info.label, 0));
+		}
+	} else if (end->type == IR_IF) {
+		struct node *cond = end->arguments[1];
+		scalar_to_reg(cond, REG_RDI);
+		asm_ins2("testq", R8(REG_RDI), R8(REG_RDI));
+		asm_ins1("je", IMML_ABS(end->if_info.block_false->block_info.label, 0));
+		asm_ins1("jmp", IMML_ABS(end->if_info.block_true->block_info.label, 0));
 	} else {
-		asm_ins0("ud2");
+		printf("Ending node on %d %d\n", end->type, IR_IF);
+		NOTIMP();
 	}
 }
 
-static void codegen_function(struct function *func) {
+static void codegen_function(struct node *func) {
 	int perm_stack_count = 0;
 	int max_temp_stack = 0;
 
+	// Give labels to blocks.
+	for (struct node *block = func->child; block; block = block->next) {
+		block->block_info.label = register_label();
+	}
+
 	// Allocate variables that spans multiple blocks.
-	for (struct node *block = func->first; block; block = block->next) {
+	for (struct node *block = func->child; block; block = block->next) {
 		for (struct node *ins = block->child; ins; ins = ins->next) {
-			if (!ins->spans_block || ins->size == 0)
+			/* if (!ins->spans_block || ins->size == 0) */
+			/* 	continue; */
+			if (ins->size == 0)
 				continue;
 			
 			perm_stack_count += ins->size;
@@ -515,7 +595,7 @@ static void codegen_function(struct function *func) {
 
 	// Allocate VLAs, a bit tricky, but works.
 	vla_info.count = 0;
-	for (struct node *block = func->first; block; block = block->next) {
+	for (struct node *block = func->child; block; block = block->next) {
 		for (struct node *ins = block->child; ins; ins = ins->next) {
 
 			if (ins->type == IR_VLA_ALLOC)
@@ -527,22 +607,24 @@ static void codegen_function(struct function *func) {
 	vla_info.vla_slot_buffer_offset = perm_stack_count;
 
 	// Allocate IR_ALLOC instructions.
-	for (struct node *block = func->first; block; block = block->next) {
+	for (struct node *block = func->child; block; block = block->next) {
 		for (struct node *ins = block->child; ins; ins = ins->next) {
 			if (ins->type == IR_ALLOC) {
 				perm_stack_count += ins->alloc.size;
 				ins->alloc.stack_location = perm_stack_count;
-
-				if (ins->alloc.save_to_preamble)
-					vla_info.alloc_preamble = perm_stack_count;
 			}
 		}
 	}
 
+	if (func->function.preamble_alloc) {
+		perm_stack_count += func->function.preamble_alloc;
+		vla_info.alloc_preamble = perm_stack_count;
+	}
+
 	// Allocate variables that are local to one block.
-	
-	for (struct node *block = func->first; block; block = block->next) {
+	for (struct node *block = func->child; block; block = block->next) {
 		for (struct node *ins = block->child; ins; ins = ins->next) {
+			continue;
 			if (ins->spans_block || !ins->used || ins->size == 0)
 				continue;
 
@@ -557,8 +639,8 @@ static void codegen_function(struct function *func) {
 		}
 	}
 
-	label_id func_label = register_label_name(sv_from_str((char *)func->name));
-	asm_label(func->is_global, func_label);
+	label_id func_label = register_label_name(sv_from_str((char *)func->function.name));
+	asm_label(func->function.is_global, func_label);
 	asm_ins1("pushq", R8(REG_RBP));
 	asm_ins2("movq", R8(REG_RSP), R8(REG_RBP));
 
@@ -571,12 +653,16 @@ static void codegen_function(struct function *func) {
 	for (int i = 0; i < vla_info.count; i++)
 		asm_ins2("movq", IMM(0), MEM(-vla_info.vla_slot_buffer_offset + i * 8, REG_RBP));
 
-	for (struct node *block = func->first; block; block = block->next)
+	struct node *reg_source = func->projects[1];
+	if (reg_source)
+		codegen_get_reg_uses(reg_source);
+
+	for (struct node *block = func->child; block; block = block->next)
 		codegen_block(block, func);
 
 	int total_stack_usage = max_temp_stack + perm_stack_count;
 	if (codegen_flags.debug_stack_size && total_stack_usage >= codegen_flags.debug_stack_min)
-		printf("Function %s has stack consumption: %d\n", func->name, total_stack_usage);
+		printf("Function %s has stack consumption: %d\n", func->function.name, total_stack_usage);
 }
 
 int codegen_get_alloc_preamble(void) {
@@ -584,7 +670,7 @@ int codegen_get_alloc_preamble(void) {
 }
 
 void codegen(void) {
-	for (struct function *func = first_function; func; func = func->next)
+	for (struct node *func = first_function; func; func = func->next)
 		codegen_function(func);
 
 	rodata_codegen();
