@@ -63,10 +63,11 @@ static int is_ext_file(struct string_view view, char ext) {
 		view.str[view.len - 1] == ext;
 }
 
-static char *replace_object_file_suffix(const char* path) {
+static char *dependency_path_from_outfile(const char* path) {
 	int len = strlen(path);
 
-    if (len <= 2 || strcmp(path + len - 2, ".o") != 0)
+	if (len <= 2 || (strcmp(path + len - 2, ".o") != 0 &&
+					 strcmp(path + len - 2, ".s") != 0))
 		return NULL;
 
 	return allocate_printf("%.*s.d", len - 2, path);
@@ -210,7 +211,7 @@ static void compile_file(const char *path,
 		if (arguments->mf_path) {
 			mf_path = arguments->mf_path;
 		} else {
-			mf_path = replace_object_file_suffix(outfile);
+			mf_path = dependency_path_from_outfile(outfile);
 		}
 
 		preprocessor_finish_writing_dependencies(mt_path, mf_path);

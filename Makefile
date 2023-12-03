@@ -22,6 +22,10 @@ DEPS += $(SRCS:$(SRC_DIR)/%.c=$(OBJ_DIR)/2/%.d)
 OBJS3 = $(SRCS:$(SRC_DIR)/%.c=$(OBJ_DIR)/3/%.o)
 DEPS += $(SRCS:$(SRC_DIR)/%.c=$(OBJ_DIR)/3/%.d)
 
+# Second generation asm files.
+ASM_DEBUG = $(SRCS:$(SRC_DIR)/%.c=$(ASM_DIR)/asm_debug/%.s)
+DEPS += $(SRCS:$(SRC_DIR)/%.c=$(ASM_DIR)/asm_debug/%.d)
+
 # Test source files
 TEST_SRCS = $(wildcard $(TEST_DIR)/*.c)
 SHOULD_FAIL_TEST_SRCS = $(wildcard $(TEST_DIR)/should_fail/*.c)
@@ -42,6 +46,7 @@ TEST_BINS_WINE = $(TEST_SRCS:$(TEST_DIR)/%.c=$(BIN_DIR)/tests/wine/%.exe)
 COMPILER = $(BIN_DIR)/cc
 COMPILER2 = $(BIN_DIR)/cc2
 COMPILER3 = $(BIN_DIR)/cc3
+COMPILER_ASM_DBG = $(BIN_DIR)/cc_asm_dbg
 
 # Default target
 all: $(COMPILER)
@@ -77,6 +82,14 @@ $(COMPILER3): config.h $(OBJS3)
 $(OBJ_DIR)/3/%.o: $(SRC_DIR)/%.c $(COMPILER2)
 	@mkdir -p $(dir $@)
 	$(COMPILER2) $(CFLAGS_SELF) -c $< -o $@
+
+$(COMPILER_ASM_DBG): config.h $(ASM_DEBUG)
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -g -o $@ $(ASM_DEBUG) -no-pie
+
+$(ASM_DIR)/asm_debug/%.s: $(SRC_DIR)/%.c $(COMPILER)
+	@mkdir -p $(dir $@)
+	$(COMPILER) $(CFLAGS_SELF) -S $< -o $@
 
 # Compile and run tests.
 check: run-tests run-tests2 run-tests-asm run-should-fail-tests compare-generations
