@@ -726,13 +726,15 @@ static struct parameter_list parse_parameter_list(void) {
 		type = type_adjust_parameter(type);
 		ret.types[ret.n - 1] = type;
 
-		if (!was_abstract) {
-			ret.arguments = cc_realloc(ret.arguments, ret.n * sizeof(*ret.arguments));
-			struct symbol_identifier *ident = symbols_add_identifier(name);
-			ident->type = IDENT_PARAMETER;
-			ident->parameter.type = type;
-			ret.arguments[ret.n - 1] = ident;
-		}
+		ret.arguments = cc_realloc(ret.arguments, ret.n * sizeof(*ret.arguments));
+		struct symbol_identifier *ident =
+			symbols_add_identifier(was_abstract
+								   ? (struct string_view) { 0 }
+								   : name);
+
+		ident->type = IDENT_PARAMETER;
+		ident->parameter.type = type;
+		ret.arguments[ret.n - 1] = ident;
 
 		if (T0->type == T_RPAR)
 			break;

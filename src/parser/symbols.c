@@ -166,6 +166,10 @@ static struct table_entry *symbols_get_in_current_scope(enum entry_type type, st
 
 // Identifier help functions.
 struct symbol_identifier *symbols_add_identifier(struct string_view name) {
+	if (name.len == 0) {
+		// Anonymous identifier.
+		return ALLOC((struct symbol_identifier) { 0 });
+	}
 	struct table_entry *entry = symbols_add(ENTRY_IDENTIFIER, name);
 	entry->identifier_data = ALLOC((struct symbol_identifier) { 0 });
 	return entry->identifier_data;
