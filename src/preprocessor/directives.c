@@ -387,9 +387,11 @@ static struct string_view get_include_path(struct token dir, struct token t, int
 }
 
 static int directiver_evaluate_conditional(struct token dir) {
-	if (sv_string_cmp(dir.str, "ifdef")) {
+	if (sv_string_cmp(dir.str, "ifdef") ||
+		sv_string_cmp(dir.str, "elifdef")) {
 		return (define_map_get(next().str) != NULL);
-	} else if (sv_string_cmp(dir.str, "ifndef")) {
+	} else if (sv_string_cmp(dir.str, "ifndef") ||
+			   sv_string_cmp(dir.str, "elifndef")) {
 		return !(define_map_get(next().str) != NULL);
 	} else if (sv_string_cmp(dir.str, "if") ||
 			   sv_string_cmp(dir.str, "elif")) {
@@ -525,7 +527,9 @@ struct token directiver_next(void) {
 				ADD_ELEMENT(cond_stack_n, cond_stack_cap, cond_stack) = -1;
 			}
 		} else if (sv_string_cmp(name, "elif") ||
-				   sv_string_cmp(name, "else")) {
+				   sv_string_cmp(name, "else") ||
+				   sv_string_cmp(name, "elifndef") ||
+				   sv_string_cmp(name, "elifdef")) {
 			if (cond_stack[cond_stack_n - 1] == 0) {
 				int result = directiver_evaluate_conditional(directive);
 				cond_stack[cond_stack_n - 1] = result;
