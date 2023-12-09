@@ -93,28 +93,34 @@ struct encoding {
 // point.
 struct encoding encodings[] = {
 	{"addq", 0x05, .rex = 1, .rexw = 1, .operand_encoding = {{OE_NONE, 0}, {OE_IMM32, 0}}, .operand_accepts = {A_RAX(8), A_IMM32_S}},
-	{"addq", 0x04, .operand_encoding = {{OE_NONE, 0}, {OE_IMM8, 0}}, .operand_accepts = {A_REG(4), A_IMM8_S}},
+	{"addl", 0x05, .operand_encoding = {{OE_NONE, 0}, {OE_IMM32, 0}}, .operand_accepts = {A_RAX(4), A_IMM32}},
+	//{"addq", 0x04, .operand_encoding = {{OE_NONE, 0}, {OE_IMM8, 0}}, .operand_accepts = {A_REG(4), A_IMM8_S}},
 	{"addq", 0x83, .rex = 1, .rexw = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_IMM8, 0}}, .operand_accepts = {A_REG(8), A_IMM8_S}},
+	{"addl", 0x83, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_IMM8, 0}}, .operand_accepts = {A_REG(4), A_IMM8_S}},
 	{"addq", 0x81, .rexw = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_IMM32, 0}}, .operand_accepts = {A_REG(8), A_IMM32_S}},
 	{"addl", 0x01, .slash_r = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_MODRM_REG, 0}}, .operand_accepts = {A_REG(4), A_REG(4)}},
 	{"addq", 0x01, .rex = 1, .rexw = 1, .slash_r = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_MODRM_REG, 0}}, .operand_accepts = {A_REG(8), A_REG(8)}},
 	{"addq", 0x03, .rex = 1, .rexw = 1, .slash_r = 1, .operand_encoding = {{OE_MODRM_REG, 0}, {OE_MODRM_RM, 0}}, .operand_accepts = {A_REG(8), A_MODRM(8)}},
 
 	{"subq", 0x83, .rex = 1, .rexw = 1, .modrm_extension = 5, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_IMM8, 0}}, .operand_accepts = {A_MODRM(8), A_IMM8_S}},
+	{"subl", 0x83, .modrm_extension = 5, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_IMM8, 0}}, .operand_accepts = {A_MODRM(4), A_IMM8_S}},
 	{"subq", 0x81, .rex = 1, .rexw = 1, .modrm_extension = 5, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_IMM32, 0}}, .operand_accepts = {A_MODRM(8), A_IMM32_S}},
 	{"subq", 0x29, .rex = 1, .rexw = 1, .slash_r = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_MODRM_REG, 0}}, .operand_accepts = {A_MODRM(8), A_REG(8)}},
 	{"subl", 0x29, .slash_r = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_MODRM_REG, 0}}, .operand_accepts = {A_MODRM(4), A_REG(4)}},
 
+	{"andl", 0x25, .operand_encoding = {{OE_NONE, 0}, {OE_IMM32, 0}}, .operand_accepts = {A_REG(4), A_IMM32}},
 	{"andl", 0x21, .slash_r = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_MODRM_REG, 0}}, .operand_accepts = {A_REG(4), A_REG(4)}},
 	{"andq", 0x21, .rex = 1, .rexw = 1, .slash_r = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_MODRM_REG, 0}}, .operand_accepts = {A_REG(8), A_REG(8)}},
+	{"andq", 0x25, .rex = 1, .rexw = 1, .operand_encoding = {{OE_NONE, 0}, {OE_IMM32, 0}}, .operand_accepts = {A_RAX(8), A_IMM32}},
 	{"andq", 0x83, .rex = 1, .rexw = 1, .modrm_extension = 4, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_IMM8, 0}}, .operand_accepts = {A_REG(8), A_IMM8_S}},
 
+	{"orl", 0x0d, .operand_encoding = {{OE_NONE, 0}, {OE_IMM32, 0}}, .operand_accepts = {A_REG(4), A_IMM32}},
 	{"orl", 0x09, .slash_r = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_MODRM_REG, 0}}, .operand_accepts = {A_REG(4), A_REG(4)}},
 	{"orq", 0x09, .rexw = 1, .slash_r = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_MODRM_REG, 0}}, .operand_accepts = {A_REG(8), A_REG(8)}},
 
-	{"xor", 0x31, .rex = 1, .rexw = 1, .slash_r = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_MODRM_REG, 0}}, .operand_accepts = {A_REG(8), A_REG(8)}},
 	{"xorq", 0x31, .rex = 1, .rexw = 1, .slash_r = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_MODRM_REG, 0}}, .operand_accepts = {A_REG(8), A_REG(8)}},
 	{"xorl", 0x31, .slash_r = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_MODRM_REG, 0}}, .operand_accepts = {A_REG(4), A_REG(4)}},
+	{"xorl", 0x83, .modrm_extension = 6, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_IMM8, 0}}, .operand_accepts = {A_REG(4), A_IMM8_S}},
 
 	{"divl", 0xf7, .modrm_extension = 6, .operand_encoding = {{OE_MODRM_RM, 0}}, .operand_accepts = {A_MODRM(4)}},
 	{"divq", 0xf7, .rexw = 1, .modrm_extension = 6, .operand_encoding = {{OE_MODRM_RM, 0}}, .operand_accepts = {A_MODRM(8)}},
@@ -123,10 +129,12 @@ struct encoding encodings[] = {
 	{"idivq", 0xf7, .rexw = 1, .modrm_extension = 7, .operand_encoding = {{OE_MODRM_RM, 0}}, .operand_accepts = {A_MODRM(8)}},
 
 	{"imulq", 0x69, .rex = 1, .rexw = 1, .slash_r = 1, .operand_encoding = {{OE_MODRM_RM, 1}, {OE_MODRM_REG, 0}, {OE_IMM32, 0}}, .operand_accepts = {A_REG(8), A_IMM32_S}},
+	{"imull", 0x69, .slash_r = 1, .operand_encoding = {{OE_MODRM_RM, 1}, {OE_MODRM_REG, 0}, {OE_IMM32, 0}}, .operand_accepts = {A_REG(4), A_IMM32_S}},
 	{"imulq", 0x6b, .rex = 1, .rexw = 1, .slash_r = 1, .operand_encoding = {{OE_MODRM_RM, 1}, {OE_MODRM_REG, 0}, {OE_IMM8, 0}}, .operand_accepts = {A_REG(8), A_IMM8_S}},
 	{"imulq", 0x0f, .op2 = 0xaf, .rex = 1, .rexw = 1, .slash_r = 1, .operand_encoding = {{OE_MODRM_REG, 0}, {OE_MODRM_RM, 0}}, .operand_accepts = {A_REG(8), A_MODRM(8)}},
 
 	{"imull", 0x0f, .op2 = 0xaf, .slash_r = 1, .operand_encoding = {{OE_MODRM_REG, 0}, {OE_MODRM_RM, 0}}, .operand_accepts = {A_REG(4), A_MODRM(4)}},
+	{"imull", 0x6b, .slash_r = 1, .operand_encoding = {{OE_MODRM_RM, 1}, {OE_MODRM_REG, 0}, {OE_IMM8, 0}}, .operand_accepts = {A_REG(4), A_IMM8_S}},
 
 	{"callq", 0xff, .modrm_extension = 2, .operand_encoding = {{OE_MODRM_RM, 0}}, .operand_accepts = {A_REG_STAR(8)}},
 	{ "cltd", .opcode = 0x99 },

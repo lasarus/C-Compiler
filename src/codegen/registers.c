@@ -39,6 +39,28 @@ const char *get_reg_name(int id, int size) {
 }
 
 void scalar_to_reg(struct node *scalar, int reg) {
+	if (scalar->type == IR_INTEGER) {
+		uint64_t value = scalar->integer.integer;
+		switch (scalar->size) {
+		case 1:
+			asm_ins2("movb", IMM(value), R1(reg));
+			break;
+		case 2:
+			asm_ins2("movw", IMM(value), R2(reg));
+			break;
+		case 4:
+			asm_ins2("movl", IMM(value), R4(reg));
+			break;
+		case 8:
+			asm_ins2("movabsq", IMM(value), R8(reg));
+			break;
+
+		case 0: break;
+
+		default: NOTIMP();
+		}
+	}
+
 	int size = scalar->size;
 	struct operand mem = MEM(-scalar->cg_info.stack_location, REG_RBP);
 	switch (size) {

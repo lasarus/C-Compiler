@@ -173,5 +173,6 @@ struct constant *expression_to_constant(struct expr *expr);
 int evaluate_constant_expression(struct expr *expr, struct constant *constant);
 
 int constant_is_zero(struct constant *c);
+int constant_is_one(struct constant *c);
 
 #endif

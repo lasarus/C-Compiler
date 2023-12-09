@@ -36,11 +36,11 @@ void recurse_mark_useful(struct node *node) {
 	}
 }
 
-void prune_dead_nodes(void) {
-	struct node **nodes;
-	size_t size;
-	ir_get_node_list(&nodes, &size);
-}
+/* void prune_dead_nodes(void) { */
+/* 	struct node **nodes; */
+/* 	size_t size; */
+/* 	ir_get_node_list(&nodes, &size); */
+/* } */
 
 void optimize_remove_dead(void) {
 	struct node **nodes;

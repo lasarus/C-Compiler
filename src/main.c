@@ -21,6 +21,8 @@
 #include "optimize/mem2reg.h"
 #include "optimize/remove_dead.h"
 #include "optimize/peephole.h"
+#include "optimize/peephole_codegen.h"
+#include "optimize/constant_folder.h"
 
 #include <time.h>
 #include <stdio.h>
@@ -159,6 +161,9 @@ static void compile_file(const char *path,
 
 	optimize_mem2reg();
 	optimize_peephole();
+	optimize_remove_dead();
+	optimize_constant_folder();
+	optimize_peephole_codegen();
 	optimize_remove_dead();
 
 	if (dump_ir_path)

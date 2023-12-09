@@ -1,4 +1,5 @@
 #include "ir.h"
+#include "arch/x64.h"
 #include "dominator_tree.h"
 #include "global_code_motion.h"
 
@@ -436,8 +437,26 @@ void ir_store(struct node *address, struct node *value) {
 	set_state(ir_new3(IR_STORE, address, value, get_state(), 0));
 }
 
+// TODO: Make this more elegant, no max depth, but some flag instead.
+static int can_be_null(struct node *ptr, int max_depth) {
+	if (max_depth <= 0)
+		return 1;
+
+	if (ptr->type == IR_ALLOC ||
+		(ptr->type == IR_LABEL && !ptr->label.reference)) {
+		return 0;
+	} else if (ptr->type == IR_PHI) {
+		if (ptr->arguments[1] && can_be_null(ptr->arguments[1], max_depth - 1))
+			return 1;
+		if (ptr->arguments[2] && can_be_null(ptr->arguments[2], max_depth - 1))
+			return 1;
+		return 0;
+	}
+	return 1;
+}
+
 struct node *ir_load(struct node *address, int size) {
-	if (address->type == IR_ALLOC) {
+	if (!can_be_null(address, 4)) {
 		return ir_new2(IR_LOAD, address, get_state(), size);
 	} else {
 		struct node *ins = ir_new2(IR_LOAD_VOLATILE, address, get_state(), 0);
@@ -482,13 +501,40 @@ struct node *ir_zero(int size) {
 	return ir_new(IR_ZERO, size);
 }
 
+struct node *ir_integer(int size, uint64_t value) {
+	struct node *ins = ir_new(IR_INTEGER, size);
+	ins->integer.integer = value;
+	return ins;
+}
+
 struct node *ir_constant(struct constant constant) {
 	int size = calculate_size(constant.data_type);
 	if (constant.type == CONSTANT_LABEL_POINTER)
 		size = 8;
 
-	struct node *ins = ir_new(IR_CONSTANT, size);
-	ins->constant.constant = constant;
+	struct node *ins = NULL;
+	switch (constant.type) {
+	case CONSTANT_TYPE:
+		ins = ir_new(IR_INTEGER, size);
+		ins->integer.integer = constant_to_u64(constant);
+		break;
+
+	case CONSTANT_LABEL:
+		ins = ir_new(IR_LABEL, size);
+		ins->label.label = constant.label.label;
+		ins->label.offset = constant.label.offset;
+		ins->label.reference = 1;
+		break;
+
+	case CONSTANT_LABEL_POINTER:
+		ins = ir_new(IR_LABEL, size);
+		ins->label.label = constant.label.label;
+		ins->label.offset = constant.label.offset;
+		ins->label.reference = 0;
+		break;
+
+	default: NOTIMP();
+	}
 	return ins;
 }
 
@@ -726,6 +772,8 @@ struct node *node_get_prev_state(struct node *node) {
 		return node->arguments[1];
 	else if (node->type == IR_COPY_MEMORY)
 		return node->arguments[2];
+	else if (node->type == IR_ASSEMBLY_STATE)
+		return node->arguments[0];
 	else if (node->type == IR_DIV ||
 			 node->type == IR_IDIV ||
 			 node->type == IR_MOD ||

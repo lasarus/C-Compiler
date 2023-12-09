@@ -1,8 +1,10 @@
 #include "debug.h"
+#include "codegen/rodata.h"
 #include "ir/ir.h"
 
 #include <common.h>
 #include <codegen/registers.h>
+#include <assembler/assembler.h>
 
 #include <stdlib.h>
 
@@ -115,7 +117,7 @@ const char *dbg_instruction(struct node *ins) {
 	case IR_LOAD: str = "load %d, state: %d"; break;
 	case IR_STORE: str = "store %d %d, state: %d"; break;
 	case IR_INT_CAST_ZERO: str = "int_cast_zero %d"; break;
-	case IR_INT_CAST_SIGN: str = "int_cast_zero %d"; break;
+	case IR_INT_CAST_SIGN: str = "int_cast_sign %d"; break;
 	case IR_BOOL_CAST: str = "bool_cast %d"; break;
 	case IR_FLOAT_CAST: str = "float_cast %d"; break;
 	case IR_INT_FLOAT_CAST: str = "int_float_cast %d"; break;
@@ -185,9 +187,38 @@ const char *dbg_instruction(struct node *ins) {
 	case IR_VLA_ALLOC: str = "vla_alloc %d"; break;
 	case IR_RETURN: str = "return %d, %d, %d"; break;
 
-	case IR_CONSTANT: // TODO: Print the constant.
-		DBG_PRINT("constant(%li)", ins->constant.constant.int_d);
+	case IR_ASSEMBLY_STATE:
+		DBG_PRINT("STATEFUL ");
+		// Fallthrough
+	case IR_ASSEMBLY:
+		DBG_PRINT("ASSEMBLY ");
+		if (ins->arguments[0])
+			DBG_PRINT("%d ", ins->arguments[0]->index);
+		else
+			DBG_PRINT("(NULL) ");
+		if (ins->arguments[1])
+			DBG_PRINT("%d ", ins->arguments[1]->index);
+		else
+			DBG_PRINT("(NULL) ");
+		if (ins->arguments[2])
+			DBG_PRINT("%d ", ins->arguments[2]->index);
+		else
+			DBG_PRINT("(NULL) ");
+		DBG_PRINT("\n");
+		for (unsigned i = 0; i < ins->assembly.len; i++) {
+			DBG_PRINT("%s\n", ins->assembly.instructions[i].mnemonic);
+		}
 		break;
+
+	case IR_INTEGER:
+		DBG_PRINT("integer(%li)", ins->integer.integer);
+		break;
+
+	case IR_LABEL: {
+		char label_buffer[64];
+		rodata_get_label(ins->label.label, sizeof label_buffer, label_buffer);
+		DBG_PRINT("label(%s+%li) reference: %d", label_buffer, ins->label.offset, ins->label.reference);
+	} break;
 
 	case IR_CALL: // TODO: Print non_clobbered_register.
 		str = "call %d";

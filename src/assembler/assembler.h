@@ -36,7 +36,9 @@ struct operand {
 		OPERAND_STAR_REG, // *Register. callq *%rax.
 		OPERAND_IMM_LABEL, // Immediate of the form $label+offset.
 		OPERAND_IMM_LABEL_ABSOLUTE,
-		OPERAND_MEM // Memory.
+		OPERAND_MEM, // Memory.
+
+		OPERAND_PLACEHOLDER, // Used for pattern matching.
 	} type;
 
 	union {
@@ -56,9 +58,10 @@ struct operand {
 
 		struct {
 			label_id label_;
-			//const char *label;
 			uint64_t offset;
 		} imm_label;
+
+		int placeholder_index;
 	};
 };
 
@@ -74,6 +77,7 @@ struct operand {
 #define R1_(REG) { .type = OPERAND_REG, .reg = { (REG), 0, 1 } }
 #define R1U_(REG) { .type = OPERAND_REG, .reg = { (REG), 1, 1 } }
 #define XMM_(IDX) { .type = OPERAND_SSE_REG, .sse_reg = (IDX) }
+#define PLACE_(IDX) { .type = OPERAND_PLACEHOLDER, .placeholder_index = (IDX) }
 #define IMM(X) (struct operand) IMM_(X)
 #define IMM_ABS(X) (struct operand) IMM_ABS_(X)
 #define IMML(LABEL_ID, X) (struct operand) IMML_(LABEL_ID, X)
@@ -86,6 +90,7 @@ struct operand {
 #define R1(REG) (struct operand) R1_(REG)
 #define R1U(REG) (struct operand) R1U_(REG)
 #define XMM(IDX) (struct operand) XMM_(IDX)
+#define PLACE(IDX) (struct operand) PLACE_(IDX)
 
 void asm_init_text_out(const char *path);
 void asm_init_object(struct object *object);

@@ -52,7 +52,8 @@ struct node {
 		IR_LOAD_VOLATILE,
 		IR_LOAD,
 		IR_STORE,
-		IR_CONSTANT,
+		IR_INTEGER,
+		IR_LABEL,
 		IR_CALL,
 		IR_BOOL_CAST,
 		IR_INT_CAST_ZERO,
@@ -85,6 +86,9 @@ struct node {
 		IR_DEAD,
 		IR_UNDEFINED,
 
+		IR_ASSEMBLY,
+		IR_ASSEMBLY_STATE,
+
 		IR_COUNT
 	} type;
 
@@ -93,8 +97,14 @@ struct node {
 
 	union {
 		struct {
-			struct constant constant;
-		} constant;
+			uint64_t integer;
+		} integer;
+
+		struct {
+			label_id label;
+			int64_t offset;
+			int reference;
+		} label;
 
 		struct {
 			int non_clobbered_register;
@@ -159,6 +169,11 @@ struct node {
 		struct {
 			int index;
 		} project;
+
+		struct {
+			struct asm_instruction *instructions;
+			size_t len;
+		} assembly;
 
 		struct {
 			int is_global;
@@ -281,6 +296,7 @@ struct node *ir_get_bits(struct node *field, int offset, int length, int sign_ex
 struct node *ir_get_offset(struct node *base_address, int offset);
 
 struct node *ir_constant(struct constant constant);
+struct node *ir_integer(int size, uint64_t value);
 
 void ir_call(struct node *callee, struct node *reg_state, struct node *call_stack,
 			 int non_clobbered_register,

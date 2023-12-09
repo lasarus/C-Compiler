@@ -539,6 +539,8 @@ static struct evaluated_expression evaluate_conditional(struct expr *expr) {
 
 	int is_void = type_is_simple(expr->data_type, ST_VOID);
 
+	int fits_into_register = calculate_size(expr->data_type) <= 8;
+
 	if (is_void) {
 		struct node *block_end = new_block();
 
@@ -557,6 +559,32 @@ static struct evaluated_expression evaluate_conditional(struct expr *expr) {
 
 		return (struct evaluated_expression) {
 			.type = EE_VOID
+		};
+	} else if (fits_into_register) {
+		struct node *block_true, *block_false;
+		ir_if_selection(condition_var, &block_true, &block_false);
+
+		ir_block_start(block_true);
+		struct evaluated_expression true_ = expression_evaluate(expr->args[1]);
+		struct node *true_variable = evaluated_expression_to_var(&true_);
+
+		block_true = get_current_block(); // Current block might have changed.
+
+		ir_block_start(block_false);
+		struct evaluated_expression false_ = expression_evaluate(expr->args[2]);
+		struct node *false_variable = evaluated_expression_to_var(&false_);
+
+		block_false = get_current_block();
+
+		struct node *block_end = ir_region(block_true, block_false);
+		ir_block_start(block_end);
+
+		struct node *res_variable = ir_phi(true_variable, false_variable);
+
+		return (struct evaluated_expression) {
+			.type = EE_VARIABLE,
+			.data_type = expr->data_type,
+			.variable = res_variable,
 		};
 	} else {
 		struct node *block_true, *block_false;

@@ -1114,3 +1114,14 @@ int constant_is_zero(struct constant *c) {
 
 	return 0;
 }
+
+int constant_is_one(struct constant *c) {
+	if (c->type != CONSTANT_TYPE)
+		return 0;
+
+	if (type_is_integer(c->data_type) && is_signed(c->data_type->simple)) {
+		return c->int_d == 1;
+	}
+
+	return 0;
+}

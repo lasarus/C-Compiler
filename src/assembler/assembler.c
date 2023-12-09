@@ -169,6 +169,9 @@ static void asm_emit_operand(struct operand op) {
 		}
 		asm_emit_no_newline(")");
 		break;
+
+	case OPERAND_PLACEHOLDER:
+		ICE("Operand escaped to assembler.");
 	}
 }
 
