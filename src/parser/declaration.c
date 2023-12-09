@@ -1388,19 +1388,21 @@ int parse_declaration(int external) {
 			if (!type_is_simple(constant->data_type, ST_INT))
 				ERROR(T0->pos, "Invalid _Static_assert type: %s\n", dbg_type(constant->data_type));
 
-			TEXPECT(T_COMMA);
-			if (T0->type != T_STRING)
-				ERROR(T0->pos, "Second argument to _Static_assert must be a string.");
+			if (TACCEPT(T_COMMA)) {
+				if (T0->type != T_STRING)
+					ERROR(T0->pos, "Second argument to _Static_assert must be a string.");
 
-			struct string_view msg = T0->str;
-			TNEXT();
+				struct string_view msg = T0->str;
+				TNEXT();
 
+				if (constant->uint_d)
+					ERROR(T0->pos, "Static assert failed: %.*s\n", msg.len, msg.str);
+			} else {
+				if (constant->uint_d)
+					ERROR(T0->pos, "Static assert failed.\n");
+			}
 			TEXPECT(T_RPAR);
-
 			TEXPECT(T_SEMI_COLON);
-
-			if (constant->uint_d)
-				ERROR(T0->pos, "Static assert failed: %.*s\n", msg.len, msg.str);
 			return 1;
 		}
 		return 0;
