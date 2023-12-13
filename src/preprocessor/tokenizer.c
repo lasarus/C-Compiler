@@ -9,7 +9,7 @@
 static char c;
 static struct position pos;
 static const char *str;
-static int needs_escape_sequences_removed;
+static int needs_escape_sequences_removed, needs_digit_separator_removed;
 
 enum {
 	EQ_UTF8 = 0,
@@ -103,12 +103,39 @@ static struct string_view remove_escape_sequences(const char *initial_pos) {
 	return sv_from_str(ret_str);
 }
 
+static struct string_view remove_digit_separator(const char *initial_pos) {
+	size_t len = str - initial_pos - 1;
+	char *ret_str = cc_malloc(len + 1);
+	memcpy(ret_str, initial_pos, len);
+	ret_str[len] = '\0';
+
+	char *write = ret_str;
+	// Remove '\\n':
+	for (char *read = ret_str; *read; read++) {
+		if (read[0] != '\'')
+			*write++ = *read;
+	}
+	*write = '\0';
+
+	return sv_from_str(ret_str);
+}
+
+
 static void parse_number(void) {
 	for (;;) {
 		if (c == EQ_EXPONENT) {
 			next_char();
 			if ((c == '+' || c == '-'))
 				next_char();
+		} else if (c == '\'') {
+			next_char();
+			if (c == '8' || c == EQ_DECIMAL || c == EQ_ALPHA ||
+				c == 'u' || c == 'U' || c == 'L') {
+				needs_digit_separator_removed = 1;
+				next_char();
+			} else {
+				ERROR(pos, "Expected digit or non-digit after ' separator.");
+			}
 		} else if (c == EQ_DECIMAL || c == '8' || c == EQ_ALPHA || c == 'u' ||
 		           c == 'U' || c == EQ_EXPONENT || c == 'L' || c == '.') {
 			next_char();
@@ -166,6 +193,7 @@ restart:
 
 	const char *initial_pos = str - 1;
 	needs_escape_sequences_removed = 0;
+	needs_digit_separator_removed = 0;
 
 	switch (c) {
 	case EQ_SPACE:
@@ -444,6 +472,9 @@ restart:
 
 	if (needs_escape_sequences_removed)
 		next.str = remove_escape_sequences(initial_pos);
+
+	if (needs_digit_separator_removed)
+		next.str = remove_digit_separator(initial_pos);
 
 	if (next.type == T_IDENT && *is_directive) {
 		*is_header = sv_string_cmp(next.str, "include");
