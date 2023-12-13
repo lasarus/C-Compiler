@@ -100,6 +100,16 @@ void object_write_zero(size_t size) {
 	memset(ADD_ELEMENTS(section->size, section->cap, section->data, size), 0, size);
 }
 
+void object_align(size_t alignment) {
+	struct section *section = &current_object.sections[current_section];
+	size_t remainder = section->size % alignment;
+	if (remainder == 0)
+		return;
+
+	object_write_zero(alignment - remainder);
+	section->alignment = MAX(section->alignment, alignment);
+}
+
 void object_symbol_relocate(label_id label, int64_t offset, int64_t add, enum relocation_type type) {
 	struct section *section = &current_object.sections[current_section];
 	struct object_relocation *relocation = &ADD_ELEMENT(section->relocation_size,

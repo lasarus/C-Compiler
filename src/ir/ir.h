@@ -137,7 +137,7 @@ struct node {
 		} load_base_relative_address;
 
 		struct {
-			int size, stack_location;
+			int size, stack_location, alignment;
 		} alloc;
 
 		struct {
@@ -290,7 +290,7 @@ struct node *ir_vla_alloc(struct node *length);
 struct node *ir_set_reg(struct node *variable, struct node *reg_state, int register_index, int is_sse);
 struct node *ir_get_reg(struct node *source, int size, int register_index, int is_sse);
 
-struct node *ir_allocate(int size);
+struct node *ir_allocate(int size, int alignment);
 void ir_allocate_preamble(int size);
 
 struct node *ir_allocate_call_stack(int change);

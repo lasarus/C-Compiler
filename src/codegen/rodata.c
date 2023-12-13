@@ -1,5 +1,7 @@
 #include "rodata.h"
+#include "assembler/assembler.h"
 #include "codegen.h"
+#include "types.h"
 
 #include <common.h>
 #include <arch/x64.h>
@@ -87,17 +89,19 @@ struct static_var {
 	struct type *type;
 	struct initializer init;
 	int global;
+	int alignment;
 };
 
 static struct static_var *static_vars = NULL;
 static int static_vars_size, static_vars_cap;
 
-void data_register_static_var(struct string_view label, struct type *type, struct initializer init, int global) {
+void data_register_static_var(struct string_view label, struct type *type, struct initializer init, int global, int alignment) {
 	ADD_ELEMENT(static_vars_size, static_vars_cap, static_vars) = (struct static_var) {
 		.label_ = register_label_name(label),
 		.type = type,
 		.init = init,
-		.global = global
+		.global = global,
+		.alignment = alignment,
 	};
 }
 
@@ -300,6 +304,11 @@ void codegen_initializer(struct type *type,
 static void codegen_static_var(struct static_var *static_var) {
 	(void)static_var;
 	asm_section(".data");
+
+	if (static_var->alignment)
+		asm_align(static_var->alignment);
+	else
+		asm_align(calculate_alignment(static_var->type));
 
 	if (static_var->init.type == INIT_EMPTY) {
 		asm_label(static_var->global, static_var->label_);

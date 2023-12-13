@@ -53,7 +53,7 @@ static struct evaluated_expression ms_expr_call(struct evaluated_expression *cal
 		if (fits_into_reg(return_type)) {
 			ret_in_register = 1;
 		} else {
-			registers[0] = ir_allocate(calculate_size(return_type));
+			registers[0] = ir_allocate(calculate_size(return_type), 0);
 
 			register_idx++;
 
@@ -172,7 +172,7 @@ static void ms_expr_function(struct node *func, struct type *function_type, stru
 		struct symbol_identifier *symbol = args[i];
 
 		struct type *type = symbol->parameter.type;
-		struct node *address = ir_allocate(calculate_size(type));
+		struct node *address = ir_allocate(calculate_size(type), symbol->alignment);
 
 		symbol->type = IDENT_VARIABLE;
 		symbol->variable.type = type;

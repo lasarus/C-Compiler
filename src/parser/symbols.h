@@ -42,6 +42,7 @@ struct symbol_identifier {
 
 	int is_global, is_tentative, is_register;
 	int has_definition;
+	int alignment;
 };
 
 struct type *symbols_get_identifier_type(struct symbol_identifier *symbol);

@@ -24,6 +24,11 @@ struct vla_info {
 	int alloc_preamble;
 } vla_info;
 
+struct rbp_save_info {
+	int has_saved_rsp;
+	int offset;
+} rbp_save_info;
+
 static void codegen_call(struct node *variable, int non_clobbered_register) {
 	scalar_to_reg(variable, non_clobbered_register);
 	asm_ins1("callq", R8S(non_clobbered_register));
@@ -547,6 +552,9 @@ static void codegen_block(struct node *block, struct node *func) {
 	} else if (end->type == IR_RETURN) {
 		codegen_set_reg_chain(end->arguments[1]);
 		asm_comment("Block return.");
+		if (rbp_save_info.has_saved_rsp) {
+			asm_ins2("movq", MEM(-rbp_save_info.offset, REG_RBP), R8(REG_RBP));
+		}
 		asm_ins0("leave");
 		asm_ins0("ret");
 	} else if (node_is_control(end)) {
@@ -606,11 +614,21 @@ static void codegen_function(struct node *func) {
 	perm_stack_count += vla_info.count * 8;
 	vla_info.vla_slot_buffer_offset = perm_stack_count;
 
+	size_t stack_alignment = 0;
 	// Allocate IR_ALLOC instructions.
 	for (struct node *block = func->child; block; block = block->next) {
 		for (struct node *ins = block->child; ins; ins = ins->next) {
 			if (ins->type == IR_ALLOC) {
 				perm_stack_count += ins->alloc.size;
+
+				if (ins->alloc.alignment) {
+					size_t remainder = perm_stack_count % ins->alloc.alignment;
+					if (remainder != 0)
+						perm_stack_count += ins->alloc.alignment - remainder;
+
+					stack_alignment = MAX(stack_alignment, (size_t)ins->alloc.alignment);
+				}
+
 				ins->alloc.stack_location = perm_stack_count;
 			}
 		}
@@ -639,9 +657,25 @@ static void codegen_function(struct node *func) {
 		}
 	}
 
+	rbp_save_info.has_saved_rsp = 0;
+	rbp_save_info.offset = 0;
+
+	if (stack_alignment > 16) {
+		perm_stack_count += 8;
+		rbp_save_info.offset = perm_stack_count;
+		rbp_save_info.has_saved_rsp = 1;
+	}
+
 	label_id func_label = register_label_name(sv_from_str((char *)func->function.name));
 	asm_label(func->function.is_global, func_label);
 	asm_ins1("pushq", R8(REG_RBP));
+
+	if (rbp_save_info.has_saved_rsp) {
+		asm_ins2("movq", R8(REG_RSP), R8(REG_RBP));
+		asm_ins2("andq", IMM(-stack_alignment), R8(REG_RSP));
+		asm_ins2("movq", R8(REG_RBP), MEM(-rbp_save_info.offset, REG_RSP));
+	}
+
 	asm_ins2("movq", R8(REG_RSP), R8(REG_RBP));
 
 	int stack_sub = round_up_to_nearest(perm_stack_count + max_temp_stack, 16);

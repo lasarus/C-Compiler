@@ -20,6 +20,7 @@ struct object_relocation {
 struct section {
 	char *name;
 
+	size_t alignment;
 	size_t size, cap;
 	uint8_t *data;
 
@@ -54,6 +55,7 @@ void object_write(uint8_t *data, size_t size);
 void object_write_byte(uint8_t byte);
 void object_write_quad(uint64_t quad);
 void object_write_zero(size_t size);
+void object_align(size_t alignment);
 
 void object_symbol_relocate(label_id label, int64_t offset, int64_t add, enum relocation_type type);
 void object_symbol_set(label_id label, int global);

@@ -90,7 +90,7 @@ struct function_specifiers {
 };
 
 struct alignment_specifiers {
-	int tmp;
+	int alignment;
 };
 
 struct specifiers {

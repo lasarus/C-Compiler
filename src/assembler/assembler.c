@@ -301,3 +301,11 @@ void asm_zero(int len) {
 		asm_emit_no_newline(".zero %d\n", len);
 	}
 }
+
+void asm_align(int alignment) {
+	if (!assemble_to_text) {
+		object_align(alignment);
+	} else {
+		asm_emit_no_newline(".align %d\n", alignment);
+	}
+}

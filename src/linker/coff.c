@@ -187,10 +187,27 @@ static struct coff_file *coff_from_object(struct object *object) {
 
 		coff_section->data = section->data;
 
-		uint32_t characteristics = 0;
-
 		// For now, make everything executable, writable, and readable.
-		characteristics = IMAGE_SCN_CNT_CODE | IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE | IMAGE_SCN_MEM_EXECUTE;
+		uint32_t characteristics = IMAGE_SCN_CNT_CODE | IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE | IMAGE_SCN_MEM_EXECUTE;
+
+		switch (section->alignment) {
+		case 0: break;
+		case 1: characteristics |= IMAGE_SCN_ALIGN_1BYTES; break;
+		case 2: characteristics |= IMAGE_SCN_ALIGN_2BYTES; break;
+		case 4: characteristics |= IMAGE_SCN_ALIGN_4BYTES; break;
+		case 8: characteristics |= IMAGE_SCN_ALIGN_8BYTES; break;
+		case 16: characteristics |= IMAGE_SCN_ALIGN_16BYTES; break;
+		case 32: characteristics |= IMAGE_SCN_ALIGN_32BYTES; break;
+		case 64: characteristics |= IMAGE_SCN_ALIGN_64BYTES; break;
+		case 128: characteristics |= IMAGE_SCN_ALIGN_128BYTES; break;
+		case 256: characteristics |= IMAGE_SCN_ALIGN_256BYTES; break;
+		case 512: characteristics |= IMAGE_SCN_ALIGN_512BYTES; break;
+		case 1024: characteristics |= IMAGE_SCN_ALIGN_1024BYTES; break;
+		case 2048: characteristics |= IMAGE_SCN_ALIGN_2048BYTES; break;
+		case 4096: characteristics |= IMAGE_SCN_ALIGN_4096BYTES; break;
+		case 8192: characteristics |= IMAGE_SCN_ALIGN_8192BYTES; break;
+		default: ERROR_NO_POS("Can't align coff section to %d bytes.\n", section->alignment);
+		}
 
 		coff_section->header = (struct coff_section_header) {
 			.virtual_size = section->size,

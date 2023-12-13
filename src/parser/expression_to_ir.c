@@ -61,7 +61,7 @@ struct node *evaluated_expression_to_address(struct evaluated_expression *evalua
 	switch (evaluated_expression->type) {
 	case EE_BITFIELD_POINTER: {
 		struct node *bitfield_var = evaluated_expression_to_var(evaluated_expression);
-		struct node *address = ir_allocate(calculate_size(evaluated_expression->data_type));
+		struct node *address = ir_allocate(calculate_size(evaluated_expression->data_type), 0);
 		ir_store(address, bitfield_var);
 		return address;
 	}
@@ -76,7 +76,7 @@ struct node *evaluated_expression_to_address(struct evaluated_expression *evalua
 			return ir_constant(constant);
 		} else {
 			// Allocate memory, and push the constant to it.
-			struct node *address = ir_allocate(calculate_size(evaluated_expression->data_type));
+			struct node *address = ir_allocate(calculate_size(evaluated_expression->data_type), 0);
 			ir_store(address, ir_constant(constant));
 			return address;
 		}
@@ -86,7 +86,7 @@ struct node *evaluated_expression_to_address(struct evaluated_expression *evalua
 		return evaluated_expression->pointer;
 
 	case EE_VARIABLE: {
-		struct node *address = ir_allocate(calculate_size(evaluated_expression->data_type));
+		struct node *address = ir_allocate(calculate_size(evaluated_expression->data_type), 0);
 		ir_store(address, evaluated_expression->variable);
 		return address;
 	}
@@ -420,7 +420,7 @@ static struct evaluated_expression evaluate_array_ptr_decay(struct expr *expr) {
 }
 
 static struct evaluated_expression evaluate_compound_literal(struct expr *expr) {
-	struct node *address = ir_allocate(calculate_size(expr->compound_literal.type));
+	struct node *address = ir_allocate(calculate_size(expr->compound_literal.type), 0);
 	ir_init_ptr(&expr->compound_literal.init, expr->compound_literal.type, address);
 
 	return (struct evaluated_expression) {
@@ -632,7 +632,7 @@ static struct evaluated_expression evaluate_va_start(struct expr *expr) {
 
 static struct evaluated_expression evaluate_va_arg(struct expr *expr) {
 	struct evaluated_expression v = expression_evaluate(expr->va_arg_.v);
-	struct node *result_address = ir_allocate(calculate_size(expr->data_type));
+	struct node *result_address = ir_allocate(calculate_size(expr->data_type), 0);
 	if (abi_info.va_list_is_reference) {
 		ir_va_arg(evaluated_expression_to_address(&v), result_address, expr->va_arg_.t);
 	} else {

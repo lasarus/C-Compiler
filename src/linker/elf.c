@@ -333,6 +333,7 @@ static struct elf_file *elf_from_object(struct object *object) {
 		}
 
 		elf_section->header.sh_flags = SHF_ALLOC | SHF_EXECINSTR;
+		elf_section->header.sh_addralign = section->alignment;
 	}
 
 	// Write symbol section.

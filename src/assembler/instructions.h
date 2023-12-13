@@ -108,6 +108,7 @@ struct encoding encodings[] = {
 	{"andl", 0x21, .slash_r = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_MODRM_REG, 0}}, .operand_accepts = {A_REG(4), A_REG(4)}},
 	{"andq", 0x21, .rex = 1, .rexw = 1, .slash_r = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_MODRM_REG, 0}}, .operand_accepts = {A_REG(8), A_REG(8)}},
 	{"andq", 0x83, .rex = 1, .rexw = 1, .modrm_extension = 4, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_IMM8, 0}}, .operand_accepts = {A_REG(8), A_IMM8_S}},
+	{"andq", 0x81, .rex = 1, .rexw = 1, .modrm_extension = 4, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_IMM32, 0}}, .operand_accepts = {A_REG(8), A_IMM32_S}},
 
 	{"orl", 0x09, .slash_r = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_MODRM_REG, 0}}, .operand_accepts = {A_REG(4), A_REG(4)}},
 	{"orq", 0x09, .rexw = 1, .slash_r = 1, .operand_encoding = {{OE_MODRM_RM, 0}, {OE_MODRM_REG, 0}}, .operand_accepts = {A_REG(8), A_REG(8)}},

@@ -212,7 +212,7 @@ static struct evaluated_expression sysv_expr_call(struct evaluated_expression *c
 	struct node *ret_address;
 
 	if (c.returns_address) {
-		ret_address = ir_allocate(calculate_size(return_type));
+		ret_address = ir_allocate(calculate_size(return_type), 0);
 		reg_variables[c.ret_address_index] = ret_address;
 	}
 
@@ -272,7 +272,7 @@ static struct evaluated_expression sysv_expr_call(struct evaluated_expression *c
 			.variable = variable,
 		};
 	} else if (c.ret_regs_size == 2) {
-		struct node *address = ir_allocate(calculate_size(return_type));
+		struct node *address = ir_allocate(calculate_size(return_type), 0);
 		ir_store_part_address(address, ret_reg_variables[0], 0);
 		ir_store_part_address(address, ret_reg_variables[1], 8);
 		result = (struct evaluated_expression) {
@@ -321,7 +321,7 @@ static void sysv_expr_function(struct node *func, struct type *type, struct symb
 
 		struct type *type = symbol->parameter.type;
 		int size = calculate_size(type);
-		struct node *address = ir_allocate(size);
+		struct node *address = ir_allocate(size, symbol->alignment);
 
 		symbol->type = IDENT_VARIABLE;
 		symbol->variable.type = type;

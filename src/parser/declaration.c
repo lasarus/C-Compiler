@@ -1,15 +1,18 @@
 #include "declaration.h"
+#include "arch/x64.h"
 #include "common.h"
 #include "expression.h"
 #include "ir/ir.h"
 #include "symbols.h"
 #include "expression.h"
 #include "function_parser.h"
+#include "types.h"
 
 #include <preprocessor/preprocessor.h>
 #include <abi/abi.h>
 
 #include <assert.h>
+#include <stdint.h>
 
 // Returns previous state of the bit.
 static int set_sbit(struct type_specifiers *ts, int bit_n) {
@@ -184,10 +187,24 @@ static int parse_specifier(struct type_specifiers *ts,
 		ACCEPT_INCREMENT(T_KNORETURN, fs->noreturn_n);
 	}
 	if (as) {
-		switch (T0->type) {
-		case T_KALIGNAS:
-			ERROR(T0->pos, "_Alignas not implemented");
-		default: break;
+		if (TACCEPT(T_KALIGNAS)) {
+			TEXPECT(T_LPAR);
+			struct type *type = parse_type_name();
+			struct expr *length_expr = NULL;
+			if (type)
+				length_expr = type_alignof(type);
+			else
+				length_expr = parse_expression();
+
+			length_expr = expression_cast(length_expr, type_simple(ST_ULLONG));
+
+			TEXPECT(T_RPAR);
+			struct constant *constant = expression_to_constant(length_expr);
+			if (constant->type != CONSTANT_TYPE || !type_is_simple(constant->data_type, ST_ULLONG)) {
+				ERROR(T0->pos, "_Alignas must have a constant expression or type as argument. %d", constant->data_type->type);
+			}
+			as->alignment = constant->uint_d;
+			return 1;
 		}
 	}
 	return 0;
@@ -1309,6 +1326,8 @@ static int parse_init_declarator(struct specifiers s, int external, int *was_fun
 		}
 	}
 
+	symbol->alignment = s.as.alignment;
+
 	if (!prev_definition) {
 		symbol->is_tentative = is_tentative;
 		symbol->is_global = is_global;
@@ -1338,7 +1357,7 @@ static int parse_init_declarator(struct specifiers s, int external, int *was_fun
 				symbol->label.type = type;
 			}
 
-			data_register_static_var(name, type, init, is_global);
+			data_register_static_var(name, type, init, is_global, symbol->alignment);
 		} else {
 			if (type_has_variable_size(type)) {
 				symbol->type = IDENT_VARIABLE;
@@ -1354,10 +1373,10 @@ static int parse_init_declarator(struct specifiers s, int external, int *was_fun
 				if (has_init) {
 					struct initializer init = parse_initializer(&type);
 					symbol->variable.type = type;
-					ptr = ir_allocate(calculate_size(type));
+					ptr = ir_allocate(calculate_size(type), symbol->alignment);
 					ir_init_ptr(&init, type, ptr);
 				} else {
-					ptr = ir_allocate(calculate_size(type));
+					ptr = ir_allocate(calculate_size(type), symbol->alignment);
 				}
 				symbol->variable.ptr = ptr;
 			}
@@ -1429,7 +1448,7 @@ void generate_tentative_definitions(void) {
 
 		if (symbol && symbol->is_tentative) {
 			struct type *type = symbols_get_identifier_type(symbol);
-			data_register_static_var(name, type, (struct initializer) { 0 }, symbol->is_global);
+			data_register_static_var(name, type, (struct initializer) { 0 }, symbol->is_global, symbol->alignment);
 			symbol->is_tentative = 0;
 		}
 	}

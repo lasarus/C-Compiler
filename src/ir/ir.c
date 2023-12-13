@@ -591,10 +591,11 @@ struct node *ir_get_reg(struct node *source, int size, int register_index, int i
 	return ins;
 }
 
-struct node *ir_allocate(int size) {
+struct node *ir_allocate(int size, int alignment) {
 	struct node *ins = ir_new(IR_ALLOC, 8);
 	ins->alloc.size = size;
 	ins->alloc.stack_location = -1;
+	ins->alloc.alignment = alignment;
 	return ins;
 }
 
