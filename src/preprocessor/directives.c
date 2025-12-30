@@ -37,6 +37,8 @@ static int write_dependencies = 0;
 static size_t dep_size, dep_cap;
 static char **deps;
 
+static struct token_list buffered_tokens = { 0 };
+
 void directiver_write_dependencies(void) {
 	write_dependencies = 1;
 }
@@ -87,6 +89,38 @@ void directiver_push_input(const char *path, int system) {
 			.tokens = tokenize_input(new_input.contents, new_input.path),
 			.path = strdup(new_input.path),
 		});
+}
+
+static char *get_digit_string(int num) {
+	// This is a quite ugly solution to the problem
+	// of generating strings for each number between
+	// 0 and 255.
+	static char digits[256][4];
+	sprintf(digits[num], "%d", num);
+	return digits[num];
+}
+
+static void directiver_embed(const char *path, int system) {
+	const char *parent_path = current_file ? current_file->path : ".";
+	char *opened_path = NULL;
+	FILE *fp = input_search_path(parent_path, path, system, 1, &opened_path);
+
+	if (!fp)
+		ICE("Error opening %s for embedding", opened_path);
+
+	int is_first = 1;
+	int c = fgetc(fp);
+	while (c != EOF) {
+		if (!is_first)
+			token_list_add(&buffered_tokens, (struct token) { .type = T_COMMA });
+		is_first = 0;
+
+		assert(c >= 0 && c <= 255);
+		token_list_add(&buffered_tokens, (struct token) { .type = T_NUM, .str = sv_from_str(get_digit_string(c)) });
+		c = fgetc(fp);
+	}
+
+	fclose(fp);
 }
 
 static struct token next(void);
@@ -489,6 +523,9 @@ struct token directiver_next(void) {
 	static int cond_stack_n = 0, cond_stack_cap = 0;
 	static int *cond_stack = NULL;
 
+	if (buffered_tokens.size)
+		return token_list_take_first(&buffered_tokens);
+
 	if (cond_stack_n == 0)
 		ADD_ELEMENT(cond_stack_n, cond_stack_cap, cond_stack) = 1;
 
@@ -568,6 +605,24 @@ struct token directiver_next(void) {
 				}
 
 				directiver_push_input(sv_to_str(path), system);
+			} else if (sv_string_cmp(name, "embed")) {
+				struct string_view path;
+				struct token path_tok = next();
+				int system;
+				if (path_tok.type == PP_HEADER_NAME_H ||
+					path_tok.type == PP_HEADER_NAME_Q) {
+					path = path_tok.str;
+					system = path_tok.type == PP_HEADER_NAME_H;
+					path.len -= 2;
+					path.str++;
+				} else {
+					path = get_include_path(directive, path_tok, &system);
+				}
+
+				directiver_embed(sv_to_str(path), system);
+
+				if (buffered_tokens.size)
+					return token_list_take_first(&buffered_tokens);
 			} else if (sv_string_cmp(name, "endif")) {
 				// Do nothing.
 			} else if (sv_string_cmp(name, "pragma")) {

@@ -17,3 +17,10 @@ int token_list_index_of(struct token_list *list, struct token t) {
 	return -1;
 }
 
+struct token token_list_take_first(struct token_list *list) {
+	if (!list->size)
+		ICE("Can't take first token from empty list");
+	struct token ret = list->list[0];
+	REMOVE_ELEMENT(list->size, list->list, 0);
+	return ret;
+}
